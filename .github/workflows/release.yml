@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build, Sign, Notarize & Publish Release
+    runs-on: macos-15
+    env:
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+      KEYCHAIN_PWD: ${{ secrets.KEYCHAIN_PWD || 'temp-build-keychain-pass' }}
+      DEVELOPER_ID_APP: ${{ secrets.DEVELOPER_ID_APP }}
+      DEVELOPER_ID_INSTALLER: ${{ secrets.DEVELOPER_ID_INSTALLER }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract release version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v${VERSION#v}"
+          else
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          fi
+          if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
+            VERSION="1.0.0"
+            TAG="v1.0.0"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+
+      - name: Set up Apple Developer ID Certificate (if secrets provided)
+        if: env.MACOS_CERTIFICATE != ''
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+          security import "$CERT_PATH" -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed -e 's/"//g')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          rm -f "$CERT_PATH"
+
+      - name: Configure Apple Notarization credentials
+        if: env.APPLE_APP_SPECIFIC_PASSWORD != ''
+        run: |
+          xcrun notarytool store-credentials "notarytool-profile" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID"
+
+      - name: Run 9,091-word benchmark regression suite
+        run: swift run VieLotusCLI --benchmark --threshold 95.0
+
+      - name: Build and Sign universal App bundle
+        run: |
+          ./scripts/build_imk.sh "${{ steps.version.outputs.version }}"
+
+      - name: Archive VieLotusIM.app
+        run: |
+          cd .build/dist
+          zip -r -y VieLotusIM.app.zip VieLotusIM.app
+
+      - name: Notarize and Staple VieLotusIM.app.zip (if notarytool configured)
+        if: env.APPLE_APP_SPECIFIC_PASSWORD != ''
+        run: |
+          echo "=== Submitting VieLotusIM.app.zip for Apple Notarization ==="
+          xcrun notarytool submit ".build/dist/VieLotusIM.app.zip" --keychain-profile "notarytool-profile" --wait
+          echo "=== Stapling ticket to VieLotusIM.app ==="
+          xcrun stapler staple ".build/dist/VieLotusIM.app"
+          cd .build/dist
+          rm -f VieLotusIM.app.zip
+          zip -r -y VieLotusIM.app.zip VieLotusIM.app
+
+      - name: Build, Sign, and Notarize PKG installer
+        env:
+          NOTARIZE: ${{ env.APPLE_APP_SPECIFIC_PASSWORD != '' && '1' || '0' }}
+          NOTARY_KEYCHAIN_PROFILE: "notarytool-profile"
+        run: |
+          ./scripts/build_pkg.sh "${{ steps.version.outputs.version }}"
+
+      - name: Build, Sign, and Notarize disk image (VieLotusIM.dmg)
+        env:
+          NOTARIZE: ${{ env.APPLE_APP_SPECIFIC_PASSWORD != '' && '1' || '0' }}
+          NOTARY_KEYCHAIN_PROFILE: "notarytool-profile"
+        run: |
+          ./scripts/build_dmg.sh "${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            .build/dist/VieLotusIM.dmg
+            .build/dist/VieLotusIM.pkg
+            .build/dist/VieLotusIM.app.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+      - name: Clean up temporary keychain
+        if: always()
+        run: |
+          if [ -n "$RUNNER_TEMP" ] && [ -f "$RUNNER_TEMP/build.keychain" ]; then
+            security delete-keychain "$RUNNER_TEMP/build.keychain" || true
+          fi

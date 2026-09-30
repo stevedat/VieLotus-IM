@@ -1,0 +1,63 @@
+#!/bin/bash
+set +e
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+consoleUser="$(stat -f%Su /dev/console)"
+
+if [ -z "$consoleUser" ] || [ "$consoleUser" = "root" ]; then
+    consoleUser="$(id -un)"
+fi
+if [ "$consoleUser" = "root" ]; then
+    echo "postinstall: cannot determine console user — skipping registration" >&2
+    exit 0
+fi
+uid="$(id -u "$consoleUser")"
+
+run_as_user() {
+    if [ "$(id -u)" = "0" ]; then
+        launchctl asuser "$uid" sudo -u "$consoleUser" "$@"
+    else
+        "$@"
+    fi
+}
+
+homeDir="$(dscl . -read "/Users/$consoleUser" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+[ -z "$homeDir" ] && homeDir="/Users/$consoleUser"
+target="$homeDir/Library/Input Methods"
+
+if [ "$(id -u)" = "0" ]; then
+    check="$target"
+    while [ ! -e "$check" ] && [ "$check" != "/" ]; do
+        check="$(dirname "$check")"
+    done
+    real="$(cd "$check" 2>/dev/null && pwd -P)"
+    if [ "$real" != "$check" ]; then
+        echo "postinstall: refusing — symlink escape" >&2
+        exit 1
+    fi
+fi
+
+if [ -d "/Library/Input Methods/VieLotusIM.app" ]; then
+    APP="/Library/Input Methods/VieLotusIM.app"
+elif [ -d "$target/VieLotusIM.app" ]; then
+    APP="$target/VieLotusIM.app"
+else
+    APP="/Library/Input Methods/VieLotusIM.app"
+fi
+
+# Kill old running instance
+run_as_user pkill -9 VieLotusIM 2>/dev/null
+
+# Register with LaunchServices
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+"$LSREGISTER" -f "$APP" 2>/dev/null
+
+# Register TIS input source
+if ! run_as_user "$DIR/register-source" "$APP"; then
+    echo "postinstall: register-source failed" >&2
+fi
+
+# Open Keyboard settings for user to add
+run_as_user open "x-apple.systempreferences:com.apple.Keyboard-Settings.extension" 2>/dev/null
+
+exit 0

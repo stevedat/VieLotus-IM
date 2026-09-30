@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sen Việt (VieLotusIM) — Bộ gõ tiếng Việt Native cho macOS</title>
+  <meta name="description" content="Bộ gõ tiếng Việt Native cho macOS chuẩn InputMethodKit. Không giật gạch chân CJK, không cần quyền Trợ năng (Accessibility), bảo toàn 100% lịch sử Undo Cmd+Z, bảo mật Zero-Logging.">
+  
+  <!-- Canonical & OpenGraph -->
+  <link rel="canonical" href="https://stevedat.github.io/VietLotus-IM/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://stevedat.github.io/VietLotus-IM/">
+  <meta property="og:title" content="Sen Việt (VieLotusIM) — Bộ gõ tiếng Việt Native cho macOS">
+  <meta property="og:description" content="Gõ mượt mà như bàn phím hệ thống. Không gạch chân nhấp nháy, nhận diện tiếng Anh thông minh.">
+  <meta property="og:image" content="https://stevedat.github.io/VietLotus-IM/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sen Việt (VieLotusIM) — Bộ gõ tiếng Việt Native cho macOS">
+  <meta name="twitter:description" content="Bộ gõ tiếng Việt chuẩn Apple Native, lõi Pure Swift vi giây, bảo mật riêng tư tuyệt đối.">
+  <meta name="twitter:image" content="https://stevedat.github.io/VietLotus-IM/assets/og-card.png">
+  
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+
+  <!-- Tailwind CSS CDN for high-performance self-contained rendering -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            lotus: {
+              accent: '#FF5E8E',
+              magenta: '#A828B8',
+              indigo: '#4F46E5',
+              dark: '#090714',
+              card: 'rgba(255, 255, 255, 0.03)',
+              border: 'rgba(255, 255, 255, 0.08)'
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #090714;
+      color: #F8FAFC;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .gradient-brand {
+      background: linear-gradient(135deg, #FF5E8E 0%, #A828B8 50%, #4F46E5 100%);
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #FF8EB2 0%, #C084FC 50%, #818CF8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-card:hover {
+      border-color: rgba(255, 94, 142, 0.25);
+    }
+
+    .glass-nav {
+      background: rgba(9, 7, 20, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .glow-ambient {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-lotus-accent/30 selection:text-white">
+
+  <!-- Ambient Glows -->
+  <div class="glow-ambient top-[-100px] left-1/2 -translate-x-1/2 bg-gradient-to-br from-lotus-accent via-lotus-magenta to-lotus-indigo"></div>
+  <div class="glow-ambient top-[600px] -left-48 bg-lotus-indigo opacity-10"></div>
+  <div class="glow-ambient top-[1200px] -right-48 bg-lotus-accent opacity-10"></div>
+
+  <!-- 1. Header / Navbar -->
+  <header class="sticky top-0 z-50 glass-nav transition-all duration-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <!-- Brand Logo -->
+      <a href="#" class="flex items-center gap-3 group">
+        <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-8 h-8 rounded-lg shadow-sm group-hover:scale-105 transition-transform duration-200">
+        <span class="font-semibold text-lg tracking-tight text-white flex items-center gap-2">
+          Sen Việt
+          <span class="text-[11px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/10">v1.0.0</span>
+        </span>
+      </a>
+
+      <!-- Desktop Nav -->
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+        <a href="#features" data-i18n="nav.features" class="hover:text-white transition-colors">Tính năng</a>
+        <a href="#playground" data-i18n="nav.playground" class="hover:text-white transition-colors">Thử nghiệm</a>
+        <a href="#comparison" data-i18n="nav.comparison" class="hover:text-white transition-colors">So sánh</a>
+        <a href="#architecture" data-i18n="nav.architecture" class="hover:text-white transition-colors">Kiến trúc</a>
+        <a href="#roadmap" data-i18n="nav.roadmap" class="hover:text-white transition-colors">Lộ trình</a>
+        <a href="#sponsor" data-i18n="nav.sponsor" class="hover:text-white transition-colors">Tài trợ</a>
+      </nav>
+
+      <!-- Language Toggle & Action Buttons -->
+      <div class="flex items-center gap-3">
+        <!-- Language Switcher Pill (Apple-style segmented control) -->
+        <div class="flex items-center p-0.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold" role="group" aria-label="Language selection">
+          <button id="lang-btn-vi" onclick="setLanguage('vi')" class="px-2 py-1 rounded-md transition-all text-white bg-white/15 shadow-sm">VI</button>
+          <button id="lang-btn-en" onclick="setLanguage('en')" class="px-2 py-1 rounded-md transition-all text-slate-400 hover:text-white">EN</button>
+        </div>
+
+        <a href="https://github.com/stevedat/VietLotus-IM" target="_blank" rel="noopener noreferrer" 
+           class="hidden sm:inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span data-i18n="nav.github">Star trên GitHub</span>
+        </a>
+
+        <a href="#download" class="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg gradient-brand text-white shadow-sm hover:opacity-95 active:scale-95 transition-all">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v8.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 11.586V3a1 1 0 011-1zM3 16a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
+          <span data-i18n="nav.download">Tải bản v1.0.0</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-grow z-10">
+
+    <!-- 2. Hero Section -->
+    <section class="pt-16 pb-20 px-4 sm:px-6 max-w-5xl mx-auto text-center">
+      <!-- Pill Badge -->
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 mb-8 backdrop-blur-md">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span data-i18n="hero.badge">Mã nguồn mở · Giấy phép Apache 2.0 · Không quyền Trợ năng</span>
+      </div>
+
+      <!-- Main Headline -->
+      <h1 data-i18n="hero.title" class="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white mb-6 leading-tight">
+        Sen Việt<br>
+        <span class="gradient-text">Bộ gõ tiếng Việt Native cho macOS.</span>
+      </h1>
+
+      <!-- Subtitle -->
+      <p data-i18n="hero.subtitle" class="max-w-2xl mx-auto text-base sm:text-lg text-slate-400 font-normal leading-relaxed mb-10">
+        Không gạch chân nhấp nháy CJK. Không đòi hỏi quyền Trợ năng (Accessibility). 
+        Bảo toàn 100% lịch sử Undo (<code class="text-xs bg-white/10 text-slate-200 px-1.5 py-0.5 rounded font-mono">Cmd + Z</code>) trong mọi ứng dụng.
+      </p>
+
+      <!-- Download CTA Group -->
+      <div id="download" class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+        <!-- Main DMG Download -->
+        <a id="btn-download-dmg" href="https://github.com/stevedat/VietLotus-IM/releases/latest/download/VieLotusIM.dmg" 
+           class="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl gradient-brand text-white font-medium shadow-lg shadow-lotus-accent/20 hover:opacity-95 active:scale-95 transition-all group">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 170 170"><path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.03-7.64-7.85-11.83-14.45-6.66-10.45-11.75-21.72-15.26-33.8-3.51-12.08-5.27-23.77-5.27-35.07 0-14.15 3.36-25.79 10.08-34.92 6.72-9.13 15.2-13.79 25.43-13.98 4.79 0 10.05 1.34 15.78 4.02 5.73 2.68 9.53 4.07 11.4 4.18 1.45 0 5.48-1.5 12.09-4.5 6.61-3 12.39-4.39 17.34-4.17 12.87.64 23.01 5.43 30.43 14.37-11.33 6.84-16.89 16.29-16.68 28.35.21 9.42 3.86 17.38 10.95 23.88 7.09 6.5 15.62 10.14 25.59 10.92-2.13 6.53-4.7 13.06-7.71 19.59zM119.22 31.84c0-7.39 2.62-14.38 7.86-20.97 5.24-6.59 11.74-10.42 19.5-11.49.21 1.07.32 2.03.32 2.89 0 7.39-2.73 14.48-8.19 21.28-5.46 6.8-12.06 10.6-19.8 11.4-.21-1.07-.32-2.03-.32-2.89z"/></svg>
+          <div class="text-left">
+            <div data-i18n="hero.btn_dmg_title" class="text-sm font-semibold tracking-tight">Tải về .dmg (Khuyên dùng)</div>
+            <div data-i18n="hero.btn_dmg_sub" class="text-[11px] opacity-80 font-normal">macOS 13+ · Universal (M1/M2/M3/M4 & Intel)</div>
+          </div>
+        </a>
+
+        <!-- Secondary PKG Download -->
+        <a id="btn-download-pkg" href="https://github.com/stevedat/VietLotus-IM/releases/latest/download/VieLotusIM.pkg" 
+           class="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl glass-card text-white hover:bg-white/10 active:scale-95 transition-all">
+          <svg class="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+          <div class="text-left">
+            <div data-i18n="hero.btn_pkg_title" class="text-sm font-medium">Tải về .pkg</div>
+            <div data-i18n="hero.btn_pkg_sub" class="text-[11px] text-slate-400">Gói cài đặt tự động kích hoạt</div>
+          </div>
+        </a>
+      </div>
+
+      <!-- Quick Command Snippet -->
+      <div class="max-w-lg mx-auto mb-12">
+        <div class="flex items-center justify-between px-4 py-2.5 rounded-xl bg-black/60 border border-white/10 text-xs font-mono text-slate-300 shadow-inner">
+          <div class="flex items-center gap-2 overflow-hidden mr-2">
+            <span class="text-lotus-accent select-none">$</span>
+            <span id="cmd-text" class="truncate">curl -fsSL https://raw.githubusercontent.com/stevedat/VietLotus-IM/main/scripts/install.sh | bash</span>
+          </div>
+          <button id="btn-copy-command" data-i18n-title="hero.copy_title" class="px-2.5 py-1 rounded bg-white/10 hover:bg-white/15 text-slate-200 hover:text-white transition-colors flex items-center gap-1.5 shrink-0" title="Chép lệnh">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+            <span id="copy-label" data-i18n="hero.copy_label">Chép</span>
+          </button>
+        </div>
+        <p data-i18n="hero.cmd_note" class="text-[11px] text-slate-500 mt-2">Dành cho Terminal: Tự động tải, cài đặt gói PKG và mở cài đặt bàn phím.</p>
+      </div>
+
+      <!-- 3 Verified Technical Metrics -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto mb-16">
+        <div class="glass-card rounded-2xl p-6 text-center">
+          <div data-i18n="metrics.latency_val" class="text-2xl sm:text-3xl font-extrabold text-white mb-1 tracking-tight">10 – 25 µs</div>
+          <div data-i18n="metrics.latency_desc" class="text-xs font-medium text-slate-400">Tốc độ phản hồi phím (Pure Swift Native Swift)</div>
+        </div>
+        <div class="glass-card rounded-2xl p-6 text-center">
+          <div data-i18n="metrics.accuracy_val" class="text-2xl sm:text-3xl font-extrabold text-white mb-1 tracking-tight">98.71%</div>
+          <div data-i18n="metrics.accuracy_desc" class="text-xs font-medium text-slate-400">Độ chính xác hồi quy (9,091 từ kiểm thử)</div>
+        </div>
+        <div class="glass-card rounded-2xl p-6 text-center">
+          <div data-i18n="metrics.privacy_val" class="text-2xl sm:text-3xl font-extrabold text-white mb-1 tracking-tight">0 byte log</div>
+          <div data-i18n="metrics.privacy_desc" class="text-xs font-medium text-slate-400">Cam kết Zero-Logging & Offline 100%</div>
+        </div>
+      </div>
+
+      <!-- 3-Step Setup Guide -->
+      <div class="max-w-3xl mx-auto text-left">
+        <h3 data-i18n="setup.title" class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-4 text-center">3 Bước Kích Hoạt Đơn Giản Sau Khi Cài Đặt</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="glass-card rounded-2xl p-5 border border-white/10">
+            <div class="w-7 h-7 rounded-lg bg-lotus-accent/20 text-lotus-accent text-xs font-bold flex items-center justify-center mb-3">1</div>
+            <div data-i18n="setup.step1_title" class="text-sm font-semibold text-white mb-1">Cài đặt & Đăng xuất</div>
+            <div data-i18n="setup.step1_desc" class="text-xs text-slate-400 leading-relaxed">Cài file .pkg xong, hãy <strong>Đăng xuất (Log Out)</strong> để macOS nạp bộ gõ mới.</div>
+          </div>
+          <div class="glass-card rounded-2xl p-5 border border-white/10">
+            <div class="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-300 text-xs font-bold flex items-center justify-center mb-3">2</div>
+            <div data-i18n="setup.step2_title" class="text-sm font-semibold text-white mb-1">Cài đặt Bàn phím</div>
+            <div data-i18n="setup.step2_desc" class="text-xs text-slate-400 leading-relaxed">Vào <strong>System Settings</strong> ➔ <strong>Keyboard</strong> ➔ <strong>Text Input</strong> (Edit...).</div>
+          </div>
+          <div class="glass-card rounded-2xl p-5 border border-white/10">
+            <div class="w-7 h-7 rounded-lg bg-lotus-indigo/20 text-indigo-300 text-xs font-bold flex items-center justify-center mb-3">3</div>
+            <div data-i18n="setup.step3_title" class="text-sm font-semibold text-white mb-1">Thêm VieLotusIM</div>
+            <div data-i18n="setup.step3_desc" class="text-xs text-slate-400 leading-relaxed">Nhấn <strong>+</strong>, chọn <strong>Vietnamese (Tiếng Việt)</strong> ➔ Thêm <strong>VieLotusIM</strong>.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Interactive Typing Playground -->
+    <section id="playground" class="py-16 px-4 sm:px-6 max-w-4xl mx-auto">
+      <div class="text-center mb-8">
+        <h2 data-i18n="playground.title" class="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2">Trải nghiệm gõ trực tiếp</h2>
+        <p data-i18n="playground.subtitle" class="text-sm text-slate-400">Thử gõ Telex hoặc từ tiếng Anh ngay trên trình duyệt để cảm nhận tốc độ phản hồi tức thì.</p>
+      </div>
+
+      <!-- Simulated Mac Terminal / Editor Window -->
+      <div class="glass-card rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+        <!-- Window Titlebar -->
+        <div class="bg-white/[0.04] px-4 py-3 flex items-center justify-between border-b border-white/[0.06]">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-rose-500/80 inline-block"></span>
+            <span class="w-3 h-3 rounded-full bg-amber-500/80 inline-block"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald-500/80 inline-block"></span>
+          </div>
+          <div class="text-xs font-medium text-slate-400 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span data-i18n="playground.window_title">Sen Việt Simulator — Direct Replacement Mode</span>
+          </div>
+          <div class="text-xs text-slate-500 font-mono">UTF-8</div>
+        </div>
+
+        <!-- Playground Body -->
+        <div class="p-6 bg-black/60">
+          <label for="live-input" data-i18n="playground.input_label" class="block text-xs font-mono text-slate-400 mb-2">Nhập thử văn bản bên dưới:</label>
+          <div class="relative">
+            <input type="text" id="live-input" 
+                   data-i18n-placeholder="playground.placeholder"
+                   class="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3.5 text-base sm:text-lg font-mono text-white focus:outline-none focus:border-lotus-accent/60 transition-colors placeholder:text-slate-600"
+                   placeholder="Nhập thử: vieetj nam, to6i hojc, apple, wifi...">
+            <div id="smart-badge" class="absolute right-3 top-1/2 -translate-y-1/2 hidden px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              Smart Bilingual Active
+            </div>
+          </div>
+
+          <!-- Quick Test Chips -->
+          <div class="flex flex-wrap items-center gap-2 mt-4 text-xs">
+            <span data-i18n="playground.suggestions_label" class="text-slate-500">Mẫu gợi ý:</span>
+            <button class="chip-btn px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5 transition-colors font-mono" data-text="vieetj nam">vieetj nam ➔ việt nam</button>
+            <button class="chip-btn px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5 transition-colors font-mono" data-text="apple facebook"><span data-i18n="playground.chip_apple">apple (giữ nguyên)</span></button>
+            <button class="chip-btn px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5 transition-colors font-mono" data-text="to6i hojc">to6i hojc ➔ tôi học (VNI)</button>
+            <button id="btn-clear-demo" data-i18n="playground.clear_btn" class="ml-auto text-slate-500 hover:text-slate-300 text-xs">Xóa</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings Showcase Section -->
+    <section class="py-12 px-4 sm:px-6 max-w-5xl mx-auto">
+      <div class="glass-card rounded-3xl p-8 sm:p-12 border border-white/10 flex flex-col md:flex-row items-center gap-10">
+        <div class="flex-1 text-left">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-lotus-accent mb-4">
+            <span data-i18n="settings.pill">Thiết kế Apple Minimalist</span>
+          </div>
+          <h2 data-i18n="settings.title" class="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-4">Bảng Cài đặt Tinh giản, Đậm chất macOS</h2>
+          <p data-i18n="settings.desc" class="text-sm text-slate-400 leading-relaxed mb-6">
+            Không cửa sổ cồng kềnh, không banner quảng cáo, không thiết lập thừa thãi. Cửa sổ cài đặt của Sen Việt được đóng gói dưới dạng thẻ Inspector 380×420px gọn gàng, tự động thích ứng Dark / Light mode:
+          </p>
+          <ul class="space-y-3 text-xs sm:text-sm text-slate-300">
+            <li class="flex items-start gap-2.5">
+              <svg class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="settings.bullet1"><strong>Chọn kiểu gõ tức thì:</strong> Chuyển đổi mượt mà giữa Telex và VNI.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <svg class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="settings.bullet2"><strong>Chuẩn chính tả mới:</strong> Tùy chọn bỏ dấu kiểu mới (hoà/hòa) và viết tắt vần cuối.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <svg class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              <span data-i18n="settings.bullet3"><strong>Smart Bilingual:</strong> Tự động nhận diện và khôi phục tiếng Anh khi gõ hỗn hợp.</span>
+            </li>
+          </ul>
+        </div>
+        <div class="flex-shrink-0 relative group">
+          <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-lotus-accent via-lotus-magenta to-lotus-indigo opacity-30 blur-lg group-hover:opacity-50 transition-opacity"></div>
+          <img src="assets/settings-preview.png" data-i18n-alt="settings.img_alt" alt="Giao diện Cài đặt Sen Việt" class="relative rounded-2xl shadow-2xl border border-white/15 max-w-[280px] sm:max-w-[320px]">
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Core Technical USPs -->
+    <section id="features" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 data-i18n="features.title" class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-4">4 Khác biệt Kỹ thuật Cốt lõi</h2>
+        <p data-i18n="features.subtitle" class="text-base text-slate-400 max-w-2xl mx-auto">Được thiết kế từ gốc để giải quyết triệt để các hạn chế lịch sử của bộ gõ trên macOS.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Feature 1 -->
+        <div class="glass-card rounded-2xl p-8 relative overflow-hidden group">
+          <div class="w-12 h-12 rounded-xl bg-lotus-accent/10 border border-lotus-accent/20 flex items-center justify-center text-lotus-accent mb-6 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+          </div>
+          <h3 data-i18n="features.f1_title" class="text-xl font-bold text-white mb-3">Chuẩn Apple Native — Không cần quyền Trợ năng</h3>
+          <p data-i18n="features.f1_desc" class="text-sm text-slate-400 leading-relaxed">
+            Chạy trực tiếp dưới dạng Input Method của hệ thống qua giao thức <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">InputMethodKit</code>. 
+            Tuyệt đối không can thiệp phím ngầm qua <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">CGEventTap</code>, không đòi quyền Accessibility, bảo đảm an toàn dữ liệu 100%.
+          </p>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="glass-card rounded-2xl p-8 relative overflow-hidden group">
+          <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-6 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+          </div>
+          <h3 data-i18n="features.f2_title" class="text-xl font-bold text-white mb-3">Hiển thị tức thì — Không gạch chân nhấp nháy</h3>
+          <p data-i18n="features.f2_desc" class="text-sm text-slate-400 leading-relaxed">
+            Cơ chế thay thế trực tiếp ký tự tại con trỏ (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">directReplacement</code>) loại bỏ vạch gạch chân chờ CJK khó chịu. 
+            Đặc biệt, bảo toàn nguyên vẹn 100% lịch sử Undo (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">Cmd + Z</code>) trong Word, VS Code, Notion.
+          </p>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="glass-card rounded-2xl p-8 relative overflow-hidden group">
+          <div class="w-12 h-12 rounded-xl bg-lotus-indigo/10 border border-lotus-indigo/20 flex items-center justify-center text-indigo-400 mb-6 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+            </svg>
+          </div>
+          <h3 data-i18n="features.f3_title" class="text-xl font-bold text-white mb-3">Phản hồi mượt mà trong ứng dụng Chat</h3>
+          <p data-i18n="features.f3_desc" class="text-sm text-slate-400 leading-relaxed">
+            Tối ưu hóa hành vi con trỏ khi chuyển cửa sổ giữa trình duyệt và các ứng dụng nhắn tin (Telegram, Zalo, Slack, Messenger). 
+            Nhận diện ký tự bỏ dấu ngay từ phím đầu tiên mà không cần gõ phím Space mồi.
+          </p>
+        </div>
+
+        <!-- Feature 4 -->
+        <div class="glass-card rounded-2xl p-8 relative overflow-hidden group">
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-6 group-hover:scale-110 transition-transform">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+            </svg>
+          </div>
+          <h3 data-i18n="features.f4_title" class="text-xl font-bold text-white mb-3">Nhận diện tiếng Anh thông minh (Smart Bilingual)</h3>
+          <p data-i18n="features.f4_desc" class="text-sm text-slate-400 leading-relaxed">
+            Kết hợp luật âm vị tiếng Việt, từ điển hệ thống và Apple NaturalLanguage để tự động khôi phục từ tiếng Anh khi gõ văn bản hỗn hợp (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">wifi</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">apple</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">system</code>) mà không cần chuyển bộ gõ.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Comparison Matrix -->
+    <section id="comparison" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 data-i18n="comparison.title" class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-4">Bảng So sánh Trực quan</h2>
+        <p data-i18n="comparison.subtitle" class="text-base text-slate-400 max-w-2xl mx-auto">So sánh thực tế giữa Sen Việt với bộ gõ mặc định của macOS và các công cụ dùng quyền Accessibility cũ.</p>
+      </div>
+
+      <div class="glass-card rounded-2xl overflow-x-auto border border-white/10">
+        <table class="w-full text-left text-sm text-slate-300 min-w-[640px]">
+          <thead class="bg-white/[0.04] text-xs font-semibold text-slate-200 uppercase tracking-wider border-b border-white/[0.08]">
+            <tr>
+              <th scope="col" data-i18n="comparison.col_criteria" class="py-4 px-6">Tiêu chí trải nghiệm</th>
+              <th scope="col" data-i18n="comparison.col_macos" class="py-4 px-6 text-center text-slate-400">macOS Mặc định</th>
+              <th scope="col" data-i18n="comparison.col_legacy" class="py-4 px-6 text-center text-slate-400">Bộ gõ Accessibility cũ</th>
+              <th scope="col" data-i18n="comparison.col_vielotus" class="py-4 px-6 text-center text-lotus-accent bg-lotus-accent/[0.05] border-x border-white/[0.08]">Sen Việt (VieLotusIM)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/[0.06]">
+            <tr>
+              <td data-i18n="comparison.row1_label" class="py-4 px-6 font-medium text-white">Quyền Trợ năng (Accessibility)</td>
+              <td data-i18n="comparison.row1_macos" class="py-4 px-6 text-center text-slate-400">Không cần</td>
+              <td data-i18n="comparison.row1_legacy" class="py-4 px-6 text-center text-rose-400">Bắt buộc cấp quyền</td>
+              <td data-i18n="comparison.row1_vielotus" class="py-4 px-6 text-center font-semibold text-emerald-400 bg-lotus-accent/[0.05] border-x border-white/[0.08]">Không cần quyền</td>
+            </tr>
+            <tr>
+              <td data-i18n="comparison.row2_label" class="py-4 px-6 font-medium text-white">Gạch chân nhấp nháy CJK</td>
+              <td data-i18n="comparison.row2_macos" class="py-4 px-6 text-center text-rose-400">Có (rất khó chịu)</td>
+              <td data-i18n="comparison.row2_legacy" class="py-4 px-6 text-center text-slate-400">Không</td>
+              <td data-i18n="comparison.row2_vielotus" class="py-4 px-6 text-center font-semibold text-emerald-400 bg-lotus-accent/[0.05] border-x border-white/[0.08]">Không gạch chân</td>
+            </tr>
+            <tr>
+              <td data-i18n="comparison.row3_label" class="py-4 px-6 font-medium text-white">Bảo toàn Undo (Cmd + Z)</td>
+              <td data-i18n="comparison.row3_macos" class="py-4 px-6 text-center text-emerald-400">Bảo toàn</td>
+              <td data-i18n="comparison.row3_legacy" class="py-4 px-6 text-center text-rose-400">Bị phá hỏng</td>
+              <td data-i18n="comparison.row3_vielotus" class="py-4 px-6 text-center font-semibold text-emerald-400 bg-lotus-accent/[0.05] border-x border-white/[0.08]">Giữ trọn 100%</td>
+            </tr>
+            <tr>
+              <td data-i18n="comparison.row4_label" class="py-4 px-6 font-medium text-white">Gõ trong khung Chat (Zalo, Slack)</td>
+              <td data-i18n="comparison.row4_macos" class="py-4 px-6 text-center text-amber-400">Hay dính chữ</td>
+              <td data-i18n="comparison.row4_legacy" class="py-4 px-6 text-center text-slate-400">Tương đối</td>
+              <td data-i18n="comparison.row4_vielotus" class="py-4 px-6 text-center font-semibold text-emerald-400 bg-lotus-accent/[0.05] border-x border-white/[0.08]">Tức thì từ phím đầu</td>
+            </tr>
+            <tr>
+              <td data-i18n="comparison.row5_label" class="py-4 px-6 font-medium text-white">Tự khôi phục từ tiếng Anh</td>
+              <td data-i18n="comparison.row5_macos" class="py-4 px-6 text-center text-slate-400">Không hỗ trợ</td>
+              <td data-i18n="comparison.row5_legacy" class="py-4 px-6 text-center text-slate-400">Bán tự động</td>
+              <td data-i18n="comparison.row5_vielotus" class="py-4 px-6 text-center font-semibold text-emerald-400 bg-lotus-accent/[0.05] border-x border-white/[0.08]">Smart Bilingual tự động</td>
+            </tr>
+            <tr>
+              <td data-i18n="comparison.row6_label" class="py-4 px-6 font-medium text-white">Lưu vết phím gõ (Keylogging)</td>
+              <td data-i18n="comparison.row6_macos" class="py-4 px-6 text-center text-slate-400">Telemetry hệ thống</td>
+              <td data-i18n="comparison.row6_legacy" class="py-4 px-6 text-center text-amber-400">Tùy cấu hình</td>
+              <td data-i18n="comparison.row6_vielotus" class="py-4 px-6 text-center font-semibold text-emerald-400 bg-lotus-accent/[0.05] border-x border-white/[0.08]">Zero-Logging tuyệt đối</td>
+            </tr>
+            <tr>
+              <td data-i18n="comparison.row7_label" class="py-4 px-6 font-medium text-white">Giấy phép phát hành</td>
+              <td data-i18n="comparison.row7_macos" class="py-4 px-6 text-center text-slate-400">Đóng mã độc quyền</td>
+              <td data-i18n="comparison.row7_legacy" class="py-4 px-6 text-center text-slate-400">Nhiều giấy phép</td>
+              <td data-i18n="comparison.row7_vielotus" class="py-4 px-6 text-center font-semibold text-slate-200 bg-lotus-accent/[0.05] border-x border-white/[0.08]">Apache License 2.0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 6. Architecture & Tech Specs -->
+    <section id="architecture" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 data-i18n="arch.title" class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-4">Kiến trúc Tách lớp Độc lập</h2>
+        <p data-i18n="arch.subtitle" class="text-base text-slate-400 max-w-2xl mx-auto">Tách bạch nghiêm ngặt giữa tầng giao tiếp hệ điều hành (Swift) và lõi thuật toán tiếng Việt (Pure Swift).</p>
+      </div>
+
+      <div class="glass-card rounded-2xl p-8 border border-white/10 font-mono text-xs sm:text-sm">
+        <div data-i18n="arch.comment" class="text-slate-400 mb-2">// Sơ đồ luồng xử lý phím thời gian thực</div>
+        <div class="p-4 rounded-xl bg-black/50 border border-white/5 overflow-x-auto text-slate-200 leading-relaxed">
+<pre id="arch-diagram">
+┌──────────────────────────────────────────────────────────────┐
+│  LỚP VỎ HỆ THỐNG: Swift Native (InputMethodKit)              │
+│  • IMKServer quản lý kết nối Input Source hệ thống           │
+│  • VieLotusIMController điều phối sự kiện bàn phím           │
+│  • Giao tiếp với Client qua giao thức NSTextInputClient      │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ (Direct Swift FFI - C ABI)
+┌──────────────────────────────┴───────────────────────────────┐
+│  LÕI NGỮ ÂM TIẾNG VIỆT: Pure Swift Engine (VieLotusCore)           │
+│  • Xử lý bảng mã Telex và VNI tốc độ vi giây                 │
+│  • Bỏ dấu chuẩn mới (hoà/hòa), viết tắt vần cuối             │
+│  • Bộ đệm vòng (Ring Buffer) 32 từ hỗ trợ hoàn tác nhanh     │
+│  • Nhận diện tiếng Anh thông minh (Smart Bilingual)          │
+└──────────────────────────────────────────────────────────────┘
+</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Roadmap & Community -->
+    <section id="roadmap" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 data-i18n="roadmap.title" class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-4">Lộ trình Phát triển</h2>
+        <p data-i18n="roadmap.subtitle" class="text-base text-slate-400 max-w-2xl mx-auto">Hướng tới hệ sinh thái bộ gõ tiếng Việt hoàn chỉnh cho mọi thiết bị Apple.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+        <!-- Step 1 -->
+        <div class="glass-card rounded-2xl p-6 border-emerald-500/30">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 mb-4">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span data-i18n="roadmap.step1_badge">v1.0.0 (Hiện tại)</span>
+          </div>
+          <h3 data-i18n="roadmap.step1_title" class="text-lg font-bold text-white mb-2">macOS Universal Release</h3>
+          <p data-i18n="roadmap.step1_desc" class="text-xs text-slate-400 leading-relaxed">
+            Phát hành chính thức bản cài đặt Universal (.dmg & .pkg) cho cả Apple Silicon và Intel. Đạt 98.71% pass rate.
+          </p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="glass-card rounded-2xl p-6 border-lotus-indigo/30">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-lotus-indigo/20 text-indigo-300 mb-4">
+            <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+            <span data-i18n="roadmap.step2_badge">Đang phát triển</span>
+          </div>
+          <h3 data-i18n="roadmap.step2_title" class="text-lg font-bold text-white mb-2">iOS & iPadOS Extension</h3>
+          <p data-i18n="roadmap.step2_desc" class="text-xs text-slate-400 leading-relaxed">
+            Mở rộng bàn phím cho iPhone và iPad thông qua <code class="text-slate-300">UIInputViewController</code>, tái sử dụng trọn vẹn lõi di động <code class="text-slate-300">VieLotusCore</code>.
+          </p>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="glass-card rounded-2xl p-6 border-white/10">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/10 text-slate-400 mb-4">
+            <span data-i18n="roadmap.step3_badge">Dự kiến</span>
+          </div>
+          <h3 data-i18n="roadmap.step3_title" class="text-lg font-bold text-white mb-2">Đồng bộ Bảng gõ tắt</h3>
+          <p data-i18n="roadmap.step3_desc" class="text-xs text-slate-400 leading-relaxed">
+            Hỗ trợ tùy biến bảng gõ tắt cá nhân hóa và quản lý từ vựng kỹ thuật chuyên sâu theo nhu cầu người dùng.
+          </p>
+        </div>
+      </div>
+
+      <!-- Community Callout -->
+      <div class="glass-card rounded-2xl p-8 text-center max-w-3xl mx-auto border-lotus-accent/20">
+        <h3 data-i18n="community.title" class="text-xl font-bold text-white mb-2">Dự án Vì Cộng đồng Người dùng Mac Việt Nam</h3>
+        <p data-i18n="community.desc" class="text-sm text-slate-400 mb-6 max-w-xl mx-auto">
+          Sen Việt được phát triển phi thương mại theo giấy phép Apache 2.0. Mọi đóng góp thuật toán, báo lỗi, hoặc ý tưởng cải tiến đều được chào đón nồng nhiệt.
+        </p>
+        <a href="https://github.com/stevedat/VietLotus-IM" target="_blank" rel="noopener noreferrer"
+           class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-semibold border border-white/10 transition-colors">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span data-i18n="community.btn">Tham gia Đóng góp trên GitHub</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- 8. Sponsor & Support Section -->
+        <!-- 8. Sponsor & Support Section (Compact) -->
+    <section id="sponsor" class="py-12 px-4 sm:px-6 max-w-xl mx-auto">
+      <div class="glass-card rounded-2xl p-6 sm:p-7 text-center border border-white/10 relative overflow-hidden shadow-xl">
+        <!-- Subtle top ambient glow -->
+        <div class="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-gradient-to-br from-amber-400/15 to-lotus-accent/15 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div class="flex items-center justify-center gap-3 mb-2.5">
+          <div class="w-10 h-10 rounded-xl bg-[#FFDD00]/15 border border-[#FFDD00]/30 flex items-center justify-center text-xl shrink-0 shadow-inner">
+            ☕️
+          </div>
+          <div class="text-left">
+            <h3 data-i18n="sponsor.compact_title" class="text-base font-bold text-white">Mời tác giả ly cà phê</h3>
+            <p data-i18n="sponsor.compact_sub" class="text-xs text-slate-400">Đồng hành cùng dự án bộ gõ Sen Việt</p>
+          </div>
+        </div>
+
+        <p data-i18n="sponsor.compact_desc" class="text-xs text-slate-300 leading-relaxed mb-5 max-w-md mx-auto">
+          Sen Việt là dự án mã nguồn mở phi lợi nhuận. Sự ủng hộ của bạn là động lực để tiếp tục cải tiến và phát triển bộ gõ cho hệ sinh thái Apple.
+        </p>
+
+        <!-- Compact Action Buttons -->
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <!-- Buy Me a Coffee Button -->
+          <a href="https://buymeacoffee.com/stevedat" target="_blank" rel="noopener noreferrer"
+             class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#FFDD00] text-slate-950 text-xs font-bold hover:bg-[#FFE433] active:scale-95 transition-all shadow-md shadow-[#FFDD00]/10">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M20.216 6.415l-.132-.666c-.193-.97-1.03-1.67-2.022-1.67h-11.127c-.992 0-1.83.7-2.022 1.67l-.132.666a1.996 1.996 0 0 0-.256 1.002c0 .285.061.558.17.807l1.196 6.002a3.003 3.003 0 0 0 2.943 2.414h6.346a3.003 3.003 0 0 0 2.943-2.414l1.196-6.002c.109-.249.17-.522.17-.807 0-.356-.094-.693-.256-1.002zm-1.859 1.002l-1.196 6.002a1.001 1.001 0 0 1-.981.805h-6.346a1.001 1.001 0 0 1-.981-.805l-1.196-6.002c-.035-.08-.057-.168-.057-.261 0-.323.264-.587.587-.587h11.127c.323 0 .587.264.587.587 0 .093-.022.181-.057.261zM23.001 8.5c0 2.485-2.015 4.5-4.5 4.5h-.5v-2h.5c1.379 0 2.5-1.121 2.5-2.5s-1.121-2.5-2.5-2.5h-.5v-2h.5c2.485 0 4.5 2.015 4.5 4.5z"/></svg>
+            <span data-i18n="sponsor.compact_btn_coffee">Buy Me a Coffee</span>
+          </a>
+
+          <!-- PayPal Direct Donate Button -->
+          <a href="https://www.paypal.com/ncp/payment/T2CFZT8EL6QA4" target="_blank" rel="noopener noreferrer"
+             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10 active:scale-95 transition-all">
+            <svg class="w-3.5 h-3.5 fill-[#0079C1]" viewBox="0 0 24 24"><path d="M20.067 8.478c.492.315.844.818.996 1.427.59 2.37-1.085 4.792-3.456 5.382-.284.07-.577.108-.871.113h-2.122l-.768 4.887c-.039.248-.25.433-.502.433H9.98c-.286 0-.505-.246-.462-.53l2.25-14.286c.039-.248.25-.433.502-.433h4.636c2.14 0 3.754 1.258 3.161 3.007z"/></svg>
+            <span data-i18n="sponsor.compact_btn_paypal">PayPal</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 8. Footer (Strict Compliance: YouPersona.com standard) -->
+  <footer class="border-t border-white/[0.08] py-12 px-4 sm:px-6 bg-black/40 z-10">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-slate-500">
+      <div class="flex items-center gap-3">
+        <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-6 h-6 opacity-75">
+        <div class="flex flex-col gap-0.5">
+          <span data-i18n="footer.license">Sen Việt (VieLotusIM) · Mã nguồn mở theo giấy phép <strong>Apache License 2.0</strong>.</span>
+          <span class="text-[10px] text-slate-500/80 uppercase tracking-wider font-semibold">Created by Steve Dat · Engineered & Copyrighted by Nido Holdings</span>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-6">
+        <a href="https://github.com/stevedat/VietLotus-IM" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition-colors">GitHub Repository</a>
+        <a href="https://github.com/stevedat/VietLotus-IM/releases" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases" class="hover:text-slate-300 transition-colors">Bản phát hành</a>
+        <a href="https://github.com/stevedat/VietLotus-IM/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.issues" class="hover:text-slate-300 transition-colors">Báo lỗi</a>
+        <a href="#sponsor" data-i18n="footer.sponsor" class="hover:text-slate-300 transition-colors">Tài trợ</a>
+        <a href="https://youpersona.com" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 text-slate-400 font-medium transition-colors">YouPersona.com</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Bilingual i18n Dictionary & Runtime Logic -->
+  <script>
+    const translations = {
+      vi: {
+        'page.title': 'Sen Việt (VieLotusIM) — Bộ gõ tiếng Việt Native cho macOS',
+        'page.description': 'Bộ gõ tiếng Việt Native cho macOS chuẩn InputMethodKit. Không giật gạch chân CJK, không cần quyền Trợ năng (Accessibility), bảo toàn 100% lịch sử Undo Cmd+Z, bảo mật Zero-Logging.',
+        'og.description': 'Gõ mượt mà như bàn phím hệ thống. Không gạch chân nhấp nháy, nhận diện tiếng Anh thông minh.',
+        'twitter.description': 'Bộ gõ tiếng Việt chuẩn Apple Native, lõi Pure Swift vi giây, bảo mật riêng tư tuyệt đối.',
+        'nav.features': 'Tính năng',
+        'nav.playground': 'Thử nghiệm',
+        'nav.comparison': 'So sánh',
+        'nav.architecture': 'Kiến trúc',
+        'nav.roadmap': 'Lộ trình',
+        'nav.github': 'Star trên GitHub',
+        'nav.download': 'Tải bản v1.0.0',
+        'hero.badge': 'Mã nguồn mở · Giấy phép Apache 2.0 · Không quyền Trợ năng',
+        'hero.title': 'Sen Việt<br><span class="gradient-text">Bộ gõ tiếng Việt Native cho macOS.</span>',
+        'hero.subtitle': 'Không gạch chân nhấp nháy CJK. Không đòi hỏi quyền Trợ năng (Accessibility). Bảo toàn 100% lịch sử Undo (<code class="text-xs bg-white/10 text-slate-200 px-1.5 py-0.5 rounded font-mono">Cmd + Z</code>) trong mọi ứng dụng.',
+        'hero.btn_dmg_title': 'Tải về .dmg (Khuyên dùng)',
+        'hero.btn_dmg_sub': 'macOS 13+ · Universal (M1/M2/M3/M4 & Intel)',
+        'hero.btn_pkg_title': 'Tải về .pkg',
+        'hero.btn_pkg_sub': 'Gói cài đặt tự động kích hoạt',
+        'hero.copy_title': 'Chép lệnh',
+        'hero.copy_label': 'Chép',
+        'hero.cmd_note': 'Dành cho Terminal: Tự động tải, cài đặt gói PKG và mở cài đặt bàn phím.',
+        'metrics.latency_val': '10 – 25 µs',
+        'metrics.latency_desc': 'Tốc độ phản hồi phím (Pure Swift Native Swift)',
+        'metrics.accuracy_val': '98.71%',
+        'metrics.accuracy_desc': 'Độ chính xác hồi quy (9,091 từ kiểm thử)',
+        'metrics.privacy_val': '0 byte log',
+        'metrics.privacy_desc': 'Cam kết Zero-Logging & Offline 100%',
+        'setup.title': '3 Bước Kích Hoạt Đơn Giản Sau Khi Cài Đặt',
+        'setup.step1_title': 'Cài đặt & Đăng xuất',
+        'setup.step1_desc': 'Cài file .pkg xong, hãy <strong>Đăng xuất (Log Out)</strong> để macOS nạp bộ gõ mới.',
+        'setup.step2_title': 'Cài đặt Bàn phím',
+        'setup.step2_desc': 'Vào <strong>System Settings</strong> ➔ <strong>Keyboard</strong> ➔ <strong>Text Input</strong> (Edit...).',
+        'setup.step3_title': 'Thêm VieLotusIM',
+        'setup.step3_desc': 'Nhấn <strong>+</strong>, chọn <strong>Vietnamese (Tiếng Việt)</strong> ➔ Thêm <strong>VieLotusIM</strong>.',
+        'playground.title': 'Trải nghiệm gõ trực tiếp',
+        'playground.subtitle': 'Thử gõ Telex hoặc từ tiếng Anh ngay trên trình duyệt để cảm nhận tốc độ phản hồi tức thì.',
+        'playground.window_title': 'Sen Việt Simulator — Direct Replacement Mode',
+        'playground.input_label': 'Nhập thử văn bản bên dưới:',
+        'playground.placeholder': 'Nhập thử: vieetj nam, to6i hojc, apple, wifi...',
+        'playground.suggestions_label': 'Mẫu gợi ý:',
+        'playground.chip_apple': 'apple (giữ nguyên)',
+        'playground.clear_btn': 'Xóa',
+        'settings.pill': 'Thiết kế Apple Minimalist',
+        'settings.title': 'Bảng Cài đặt Tinh giản, Đậm chất macOS',
+        'settings.desc': 'Không cửa sổ cồng kềnh, không banner quảng cáo, không thiết lập thừa thãi. Cửa sổ cài đặt của Sen Việt được đóng gói dưới dạng thẻ Inspector 380×420px gọn gàng, tự động thích ứng Dark / Light mode:',
+        'settings.bullet1': '<strong>Chọn kiểu gõ tức thì:</strong> Chuyển đổi mượt mà giữa Telex và VNI.',
+        'settings.bullet2': '<strong>Chuẩn chính tả mới:</strong> Tùy chọn bỏ dấu kiểu mới (hoà/hòa) và viết tắt vần cuối.',
+        'settings.bullet3': '<strong>Smart Bilingual:</strong> Tự động nhận diện và khôi phục tiếng Anh khi gõ hỗn hợp.',
+        'settings.img_alt': 'Giao diện Cài đặt Sen Việt',
+        'features.title': '4 Khác biệt Kỹ thuật Cốt lõi',
+        'features.subtitle': 'Được thiết kế từ gốc để giải quyết triệt để các hạn chế lịch sử của bộ gõ trên macOS.',
+        'features.f1_title': 'Chuẩn Apple Native — Không cần quyền Trợ năng',
+        'features.f1_desc': 'Chạy trực tiếp dưới dạng Input Method của hệ thống qua giao thức <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">InputMethodKit</code>. Tuyệt đối không can thiệp phím ngầm qua <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">CGEventTap</code>, không đòi quyền Accessibility, bảo đảm an toàn dữ liệu 100%.',
+        'features.f2_title': 'Hiển thị tức thì — Không gạch chân nhấp nháy',
+        'features.f2_desc': 'Cơ chế thay thế trực tiếp ký tự tại con trỏ (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">directReplacement</code>) loại bỏ vạch gạch chân chờ CJK khó chịu. Đặc biệt, bảo toàn nguyên vẹn 100% lịch sử Undo (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">Cmd + Z</code>) trong Word, VS Code, Notion.',
+        'features.f3_title': 'Phản hồi mượt mà trong ứng dụng Chat',
+        'features.f3_desc': 'Tối ưu hóa hành vi con trỏ khi chuyển cửa sổ giữa trình duyệt và các ứng dụng nhắn tin (Telegram, Zalo, Slack, Messenger). Nhận diện ký tự bỏ dấu ngay từ phím đầu tiên mà không cần gõ phím Space mồi.',
+        'features.f4_title': 'Nhận diện tiếng Anh thông minh (Smart Bilingual)',
+        'features.f4_desc': 'Kết hợp luật âm vị tiếng Việt, từ điển hệ thống và Apple NaturalLanguage để tự động khôi phục từ tiếng Anh khi gõ văn bản hỗn hợp (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">wifi</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">apple</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">system</code>) mà không cần chuyển bộ gõ.',
+        'comparison.title': 'Bảng So sánh Trực quan',
+        'comparison.subtitle': 'So sánh thực tế giữa Sen Việt với bộ gõ mặc định của macOS và các công cụ dùng quyền Accessibility cũ.',
+        'comparison.col_criteria': 'Tiêu chí trải nghiệm',
+        'comparison.col_macos': 'macOS Mặc định',
+        'comparison.col_legacy': 'Bộ gõ Accessibility cũ',
+        'comparison.col_vielotus': 'Sen Việt (VieLotusIM)',
+        'comparison.row1_label': 'Quyền Trợ năng (Accessibility)',
+        'comparison.row1_macos': 'Không cần',
+        'comparison.row1_legacy': 'Bắt buộc cấp quyền',
+        'comparison.row1_vielotus': 'Không cần quyền',
+        'comparison.row2_label': 'Gạch chân nhấp nháy CJK',
+        'comparison.row2_macos': 'Có (rất khó chịu)',
+        'comparison.row2_legacy': 'Không',
+        'comparison.row2_vielotus': 'Không gạch chân',
+        'comparison.row3_label': 'Bảo toàn Undo (Cmd + Z)',
+        'comparison.row3_macos': 'Bảo toàn',
+        'comparison.row3_legacy': 'Bị phá hỏng',
+        'comparison.row3_vielotus': 'Giữ trọn 100%',
+        'comparison.row4_label': 'Gõ trong khung Chat (Zalo, Slack)',
+        'comparison.row4_macos': 'Hay dính chữ',
+        'comparison.row4_legacy': 'Tương đối',
+        'comparison.row4_vielotus': 'Tức thì từ phím đầu',
+        'comparison.row5_label': 'Tự khôi phục từ tiếng Anh',
+        'comparison.row5_macos': 'Không hỗ trợ',
+        'comparison.row5_legacy': 'Bán tự động',
+        'comparison.row5_vielotus': 'Smart Bilingual tự động',
+        'comparison.row6_label': 'Lưu vết phím gõ (Keylogging)',
+        'comparison.row6_macos': 'Telemetry hệ thống',
+        'comparison.row6_legacy': 'Tùy cấu hình',
+        'comparison.row6_vielotus': 'Zero-Logging tuyệt đối',
+        'comparison.row7_label': 'Giấy phép phát hành',
+        'comparison.row7_macos': 'Đóng mã độc quyền',
+        'comparison.row7_legacy': 'Nhiều giấy phép',
+        'comparison.row7_vielotus': 'Apache License 2.0',
+        'arch.title': 'Kiến trúc Tách lớp Độc lập',
+        'arch.subtitle': 'Tách bạch nghiêm ngặt giữa tầng giao tiếp hệ điều hành (Swift) và lõi thuật toán tiếng Việt (Pure Swift).',
+        'arch.comment': '// Sơ đồ luồng xử lý phím thời gian thực',
+        'arch.diagram': `┌──────────────────────────────────────────────────────────────┐
+│  LỚP VỎ HỆ THỐNG: Swift Native (InputMethodKit)              │
+│  • IMKServer quản lý kết nối Input Source hệ thống           │
+│  • VieLotusIMController điều phối sự kiện bàn phím           │
+│  • Giao tiếp với Client qua giao thức NSTextInputClient      │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ (Direct Swift FFI - C ABI)
+┌──────────────────────────────┴───────────────────────────────┐
+│  LÕI NGỮ ÂM TIẾNG VIỆT: Pure Swift Engine (VieLotusCore)           │
+│  • Xử lý bảng mã Telex và VNI tốc độ vi giây                 │
+│  • Bỏ dấu chuẩn mới (hoà/hòa), viết tắt vần cuối             │
+│  • Bộ đệm vòng (Ring Buffer) 32 từ hỗ trợ hoàn tác nhanh     │
+│  • Nhận diện tiếng Anh thông minh (Smart Bilingual)          │
+└──────────────────────────────────────────────────────────────┘`,
+        'roadmap.title': 'Lộ trình Phát triển',
+        'roadmap.subtitle': 'Hướng tới hệ sinh thái bộ gõ tiếng Việt hoàn chỉnh cho mọi thiết bị Apple.',
+        'roadmap.step1_badge': 'v1.0.0 (Hiện tại)',
+        'roadmap.step1_title': 'macOS Universal Release',
+        'roadmap.step1_desc': 'Phát hành chính thức bản cài đặt Universal (.dmg & .pkg) cho cả Apple Silicon và Intel. Đạt 98.71% pass rate.',
+        'roadmap.step2_badge': 'Đang phát triển',
+        'roadmap.step2_title': 'iOS & iPadOS Extension',
+        'roadmap.step2_desc': 'Mở rộng bàn phím cho iPhone và iPad thông qua <code class="text-slate-300">UIInputViewController</code>, tái sử dụng trọn vẹn lõi di động <code class="text-slate-300">VieLotusCore</code>.',
+        'roadmap.step3_badge': 'Dự kiến',
+        'roadmap.step3_title': 'Đồng bộ Bảng gõ tắt',
+        'roadmap.step3_desc': 'Hỗ trợ tùy biến bảng gõ tắt cá nhân hóa và quản lý từ vựng kỹ thuật chuyên sâu theo nhu cầu người dùng.',
+        'nav.sponsor': 'Tài trợ',
+        'community.title': 'Dự án Vì Cộng đồng Người dùng Mac Việt Nam',
+        'community.desc': 'Sen Việt được phát triển phi thương mại theo giấy phép Apache 2.0. Mọi đóng góp thuật toán, báo lỗi, hoặc ý tưởng cải tiến đều được chào đón nồng nhiệt.',
+        'community.btn': 'Tham gia Đóng góp trên GitHub',
+        'sponsor.compact_title': 'Mời tác giả ly cà phê',
+        'sponsor.compact_sub': 'Đồng hành cùng dự án bộ gõ Sen Việt',
+        'sponsor.compact_desc': 'Sen Việt là dự án mã nguồn mở phi lợi nhuận. Sự ủng hộ của bạn là động lực để tiếp tục cải tiến và phát triển bộ gõ cho hệ sinh thái Apple.',
+        'sponsor.compact_btn_coffee': 'Buy Me a Coffee',
+        'sponsor.compact_btn_paypal': 'PayPal',
+        'footer.sponsor': 'Tài trợ',
+        'footer.license': 'Sen Việt (VieLotusIM) · Mã nguồn mở theo giấy phép <strong>Apache License 2.0</strong>.',
+        'footer.releases': 'Bản phát hành',
+        'footer.issues': 'Báo lỗi'
+      },
+      en: {
+        'page.title': 'Sen Việt (VieLotusIM) — Native macOS Vietnamese Input Method',
+        'page.description': 'Native Vietnamese Input Method for macOS built on InputMethodKit. Zero CJK underline flicker, zero Accessibility permissions required, 100% Undo Cmd+Z preservation, strict Zero-Logging privacy.',
+        'og.description': 'Type naturally like a system keyboard. Zero underline flicker, preserved Undo Cmd+Z, microsecond Pure Swift engine, and strict Zero-Logging privacy.',
+        'twitter.description': 'Apple Native Vietnamese Input Method with microsecond Pure Swift core and zero Accessibility permissions.',
+        'nav.features': 'Features',
+        'nav.playground': 'Playground',
+        'nav.comparison': 'Comparison',
+        'nav.architecture': 'Architecture',
+        'nav.roadmap': 'Roadmap',
+        'nav.github': 'Star on GitHub',
+        'nav.download': 'Download v1.0.0',
+        'hero.badge': 'Open Source · Apache 2.0 License · Zero Accessibility Permissions',
+        'hero.title': 'Sen Việt<br><span class="gradient-text">Native Vietnamese Input Method for macOS.</span>',
+        'hero.subtitle': 'Zero CJK underline flicker. Zero Accessibility permissions required. Flawlessly preserves 100% Undo history (<code class="text-xs bg-white/10 text-slate-200 px-1.5 py-0.5 rounded font-mono">Cmd + Z</code>) across all applications.',
+        'hero.btn_dmg_title': 'Download .dmg (Recommended)',
+        'hero.btn_dmg_sub': 'macOS 13+ · Universal (M1/M2/M3/M4 & Intel)',
+        'hero.btn_pkg_title': 'Download .pkg',
+        'hero.btn_pkg_sub': 'Auto-registering installer package',
+        'hero.copy_title': 'Copy command',
+        'hero.copy_label': 'Copy',
+        'hero.cmd_note': 'For Terminal: Automatically downloads, installs PKG package and launches keyboard settings.',
+        'metrics.latency_val': '10 – 25 µs',
+        'metrics.latency_desc': 'Keystroke response latency (Pure Swift Native Swift)',
+        'metrics.accuracy_val': '98.71%',
+        'metrics.accuracy_desc': 'Regression accuracy (9,091 benchmark words)',
+        'metrics.privacy_val': '0 bytes logged',
+        'metrics.privacy_desc': 'Strict Zero-Logging commitment & 100% Offline',
+        'setup.title': '3 Simple Steps to Activate After Installation',
+        'setup.step1_title': 'Install & Log Out',
+        'setup.step1_desc': 'Run the .pkg installer, then <strong>Log Out</strong> once so macOS loads the new input method.',
+        'setup.step2_title': 'Keyboard Settings',
+        'setup.step2_desc': 'Go to <strong>System Settings</strong> ➔ <strong>Keyboard</strong> ➔ <strong>Text Input</strong> (click Edit...).',
+        'setup.step3_title': 'Add VieLotusIM',
+        'setup.step3_desc': 'Click <strong>+</strong>, choose <strong>Vietnamese</strong> ➔ Select <strong>VieLotusIM</strong>.',
+        'playground.title': 'Live Typing Playground',
+        'playground.subtitle': 'Try typing Telex or English words right in your browser to experience instant keystroke response.',
+        'playground.window_title': 'Sen Việt Simulator — Direct Replacement Mode',
+        'playground.input_label': 'Type sample text below:',
+        'playground.placeholder': 'Try typing: vieetj nam, to6i hojc, apple, wifi...',
+        'playground.suggestions_label': 'Presets:',
+        'playground.chip_apple': 'apple (kept as-is)',
+        'playground.clear_btn': 'Clear',
+        'settings.pill': 'Apple Minimalist Design',
+        'settings.title': 'Minimalist Settings, Pure macOS Feel',
+        'settings.desc': 'No bloated windows, no ad banners, no redundant clutter. Sen Việt\'s preferences are packaged in a compact 380×420px Inspector card that seamlessly adapts to Dark / Light mode:',
+        'settings.bullet1': '<strong>Instant input method switching:</strong> Seamlessly switch between Telex and VNI.',
+        'settings.bullet2': '<strong>Modern orthography:</strong> Toggle modern tone placement (hoà/hòa) and consonant shortcuts.',
+        'settings.bullet3': '<strong>Smart Bilingual:</strong> Automatically detects and restores English vocabulary in mixed sentences.',
+        'settings.img_alt': 'Sen Việt Settings Interface',
+        'features.title': '4 Core Architectural Distinctions',
+        'features.subtitle': 'Architected from the ground up to eliminate historical limitations of macOS input methods.',
+        'features.f1_title': 'Apple Native Protocol — Zero Accessibility Permissions',
+        'features.f1_desc': 'Operates directly as a system Input Method via <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">InputMethodKit</code>. Never intercepts keystrokes via low-level <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">CGEventTap</code> and requires zero Accessibility privileges, ensuring 100% data safety.',
+        'features.f2_title': 'Direct Replacement — Zero Underline Flicker',
+        'features.f2_desc': 'Direct in-place character replacement (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">directReplacement</code>) eliminates jarring CJK marked-text underlines. Flawlessly preserves 100% Undo history (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">Cmd + Z</code>) in Word, VS Code, Notion, and across macOS.',
+        'features.f3_title': 'Responsive Chat & Messaging Integration',
+        'features.f3_desc': 'Optimized cursor and focus behavior when switching between browser tabs and messaging apps (Telegram, Zalo, Slack, Messenger). Accents register on the first keystroke without requiring a dummy space key.',
+        'features.f4_title': 'Intelligent English Detection (Smart Bilingual)',
+        'features.f4_desc': 'Combines Vietnamese phonotactic rules, system dictionaries, and Apple\'s NaturalLanguage framework to restore English words automatically in mixed text (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">wifi</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">apple</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">system</code>) without toggling input modes.',
+        'comparison.title': 'Feature Comparison Matrix',
+        'comparison.subtitle': 'A side-by-side comparison between Sen Việt, the macOS default input method, and legacy Accessibility-based tools.',
+        'comparison.col_criteria': 'Criteria',
+        'comparison.col_macos': 'macOS Default',
+        'comparison.col_legacy': 'Legacy Accessibility Tools',
+        'comparison.col_vielotus': 'Sen Việt (VieLotusIM)',
+        'comparison.row1_label': 'Accessibility Permissions',
+        'comparison.row1_macos': 'Not needed',
+        'comparison.row1_legacy': 'Required',
+        'comparison.row1_vielotus': 'Zero permissions',
+        'comparison.row2_label': 'CJK Underline Flicker',
+        'comparison.row2_macos': 'Yes (flickering)',
+        'comparison.row2_legacy': 'No',
+        'comparison.row2_vielotus': 'Zero flicker',
+        'comparison.row3_label': 'Preserves Undo (Cmd + Z)',
+        'comparison.row3_macos': 'Preserved',
+        'comparison.row3_legacy': 'Broken / Corrupted',
+        'comparison.row3_vielotus': '100% Preserved',
+        'comparison.row4_label': 'Typing in Chat (Zalo, Slack)',
+        'comparison.row4_macos': 'Sticky letters',
+        'comparison.row4_legacy': 'Fair',
+        'comparison.row4_vielotus': 'Instant from 1st key',
+        'comparison.row5_label': 'Auto-restore English words',
+        'comparison.row5_macos': 'Not supported',
+        'comparison.row5_legacy': 'Semi-automatic',
+        'comparison.row5_vielotus': 'Automatic Smart Bilingual',
+        'comparison.row6_label': 'Keystroke Logging (Keylogging)',
+        'comparison.row6_macos': 'System telemetry',
+        'comparison.row6_legacy': 'Config dependent',
+        'comparison.row6_vielotus': 'Strict Zero-Logging',
+        'comparison.row7_label': 'Open Source License',
+        'comparison.row7_macos': 'Proprietary closed',
+        'comparison.row7_legacy': 'Various',
+        'comparison.row7_vielotus': 'Apache License 2.0',
+        'arch.title': 'Decoupled Layer Architecture',
+        'arch.subtitle': 'Strict separation between the OS platform layer (Swift) and the high-performance Vietnamese phonetics engine (Pure Swift).',
+        'arch.comment': '// Real-time Keystroke Processing Pipeline',
+        'arch.diagram': `┌──────────────────────────────────────────────────────────────┐
+│  SYSTEM WRAPPER: Swift Native (InputMethodKit)               │
+│  • IMKServer manages system Input Source lifecycle           │
+│  • VieLotusIMController coordinates raw keyboard events      │
+│  • Communicates with applications via NSTextInputClient      │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ (Direct Swift FFI - C ABI)
+┌──────────────────────────────┴───────────────────────────────┐
+│  VIETNAMESE PHONETICS CORE: Pure Swift Engine (VieLotusCore)       │
+│  • Microsecond-latency Telex & VNI transformation engine     │
+│  • Modern tone placement (hoà/hòa) & consonant shortcuts     │
+│  • 32-word Ring Buffer for instantaneous undo restore        │
+│  • Intelligent English word detection (Smart Bilingual)      │
+└──────────────────────────────────────────────────────────────┘`,
+        'roadmap.title': 'Development Roadmap',
+        'roadmap.subtitle': 'Building a complete, native Vietnamese input ecosystem across all Apple devices.',
+        'roadmap.step1_badge': 'v1.0.0 (Current)',
+        'roadmap.step1_title': 'macOS Universal Release',
+        'roadmap.step1_desc': 'Official universal release (.dmg & .pkg) for Apple Silicon and Intel Macs. 98.71% benchmark pass rate.',
+        'roadmap.step2_badge': 'In Active Development',
+        'roadmap.step2_title': 'iOS & iPadOS Extension',
+        'roadmap.step2_desc': 'Expanding to iPhone and iPad via <code class="text-slate-300">UIInputViewController</code>, reusing the portable <code class="text-slate-300">VieLotusCore</code> domain engine.',
+        'roadmap.step3_badge': 'Planned',
+        'roadmap.step3_title': 'Cloud Macro & Shorthand Sync',
+        'roadmap.step3_desc': 'Customizable typing shortcuts, technical glossaries, and lightweight cross-device sync.',
+        'nav.sponsor': 'Sponsor',
+        'community.title': 'Built for the Apple Community in Vietnam',
+        'community.desc': 'Sen Việt is a non-commercial open-source project licensed under Apache 2.0. All algorithmic contributions, issue reports, and community ideas are warmly welcome.',
+        'community.btn': 'Contribute on GitHub',
+        'sponsor.compact_title': 'Buy the author a coffee',
+        'sponsor.compact_sub': 'Support the open-source Sen Việt project',
+        'sponsor.compact_desc': 'Sen Việt is a free, non-commercial open-source project. Your contribution fuels continuous improvements and Apple ecosystem support.',
+        'sponsor.compact_btn_coffee': 'Buy Me a Coffee',
+        'sponsor.compact_btn_paypal': 'PayPal',
+        'footer.sponsor': 'Sponsor',
+        'footer.license': 'Sen Việt (VieLotusIM) · Open source under <strong>Apache License 2.0</strong>.',
+        'footer.releases': 'Releases',
+        'footer.issues': 'Issues'
+      }
+    };
+
+    let currentLang = 'vi';
+
+    function setLanguage(lang) {
+      if (!translations[lang]) return;
+      currentLang = lang;
+      localStorage.setItem('vielotus_lang', lang);
+      document.documentElement.lang = lang;
+
+      // Update navbar toggle buttons
+      const btnVi = document.getElementById('lang-btn-vi');
+      const btnEn = document.getElementById('lang-btn-en');
+      if (btnVi && btnEn) {
+        if (lang === 'vi') {
+          btnVi.className = 'px-2 py-1 rounded-md transition-all text-white bg-white/15 shadow-sm';
+          btnEn.className = 'px-2 py-1 rounded-md transition-all text-slate-400 hover:text-white';
+        } else {
+          btnEn.className = 'px-2 py-1 rounded-md transition-all text-white bg-white/15 shadow-sm';
+          btnVi.className = 'px-2 py-1 rounded-md transition-all text-slate-400 hover:text-white';
+        }
+      }
+
+      // Update title & meta tags
+      document.title = translations[lang]['page.title'];
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) metaDesc.setAttribute('content', translations[lang]['page.description']);
+      
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute('content', translations[lang]['page.title']);
+      const ogDesc = document.querySelector('meta[property="og:description"]');
+      if (ogDesc) ogDesc.setAttribute('content', translations[lang]['og.description']);
+
+      const twTitle = document.querySelector('meta[name="twitter:title"]');
+      if (twTitle) twTitle.setAttribute('content', translations[lang]['page.title']);
+      const twDesc = document.querySelector('meta[name="twitter:description"]');
+      if (twDesc) twDesc.setAttribute('content', translations[lang]['twitter.description']);
+
+      // Update text in elements with data-i18n
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang][key] !== undefined) {
+          el.innerHTML = translations[lang][key];
+        }
+      });
+
+      // Update placeholders
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (translations[lang][key] !== undefined) {
+          el.setAttribute('placeholder', translations[lang][key]);
+        }
+      });
+
+      // Update tooltips
+      document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        if (translations[lang][key] !== undefined) {
+          el.setAttribute('title', translations[lang][key]);
+        }
+      });
+
+      // Update alt texts
+      document.querySelectorAll('[data-i18n-alt]').forEach(el => {
+        const key = el.getAttribute('data-i18n-alt');
+        if (translations[lang][key] !== undefined) {
+          el.setAttribute('alt', translations[lang][key]);
+        }
+      });
+
+      // Update Architecture ASCII diagram
+      const archEl = document.getElementById('arch-diagram');
+      if (archEl && translations[lang]['arch.diagram']) {
+        archEl.textContent = translations[lang]['arch.diagram'];
+      }
+    }
+
+    // Initialize Language from localStorage or Browser Preference
+    (function initLanguage() {
+      const savedLang = localStorage.getItem('vielotus_lang');
+      if (savedLang && (savedLang === 'vi' || savedLang === 'en')) {
+        setLanguage(savedLang);
+      } else {
+        const browserLang = (navigator.language || navigator.userLanguage || 'vi').toLowerCase();
+        if (browserLang.startsWith('en')) {
+          setLanguage('en');
+        } else {
+          setLanguage('vi');
+        }
+      }
+    })();
+
+    // 1. Live Release Asset Links from GitHub API
+    async function updateReleaseLinks() {
+      try {
+        const response = await fetch('https://api.github.com/repos/stevedat/VietLotus-IM/releases/latest');
+        if (response.ok) {
+          const data = await response.json();
+          const dmgAsset = data.assets.find(a => a.name.endsWith('.dmg'));
+          const pkgAsset = data.assets.find(a => a.name.endsWith('.pkg'));
+          
+          if (dmgAsset) {
+            document.getElementById('btn-download-dmg').href = dmgAsset.browser_download_url;
+          }
+          if (pkgAsset) {
+            document.getElementById('btn-download-pkg').href = pkgAsset.browser_download_url;
+          }
+        }
+      } catch (err) {
+        // Fallback URLs already point to latest release directly
+      }
+    }
+    updateReleaseLinks();
+
+    // 2. Interactive Typing Simulator
+    const liveInput = document.getElementById('live-input');
+    const smartBadge = document.getElementById('smart-badge');
+    const clearBtn = document.getElementById('btn-clear-demo');
+    const chipBtns = document.querySelectorAll('.chip-btn');
+    const copyCmdBtn = document.getElementById('btn-copy-command');
+
+    const simpleTelexDict = {
+      'vieetj': 'việt',
+      'nam': 'nam',
+      'to6i': 'tôi',
+      'hojc': 'học',
+      'ddang': 'đang',
+      'ddas': 'đá',
+      'tieengs': 'tiếng',
+      'troowif': 'trời',
+      'dduwowngf': 'đường'
+    };
+
+    const englishWords = new Set(['apple', 'facebook', 'wifi', 'system', 'google', 'test', 'macos']);
+
+    liveInput.addEventListener('input', (e) => {
+      const val = e.target.value.toLowerCase();
+      let hasEnglish = false;
+      const tokens = val.split(' ');
+      
+      const converted = tokens.map(token => {
+        if (englishWords.has(token)) {
+          hasEnglish = true;
+          return token;
+        }
+        return simpleTelexDict[token] || token;
+      }).join(' ');
+
+      if (hasEnglish) {
+        smartBadge.classList.remove('hidden');
+      } else {
+        smartBadge.classList.add('hidden');
+      }
+    });
+
+    chipBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = btn.getAttribute('data-text');
+        liveInput.value = text;
+        liveInput.dispatchEvent(new Event('input'));
+        
+        // Auto convert after 300ms to simulate typing effect
+        setTimeout(() => {
+          const tokens = text.split(' ');
+          liveInput.value = tokens.map(t => {
+            if (englishWords.has(t)) return t;
+            return simpleTelexDict[t] || t;
+          }).join(' ');
+          liveInput.dispatchEvent(new Event('input'));
+        }, 300);
+      });
+    });
+
+    clearBtn.addEventListener('click', () => {
+      liveInput.value = '';
+      smartBadge.classList.add('hidden');
+      liveInput.focus();
+    });
+
+    // 3. Copy Terminal Command
+    copyCmdBtn.addEventListener('click', () => {
+      const cmdText = document.getElementById('cmd-text')?.innerText || 'curl -fsSL https://raw.githubusercontent.com/stevedat/VietLotus-IM/main/scripts/install.sh | bash';
+      navigator.clipboard.writeText(cmdText).then(() => {
+        const copyLabel = document.getElementById('copy-label');
+        const copiedText = currentLang === 'en' ? 'Copied!' : 'Đã chép!';
+        const defaultText = currentLang === 'en' ? 'Copy' : 'Chép';
+        if (copyLabel) copyLabel.innerText = copiedText;
+        setTimeout(() => {
+          if (copyLabel) copyLabel.innerText = defaultText;
+        }, 2000);
+      });
+    });
+  </script>
+</body>
+</html>

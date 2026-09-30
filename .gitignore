@@ -1,0 +1,46 @@
+# macOS System & Metadata
+.DS_Store
+._*
+
+# Swift & Xcode Build Artifacts
+.build/
+.swiftpm/
+xcuserdata/
+DerivedData/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Distribution & Binaries
+.build/dist/
+VieLotusIM.app/
+*.pkg
+*.dmg
+*.zip
+
+# Sensitive Keys, Secrets & Certificates
+.env
+.env.*
+!.env.example
+*.p12
+*.keychain
+*.keychain-db
+*.cer
+*.mobileprovision
+
+# Dependencies & Sub-builds
+Frameworks/*.a
+Frameworks/*.h
+Frameworks/Sparkle.framework/
+Frameworks/sparkle-bin/
+references/
+
+# IDE & Editor Rules
+.idea/
+.vscode/
+.venv/
+.windsurfrules
+*.cursorrules
+
+# Diagnostic & Temp Files
+*.log
+*.tmp
