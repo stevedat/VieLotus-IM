@@ -12,6 +12,7 @@ final class VieLotusIMController: IMKInputController {
     private static let caretDisarmed: Int = -999
     private var editCaretBack: Int = VieLotusIMController.caretDisarmed
     private var lastClientIdentifier: String?
+    private var virtualCursorLocation: Int = NSNotFound
     private var backtickDepth: Int = 0  // 0=normal, odd=inside backticks
 
     private func isCursorMovementKey(_ keyCode: UInt16) -> Bool {
@@ -75,6 +76,7 @@ final class VieLotusIMController: IMKInputController {
             composingWord = ""
             rawWord = ""
             editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
             backtickDepth = 0
         }
         lastClientIdentifier = clientUID
@@ -121,6 +123,7 @@ final class VieLotusIMController: IMKInputController {
             composingWord = ""
             rawWord = ""
             editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
             if presentationMode == .markedText {
                 client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
             }
@@ -178,6 +181,7 @@ final class VieLotusIMController: IMKInputController {
                 composingWord = ""
                 rawWord = ""
                 editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
                 if presentationMode == .markedText {
                     client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
                 }
@@ -216,6 +220,7 @@ final class VieLotusIMController: IMKInputController {
                                 composingWord = ""
                                 rawWord = ""
                                 editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
                             }
                             return true
                         }
@@ -225,11 +230,15 @@ final class VieLotusIMController: IMKInputController {
                             let maxBackspaces = composingWord.utf16.count
                             let safeBackspaces = min(diff.backspaces, maxBackspaces)
 
-                            let range = (selection.location != NSNotFound && selection.location >= safeBackspaces)
-                                ? NSRange(location: selection.location - safeBackspaces, length: safeBackspaces)
+                            let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : selection.location
+                            let range = (currentLoc != NSNotFound && currentLoc >= safeBackspaces)
+                                ? NSRange(location: currentLoc - safeBackspaces, length: safeBackspaces)
                                 : NSRange(location: NSNotFound, length: 0)
 
                             client.insertText(diff.suffix, replacementRange: range)
+                            if virtualCursorLocation != NSNotFound {
+                                virtualCursorLocation = currentLoc - safeBackspaces + diff.suffix.utf16.count
+                            }
                             composingWord = engine.currentOutput()
 
                             if composingWord.isEmpty {
@@ -270,6 +279,7 @@ final class VieLotusIMController: IMKInputController {
             composingWord = ""
             rawWord = ""
             editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
             backtickDepth = 0
             return false
         }
@@ -403,6 +413,7 @@ final class VieLotusIMController: IMKInputController {
             composingWord = ""
             rawWord = ""
             editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
         }
 
         let wasComposing = engine.isComposing
@@ -431,6 +442,9 @@ final class VieLotusIMController: IMKInputController {
         if let diff = feedResult {
             if !wasComposing {
                 rawWord = String(firstChar)
+                if virtualCursorLocation == NSNotFound && selection.location != NSNotFound {
+                    virtualCursorLocation = selection.location
+                }
             } else {
                 rawWord.append(firstChar)
             }
@@ -514,7 +528,7 @@ final class VieLotusIMController: IMKInputController {
             // Restore English rawWord
             if presentationMode == .directReplacement {
                 let wordLen = output.utf16.count
-                let currentLoc = selection.location != NSNotFound ? selection.location : client.selectedRange().location
+                let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : (selection.location != NSNotFound ? selection.location : client.selectedRange().location)
                 let range: NSRange
                 if currentLoc != NSNotFound && currentLoc >= wordLen {
                     range = NSRange(location: currentLoc - wordLen, length: wordLen)
@@ -522,6 +536,7 @@ final class VieLotusIMController: IMKInputController {
                     range = NSRange(location: NSNotFound, length: 0)
                 }
                 client.insertText(rawWord, replacementRange: range)
+                virtualCursorLocation = NSNotFound
             } else if presentationMode == .terminalDirect {
                 let deleteChars = String(repeating: "\u{7F}", count: output.count)
                 client.insertText(deleteChars + rawWord, replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -533,6 +548,7 @@ final class VieLotusIMController: IMKInputController {
             composingWord = ""
             rawWord = ""
             editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
         } else {
             // Commit Vietnamese word
             if presentationMode == .markedText {
@@ -689,6 +705,7 @@ final class VieLotusIMController: IMKInputController {
         composingWord = ""
         rawWord = ""
         editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
     }
 
     override func activateServer(_ sender: Any!) {
@@ -698,6 +715,7 @@ final class VieLotusIMController: IMKInputController {
         composingWord = ""
         rawWord = ""
         editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
         NSLog("VieLotusIMController: Activated")
     }
 
@@ -706,6 +724,7 @@ final class VieLotusIMController: IMKInputController {
         composingWord = ""
         rawWord = ""
         editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
         super.deactivateServer(sender)
         NSLog("VieLotusIMController: Deactivated")
     }
