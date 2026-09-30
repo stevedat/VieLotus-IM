@@ -273,7 +273,7 @@ final class VieLotusIMController: IMKInputController {
         // Handle Return / Enter (keyCode 36, 76)
         if keyCode == 36 || keyCode == 76 {
             if engine.isComposing {
-                commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
             }
             engine.reset()
             composingWord = ""
@@ -288,7 +288,7 @@ final class VieLotusIMController: IMKInputController {
         if keyCode == 48 {
             editCaretBack = Self.caretDisarmed
             if engine.isComposing {
-                commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
             }
             return false
         }
@@ -296,7 +296,7 @@ final class VieLotusIMController: IMKInputController {
         // Handle Plain Arrow & Navigation keys (no modifiers)
         if keyCode == 123 { // Plain Left arrow
             if engine.isComposing {
-                commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
             }
             if editCaretBack >= -1 {
                 editCaretBack += 1
@@ -305,7 +305,7 @@ final class VieLotusIMController: IMKInputController {
         }
         if keyCode == 124 { // Plain Right arrow
             if engine.isComposing {
-                commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
             }
             if editCaretBack >= 0 {
                 editCaretBack -= 1
@@ -320,7 +320,7 @@ final class VieLotusIMController: IMKInputController {
                 if presentationMode == .terminalDirect {
                     cancelComposition()
                 } else {
-                    commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                    _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
                 }
             }
             return false
@@ -331,7 +331,7 @@ final class VieLotusIMController: IMKInputController {
                 if presentationMode == .terminalDirect {
                     cancelComposition()
                 } else {
-                    commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                    _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
                 }
             }
             return false
@@ -355,7 +355,7 @@ final class VieLotusIMController: IMKInputController {
                 if presentationMode == .terminalDirect {
                     cancelComposition()
                 } else {
-                    commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                    _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
                 }
             }
             return false
@@ -370,7 +370,7 @@ final class VieLotusIMController: IMKInputController {
         if Preferences.shared.developerMode {
             if firstChar == "`" {
                 if engine.isComposing {
-                    commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                    _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
                 }
                 backtickDepth += 1
                 return false
@@ -388,10 +388,14 @@ final class VieLotusIMController: IMKInputController {
         // Space key: commit current word and pass through
         if firstChar == " " {
             DiagnosticLogger.shared.log("SPACE | app: \(bundleID ?? "?") | wasComposing: \(engine.isComposing) | output: '\(engine.currentOutput())'")
+            var restored = false
             if engine.isComposing {
-                commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: " ")
             }
             editCaretBack = -1
+            if restored && presentationMode == .directReplacement {
+                return true
+            }
             return false
         }
 
@@ -399,8 +403,12 @@ final class VieLotusIMController: IMKInputController {
         if firstChar.isPunctuation || firstChar.isSymbol {
             DiagnosticLogger.shared.log("PUNCT '\(firstChar)' | app: \(bundleID ?? "?") | wasComposing: \(engine.isComposing)")
             editCaretBack = Self.caretDisarmed
+            var restored = false
             if engine.isComposing {
-                commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: firstChar)
+            }
+            if restored && presentationMode == .directReplacement {
+                return true
             }
             return false
         }
@@ -513,19 +521,20 @@ final class VieLotusIMController: IMKInputController {
             }
         } else {
             if wasComposing {
-                commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
             }
             return false
         }
     }
 
-    private func commitWordWithBilingualCheck(client: IMKTextInput, presentationMode: PresentationMode, selection: NSRange) {
-        guard engine.isComposing else { return }
+    private func commitWordWithBilingualCheck(client: IMKTextInput, presentationMode: PresentationMode, selection: NSRange, suffixChar: Character? = nil) -> Bool {
+        guard engine.isComposing else { return false }
 
         let output = engine.currentOutput()
 
         if Preferences.shared.smartBilingual && !rawWord.isEmpty && shouldRestoreEnglish(raw: rawWord, rendered: output, context: recentContext) {
             // Restore English rawWord
+            let appendStr = suffixChar != nil ? String(suffixChar!) : ""
             if presentationMode == .directReplacement {
                 let wordLen = output.utf16.count
                 let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : (selection.location != NSNotFound ? selection.location : client.selectedRange().location)
@@ -535,13 +544,13 @@ final class VieLotusIMController: IMKInputController {
                 } else {
                     range = NSRange(location: NSNotFound, length: 0)
                 }
-                client.insertText(rawWord, replacementRange: range)
+                client.insertText(rawWord + appendStr, replacementRange: range)
                 virtualCursorLocation = NSNotFound
             } else if presentationMode == .terminalDirect {
                 let deleteChars = String(repeating: "\u{7F}", count: output.count)
-                client.insertText(deleteChars + rawWord, replacementRange: NSRange(location: NSNotFound, length: 0))
+                client.insertText(deleteChars + rawWord + appendStr, replacementRange: NSRange(location: NSNotFound, length: 0))
             } else {
-                client.insertText(rawWord, replacementRange: NSRange(location: NSNotFound, length: 0))
+                client.insertText(rawWord + appendStr, replacementRange: NSRange(location: NSNotFound, length: 0))
             }
             appendContext(rawWord)
             engine.reset()
@@ -549,6 +558,7 @@ final class VieLotusIMController: IMKInputController {
             rawWord = ""
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
+            return true
         } else {
             // Commit Vietnamese word
             if presentationMode == .markedText {
@@ -559,6 +569,7 @@ final class VieLotusIMController: IMKInputController {
             composingWord = ""
             rawWord = ""
             editCaretBack = Self.caretDisarmed
+            return false
         }
     }
 
@@ -695,7 +706,7 @@ final class VieLotusIMController: IMKInputController {
             let appCategory = ClientAdapter.classify(bundleIdentifier: bundleID)
             let mode = ClientAdapter.presentationMode(for: appCategory, bundleIdentifier: bundleID, terminalDirectEnabled: Preferences.shared.terminalDirectMode)
             let selection = client.selectedRange()
-            commitWordWithBilingualCheck(client: client, presentationMode: mode, selection: selection)
+            _ = commitWordWithBilingualCheck(client: client, presentationMode: mode, selection: selection)
         }
         editCaretBack = Self.caretDisarmed
     }
@@ -742,7 +753,7 @@ final class VieLotusIMController: IMKInputController {
                     cancelComposition()
                 } else {
                     let selection = client.selectedRange()
-                    commitWordWithBilingualCheck(client: client, presentationMode: mode, selection: selection)
+                    _ = commitWordWithBilingualCheck(client: client, presentationMode: mode, selection: selection)
                 }
             } else {
                 cancelComposition()
