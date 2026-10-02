@@ -6,7 +6,7 @@ public struct SmartBilingualDetector {
     private static let sharedRecognizer = NLLanguageRecognizer()
     private static var spellCheckCache: [String: Bool] = [:]
     private static var cacheKeys: [String] = []
-    private static let maxCacheEntries = 1024
+    private static let maxCacheEntries = 65536
 
     public static var spellCheckerProvider: SpellCheckerProvider?
 
@@ -24,7 +24,13 @@ public struct SmartBilingualDetector {
         "linux", "ubuntu", "macos", "ios", "android", "windows"
     ]
 
-    private static let commonEnglishWords: Set<String> = ["user", "users"]
+    private static let commonEnglishWords: Set<String> = [
+        "user", "users", "are", "your", "more", "we", "bios", "yarn",
+        "aes", "await", "nginx", "nostr", "sizeof", "uefi", "where",
+        "there", "their", "share", "before", "sure", "were", "care", "core",
+        "search", "our", "use", "year", "years", "next", "music", "post",
+        "very", "does", "research", "life", "way"
+    ]
 
     private static let nonVietnameseLetters: Set<Character> = ["f", "j", "w", "z"]
 
