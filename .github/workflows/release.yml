@@ -73,6 +73,9 @@ jobs:
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID"
 
+      - name: Run Unit Tests
+        run: swift test
+
       - name: Run 9,091-word benchmark regression suite
         run: swift run VieLotusCLI --benchmark --threshold 98.0
 

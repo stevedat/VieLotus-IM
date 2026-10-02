@@ -70,6 +70,64 @@ private struct TraceTarget: Identifiable, Hashable {
     }
 }
 
+private struct IMEInfo {
+    let isRunning: Bool
+    let version: String
+    let buildNumber: String
+    let gitCommit: String
+    let bundlePath: String
+
+    static func current() -> IMEInfo {
+        let bundleID = "org.vielotus.inputmethod.VieLotusIM"
+        
+        // 1. Check if the IME process is currently active in memory
+        if let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
+            let bundleURL = runningApp.bundleURL
+            let bundle = bundleURL != nil ? Bundle(url: bundleURL!) : nil
+            let version = bundle?.infoDictionary?["CFBundleShortVersionString"] as? String ?? "không xác định"
+            let build = bundle?.infoDictionary?["CFBundleVersion"] as? String ?? "không xác định"
+            let commit = bundle?.infoDictionary?["GitCommitHash"] as? String ?? "không xác định"
+            let path = bundleURL?.path ?? "tiến trình đang chạy"
+            return IMEInfo(
+                isRunning: true,
+                version: version,
+                buildNumber: build,
+                gitCommit: commit,
+                bundlePath: path
+            )
+        }
+
+        // 2. Fallback: inspect installed app bundle on disk
+        let candidateURLs = [
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Input Methods/VieLotusIM.app"),
+            URL(fileURLWithPath: "/Library/Input Methods/VieLotusIM.app")
+        ]
+
+        for url in candidateURLs {
+            if FileManager.default.fileExists(atPath: url.path), let bundle = Bundle(url: url) {
+                let version = bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "không xác định"
+                let build = bundle.infoDictionary?["CFBundleVersion"] as? String ?? "không xác định"
+                let commit = bundle.infoDictionary?["GitCommitHash"] as? String ?? "không xác định"
+                return IMEInfo(
+                    isRunning: false,
+                    version: version,
+                    buildNumber: build,
+                    gitCommit: commit,
+                    bundlePath: url.path
+                )
+            }
+        }
+
+        return IMEInfo(
+            isRunning: false,
+            version: "chưa cài đặt hoặc không xác định",
+            buildNumber: "N/A",
+            gitCommit: "N/A",
+            bundlePath: "N/A"
+        )
+    }
+}
+
 @MainActor
 private final class LabStore: ObservableObject {
     private static let externalTraceSamplingInterval: TimeInterval = 0.04
@@ -503,7 +561,7 @@ private final class LabStore: ObservableObject {
         return NSRange(location: range.location, length: range.length)
     }
 
-    private func computeTextDelta(from before: String, to after: String) -> (summary: String, removed: String, inserted: String) {
+    private func computeTextDelta(from before: String, to after: String) -> (summary: String, removedCount: Int, inserted: String) {
         let old = before as NSString
         let new = after as NSString
         var prefix = 0
@@ -511,16 +569,10 @@ private final class LabStore: ObservableObject {
         var suffix = 0
         while suffix < old.length - prefix, suffix < new.length - prefix,
               old.character(at: old.length - suffix - 1) == new.character(at: new.length - suffix - 1) { suffix += 1 }
-        let removed = old.substring(with: NSRange(location: prefix, length: old.length - prefix - suffix))
+        let removedLength = old.length - prefix - suffix
         let inserted = new.substring(with: NSRange(location: prefix, length: new.length - prefix - suffix))
-        return ("deltaAt=\(prefix) removed=\(removed.debugDescription) inserted=\(inserted.debugDescription)", removed, inserted)
-    }
-
-    func captureHost(_ action: String, text: String, selection: NSRange) {
-        liveText = text
-        liveSelection = "\(selection.location),\(selection.length)"
-        append(TraceEntry(source: "Host", action: action, key: "", raw: "", composing: "",
-                          committed: text, detail: "selection=\(selection.location),\(selection.length)"))
+        let removedSummary = removedLength > 0 ? "removed=\(removedLength) chars" : "removed=0"
+        return ("deltaAt=\(prefix) \(removedSummary) inserted=\(inserted.debugDescription)", removedLength, inserted)
     }
 
     func export() {
@@ -540,15 +592,25 @@ private final class LabStore: ObservableObject {
                 targetCat = "Môi trường giả lập"
             }
 
+            let ime = IMEInfo.current()
             var packet: [String: Any] = [
-                "diagnostic_schema_version": "1.0",
+                "diagnostic_schema_version": "1.1",
                 "created_at": TraceEntry.timestamp(),
                 "environment": [
                     "os_version": AppInfo.osVersionString,
                     "architecture": AppInfo.architecture,
-                    "app_version": AppInfo.appVersion,
-                    "build_number": AppInfo.buildNumber,
-                    "git_commit": AppInfo.gitCommit
+                    "lab_app": [
+                        "version": AppInfo.appVersion,
+                        "build_number": AppInfo.buildNumber,
+                        "git_commit": AppInfo.gitCommit
+                    ],
+                    "input_method": [
+                        "is_running": ime.isRunning,
+                        "version": ime.version,
+                        "build_number": ime.buildNumber,
+                        "git_commit": ime.gitCommit,
+                        "bundle_path": ime.bundlePath
+                    ]
                 ],
                 "ime_settings": [
                     "input_method": method == .telex ? "telex" : "vni",
@@ -574,9 +636,7 @@ private final class LabStore: ObservableObject {
             let eventData = try entries.map { entry -> [String: Any] in
                 var dict = (try JSONSerialization.jsonObject(with: try encoder.encode(entry)) as? [String: Any]) ?? [:]
                 dict.removeValue(forKey: "documentBefore")
-                if entry.action == "AX focused control snapshot" {
-                    dict["documentText"] = "[REDACTED]"
-                }
+                dict.removeValue(forKey: "documentText")
                 return dict
             }
             packet["events"] = eventData
@@ -605,6 +665,12 @@ private final class LabStore: ObservableObject {
         report += "#### 1. Môi trường kiểm thử (Environment)\n"
         report += "- **macOS:** \(AppInfo.osVersionString) (\(AppInfo.architecture))\n"
         report += "- **VieLotus Lab:** v\(AppInfo.appVersion) (Build \(AppInfo.buildNumber) · `\(AppInfo.gitCommit)`)\n"
+        let ime = IMEInfo.current()
+        let imeStatus = ime.isRunning ? "Đang chạy" : "Không tìm thấy tiến trình"
+        report += "- **Bộ gõ VieLotusIM:** v\(ime.version) (Build \(ime.buildNumber) · `\(ime.gitCommit)`) — \(imeStatus)\n"
+        if ime.bundlePath != "N/A" {
+            report += "- **Vị trí bộ gõ:** `\(ime.bundlePath)`\n"
+        }
         report += "- **Thời gian:** \(TraceEntry.timestamp())\n\n"
 
         report += "#### 2. Cấu hình bộ gõ (IME Settings)\n"
@@ -697,14 +763,14 @@ private final class LabStore: ObservableObject {
 
     func displayDetail(_ entry: TraceEntry) -> String {
         if entry.action == "AX focused control snapshot" {
-            return "Starting text: «\(entry.documentText.isEmpty ? "(empty)" : entry.documentText)» · \(entry.detail)"
+            return entry.detail
         }
         if entry.action == "AX value/selection changed" {
-            let delta = computeTextDelta(from: entry.documentBefore, to: entry.documentText)
-            let change = delta.removed.isEmpty ? "Added «\(delta.inserted)»" :
-                delta.inserted.isEmpty ? "Deleted «\(delta.removed)»" :
-                "Replaced «\(delta.removed)» with «\(delta.inserted)»"
-            return "\(change) · now «\(entry.documentText)» · caret \(entry.selectionLocation)"
+            if !entry.insertedText.isEmpty {
+                return "Inserted «\(entry.insertedText)» · caret \(entry.selectionLocation) · \(entry.detail)"
+            } else {
+                return "Caret \(entry.selectionLocation) · \(entry.detail)"
+            }
         }
         return entry.detail
     }
@@ -827,9 +893,10 @@ private final class LabStore: ObservableObject {
         var suffix = 0
         while suffix < old.length - prefix, suffix < new.length - prefix,
               old.character(at: old.length - suffix - 1) == new.character(at: new.length - suffix - 1) { suffix += 1 }
-        let removed = old.substring(with: NSRange(location: prefix, length: old.length - prefix - suffix))
+        let removedLength = old.length - prefix - suffix
         let inserted = new.substring(with: NSRange(location: prefix, length: new.length - prefix - suffix))
-        return "at=\(prefix) removed=\(removed.debugDescription) inserted=\(inserted.debugDescription)"
+        let removedSummary = removedLength > 0 ? "removed=\(removedLength) chars" : "removed=0"
+        return "at=\(prefix) \(removedSummary) inserted=\(inserted.debugDescription)"
     }
 
     private func describe(_ action: SessionAction) -> String {
