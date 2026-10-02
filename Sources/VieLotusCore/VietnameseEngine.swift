@@ -183,12 +183,7 @@ public final class VietnameseEngine: @unchecked Sendable {
             return String(chars)
         }
         
-        // Non-Vietnamese double consonants (cannot exist in Vietnamese syllables)
-        // Note: 'ff', 'rr', 'ss', 'xx', 'jj' are omitted because they are valid Telex tone cancellations!
-        let invalidDoubleConsonants = ["bb", "cc", "ll", "mm", "nn", "pp", "tt", "vv"]
-        if invalidDoubleConsonants.contains(where: { lowerRaw.contains($0) }) {
-            return String(chars)
-        }
+        
         
         if inputMethod == .vni {
             return transformVNI(chars)
@@ -211,6 +206,12 @@ public final class VietnameseEngine: @unchecked Sendable {
             
             // Check 'dd' / 'DD' -> 'đ' / 'Đ'
             if lower == "d" {
+                if i + 2 < chars.count && Character(chars[i + 1].lowercased()) == "d" && Character(chars[i + 2].lowercased()) == "d" {
+                    result.append(ch)
+                    result.append(chars[i + 1])
+                    i += 3
+                    continue
+                }
                 if i + 1 < chars.count && Character(chars[i + 1].lowercased()) == "d" {
                     let isUpper = ch.isUppercase
                     result.append(isUpper ? "Đ" : "đ")
@@ -239,6 +240,12 @@ public final class VietnameseEngine: @unchecked Sendable {
             }
             
             // Check vowel doubling (aa -> â, ee -> ê, oo -> ô)
+            if (lower == "a" || lower == "e" || lower == "o") && i + 2 < chars.count && Character(chars[i + 1].lowercased()) == lower && Character(chars[i + 2].lowercased()) == lower {
+                result.append(ch)
+                result.append(chars[i + 1])
+                i += 3
+                continue
+            }
             if (lower == "a" || lower == "e" || lower == "o") && i + 1 < chars.count && Character(chars[i + 1].lowercased()) == lower {
                 let transformed: Character
                 switch lower {
@@ -256,6 +263,13 @@ public final class VietnameseEngine: @unchecked Sendable {
             if lower == "w" {
                 // If w is at the beginning of the word
                 if result.isEmpty {
+                    if i + 2 < chars.count && Character(chars[i + 1].lowercased()) == "w" && Character(chars[i + 2].lowercased()) == "w" {
+                        result.append(ch)
+                        result.append(chars[i + 1])
+                        result.append(chars[i + 2])
+                        i += 3
+                        continue
+                    }
                     if i + 1 < chars.count && Character(chars[i + 1].lowercased()) == "w" {
                         // Second 'w' cancels horn modifier -> 'w'
                         result.append(ch)
@@ -267,6 +281,11 @@ public final class VietnameseEngine: @unchecked Sendable {
                     continue
                 }
                 
+                if i + 1 < chars.count && Character(chars[i + 1].lowercased()) == "w" {
+                    result.append(ch)
+                    i += 2
+                    continue
+                }
                 // Free-tone W modifier: scan backwards to find the last applicable vowel
                 var transformed = false
                 for idx in stride(from: result.count - 1, through: 0, by: -1) {
@@ -345,8 +364,10 @@ public final class VietnameseEngine: @unchecked Sendable {
                 
                 if let t = toneFound {
                     if tone == t && t != .none {
-                        // Double tone key cancels tone and restores raw characters (e.g. toanss -> toans, tieengss -> tieengs)
-                        return String(chars.dropLast())
+                        // Double tone key cancels tone
+                        tone = .none
+                        // The previous tone character was eaten, so we restore it by appending it now.
+                        result.append(ch)
                     } else {
                         tone = t
                     }

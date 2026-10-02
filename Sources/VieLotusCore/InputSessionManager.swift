@@ -83,7 +83,7 @@ public class InputSessionManager {
 
     /// Evaluates if a character acts as a word boundary
     public func isWordBoundary(_ char: Character) -> Bool {
-        return char == " " || char.isPunctuation || char.isSymbol || char.isNewline
+        return char == " " || char.isNewline || ",;:!?\"'()[]{}<>".contains(char)
     }
 
     /// Processes a single character feed
@@ -117,9 +117,7 @@ public class InputSessionManager {
             } else if !wasComposing {
                 rawWord = String(char)
             } else {
-                if diff.backspaces > 0 || diff.suffix.count > 0 {
-                    rawWord.append(char)
-                }
+                rawWord.append(char)
             }
             
             // Visual logic with UTF-16 code unit precision
@@ -193,7 +191,7 @@ public class InputSessionManager {
         let finalWord: String
         var isOverride = false
         
-        if smartBilingualEnabled && !rawWord.isEmpty && rawWord.count >= 2 && rawWord.lowercased() != output.lowercased() && SmartBilingualDetector.isEnglishWord(raw: rawWord, context: context) {
+        if smartBilingualEnabled && !rawWord.isEmpty && rawWord.count >= 2 && rawWord.lowercased() != output.lowercased() && SmartBilingualDetector.isEnglishWord(raw: rawWord, context: context, rendered: output) {
             finalWord = rawWord
             isOverride = true
         } else {

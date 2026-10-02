@@ -74,7 +74,7 @@ jobs:
             --team-id "$APPLE_TEAM_ID"
 
       - name: Run 9,091-word benchmark regression suite
-        run: swift run VieLotusCLI --benchmark --threshold 95.0
+        run: swift run VieLotusCLI --benchmark --threshold 98.0
 
       - name: Build and Sign universal App bundle
         run: |
@@ -110,13 +110,54 @@ jobs:
         run: |
           ./scripts/build_dmg.sh "${{ steps.version.outputs.version }}"
 
+      - name: Build, Sign, and Notarize VieLotusLab disk image (VieLotusLab.dmg)
+        env:
+          NOTARIZE: ${{ env.APPLE_APP_SPECIFIC_PASSWORD != '' && '1' || '0' }}
+          NOTARY_KEYCHAIN_PROFILE: "notarytool-profile"
+        run: |
+          ./scripts/build_lab_dmg.sh "${{ steps.version.outputs.version }}"
+
+      - name: Generate Checksums & Verify Release Deliverables
+        run: |
+          cd .build/dist
+          shasum -a 256 VieLotusIM.dmg VieLotusIM.pkg VieLotusIM.app.zip VieLotusLab.dmg > checksums.sha256
+          echo "=== SHA-256 Checksums ==="
+          cat checksums.sha256
+          cd ../..
+          ./scripts/verify_release_assets.sh .build/dist
+
+      - name: Prepare Release Notes Body
+        run: |
+          COMMIT_SHA=$(git rev-parse HEAD)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          cat > release_notes.md <<EOF
+          ### 🌸 Sen Việt (VieLotusIM) & VieLotus Lab v${{ steps.version.outputs.version }}
+
+          - **Git Commit:** [\`${SHORT_SHA}\`](https://github.com/${{ github.repository }}/commit/${COMMIT_SHA})
+          - **Build Timestamp:** ${BUILD_DATE}
+          - **Apple Notarization:** Official Developer ID (\`9QCZ4F58K8\`)
+
+          #### 🔐 Bảng mã băm SHA-256 đối chiếu (Integrity Checksums)
+          \`\`\`text
+          $(cat .build/dist/checksums.sha256)
+          \`\`\`
+
+          #### 📥 Hướng dẫn cài đặt & Kiểm thử
+          Xem chi tiết tại [Hướng dẫn Kiểm thử Lab & Báo cáo Lỗi](https://github.com/${{ github.repository }}/blob/main/docs/LAB_TESTING_GUIDE.md).
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release_notes.md
           files: |
             .build/dist/VieLotusIM.dmg
             .build/dist/VieLotusIM.pkg
             .build/dist/VieLotusIM.app.zip
+            .build/dist/VieLotusLab.dmg
+            .build/dist/checksums.sha256
           draft: false
           prerelease: false
           generate_release_notes: true

@@ -16,10 +16,11 @@ VieLotusIM uses an adaptive presentation engine to provide flicker-free direct r
 
 | Application Category | Sample Applications | Presentation Mode | Behavior & Verification |
 | :--- | :--- | :--- | :--- |
-| **Standard AppKit / Cocoa** | TextEdit, Notes, Pages, Keynote, Numbers, Mail, Safari | Direct Replacement | Zero flicker, no CJK underline, native Cmd+Z undo stack. |
-| **Chromium & Electron** | Google Chrome, Microsoft Edge, Brave, VS Code, Slack, Discord, Notion, Obsidian | Direct Replacement | Instant syllable replacement via `replacementRange`. |
-| **Microsoft Office** | Word, Excel, PowerPoint | Direct Replacement | Clean typing buffer with accurate caret position. |
-| **Terminal Emulators** | Terminal.app, iTerm2, Ghostty, Alacritty, Kitty, WezTerm | Marked Text | Standard marked buffer inline composition. |
+| **Standard AppKit / Cocoa** | TextEdit, Notes, Pages, Keynote, Numbers, Mail, Safari, Xcode, Finder | Direct Replacement | Zero flicker, no CJK underline, native Cmd+Z undo stack. |
+| **Chromium, Electron & CEF** | Chrome, Edge, Arc, Brave, Opera, Vivaldi, VS Code, Cursor, Windsurf, Slack, Discord, Notion, Obsidian, Logseq, Linear, Figma, Zalo, Telegram, Teams, WhatsApp, Signal, Codex, Antigravity | Direct Replacement | Instant syllable replacement via `replacementRange` and synchronized virtual cursor. |
+| **Microsoft Office** | Word, Excel, PowerPoint, OneNote, Outlook | Direct Replacement | Clean typing buffer with accurate caret position. |
+| **Terminal Emulators** | Terminal.app, iTerm2, Warp, Ghostty, Alacritty, Kitty, WezTerm, Rio, Hyper, Tabby | Terminal Direct / Marked Text | Real-time direct PTY emission (`\u{7F}`) or marked text inline composition. |
+| **Quick Search & Overlays** | Spotlight, Raycast, Alfred, LaunchBar, Sol | Direct Replacement | Instant focus response without selection locking. |
 | **Dynamic Fallback (Special Controls)** | Legacy webviews, custom canvas inputs returning `NSNotFound` | Dynamic `markedText` Fallback | Automatically activates inline marked text if client does not expose caret range. |
 
 ---
@@ -51,3 +52,9 @@ Test typing in the following 5 representative application environments:
 3. **VS Code**: Type comments `// Kiểm tra bộ gõ tiếng Việt` $\rightarrow$ Confirm auto-closing bracket and caret position stability.
 4. **Terminal / iTerm2**: Type `echo "Chào Việt Nam"` $\rightarrow$ Confirm marked text inline composition.
 5. **Context Switch Test**: Highlight a word with mouse/keyboard and start typing $\rightarrow$ Confirm active selection is overwritten immediately without ghost characters.
+
+---
+
+## 4. External Tester & Diagnostic Guide
+
+For a complete step-by-step walkthrough covering automated diagnostic packet exports, trace event collection with `VieLotusLab`, and clean uninstallation, see [docs/LAB_TESTING_GUIDE.md](LAB_TESTING_GUIDE.md).

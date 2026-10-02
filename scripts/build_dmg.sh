@@ -52,18 +52,18 @@ if [ -f "Sources/VieLotusIM/Resources/AppIcon.icns" ]; then
 fi
 
 # 2. Codesign the DMG if Developer ID is available
+if [ -z "$DEVELOPER_ID_APP" ]; then
+    DEVELOPER_ID_APP="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/"Developer ID Application:/ { print $2; exit }')"
+fi
+
 if [ -n "$DEVELOPER_ID_APP" ]; then
     echo "=== Signing VieLotusIM.dmg with ($DEVELOPER_ID_APP) ==="
     codesign --force --sign "$DEVELOPER_ID_APP" --timestamp "$OUT"
 fi
 
 # 3. Notarize and Staple DMG if requested
-if [ "$NOTARIZE" = "1" ]; then
-    PROFILE="${NOTARY_KEYCHAIN_PROFILE:-notarytool-profile}"
-    echo "=== Submitting VieLotusIM.dmg for Apple Notarization ==="
-    xcrun notarytool submit "$OUT" --keychain-profile "$PROFILE" --wait
-    echo "=== Stapling ticket to VieLotusIM.dmg ==="
-    xcrun stapler staple "$OUT"
+if [ "${NOTARIZE:-0}" = "1" ]; then
+    bash "$SCRIPT_DIR/scripts/notarize_artifact.sh" "$OUT"
 fi
 
 echo "✅ Disk image ready at: $OUT (v${VERSION})"

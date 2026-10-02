@@ -36,6 +36,14 @@ cp "$RES/postinstall" "$WORK/scripts/postinstall"
 chmod +x "$WORK/scripts/postinstall"
 chmod +x "$WORK/scripts/register-source"
 
+# Auto-detect Developer ID identities from keychain if not set
+if [ -z "$DEVELOPER_ID_APP" ]; then
+    DEVELOPER_ID_APP="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/"Developer ID Application:/ { print $2; exit }')"
+fi
+if [ -z "$DEVELOPER_ID_INSTALLER" ]; then
+    DEVELOPER_ID_INSTALLER="$(security find-identity -v -p basic 2>/dev/null | awk -F'"' '/"Developer ID Installer:/ { print $2; exit }')"
+fi
+
 if [ -n "$DEVELOPER_ID_APP" ]; then
     echo "=== Signing register-source helper with Apple Developer ID Application ($DEVELOPER_ID_APP) ==="
     codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID_APP" "$WORK/scripts/register-source"
@@ -81,14 +89,8 @@ if [ -f "Sources/VieLotusIM/Resources/AppIcon.icns" ]; then
 fi
 
 # Optional Notarization step if requested
-if [ "$NOTARIZE" = "1" ]; then
-    PROFILE="${NOTARY_KEYCHAIN_PROFILE:-notarytool-profile}"
-    echo "=== Notarizing package via xcrun notarytool (profile: $PROFILE) ==="
-    xcrun notarytool submit "$OUT" --keychain-profile "$PROFILE" --wait
-
-    echo "=== Stapling ticket to PKG ==="
-    xcrun stapler staple "$OUT"
-    echo "✅ Successfully notarized and stapled $OUT"
+if [ "${NOTARIZE:-0}" = "1" ]; then
+    bash "$SCRIPT_DIR/scripts/notarize_artifact.sh" "$OUT"
 fi
 
 echo "✅ Installer package ready at: $OUT (v${VERSION})"

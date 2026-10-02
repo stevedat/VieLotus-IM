@@ -12,6 +12,7 @@ let package = Package(
     products: [
         .executable(name: "VieLotusIM", targets: ["VieLotusIM"]),
         .executable(name: "VieLotusCLI", targets: ["VieLotusCLI"]),
+        .executable(name: "VieLotusLab", targets: ["VieLotusLab"]),
         .library(name: "VieLotusCore", targets: ["VieLotusCore"])
     ],
     targets: [
@@ -26,6 +27,11 @@ let package = Package(
                 .linkedFramework("NaturalLanguage"),
             ]
         ),
+        .target(
+            name: "VieLotusTrace",
+            dependencies: [],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         .executableTarget(
             name: "VieLotusCLI",
             dependencies: ["VieLotusCore"],
@@ -39,7 +45,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "VieLotusIM",
-            dependencies: ["VieLotusCore"],
+            dependencies: ["VieLotusCore", "VieLotusTrace"],
             exclude: ["Info.plist", "Resources/AppIcon.icns"],
             swiftSettings: [
                 .swiftLanguageMode(.v5),
@@ -50,9 +56,20 @@ let package = Package(
                 .linkedFramework("Carbon"),
             ]
         ),
+        .executableTarget(
+            name: "VieLotusLab",
+            dependencies: ["VieLotusCore", "VieLotusTrace"],
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ],
+            linkerSettings: [
+                .linkedFramework("Cocoa"),
+                .linkedFramework("SwiftUI"),
+            ]
+        ),
         .testTarget(
             name: "VieLotusCoreTests",
-            dependencies: ["VieLotusCore"],
+            dependencies: ["VieLotusCore", "VieLotusTrace"],
             swiftSettings: [
                 .swiftLanguageMode(.v5),
             ],

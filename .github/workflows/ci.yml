@@ -27,7 +27,7 @@ jobs:
         run: swift test
 
       - name: Run 9,091-word benchmark regression suite
-        run: swift run VieLotusCLI --benchmark --threshold 95.0
+        run: swift run VieLotusCLI --benchmark --threshold 98.0
 
       - name: Build universal App bundle (VieLotusIM.app)
         run: ./scripts/build_imk.sh
@@ -38,11 +38,15 @@ jobs:
       - name: Build disk image (VieLotusIM.dmg)
         run: ./scripts/build_dmg.sh
 
+      - name: Build disk image (VieLotusLab.dmg)
+        run: ./scripts/build_lab_dmg.sh
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: VieLotusIM-build
+          name: VieLotus-build
           path: |
             .build/dist/VieLotusIM.app
             .build/dist/VieLotusIM.pkg
             .build/dist/VieLotusIM.dmg
+            .build/dist/VieLotusLab.dmg

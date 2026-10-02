@@ -36,21 +36,7 @@ public struct MacSpellChecker: SpellCheckerProvider {
             }
         }
         
-        // Also check uppercase for acronyms (e.g. "url" -> "URL", "api" -> "API")
-        let uppercased = word.uppercased()
-        if uppercased != word && uppercased != capitalized {
-            let upperRange = NSSpellChecker.shared.checkSpelling(
-                of: uppercased,
-                startingAt: 0,
-                language: "en",
-                wrap: false,
-                inSpellDocumentWithTag: 0,
-                wordCount: &wordCount
-            )
-            if upperRange.location == NSNotFound {
-                return true
-            }
-        }
+
         
         return false
     }

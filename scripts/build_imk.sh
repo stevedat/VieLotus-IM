@@ -40,6 +40,15 @@ cp "Sources/VieLotusIM/Info.plist" "$APP_DIR/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_DIR/Contents/Info.plist" 2>/dev/null || \
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$APP_DIR/Contents/Info.plist"
 
+GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+BUILD_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+/usr/libexec/PlistBuddy -c "Set :GitCommitHash $GIT_COMMIT" "$APP_DIR/Contents/Info.plist" 2>/dev/null || \
+/usr/libexec/PlistBuddy -c "Add :GitCommitHash string $GIT_COMMIT" "$APP_DIR/Contents/Info.plist"
+
+/usr/libexec/PlistBuddy -c "Set :BuildTimestamp $BUILD_TIMESTAMP" "$APP_DIR/Contents/Info.plist" 2>/dev/null || \
+/usr/libexec/PlistBuddy -c "Add :BuildTimestamp string $BUILD_TIMESTAMP" "$APP_DIR/Contents/Info.plist"
+
 if [ -f "Sources/VieLotusIM/Resources/AppIcon.icns" ]; then
     cp "Sources/VieLotusIM/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 elif [ -f "AppIcon.icns" ]; then
@@ -48,6 +57,11 @@ fi
 
 # Clean any extended attribute metadata files
 find "$APP_DIR" -name "._*" -delete 2>/dev/null || true
+
+# Auto-detect Developer ID Application from keychain if not set
+if [ -z "$DEVELOPER_ID_APP" ]; then
+    DEVELOPER_ID_APP="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/"Developer ID Application:/ { print $2; exit }')"
+fi
 
 if [ -n "$DEVELOPER_ID_APP" ]; then
     echo "=== Signing with Apple Developer ID Application ($DEVELOPER_ID_APP) + Hardened Runtime ==="

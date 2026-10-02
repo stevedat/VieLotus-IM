@@ -112,12 +112,59 @@ struct SettingsView: View {
                         }
                     }
                 }
+
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("CHẨN ĐOÁN & HỖ TRỢ")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(AppInfo.systemSummary)
+                                .font(.system(size: 9))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+
+                        HStack(spacing: 8) {
+                            Button {
+                                copyDiagnostics()
+                            } label: {
+                                Label(copiedDiagnostics ? "Đã sao chép!" : "Sao chép cấu hình",
+                                      systemImage: copiedDiagnostics ? "checkmark.circle.fill" : "doc.on.doc")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+
+                            Button {
+                                openGitHubIssue()
+                            } label: {
+                                Label("Báo lỗi GitHub", systemImage: "ladybug")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+
+                            Button {
+                                openVieLotusLab()
+                            } label: {
+                                Label("Mở Lab", systemImage: "waveform.path.ecg")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+
+                        Text("🔒 Sen Việt áp dụng Zero-logging: Tuyệt đối không ghi phím gõ. Nhấn 'Sao chép cấu hình' để đính kèm thông số vào GitHub Issue.")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
             }
             .formStyle(.grouped)
 
             // MARK: - Apple Clean Minimalist Footer
             HStack {
-                Text("v1.1 (Universal) • Không quyền Trợ năng")
+                Text("v\(AppInfo.appVersion) (\(AppInfo.gitCommit)) • Không quyền Trợ năng")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                 
@@ -136,6 +183,58 @@ struct SettingsView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
         }
-        .frame(width: 420, height: 500)
+        .frame(width: 440, height: 550)
+    }
+
+    @State private var copiedDiagnostics = false
+
+    private func copyDiagnostics() {
+        var text = "### 📋 Thông số Cấu hình & Môi trường VieLotusIM\n\n"
+        text += "- **Hệ điều hành:** macOS \(AppInfo.osVersionString) (\(AppInfo.architecture))\n"
+        text += "- **Phiên bản:** v\(AppInfo.appVersion) (Build \(AppInfo.buildNumber) · `\(AppInfo.gitCommit)`)\n"
+        text += AppInfo.formattedConfiguration(
+            inputMethod: prefs.inputMethod == .telex ? "TELEX" : "VNI",
+            smartBilingual: prefs.smartBilingual,
+            modernOrthography: prefs.modernOrthography,
+            developerMode: prefs.developerMode,
+            terminalDirectMode: prefs.terminalDirectMode,
+            quickTelex: prefs.quickTelex,
+            relaxedCoda: prefs.relaxedCoda
+        ) + "\n\n"
+        text += "> 🔒 Sen Việt áp dụng Zero-logging: Không ghi phím vào đĩa hay mạng.\n"
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        copiedDiagnostics = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            copiedDiagnostics = false
+        }
+    }
+
+    private func openGitHubIssue() {
+        if let url = URL(string: "https://github.com/stevedat/VietLotus-IM/issues/new?template=bug_report.md") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func openVieLotusLab() {
+        let searchPaths = [
+            "/Applications/VieLotus Lab.app",
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/VieLotus Lab.app").path,
+            Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("VieLotusLab.app").path
+        ]
+        for path in searchPaths {
+            if FileManager.default.fileExists(atPath: path) {
+                NSWorkspace.shared.open(URL(fileURLWithPath: path))
+                return
+            }
+        }
+        if let appUrl = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "org.vielotus.inputmethod.VieLotusLab") {
+            NSWorkspace.shared.open(appUrl)
+        } else {
+            if let url = URL(string: "https://github.com/stevedat/VietLotus-IM/releases") {
+                NSWorkspace.shared.open(url)
+            }
+        }
     }
 }

@@ -60,6 +60,11 @@
 3. 🔄 **Lưu ý quan trọng (Đăng xuất):** Sau khi cài đặt xong, vui lòng **Đăng xuất (Log Out)** và đăng nhập lại một lần để macOS làm mới danh sách bộ gõ.
 4. Mở **System Settings** $\rightarrow$ **Keyboard** $\rightarrow$ **Text Input** (Nguồn nhập) bấm **Edit...** $\rightarrow$ bấm **`+`** chọn **Vietnamese** $\rightarrow$ thêm **VieLotusIM** (hoặc Sen Việt).
 
+
+Dành cho Tester tham gia thử nghiệm và chẩn đoán nhịp gõ:
+- Tải thêm **`VieLotusLab.dmg`** từ trang Releases để theo dõi ứng dụng ngoài và xuất gói báo cáo lỗi.
+- Xem chi tiết quy trình kiểm thử khép kín tại [docs/LAB_TESTING_GUIDE.md](docs/LAB_TESTING_GUIDE.md).
+
 Tự biên dịch từ mã nguồn:
 ```bash
 git clone https://github.com/stevedat/VietLotus-IM.git
