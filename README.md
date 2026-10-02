@@ -9,7 +9,7 @@
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPLv3"></a>
   <a href="https://apple.com/macos"><img src="https://img.shields.io/badge/Platform-macOS%2013%2B-black.svg" alt="Platform: macOS"></a>
   <img src="https://img.shields.io/badge/Architecture-Universal%20(Apple%20Silicon%20%26%20Intel)-brightgreen.svg" alt="Architecture: Universal">
-  <img src="https://img.shields.io/badge/Benchmark-98.71%25%20(9%2C091%20words)-brightgreen.svg" alt="Benchmark Pass Rate">
+  <img src="https://img.shields.io/badge/Benchmark-99.51%25%20(9%2C091%20words)-brightgreen.svg" alt="Benchmark Pass Rate">
   <a href="https://stevedat.github.io/VietLotus-IM/"><img src="https://img.shields.io/badge/Website-stevedat.github.io%2FVietLotus--IM-FF5E8E.svg" alt="Website"></a>
 </p>
 
@@ -25,7 +25,7 @@
 2. **Không gạch chân CJK**: Thay thế trực tiếp ký tự tại con trỏ (`directReplacement`). Bảo toàn 100% lịch sử Undo (`Cmd + Z`) trong mọi ứng dụng.
 3. **Phản hồi tức thì trong Chat**: Nhận diện phím ngay từ ký tự đầu tiên khi gõ trong Telegram, Zalo, Slack, Messenger mà không cần nhấn phím Space mồi.
 4. **Nhận diện tiếng Anh thông minh (Smart Bilingual)**: Tự động khôi phục từ tiếng Anh (`wifi`, `system`, `apple`, `facebook`) khi gõ văn bản hỗn hợp.
-5. **Độ trễ vi giây (Pure Swift Core)**: Xử lý âm tiết trong **10 – 25 µs**, vượt qua bài kiểm thử hồi quy 9,091 từ với tỷ lệ chính xác **98.30%**.
+5. **Độ trễ vi giây (Pure Swift Core)**: Xử lý âm tiết trong **10 – 25 µs**, vượt qua bài kiểm thử hồi quy 9,091 từ với tỷ lệ chính xác **99.51%**.
 6. **Zero-Logging**: Hoạt động offline 100%, không ghi bất kỳ dữ liệu phím gõ nào ra đĩa.
 
 ### 🏛️ Kiến Trúc Hệ Thống
@@ -39,7 +39,7 @@
 └──────────────────────────────┬───────────────────────────────┘
                                │ (Gọi trực tiếp Pure Swift)
 ┌──────────────────────────────┴───────────────────────────────┐
-│  LÕI XỬ LÝ TIẾNG VIỆT: Pure Swift Engine (VieLotusCore)            │
+│  LÕI XỬ LÝ TIẾNG VIỆT: Pure Swift Engine (VieLotusCore)      │
 │  • Xử lý kiểu gõ Telex và VNI tốc độ cao                     │
 │  • Bỏ dấu chuẩn mới (hoà/hòa), viết tắt vần cuối             │
 │  • Bộ đệm vòng 32 từ hỗ trợ lùi con trỏ sửa từ               │
@@ -50,6 +50,7 @@
 ### 🗺️ Lộ Trình (Roadmap)
 
 - [x] **macOS v1.0.0**: Bản phát hành chính thức (Universal Binary cho Apple Silicon & Intel).
+- [x] **macOS v1.1.0 & VieLotusLab**: Nâng tỷ lệ kiểm thử lên 99.51% với ràng buộc ngữ âm Pure Swift; ra mắt VieLotusLab chẩn đoán nhịp gõ và xuất gói báo cáo lỗi khép kín.
 - [ ] **Mở rộng iOS & iPadOS**: Bàn phím mở rộng cho iPhone/iPad dùng chung lõi `VieLotusCore`.
 - [ ] **Đồng bộ bảng gõ tắt**: Tùy biến viết tắt và từ điển cá nhân hóa.
 
@@ -69,7 +70,7 @@ Tự biên dịch từ mã nguồn:
 ```bash
 git clone https://github.com/stevedat/VietLotus-IM.git
 cd VietLotus-IM
-./scripts/build_pkg.sh 1.0.0
+./scripts/build_pkg.sh 1.1.0
 ```
 
 ---
@@ -84,7 +85,7 @@ cd VietLotus-IM
 2. **Zero-Flicker & Preserved Undo**: Direct text replacement at the caret position. Eliminates CJK underline flicker while preserving `Cmd + Z` history.
 3. **Instant Chat Response**: Immediate character composition in Telegram, Zalo, Slack, and Discord without requiring a priming Space key.
 4. **Smart Bilingual Detection**: Automatically preserves standard English words (`wifi`, `system`, `apple`, `database`) during mixed typing.
-5. **Microsecond Latency (Pure Swift Core)**: Syllable transforms in **10 – 25 µs** with a verified **98.30% pass rate** on a 9,091-word benchmark.
+5. **Microsecond Latency (Pure Swift Core)**: Syllable transforms in **10 – 25 µs** with a verified **99.51% pass rate** on a 9,091-word benchmark.
 6. **Zero-Logging Privacy**: Fully offline, zero disk logging, zero telemetry.
 
 ### 🏛️ System Architecture
@@ -98,7 +99,7 @@ cd VietLotus-IM
 └──────────────────────────────┬───────────────────────────────┘
                                │ (Direct Swift Call)
 ┌──────────────────────────────┴───────────────────────────────┐
-│  VIETNAMESE ENGINE: Pure Swift Core (VieLotusCore)                 │
+│  VIETNAMESE ENGINE: Pure Swift Core (VieLotusCore)           │
 │  • High-performance Telex & VNI syllable transformation      │
 │  • Modern tone placement & relaxed coda consonants           │
 │  • 32-word ring buffer for caret step-back editing           │
@@ -109,6 +110,7 @@ cd VietLotus-IM
 ### 🗺️ Roadmap
 
 - [x] **macOS v1.0.0**: Universal release for Apple Silicon and Intel.
+- [x] **macOS v1.1.0 & VieLotusLab**: Elevated benchmark pass rate to 99.51% via pure Swift phonological rules; introduced VieLotusLab typing diagnostics app and closed-loop issue export.
 - [ ] **iOS & iPadOS Expansion**: Keyboard extension for iPhone/iPad sharing `VieLotusCore`.
 - [ ] **Custom Shorthands**: User-configurable abbreviations and custom vocabulary.
 
@@ -123,7 +125,7 @@ Build from source:
 ```bash
 git clone https://github.com/stevedat/VietLotus-IM.git
 cd VietLotus-IM
-./scripts/build_pkg.sh 1.0.0
+./scripts/build_pkg.sh 1.1.0
 ```
 
 ---
