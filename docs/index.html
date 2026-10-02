@@ -117,14 +117,15 @@
         <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-8 h-8 rounded-lg shadow-sm group-hover:scale-105 transition-transform duration-200">
         <span class="font-semibold text-lg tracking-tight text-white flex items-center gap-2">
           Sen Việt
-          <span class="text-[11px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/10">v1.0.0</span>
+          <span class="text-[11px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/10">v1.1.0</span>
         </span>
       </a>
 
       <!-- Desktop Nav -->
-      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+      <nav class="hidden md:flex items-center gap-7 text-sm font-medium text-slate-300">
         <a href="#features" data-i18n="nav.features" class="hover:text-white transition-colors">Tính năng</a>
         <a href="#playground" data-i18n="nav.playground" class="hover:text-white transition-colors">Thử nghiệm</a>
+        <a href="#lab" data-i18n="nav.lab" class="hover:text-white transition-colors">Lab & Kiểm thử</a>
         <a href="#comparison" data-i18n="nav.comparison" class="hover:text-white transition-colors">So sánh</a>
         <a href="#architecture" data-i18n="nav.architecture" class="hover:text-white transition-colors">Kiến trúc</a>
         <a href="#roadmap" data-i18n="nav.roadmap" class="hover:text-white transition-colors">Lộ trình</a>
@@ -147,7 +148,7 @@
 
         <a href="#download" class="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg gradient-brand text-white shadow-sm hover:opacity-95 active:scale-95 transition-all">
           <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v8.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 11.586V3a1 1 0 011-1zM3 16a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
-          <span data-i18n="nav.download">Tải bản v1.0.0</span>
+          <span data-i18n="nav.download">Tải bản v1.1.0</span>
         </a>
       </div>
     </div>
@@ -160,7 +161,7 @@
       <!-- Pill Badge -->
       <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 mb-8 backdrop-blur-md">
         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span data-i18n="hero.badge">Mã nguồn mở · Giấy phép Apache 2.0 · Không quyền Trợ năng</span>
+        <span data-i18n="hero.badge">Mã nguồn mở · Giấy phép GPLv3 · Chuẩn Apple InputMethodKit</span>
       </div>
 
       <!-- Main Headline -->
@@ -171,31 +172,42 @@
 
       <!-- Subtitle -->
       <p data-i18n="hero.subtitle" class="max-w-2xl mx-auto text-base sm:text-lg text-slate-400 font-normal leading-relaxed mb-10">
-        Không gạch chân nhấp nháy CJK. Không đòi hỏi quyền Trợ năng (Accessibility). 
-        Bảo toàn 100% lịch sử Undo (<code class="text-xs bg-white/10 text-slate-200 px-1.5 py-0.5 rounded font-mono">Cmd + Z</code>) trong mọi ứng dụng.
+        Khởi nguồn từ mong muốn một trải nghiệm gõ tự nhiên, an toàn và hòa hợp với macOS. Không cần quyền Trợ năng (Accessibility) hay CGEventTap, bảo toàn ngữ cảnh hoàn tác (<code class="text-xs bg-white/10 text-slate-200 px-1.5 py-0.5 rounded font-mono">Cmd + Z</code>) và vận hành hoàn toàn offline.
       </p>
 
       <!-- Download CTA Group -->
       <div id="download" class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-        <!-- Main DMG Download -->
-        <a id="btn-download-dmg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.dmg" 
-           class="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl gradient-brand text-white font-medium shadow-lg shadow-lotus-accent/20 hover:opacity-95 active:scale-95 transition-all group">
-          <svg class="w-5 h-5 fill-current" viewBox="0 0 170 170"><path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.03-7.64-7.85-11.83-14.45-6.66-10.45-11.75-21.72-15.26-33.8-3.51-12.08-5.27-23.77-5.27-35.07 0-14.15 3.36-25.79 10.08-34.92 6.72-9.13 15.2-13.79 25.43-13.98 4.79 0 10.05 1.34 15.78 4.02 5.73 2.68 9.53 4.07 11.4 4.18 1.45 0 5.48-1.5 12.09-4.5 6.61-3 12.39-4.39 17.34-4.17 12.87.64 23.01 5.43 30.43 14.37-11.33 6.84-16.89 16.29-16.68 28.35.21 9.42 3.86 17.38 10.95 23.88 7.09 6.5 15.62 10.14 25.59 10.92-2.13 6.53-4.7 13.06-7.71 19.59zM119.22 31.84c0-7.39 2.62-14.38 7.86-20.97 5.24-6.59 11.74-10.42 19.5-11.49.21 1.07.32 2.03.32 2.89 0 7.39-2.73 14.48-8.19 21.28-5.46 6.8-12.06 10.6-19.8 11.4-.21-1.07-.32-2.03-.32-2.89z"/></svg>
-          <div class="text-left">
-            <div data-i18n="hero.btn_dmg_title" class="text-sm font-semibold tracking-tight">Tải về .dmg (Khuyên dùng)</div>
-            <div data-i18n="hero.btn_dmg_sub" class="text-[11px] opacity-80 font-normal">macOS 13+ · Universal (M1/M2/M3/M4 & Intel)</div>
-          </div>
-        </a>
-
-        <!-- Secondary PKG Download -->
+        <!-- Main PKG Download -->
         <a id="btn-download-pkg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg" 
-           class="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl glass-card text-white hover:bg-white/10 active:scale-95 transition-all">
-          <svg class="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+           class="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl gradient-brand text-white font-medium shadow-lg shadow-lotus-accent/20 hover:opacity-95 active:scale-95 transition-all group">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
           </svg>
           <div class="text-left">
-            <div data-i18n="hero.btn_pkg_title" class="text-sm font-medium">Tải về .pkg</div>
-            <div data-i18n="hero.btn_pkg_sub" class="text-[11px] text-slate-400">Gói cài đặt tự động kích hoạt</div>
+            <div data-i18n="hero.btn_pkg_title" class="text-sm font-semibold tracking-tight">Tải về .pkg (Khuyên dùng)</div>
+            <div data-i18n="hero.btn_pkg_sub" class="text-[11px] opacity-80 font-normal">macOS 13+ · Universal (M1/M2/M3/M4 & Intel)</div>
+          </div>
+        </a>
+
+        <!-- Secondary DMG Download -->
+        <a id="btn-download-dmg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.dmg" 
+           class="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl glass-card text-white hover:bg-white/10 active:scale-95 transition-all">
+          <svg class="w-5 h-5 fill-current text-slate-300" viewBox="0 0 170 170"><path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.03-7.64-7.85-11.83-14.45-6.66-10.45-11.75-21.72-15.26-33.8-3.51-12.08-5.27-23.77-5.27-35.07 0-14.15 3.36-25.79 10.08-34.92 6.72-9.13 15.2-13.79 25.43-13.98 4.79 0 10.05 1.34 15.78 4.02 5.73 2.68 9.53 4.07 11.4 4.18 1.45 0 5.48-1.5 12.09-4.5 6.61-3 12.39-4.39 17.34-4.17 12.87.64 23.01 5.43 30.43 14.37-11.33 6.84-16.89 16.29-16.68 28.35.21 9.42 3.86 17.38 10.95 23.88 7.09 6.5 15.62 10.14 25.59 10.92-2.13 6.53-4.7 13.06-7.71 19.59zM119.22 31.84c0-7.39 2.62-14.38 7.86-20.97 5.24-6.59 11.74-10.42 19.5-11.49.21 1.07.32 2.03.32 2.89 0 7.39-2.73 14.48-8.19 21.28-5.46 6.8-12.06 10.6-19.8 11.4-.21-1.07-.32-2.03-.32-2.89z"/></svg>
+          <div class="text-left">
+            <div data-i18n="hero.btn_dmg_title" class="text-sm font-medium">Tải về .dmg</div>
+            <div data-i18n="hero.btn_dmg_sub" class="text-[11px] text-slate-400">Kéo thả vào Applications</div>
+          </div>
+        </a>
+
+        <!-- Lab Tool Download -->
+        <a id="btn-download-lab-hero" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusLab.dmg" 
+           class="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl glass-card text-white hover:bg-white/10 active:scale-95 transition-all">
+          <svg class="w-5 h-5 text-lotus-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+          <div class="text-left">
+            <div data-i18n="hero.btn_lab_title" class="text-sm font-medium">VieLotus Lab (.dmg)</div>
+            <div data-i18n="hero.btn_lab_sub" class="text-[11px] text-slate-400">Công cụ chẩn đoán cho Tester</div>
           </div>
         </a>
       </div>
@@ -221,15 +233,15 @@
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto mb-16">
         <div class="glass-card rounded-2xl p-6 text-center">
           <div data-i18n="metrics.latency_val" class="text-2xl sm:text-3xl font-extrabold text-white mb-1 tracking-tight">10 – 25 µs</div>
-          <div data-i18n="metrics.latency_desc" class="text-xs font-medium text-slate-400">Tốc độ phản hồi phím (Pure Swift Native Swift)</div>
+          <div data-i18n="metrics.latency_desc" class="text-xs font-medium text-slate-400">Tốc độ phản hồi phím (Pure Swift Engine)</div>
         </div>
         <div class="glass-card rounded-2xl p-6 text-center">
-          <div data-i18n="metrics.accuracy_val" class="text-2xl sm:text-3xl font-extrabold text-white mb-1 tracking-tight">98.71%</div>
-          <div data-i18n="metrics.accuracy_desc" class="text-xs font-medium text-slate-400">Độ chính xác hồi quy (9,091 từ kiểm thử)</div>
+          <div data-i18n="metrics.accuracy_val" class="text-2xl sm:text-3xl font-extrabold text-white mb-1 tracking-tight">99.51%</div>
+          <div data-i18n="metrics.accuracy_desc" class="text-xs font-medium text-slate-400">Tỉ lệ kiểm thử hồi quy (9,091 từ thực tế)</div>
         </div>
         <div class="glass-card rounded-2xl p-6 text-center">
           <div data-i18n="metrics.privacy_val" class="text-2xl sm:text-3xl font-extrabold text-white mb-1 tracking-tight">0 byte log</div>
-          <div data-i18n="metrics.privacy_desc" class="text-xs font-medium text-slate-400">Cam kết Zero-Logging & Offline 100%</div>
+          <div data-i18n="metrics.privacy_desc" class="text-xs font-medium text-slate-400">Hoạt động offline & Tôn trọng quyền riêng tư</div>
         </div>
       </div>
 
@@ -337,11 +349,11 @@
       </div>
     </section>
 
-    <!-- 4. Core Technical USPs -->
+    <!-- 4. Core Technical Highlights -->
     <section id="features" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
       <div class="text-center mb-16">
-        <h2 data-i18n="features.title" class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-4">4 Khác biệt Kỹ thuật Cốt lõi</h2>
-        <p data-i18n="features.subtitle" class="text-base text-slate-400 max-w-2xl mx-auto">Được thiết kế từ gốc để giải quyết triệt để các hạn chế lịch sử của bộ gõ trên macOS.</p>
+        <h2 data-i18n="features.title" class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-4">4 Điểm Nhấn Kiến Trúc Cốt Lõi</h2>
+        <p data-i18n="features.subtitle" class="text-base text-slate-400 max-w-2xl mx-auto">Thiết kế tinh gọn, an toàn và hòa nhập tự nhiên vào hệ thống macOS.</p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -352,10 +364,9 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
             </svg>
           </div>
-          <h3 data-i18n="features.f1_title" class="text-xl font-bold text-white mb-3">Chuẩn Apple Native — Không cần quyền Trợ năng</h3>
+          <h3 data-i18n="features.f1_title" class="text-xl font-bold text-white mb-3">Chuẩn Apple Native — Không cần quyền can thiệp hệ thống</h3>
           <p data-i18n="features.f1_desc" class="text-sm text-slate-400 leading-relaxed">
-            Chạy trực tiếp dưới dạng Input Method của hệ thống qua giao thức <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">InputMethodKit</code>. 
-            Tuyệt đối không can thiệp phím ngầm qua <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">CGEventTap</code>, không đòi quyền Accessibility, bảo đảm an toàn dữ liệu 100%.
+            Tích hợp trực tiếp qua giao thức <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">InputMethodKit</code>. Vận hành an toàn như một nguồn nhập liệu tiêu chuẩn của hệ điều hành mà không cần cấp quyền Trợ năng (Accessibility) hay dùng <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">CGEventTap</code>.
           </p>
         </div>
 
@@ -366,10 +377,9 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
           </div>
-          <h3 data-i18n="features.f2_title" class="text-xl font-bold text-white mb-3">Hiển thị tức thì — Không gạch chân nhấp nháy</h3>
+          <h3 data-i18n="features.f2_title" class="text-xl font-bold text-white mb-3">Bảo toàn ngữ cảnh — Giữ nguyên lịch sử Undo (Cmd + Z)</h3>
           <p data-i18n="features.f2_desc" class="text-sm text-slate-400 leading-relaxed">
-            Cơ chế thay thế trực tiếp ký tự tại con trỏ (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">directReplacement</code>) loại bỏ vạch gạch chân chờ CJK khó chịu. 
-            Đặc biệt, bảo toàn nguyên vẹn 100% lịch sử Undo (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">Cmd + Z</code>) trong Word, VS Code, Notion.
+            Cơ chế thay thế trực tiếp ký tự tại con trỏ (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">directReplacement</code>) giúp các thao tác hoàn tác (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">Cmd + Z</code>) hoạt động chuẩn xác trong VS Code, Cursor, Word, Notion và các công cụ thiết kế.
           </p>
         </div>
 
@@ -380,10 +390,9 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
             </svg>
           </div>
-          <h3 data-i18n="features.f3_title" class="text-xl font-bold text-white mb-3">Phản hồi mượt mà trong ứng dụng Chat</h3>
+          <h3 data-i18n="features.f3_title" class="text-xl font-bold text-white mb-3">Phản hồi tự nhiên trong ứng dụng Chat & Trình duyệt</h3>
           <p data-i18n="features.f3_desc" class="text-sm text-slate-400 leading-relaxed">
-            Tối ưu hóa hành vi con trỏ khi chuyển cửa sổ giữa trình duyệt và các ứng dụng nhắn tin (Telegram, Zalo, Slack, Messenger). 
-            Nhận diện ký tự bỏ dấu ngay từ phím đầu tiên mà không cần gõ phím Space mồi.
+            Được tối ưu hóa cho hành vi con trỏ khi chuyển cửa sổ giữa trình duyệt và các ứng dụng nhắn tin (Telegram, Zalo, Slack, Messenger), bảo đảm các ký tự đầu tiên luôn nhận diện đúng dấu.
           </p>
         </div>
 
@@ -394,15 +403,145 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
             </svg>
           </div>
-          <h3 data-i18n="features.f4_title" class="text-xl font-bold text-white mb-3">Nhận diện tiếng Anh thông minh (Smart Bilingual)</h3>
+          <h3 data-i18n="features.f4_title" class="text-xl font-bold text-white mb-3">Nhận diện từ tiếng Anh thông minh (Smart Bilingual)</h3>
           <p data-i18n="features.f4_desc" class="text-sm text-slate-400 leading-relaxed">
-            Kết hợp luật âm vị tiếng Việt, từ điển hệ thống và Apple NaturalLanguage để tự động khôi phục từ tiếng Anh khi gõ văn bản hỗn hợp (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">wifi</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">apple</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">system</code>) mà không cần chuyển bộ gõ.
+            Tự động giữ nguyên các từ tiếng Anh quen thuộc (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">wifi</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">apple</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">system</code>) khi gõ văn bản kỹ thuật hỗn hợp mà không cần thao tác chuyển bàn phím thủ công.
           </p>
         </div>
       </div>
     </section>
 
-    <!-- 5. Comparison Matrix -->
+    <!-- 5. VieLotus Lab & Community Testing -->
+    <section id="lab" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
+      <div class="glass-card rounded-3xl p-8 sm:p-12 border border-white/10 relative overflow-hidden shadow-2xl">
+        <!-- Subtle background ambient glow -->
+        <div class="absolute -top-24 -right-24 w-96 h-96 bg-gradient-to-br from-lotus-accent/20 to-lotus-indigo/20 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="flex flex-col lg:flex-row items-start gap-10 relative z-10">
+          <!-- Left Column: Purpose & Highlights -->
+          <div class="flex-1 text-left">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-emerald-300 mb-4">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span data-i18n="lab.pill">Công cụ chẩn đoán đồng hành · Mã nguồn mở</span>
+            </div>
+
+            <h2 data-i18n="lab.title" class="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-4">
+              VieLotus Lab — Cùng hoàn thiện bộ gõ cho mọi ứng dụng
+            </h2>
+
+            <p data-i18n="lab.desc" class="text-sm text-slate-400 leading-relaxed mb-6">
+              Hệ sinh thái phần mềm trên macOS vô cùng phong phú: từ các ứng dụng AppKit truyền thống, trình duyệt web, các bộ công cụ Electron (VS Code, Cursor, Slack) cho đến Office và Terminal. Không một giải pháp đơn lẻ nào có thể hoàn hảo ngay từ đầu trên mọi ô nhập liệu. 
+              <strong>VieLotus Lab</strong> là không gian đồng hành mở để người dùng và cộng đồng theo dõi trực tiếp nhịp phím, bắt các tình huống góc và cùng đóng góp để bộ gõ ngày càng hoàn thiện hơn.
+            </p>
+
+            <!-- 3 Pillars -->
+            <div class="space-y-4 mb-8">
+              <div class="flex items-start gap-3">
+                <div class="w-7 h-7 rounded-lg bg-lotus-accent/20 text-lotus-accent flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                  🔍
+                </div>
+                <div>
+                  <h4 data-i18n="lab.f1_title" class="text-xs sm:text-sm font-semibold text-white">Theo dõi nhịp phím trên ứng dụng thực tế</h4>
+                  <p data-i18n="lab.f1_desc" class="text-xs text-slate-400">Bắt nhịp biến đổi văn bản và trạng thái con trỏ thời gian thực trên Cursor, VS Code, Word, Chrome, Slack, Terminal.</p>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-3">
+                <div class="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                  🛡️
+                </div>
+                <div>
+                  <h4 data-i18n="lab.f2_title" class="text-xs sm:text-sm font-semibold text-white">Bảo vệ quyền riêng tư (Privacy by Design)</h4>
+                  <p data-i18n="lab.f2_desc" class="text-xs text-slate-400">Chỉ ghi nhận lượng ký tự tăng/giảm trong phiên thử nghiệm. Tuyệt đối không lưu nội dung tài liệu có sẵn và không ghi lại ký tự bị xóa.</p>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-3">
+                <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                  📋
+                </div>
+                <div>
+                  <h4 data-i18n="lab.f3_title" class="text-xs sm:text-sm font-semibold text-white">Xuất gói chẩn đoán khép kín</h4>
+                  <p data-i18n="lab.f3_desc" class="text-xs text-slate-400">Xem trước, tự do biên tập và xuất báo cáo Markdown hoặc gói JSON chuẩn (tách rõ phiên bản Lab và IME đang chạy) để đính kèm GitHub Issue.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Lab Action Buttons -->
+            <div class="flex flex-wrap items-center gap-3">
+              <a id="btn-download-lab" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusLab.dmg"
+                 class="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl gradient-brand text-white text-xs font-semibold shadow-md active:scale-95 transition-all">
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                <span data-i18n="lab.btn_download">Tải VieLotusLab.dmg</span>
+              </a>
+
+              <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/LAB_TESTING_GUIDE.md" target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors">
+                <span data-i18n="lab.btn_guide">Xem tài liệu kiểm thử 6 bước</span>
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+              </a>
+            </div>
+          </div>
+
+          <!-- Right Column: Visual Simulator Card & 4-Step Contribution Guide -->
+          <div class="w-full lg:w-[380px] shrink-0">
+            <!-- Simulated Lab Window -->
+            <div class="rounded-2xl bg-black/75 border border-white/15 p-4 shadow-2xl font-mono text-xs">
+              <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-3 text-[11px] text-slate-400">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+                  <span class="ml-1 text-slate-300 font-sans font-medium">VieLotus Lab v1.1.0</span>
+                </div>
+                <span class="text-emerald-400 text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Live Observer</span>
+              </div>
+
+              <!-- Live event simulation -->
+              <div class="space-y-2 text-[11px] text-slate-300">
+                <div class="p-2 rounded bg-white/[0.03] border border-white/5 flex items-center justify-between">
+                  <span class="text-slate-500">Mục tiêu:</span>
+                  <span class="text-white font-semibold">VS Code [Chromium]</span>
+                </div>
+                <div class="p-2.5 rounded bg-white/[0.03] border border-white/5 space-y-1.5">
+                  <div class="text-slate-400 flex items-center justify-between text-[10px]">
+                    <span>1. Phím nhận [v, i, e, e, j, t]</span>
+                    <span class="text-emerald-400 font-semibold font-mono">«việt»</span>
+                  </div>
+                  <div class="text-slate-400 flex items-center justify-between text-[10px]">
+                    <span>2. NSTextInputClient</span>
+                    <span class="text-indigo-300 font-mono">directReplace</span>
+                  </div>
+                  <div class="text-slate-500 text-[10px] pt-1 border-t border-white/5">
+                    Delta: +4 ký tự · caret 4 · IMK đồng bộ tức thì
+                  </div>
+                </div>
+                <div class="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 flex items-center gap-2 text-[10px]">
+                  <span>✓</span>
+                  <span>0 bất thường · Bảo toàn hoàn tác Cmd+Z</span>
+                </div>
+              </div>
+
+              <!-- 4-Step Testing Guide -->
+              <div class="mt-4 pt-3 border-t border-white/10 text-left font-sans">
+                <div class="text-[11px] font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
+                  <span class="text-lotus-accent">●</span>
+                  <span data-i18n="lab.steps_title">4 Bước đóng góp kiểm thử đơn giản:</span>
+                </div>
+                <ol class="space-y-1.5 text-[11px] text-slate-400 list-decimal list-inside leading-relaxed">
+                  <li><span class="text-slate-300" data-i18n="lab.s1">Tải và mở <strong>VieLotus Lab</strong></span></li>
+                  <li><span class="text-slate-300" data-i18n="lab.s2">Chọn app mục tiêu & gõ chuỗi phím thử nghiệm</span></li>
+                  <li><span class="text-slate-300" data-i18n="lab.s3">Bấm <strong>Xem trước & Báo cáo</strong> (Markdown / JSON)</span></li>
+                  <li><span class="text-slate-300" data-i18n="lab.s4">Gửi Issue lên GitHub để cùng hoàn thiện</span></li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Comparison Matrix -->
     <section id="comparison" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
       <div class="text-center mb-16">
         <h2 data-i18n="comparison.title" class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-4">Bảng So sánh Trực quan</h2>
@@ -460,14 +599,14 @@
               <td data-i18n="comparison.row7_label" class="py-4 px-6 font-medium text-white">Giấy phép phát hành</td>
               <td data-i18n="comparison.row7_macos" class="py-4 px-6 text-center text-slate-400">Đóng mã độc quyền</td>
               <td data-i18n="comparison.row7_legacy" class="py-4 px-6 text-center text-slate-400">Nhiều giấy phép</td>
-              <td data-i18n="comparison.row7_vielotus" class="py-4 px-6 text-center font-semibold text-slate-200 bg-lotus-accent/[0.05] border-x border-white/[0.08]">Apache License 2.0</td>
+              <td data-i18n="comparison.row7_vielotus" class="py-4 px-6 text-center font-semibold text-slate-200 bg-lotus-accent/[0.05] border-x border-white/[0.08]">GPLv3 License</td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <!-- 6. Architecture & Tech Specs -->
+    <!-- 7. Architecture & Tech Specs -->
     <section id="architecture" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
       <div class="text-center mb-16">
         <h2 data-i18n="arch.title" class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-4">Kiến trúc Tách lớp Độc lập</h2>
@@ -479,14 +618,14 @@
         <div class="p-4 rounded-xl bg-black/50 border border-white/5 overflow-x-auto text-slate-200 leading-relaxed">
 <pre id="arch-diagram">
 ┌──────────────────────────────────────────────────────────────┐
-│  LỚP VỎ HỆ THỐNG: Swift Native (InputMethodKit)              │
+│  LỚP ĐIỀU KHIỂN: Swift Native (InputMethodKit)               │
 │  • IMKServer quản lý kết nối Input Source hệ thống           │
 │  • VieLotusIMController điều phối sự kiện bàn phím           │
 │  • Giao tiếp với Client qua giao thức NSTextInputClient      │
 └──────────────────────────────┬───────────────────────────────┘
-                               │ (Direct Swift FFI - C ABI)
+                               │ (Gọi trực tiếp Pure Swift)
 ┌──────────────────────────────┴───────────────────────────────┐
-│  LÕI NGỮ ÂM TIẾNG VIỆT: Pure Swift Engine (VieLotusCore)           │
+│  LÕI NGỮ ÂM TIẾNG VIỆT: Pure Swift Engine (VieLotusCore)     │
 │  • Xử lý bảng mã Telex và VNI tốc độ vi giây                 │
 │  • Bỏ dấu chuẩn mới (hoà/hòa), viết tắt vần cuối             │
 │  • Bộ đệm vòng (Ring Buffer) 32 từ hỗ trợ hoàn tác nhanh     │
@@ -497,7 +636,7 @@
       </div>
     </section>
 
-    <!-- 7. Roadmap & Community -->
+    <!-- 8. Roadmap & Community -->
     <section id="roadmap" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
       <div class="text-center mb-16">
         <h2 data-i18n="roadmap.title" class="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-4">Lộ trình Phát triển</h2>
@@ -506,37 +645,37 @@
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
         <!-- Step 1 -->
-        <div class="glass-card rounded-2xl p-6 border-emerald-500/30">
-          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 mb-4">
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-            <span data-i18n="roadmap.step1_badge">v1.0.0 (Hiện tại)</span>
+        <div class="glass-card rounded-2xl p-6 border-white/10">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/10 text-slate-300 mb-4">
+            <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span data-i18n="roadmap.step1_badge">v1.0.0 (Đã phát hành)</span>
           </div>
           <h3 data-i18n="roadmap.step1_title" class="text-lg font-bold text-white mb-2">macOS Universal Release</h3>
           <p data-i18n="roadmap.step1_desc" class="text-xs text-slate-400 leading-relaxed">
-            Phát hành chính thức bản cài đặt Universal (.dmg & .pkg) cho cả Apple Silicon và Intel. Đạt 98.71% pass rate.
+            Phát hành chính thức bản cài đặt Universal (.dmg & .pkg) cho cả Apple Silicon và Intel.
           </p>
         </div>
 
         <!-- Step 2 -->
-        <div class="glass-card rounded-2xl p-6 border-lotus-indigo/30">
-          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-lotus-indigo/20 text-indigo-300 mb-4">
-            <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
-            <span data-i18n="roadmap.step2_badge">Đang phát triển</span>
+        <div class="glass-card rounded-2xl p-6 border-emerald-500/30">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 mb-4">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span data-i18n="roadmap.step2_badge">v1.1.0 (Hiện tại)</span>
           </div>
-          <h3 data-i18n="roadmap.step2_title" class="text-lg font-bold text-white mb-2">iOS & iPadOS Extension</h3>
+          <h3 data-i18n="roadmap.step2_title" class="text-lg font-bold text-white mb-2">99.51% Benchmark & VieLotus Lab</h3>
           <p data-i18n="roadmap.step2_desc" class="text-xs text-slate-400 leading-relaxed">
-            Mở rộng bàn phím cho iPhone và iPad thông qua <code class="text-slate-300">UIInputViewController</code>, tái sử dụng trọn vẹn lõi di động <code class="text-slate-300">VieLotusCore</code>.
+            Nâng tỷ lệ kiểm thử lên 99.51% với ràng buộc ngữ âm Pure Swift; ra mắt VieLotus Lab chẩn đoán nhịp gõ và xuất gói báo cáo lỗi khép kín.
           </p>
         </div>
 
         <!-- Step 3 -->
-        <div class="glass-card rounded-2xl p-6 border-white/10">
-          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/10 text-slate-400 mb-4">
-            <span data-i18n="roadmap.step3_badge">Dự kiến</span>
+        <div class="glass-card rounded-2xl p-6 border-lotus-indigo/30">
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-lotus-indigo/20 text-indigo-300 mb-4">
+            <span data-i18n="roadmap.step3_badge">Đang phát triển</span>
           </div>
-          <h3 data-i18n="roadmap.step3_title" class="text-lg font-bold text-white mb-2">Đồng bộ Bảng gõ tắt</h3>
+          <h3 data-i18n="roadmap.step3_title" class="text-lg font-bold text-white mb-2">iOS & Đồng bộ Bảng gõ tắt</h3>
           <p data-i18n="roadmap.step3_desc" class="text-xs text-slate-400 leading-relaxed">
-            Hỗ trợ tùy biến bảng gõ tắt cá nhân hóa và quản lý từ vựng kỹ thuật chuyên sâu theo nhu cầu người dùng.
+            Mở rộng bàn phím cho iPhone/iPad dùng chung lõi <code class="text-slate-300">VieLotusCore</code> và hỗ trợ tùy biến bảng gõ tắt cá nhân hóa.
           </p>
         </div>
       </div>
@@ -545,7 +684,7 @@
       <div class="glass-card rounded-2xl p-8 text-center max-w-3xl mx-auto border-lotus-accent/20">
         <h3 data-i18n="community.title" class="text-xl font-bold text-white mb-2">Dự án Vì Cộng đồng Người dùng Mac Việt Nam</h3>
         <p data-i18n="community.desc" class="text-sm text-slate-400 mb-6 max-w-xl mx-auto">
-          Sen Việt được phát triển phi thương mại theo giấy phép Apache 2.0. Mọi đóng góp thuật toán, báo lỗi, hoặc ý tưởng cải tiến đều được chào đón nồng nhiệt.
+          Sen Việt được phát triển phi thương mại theo giấy phép GPLv3. Mọi đóng góp thuật toán, báo lỗi, hoặc ý tưởng cải tiến đều được chào đón nồng nhiệt.
         </p>
         <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer"
            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-semibold border border-white/10 transition-colors">
@@ -603,7 +742,7 @@
       <div class="flex items-center gap-3">
         <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-6 h-6 opacity-75">
         <div class="flex flex-col gap-0.5">
-          <span data-i18n="footer.license">Sen Việt (VieLotusIM) · Mã nguồn mở theo giấy phép <strong>Apache License 2.0</strong>.</span>
+          <span data-i18n="footer.license">Sen Việt (VieLotusIM) · Mã nguồn mở theo giấy phép <strong>GNU General Public License v3.0 (GPLv3)</strong>.</span>
           <span class="text-[10px] text-slate-500/80 uppercase tracking-wider font-semibold">Created by Steve Dat · Engineered & Copyrighted by Nido Holdings</span>
         </div>
       </div>
@@ -611,6 +750,7 @@
       <div class="flex flex-wrap items-center gap-6">
         <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition-colors">GitHub Repository</a>
         <a href="https://github.com/stevedat/VieLotus-IM/releases" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases" class="hover:text-slate-300 transition-colors">Bản phát hành</a>
+        <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/LAB_TESTING_GUIDE.md" target="_blank" rel="noopener noreferrer" data-i18n="footer.lab_guide" class="hover:text-slate-300 transition-colors">Hướng dẫn Lab</a>
         <a href="https://github.com/stevedat/VieLotus-IM/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.issues" class="hover:text-slate-300 transition-colors">Báo lỗi</a>
         <a href="#sponsor" data-i18n="footer.sponsor" class="hover:text-slate-300 transition-colors">Tài trợ</a>
         <a href="https://youpersona.com" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 text-slate-400 font-medium transition-colors">YouPersona.com</a>
@@ -623,32 +763,36 @@
     const translations = {
       vi: {
         'page.title': 'Sen Việt (VieLotusIM) — Bộ gõ tiếng Việt Native cho macOS',
-        'page.description': 'Bộ gõ tiếng Việt Native cho macOS chuẩn InputMethodKit. Không giật gạch chân CJK, không cần quyền Trợ năng (Accessibility), bảo toàn 100% lịch sử Undo Cmd+Z, bảo mật Zero-Logging.',
-        'og.description': 'Gõ mượt mà như bàn phím hệ thống. Không gạch chân nhấp nháy, nhận diện tiếng Anh thông minh.',
-        'twitter.description': 'Bộ gõ tiếng Việt chuẩn Apple Native, lõi Pure Swift vi giây, bảo mật riêng tư tuyệt đối.',
+        'page.description': 'Bộ gõ tiếng Việt Native cho macOS chuẩn InputMethodKit. Không cần quyền Trợ năng (Accessibility) hay CGEventTap, bảo toàn 100% lịch sử Undo Cmd+Z, bảo mật Zero-Logging.',
+        'og.description': 'Trải nghiệm gõ tiếng Việt tự nhiên chuẩn Apple Native. Hỗ trợ song ngữ thông minh, có phòng thí nghiệm chẩn đoán VieLotus Lab.',
+        'twitter.description': 'Bộ gõ tiếng Việt mã nguồn mở chuẩn Apple Native, an toàn và bảo mật riêng tư tuyệt đối.',
         'nav.features': 'Tính năng',
         'nav.playground': 'Thử nghiệm',
+        'nav.lab': 'Lab & Kiểm thử',
         'nav.comparison': 'So sánh',
         'nav.architecture': 'Kiến trúc',
         'nav.roadmap': 'Lộ trình',
+        'nav.sponsor': 'Tài trợ',
         'nav.github': 'Star trên GitHub',
-        'nav.download': 'Tải bản v1.0.0',
-        'hero.badge': 'Mã nguồn mở · Giấy phép Apache 2.0 · Không quyền Trợ năng',
+        'nav.download': 'Tải bản v1.1.0',
+        'hero.badge': 'Mã nguồn mở · Giấy phép GPLv3 · Chuẩn Apple InputMethodKit',
         'hero.title': 'Sen Việt<br><span class="gradient-text">Bộ gõ tiếng Việt Native cho macOS.</span>',
-        'hero.subtitle': 'Không gạch chân nhấp nháy CJK. Không đòi hỏi quyền Trợ năng (Accessibility). Bảo toàn 100% lịch sử Undo (<code class="text-xs bg-white/10 text-slate-200 px-1.5 py-0.5 rounded font-mono">Cmd + Z</code>) trong mọi ứng dụng.',
-        'hero.btn_dmg_title': 'Tải về .dmg (Khuyên dùng)',
-        'hero.btn_dmg_sub': 'macOS 13+ · Universal (M1/M2/M3/M4 & Intel)',
-        'hero.btn_pkg_title': 'Tải về .pkg',
-        'hero.btn_pkg_sub': 'Gói cài đặt tự động kích hoạt',
+        'hero.subtitle': 'Khởi nguồn từ mong muốn một trải nghiệm gõ tự nhiên, an toàn và hòa hợp với macOS. Không cần quyền Trợ năng (Accessibility) hay CGEventTap, bảo toàn ngữ cảnh hoàn tác (<code class="text-xs bg-white/10 text-slate-200 px-1.5 py-0.5 rounded font-mono">Cmd + Z</code>) và vận hành hoàn toàn offline.',
+        'hero.btn_pkg_title': 'Tải về .pkg (Khuyên dùng)',
+        'hero.btn_pkg_sub': 'macOS 13+ · Universal (M1/M2/M3/M4 & Intel)',
+        'hero.btn_dmg_title': 'Tải về .dmg',
+        'hero.btn_dmg_sub': 'Kéo thả vào Applications',
+        'hero.btn_lab_title': 'VieLotus Lab (.dmg)',
+        'hero.btn_lab_sub': 'Công cụ chẩn đoán cho Tester',
         'hero.copy_title': 'Chép lệnh',
         'hero.copy_label': 'Chép',
         'hero.cmd_note': 'Dành cho Terminal: Tự động tải, cài đặt gói PKG và mở cài đặt bàn phím.',
         'metrics.latency_val': '10 – 25 µs',
-        'metrics.latency_desc': 'Tốc độ phản hồi phím (Pure Swift Native Swift)',
-        'metrics.accuracy_val': '98.71%',
-        'metrics.accuracy_desc': 'Độ chính xác hồi quy (9,091 từ kiểm thử)',
+        'metrics.latency_desc': 'Tốc độ phản hồi phím (Pure Swift Engine)',
+        'metrics.accuracy_val': '99.51%',
+        'metrics.accuracy_desc': 'Tỉ lệ kiểm thử hồi quy (9,091 từ thực tế)',
         'metrics.privacy_val': '0 byte log',
-        'metrics.privacy_desc': 'Cam kết Zero-Logging & Offline 100%',
+        'metrics.privacy_desc': 'Hoạt động offline & Tôn trọng quyền riêng tư',
         'setup.title': '3 Bước Kích Hoạt Đơn Giản Sau Khi Cài Đặt',
         'setup.step1_title': 'Cài đặt & Đăng xuất',
         'setup.step1_desc': 'Cài file .pkg xong, hãy <strong>Đăng xuất (Log Out)</strong> để macOS nạp bộ gõ mới.',
@@ -671,16 +815,32 @@
         'settings.bullet2': '<strong>Chuẩn chính tả mới:</strong> Tùy chọn bỏ dấu kiểu mới (hoà/hòa) và viết tắt vần cuối.',
         'settings.bullet3': '<strong>Smart Bilingual:</strong> Tự động nhận diện và khôi phục tiếng Anh khi gõ hỗn hợp.',
         'settings.img_alt': 'Giao diện Cài đặt Sen Việt',
-        'features.title': '4 Khác biệt Kỹ thuật Cốt lõi',
-        'features.subtitle': 'Được thiết kế từ gốc để giải quyết triệt để các hạn chế lịch sử của bộ gõ trên macOS.',
-        'features.f1_title': 'Chuẩn Apple Native — Không cần quyền Trợ năng',
-        'features.f1_desc': 'Chạy trực tiếp dưới dạng Input Method của hệ thống qua giao thức <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">InputMethodKit</code>. Tuyệt đối không can thiệp phím ngầm qua <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">CGEventTap</code>, không đòi quyền Accessibility, bảo đảm an toàn dữ liệu 100%.',
-        'features.f2_title': 'Hiển thị tức thì — Không gạch chân nhấp nháy',
-        'features.f2_desc': 'Cơ chế thay thế trực tiếp ký tự tại con trỏ (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">directReplacement</code>) loại bỏ vạch gạch chân chờ CJK khó chịu. Đặc biệt, bảo toàn nguyên vẹn 100% lịch sử Undo (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">Cmd + Z</code>) trong Word, VS Code, Notion.',
-        'features.f3_title': 'Phản hồi mượt mà trong ứng dụng Chat',
-        'features.f3_desc': 'Tối ưu hóa hành vi con trỏ khi chuyển cửa sổ giữa trình duyệt và các ứng dụng nhắn tin (Telegram, Zalo, Slack, Messenger). Nhận diện ký tự bỏ dấu ngay từ phím đầu tiên mà không cần gõ phím Space mồi.',
-        'features.f4_title': 'Nhận diện tiếng Anh thông minh (Smart Bilingual)',
-        'features.f4_desc': 'Kết hợp luật âm vị tiếng Việt, từ điển hệ thống và Apple NaturalLanguage để tự động khôi phục từ tiếng Anh khi gõ văn bản hỗn hợp (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">wifi</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">apple</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">system</code>) mà không cần chuyển bộ gõ.',
+        'features.title': '4 Điểm Nhấn Kiến Trúc Cốt Lõi',
+        'features.subtitle': 'Thiết kế tinh gọn, an toàn và hòa nhập tự nhiên vào hệ thống macOS.',
+        'features.f1_title': 'Chuẩn Apple Native — Không cần quyền can thiệp hệ thống',
+        'features.f1_desc': 'Tích hợp trực tiếp qua giao thức <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">InputMethodKit</code>. Vận hành an toàn như một nguồn nhập liệu tiêu chuẩn của hệ điều hành mà không cần cấp quyền Trợ năng (Accessibility) hay dùng <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">CGEventTap</code>.',
+        'features.f2_title': 'Bảo toàn ngữ cảnh — Giữ nguyên lịch sử Undo (Cmd + Z)',
+        'features.f2_desc': 'Cơ chế thay thế trực tiếp ký tự tại con trỏ (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">directReplacement</code>) giúp các thao tác hoàn tác (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">Cmd + Z</code>) hoạt động chuẩn xác trong VS Code, Cursor, Word, Notion và các công cụ thiết kế.',
+        'features.f3_title': 'Phản hồi tự nhiên trong ứng dụng Chat & Trình duyệt',
+        'features.f3_desc': 'Được tối ưu hóa cho hành vi con trỏ khi chuyển cửa sổ giữa trình duyệt và các ứng dụng nhắn tin (Telegram, Zalo, Slack, Messenger), bảo đảm các ký tự đầu tiên luôn nhận diện đúng dấu.',
+        'features.f4_title': 'Nhận diện từ tiếng Anh thông minh (Smart Bilingual)',
+        'features.f4_desc': 'Tự động giữ nguyên các từ tiếng Anh quen thuộc (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">wifi</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">apple</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">system</code>) khi gõ văn bản kỹ thuật hỗn hợp mà không cần thao tác chuyển bàn phím thủ công.',
+        'lab.pill': 'Công cụ chẩn đoán đồng hành · Mã nguồn mở',
+        'lab.title': 'VieLotus Lab — Cùng hoàn thiện bộ gõ cho mọi ứng dụng',
+        'lab.desc': 'Hệ sinh thái phần mềm trên macOS vô cùng phong phú: từ các ứng dụng AppKit truyền thống, trình duyệt web, các bộ công cụ Electron (VS Code, Cursor, Slack) cho đến Office và Terminal. Không một giải pháp đơn lẻ nào có thể hoàn hảo ngay từ đầu trên mọi ô nhập liệu. <strong>VieLotus Lab</strong> là không gian đồng hành mở để người dùng và cộng đồng theo dõi trực tiếp nhịp phím, bắt các tình huống góc và cùng đóng góp để bộ gõ ngày càng hoàn thiện hơn.',
+        'lab.f1_title': 'Theo dõi nhịp phím trên ứng dụng thực tế',
+        'lab.f1_desc': 'Bắt nhịp biến đổi văn bản và trạng thái con trỏ thời gian thực trên Cursor, VS Code, Word, Chrome, Slack, Terminal.',
+        'lab.f2_title': 'Bảo vệ quyền riêng tư (Privacy by Design)',
+        'lab.f2_desc': 'Chỉ ghi nhận lượng ký tự tăng/giảm trong phiên thử nghiệm. Tuyệt đối không lưu nội dung tài liệu có sẵn và không ghi lại ký tự bị xóa.',
+        'lab.f3_title': 'Xuất gói chẩn đoán khép kín',
+        'lab.f3_desc': 'Xem trước, tự do biên tập và xuất báo cáo Markdown hoặc gói JSON chuẩn (tách rõ phiên bản Lab và IME đang chạy) để đính kèm GitHub Issue.',
+        'lab.btn_download': 'Tải VieLotusLab.dmg',
+        'lab.btn_guide': 'Xem tài liệu kiểm thử 6 bước',
+        'lab.steps_title': '4 Bước đóng góp kiểm thử đơn giản:',
+        'lab.s1': 'Tải và mở <strong>VieLotus Lab</strong>',
+        'lab.s2': 'Chọn app mục tiêu & gõ chuỗi phím thử nghiệm',
+        'lab.s3': 'Bấm <strong>Xem trước & Báo cáo</strong> (Markdown / JSON)',
+        'lab.s4': 'Gửi Issue lên GitHub để cùng hoàn thiện',
         'comparison.title': 'Bảng So sánh Trực quan',
         'comparison.subtitle': 'So sánh thực tế giữa Sen Việt với bộ gõ mặc định của macOS và các công cụ dùng quyền Accessibility cũ.',
         'comparison.col_criteria': 'Tiêu chí trải nghiệm',
@@ -692,7 +852,7 @@
         'comparison.row1_legacy': 'Bắt buộc cấp quyền',
         'comparison.row1_vielotus': 'Không cần quyền',
         'comparison.row2_label': 'Gạch chân nhấp nháy CJK',
-        'comparison.row2_macos': 'Có (rất khó chịu)',
+        'comparison.row2_macos': 'Có (gây gián đoạn)',
         'comparison.row2_legacy': 'Không',
         'comparison.row2_vielotus': 'Không gạch chân',
         'comparison.row3_label': 'Bảo toàn Undo (Cmd + Z)',
@@ -714,19 +874,19 @@
         'comparison.row7_label': 'Giấy phép phát hành',
         'comparison.row7_macos': 'Đóng mã độc quyền',
         'comparison.row7_legacy': 'Nhiều giấy phép',
-        'comparison.row7_vielotus': 'Apache License 2.0',
+        'comparison.row7_vielotus': 'GPLv3 License',
         'arch.title': 'Kiến trúc Tách lớp Độc lập',
         'arch.subtitle': 'Tách bạch nghiêm ngặt giữa tầng giao tiếp hệ điều hành (Swift) và lõi thuật toán tiếng Việt (Pure Swift).',
         'arch.comment': '// Sơ đồ luồng xử lý phím thời gian thực',
         'arch.diagram': `┌──────────────────────────────────────────────────────────────┐
-│  LỚP VỎ HỆ THỐNG: Swift Native (InputMethodKit)              │
+│  LỚP ĐIỀU KHIỂN: Swift Native (InputMethodKit)               │
 │  • IMKServer quản lý kết nối Input Source hệ thống           │
 │  • VieLotusIMController điều phối sự kiện bàn phím           │
 │  • Giao tiếp với Client qua giao thức NSTextInputClient      │
 └──────────────────────────────┬───────────────────────────────┘
-                               │ (Direct Swift FFI - C ABI)
+                               │ (Gọi trực tiếp Pure Swift)
 ┌──────────────────────────────┴───────────────────────────────┐
-│  LÕI NGỮ ÂM TIẾNG VIỆT: Pure Swift Engine (VieLotusCore)           │
+│  LÕI NGỮ ÂM TIẾNG VIỆT: Pure Swift Engine (VieLotusCore)     │
 │  • Xử lý bảng mã Telex và VNI tốc độ vi giây                 │
 │  • Bỏ dấu chuẩn mới (hoà/hòa), viết tắt vần cuối             │
 │  • Bộ đệm vòng (Ring Buffer) 32 từ hỗ trợ hoàn tác nhanh     │
@@ -734,18 +894,17 @@
 └──────────────────────────────────────────────────────────────┘`,
         'roadmap.title': 'Lộ trình Phát triển',
         'roadmap.subtitle': 'Hướng tới hệ sinh thái bộ gõ tiếng Việt hoàn chỉnh cho mọi thiết bị Apple.',
-        'roadmap.step1_badge': 'v1.0.0 (Hiện tại)',
+        'roadmap.step1_badge': 'v1.0.0 (Đã phát hành)',
         'roadmap.step1_title': 'macOS Universal Release',
-        'roadmap.step1_desc': 'Phát hành chính thức bản cài đặt Universal (.dmg & .pkg) cho cả Apple Silicon và Intel. Đạt 98.71% pass rate.',
-        'roadmap.step2_badge': 'Đang phát triển',
-        'roadmap.step2_title': 'iOS & iPadOS Extension',
-        'roadmap.step2_desc': 'Mở rộng bàn phím cho iPhone và iPad thông qua <code class="text-slate-300">UIInputViewController</code>, tái sử dụng trọn vẹn lõi di động <code class="text-slate-300">VieLotusCore</code>.',
-        'roadmap.step3_badge': 'Dự kiến',
-        'roadmap.step3_title': 'Đồng bộ Bảng gõ tắt',
-        'roadmap.step3_desc': 'Hỗ trợ tùy biến bảng gõ tắt cá nhân hóa và quản lý từ vựng kỹ thuật chuyên sâu theo nhu cầu người dùng.',
-        'nav.sponsor': 'Tài trợ',
+        'roadmap.step1_desc': 'Phát hành chính thức bản cài đặt Universal (.dmg & .pkg) cho cả Apple Silicon và Intel.',
+        'roadmap.step2_badge': 'v1.1.0 (Hiện tại)',
+        'roadmap.step2_title': '99.51% Benchmark & VieLotus Lab',
+        'roadmap.step2_desc': 'Nâng tỷ lệ kiểm thử lên 99.51% với ràng buộc ngữ âm Pure Swift; ra mắt VieLotus Lab chẩn đoán nhịp gõ và xuất gói báo cáo lỗi khép kín.',
+        'roadmap.step3_badge': 'Đang phát triển',
+        'roadmap.step3_title': 'iOS & Đồng bộ Bảng gõ tắt',
+        'roadmap.step3_desc': 'Mở rộng bàn phím cho iPhone/iPad dùng chung lõi <code class="text-slate-300">VieLotusCore</code> và hỗ trợ tùy biến bảng gõ tắt cá nhân hóa.',
         'community.title': 'Dự án Vì Cộng đồng Người dùng Mac Việt Nam',
-        'community.desc': 'Sen Việt được phát triển phi thương mại theo giấy phép Apache 2.0. Mọi đóng góp thuật toán, báo lỗi, hoặc ý tưởng cải tiến đều được chào đón nồng nhiệt.',
+        'community.desc': 'Sen Việt được phát triển phi thương mại theo giấy phép GPLv3. Mọi đóng góp thuật toán, báo lỗi, hoặc ý tưởng cải tiến đều được chào đón nồng nhiệt.',
         'community.btn': 'Tham gia Đóng góp trên GitHub',
         'sponsor.compact_title': 'Mời tác giả ly cà phê',
         'sponsor.compact_sub': 'Đồng hành cùng dự án bộ gõ Sen Việt',
@@ -753,38 +912,43 @@
         'sponsor.compact_btn_coffee': 'Buy Me a Coffee',
         'sponsor.compact_btn_paypal': 'PayPal',
         'footer.sponsor': 'Tài trợ',
-        'footer.license': 'Sen Việt (VieLotusIM) · Mã nguồn mở theo giấy phép <strong>Apache License 2.0</strong>.',
+        'footer.license': 'Sen Việt (VieLotusIM) · Mã nguồn mở theo giấy phép <strong>GNU General Public License v3.0 (GPLv3)</strong>.',
         'footer.releases': 'Bản phát hành',
+        'footer.lab_guide': 'Hướng dẫn Lab',
         'footer.issues': 'Báo lỗi'
       },
       en: {
         'page.title': 'Sen Việt (VieLotusIM) — Native macOS Vietnamese Input Method',
-        'page.description': 'Native Vietnamese Input Method for macOS built on InputMethodKit. Zero CJK underline flicker, zero Accessibility permissions required, 100% Undo Cmd+Z preservation, strict Zero-Logging privacy.',
-        'og.description': 'Type naturally like a system keyboard. Zero underline flicker, preserved Undo Cmd+Z, microsecond Pure Swift engine, and strict Zero-Logging privacy.',
-        'twitter.description': 'Apple Native Vietnamese Input Method with microsecond Pure Swift core and zero Accessibility permissions.',
+        'page.description': 'Native Vietnamese Input Method for macOS built on InputMethodKit. Zero Accessibility permissions or CGEventTap required, 100% Undo Cmd+Z preservation, strict Zero-Logging privacy.',
+        'og.description': 'Type naturally like a native system keyboard. Preserved Undo Cmd+Z, intelligent bilingual detection, accompanied by the VieLotus Lab diagnostics suite.',
+        'twitter.description': 'Open-source Apple Native Vietnamese Input Method, safe, private, and fully offline.',
         'nav.features': 'Features',
         'nav.playground': 'Playground',
+        'nav.lab': 'Lab & Testing',
         'nav.comparison': 'Comparison',
         'nav.architecture': 'Architecture',
         'nav.roadmap': 'Roadmap',
+        'nav.sponsor': 'Sponsor',
         'nav.github': 'Star on GitHub',
-        'nav.download': 'Download v1.0.0',
-        'hero.badge': 'Open Source · Apache 2.0 License · Zero Accessibility Permissions',
+        'nav.download': 'Download v1.1.0',
+        'hero.badge': 'Open Source · GPLv3 License · Apple InputMethodKit',
         'hero.title': 'Sen Việt<br><span class="gradient-text">Native Vietnamese Input Method for macOS.</span>',
-        'hero.subtitle': 'Zero CJK underline flicker. Zero Accessibility permissions required. Flawlessly preserves 100% Undo history (<code class="text-xs bg-white/10 text-slate-200 px-1.5 py-0.5 rounded font-mono">Cmd + Z</code>) across all applications.',
-        'hero.btn_dmg_title': 'Download .dmg (Recommended)',
-        'hero.btn_dmg_sub': 'macOS 13+ · Universal (M1/M2/M3/M4 & Intel)',
-        'hero.btn_pkg_title': 'Download .pkg',
-        'hero.btn_pkg_sub': 'Auto-registering installer package',
+        'hero.subtitle': 'Born from the desire for a natural, safe typing experience in harmony with macOS. Zero Accessibility permissions or CGEventTap required, flawlessly preserves Undo history (<code class="text-xs bg-white/10 text-slate-200 px-1.5 py-0.5 rounded font-mono">Cmd + Z</code>), and runs entirely offline.',
+        'hero.btn_pkg_title': 'Download .pkg (Recommended)',
+        'hero.btn_pkg_sub': 'macOS 13+ · Universal (M1/M2/M3/M4 & Intel)',
+        'hero.btn_dmg_title': 'Download .dmg',
+        'hero.btn_dmg_sub': 'Drag & Drop into Applications',
+        'hero.btn_lab_title': 'VieLotus Lab (.dmg)',
+        'hero.btn_lab_sub': 'Diagnostics Companion for Testers',
         'hero.copy_title': 'Copy command',
         'hero.copy_label': 'Copy',
         'hero.cmd_note': 'For Terminal: Automatically downloads, installs PKG package and launches keyboard settings.',
         'metrics.latency_val': '10 – 25 µs',
-        'metrics.latency_desc': 'Keystroke response latency (Pure Swift Native Swift)',
-        'metrics.accuracy_val': '98.71%',
+        'metrics.latency_desc': 'Keystroke response latency (Pure Swift Engine)',
+        'metrics.accuracy_val': '99.51%',
         'metrics.accuracy_desc': 'Regression accuracy (9,091 benchmark words)',
         'metrics.privacy_val': '0 bytes logged',
-        'metrics.privacy_desc': 'Strict Zero-Logging commitment & 100% Offline',
+        'metrics.privacy_desc': 'Strict Zero-Logging & 100% Offline by Design',
         'setup.title': '3 Simple Steps to Activate After Installation',
         'setup.step1_title': 'Install & Log Out',
         'setup.step1_desc': 'Run the .pkg installer, then <strong>Log Out</strong> once so macOS loads the new input method.',
@@ -808,15 +972,31 @@
         'settings.bullet3': '<strong>Smart Bilingual:</strong> Automatically detects and restores English vocabulary in mixed sentences.',
         'settings.img_alt': 'Sen Việt Settings Interface',
         'features.title': '4 Core Architectural Distinctions',
-        'features.subtitle': 'Architected from the ground up to eliminate historical limitations of macOS input methods.',
-        'features.f1_title': 'Apple Native Protocol — Zero Accessibility Permissions',
-        'features.f1_desc': 'Operates directly as a system Input Method via <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">InputMethodKit</code>. Never intercepts keystrokes via low-level <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">CGEventTap</code> and requires zero Accessibility privileges, ensuring 100% data safety.',
-        'features.f2_title': 'Direct Replacement — Zero Underline Flicker',
-        'features.f2_desc': 'Direct in-place character replacement (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">directReplacement</code>) eliminates jarring CJK marked-text underlines. Flawlessly preserves 100% Undo history (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">Cmd + Z</code>) in Word, VS Code, Notion, and across macOS.',
-        'features.f3_title': 'Responsive Chat & Messaging Integration',
-        'features.f3_desc': 'Optimized cursor and focus behavior when switching between browser tabs and messaging apps (Telegram, Zalo, Slack, Messenger). Accents register on the first keystroke without requiring a dummy space key.',
+        'features.subtitle': 'Designed for simplicity, security, and seamless OS compliance.',
+        'features.f1_title': 'Apple Native Architecture — Zero System-Wide Permissions',
+        'features.f1_desc': 'Operates directly as a system Input Method via <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">InputMethodKit</code>. Safely processes keystrokes in user space without Accessibility permissions or low-level <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">CGEventTap</code> interception.',
+        'features.f2_title': 'Preserved Context — 100% Undo (Cmd + Z) Preservation',
+        'features.f2_desc': 'Direct in-place character replacement (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">directReplacement</code>) ensures undo commands (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">Cmd + Z</code>) work cleanly across VS Code, Cursor, Word, Notion, and creative tools.',
+        'features.f3_title': 'Responsive Chat & Browser Integration',
+        'features.f3_desc': 'Fine-tuned focus and caret behavior across browser windows and messaging apps (Telegram, Zalo, Slack, Messenger) so initial keystrokes register accents promptly.',
         'features.f4_title': 'Intelligent English Detection (Smart Bilingual)',
-        'features.f4_desc': 'Combines Vietnamese phonotactic rules, system dictionaries, and Apple\'s NaturalLanguage framework to restore English words automatically in mixed text (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">wifi</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">apple</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">system</code>) without toggling input modes.',
+        'features.f4_desc': 'Preserves common English terms (<code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">wifi</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">apple</code>, <code class="text-xs bg-white/10 px-1 py-0.5 rounded font-mono text-slate-300">system</code>) automatically during technical typing without manual keyboard toggling.',
+        'lab.pill': 'Open Source Diagnostics Companion',
+        'lab.title': 'VieLotus Lab — Perfecting the Input Experience Across Every App',
+        'lab.desc': 'The macOS software ecosystem is vast: from standard AppKit utilities to Chromium, Electron suites (VS Code, Cursor, Slack), Office, and modern Terminal emulators. No single tool handles every bespoke text control seamlessly on day one. <strong>VieLotus Lab</strong> is an open companion space where developers and community members can observe keystroke streams, catch tricky edge cases, and collaborate on perfecting the input method together.',
+        'lab.f1_title': 'Live Real-App Inspection',
+        'lab.f1_desc': 'Inspect text mutation deltas and caret movements in real time across Cursor, VS Code, Word, Chrome, Slack, and Terminal.',
+        'lab.f2_title': 'Privacy by Design',
+        'lab.f2_desc': 'Only logs keystroke deltas (characters added/removed during testing). Never extracts existing document text or logs deleted sensitive words.',
+        'lab.f3_title': 'Closed-Loop Issue Export',
+        'lab.f3_desc': 'Preview, freely edit, and export structured Markdown or JSON diagnostic packets (with clearly separated Lab and running IME versions) ready to attach to GitHub Issues.',
+        'lab.btn_download': 'Download VieLotusLab.dmg',
+        'lab.btn_guide': 'Read the 6-Step Testing Guide',
+        'lab.steps_title': '4 Simple Steps to Contribute:',
+        'lab.s1': 'Download & open <strong>VieLotus Lab</strong>',
+        'lab.s2': 'Select target app & reproduce the keystrokes',
+        'lab.s3': 'Click <strong>Preview & Report</strong> (Markdown / JSON)',
+        'lab.s4': 'Submit on GitHub to help us refine the engine',
         'comparison.title': 'Feature Comparison Matrix',
         'comparison.subtitle': 'A side-by-side comparison between Sen Việt, the macOS default input method, and legacy Accessibility-based tools.',
         'comparison.col_criteria': 'Criteria',
@@ -828,7 +1008,7 @@
         'comparison.row1_legacy': 'Required',
         'comparison.row1_vielotus': 'Zero permissions',
         'comparison.row2_label': 'CJK Underline Flicker',
-        'comparison.row2_macos': 'Yes (flickering)',
+        'comparison.row2_macos': 'Yes (distracting)',
         'comparison.row2_legacy': 'No',
         'comparison.row2_vielotus': 'Zero flicker',
         'comparison.row3_label': 'Preserves Undo (Cmd + Z)',
@@ -850,38 +1030,37 @@
         'comparison.row7_label': 'Open Source License',
         'comparison.row7_macos': 'Proprietary closed',
         'comparison.row7_legacy': 'Various',
-        'comparison.row7_vielotus': 'Apache License 2.0',
+        'comparison.row7_vielotus': 'GPLv3 License',
         'arch.title': 'Decoupled Layer Architecture',
         'arch.subtitle': 'Strict separation between the OS platform layer (Swift) and the high-performance Vietnamese phonetics engine (Pure Swift).',
         'arch.comment': '// Real-time Keystroke Processing Pipeline',
         'arch.diagram': `┌──────────────────────────────────────────────────────────────┐
-│  SYSTEM WRAPPER: Swift Native (InputMethodKit)               │
-│  • IMKServer manages system Input Source lifecycle           │
-│  • VieLotusIMController coordinates raw keyboard events      │
-│  • Communicates with applications via NSTextInputClient      │
+│  SYSTEM CONTROLLER: Swift Native (macOS)                     │
+│  • Integrates directly into native Apple keyboard sources    │
+│  • Dispatches keystroke events without event-tap overhead    │
+│  • Direct text replacement across all macOS applications     │
 └──────────────────────────────┬───────────────────────────────┘
-                               │ (Direct Swift FFI - C ABI)
+                               │ (Direct Swift Call)
 ┌──────────────────────────────┴───────────────────────────────┐
-│  VIETNAMESE PHONETICS CORE: Pure Swift Engine (VieLotusCore)       │
-│  • Microsecond-latency Telex & VNI transformation engine     │
-│  • Modern tone placement (hoà/hòa) & consonant shortcuts     │
-│  • 32-word Ring Buffer for instantaneous undo restore        │
-│  • Intelligent English word detection (Smart Bilingual)      │
+│  VIETNAMESE ENGINE: Pure Swift Core (VieLotusCore)           │
+│  • High-performance Telex & VNI syllable transformation      │
+│  • Modern tone placement & relaxed coda consonants           │
+│  • 32-word ring buffer for caret step-back editing           │
+│  • Automatic English word detection (Smart Bilingual)        │
 └──────────────────────────────────────────────────────────────┘`,
         'roadmap.title': 'Development Roadmap',
         'roadmap.subtitle': 'Building a complete, native Vietnamese input ecosystem across all Apple devices.',
-        'roadmap.step1_badge': 'v1.0.0 (Current)',
+        'roadmap.step1_badge': 'v1.0.0 (Released)',
         'roadmap.step1_title': 'macOS Universal Release',
-        'roadmap.step1_desc': 'Official universal release (.dmg & .pkg) for Apple Silicon and Intel Macs. 98.71% benchmark pass rate.',
-        'roadmap.step2_badge': 'In Active Development',
-        'roadmap.step2_title': 'iOS & iPadOS Extension',
-        'roadmap.step2_desc': 'Expanding to iPhone and iPad via <code class="text-slate-300">UIInputViewController</code>, reusing the portable <code class="text-slate-300">VieLotusCore</code> domain engine.',
-        'roadmap.step3_badge': 'Planned',
-        'roadmap.step3_title': 'Cloud Macro & Shorthand Sync',
-        'roadmap.step3_desc': 'Customizable typing shortcuts, technical glossaries, and lightweight cross-device sync.',
-        'nav.sponsor': 'Sponsor',
+        'roadmap.step1_desc': 'Official universal release (.dmg & .pkg) for Apple Silicon and Intel Macs.',
+        'roadmap.step2_badge': 'v1.1.0 (Current)',
+        'roadmap.step2_title': '99.51% Benchmark & VieLotus Lab',
+        'roadmap.step2_desc': 'Elevated benchmark pass rate to 99.51% via pure Swift phonological rules; introduced VieLotus Lab typing diagnostics app and closed-loop issue export.',
+        'roadmap.step3_badge': 'In Active Development',
+        'roadmap.step3_title': 'iOS & Custom Shorthands',
+        'roadmap.step3_desc': 'Expanding to iPhone and iPad via <code class="text-slate-300">UIInputViewController</code>, reusing portable <code class="text-slate-300">VieLotusCore</code>, with customizable typing shortcuts.',
         'community.title': 'Built for the Apple Community in Vietnam',
-        'community.desc': 'Sen Việt is a non-commercial open-source project licensed under Apache 2.0. All algorithmic contributions, issue reports, and community ideas are warmly welcome.',
+        'community.desc': 'Sen Việt is a non-commercial open-source project licensed under GPLv3. All algorithmic contributions, issue reports, and community ideas are warmly welcome.',
         'community.btn': 'Contribute on GitHub',
         'sponsor.compact_title': 'Buy the author a coffee',
         'sponsor.compact_sub': 'Support the open-source Sen Việt project',
@@ -889,8 +1068,9 @@
         'sponsor.compact_btn_coffee': 'Buy Me a Coffee',
         'sponsor.compact_btn_paypal': 'PayPal',
         'footer.sponsor': 'Sponsor',
-        'footer.license': 'Sen Việt (VieLotusIM) · Open source under <strong>Apache License 2.0</strong>.',
+        'footer.license': 'Sen Việt (VieLotusIM) · Open source under <strong>GNU General Public License v3.0 (GPLv3)</strong>.',
         'footer.releases': 'Releases',
+        'footer.lab_guide': 'Lab Guide',
         'footer.issues': 'Issues'
       }
     };
@@ -991,14 +1171,23 @@
         const response = await fetch('https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest');
         if (response.ok) {
           const data = await response.json();
-          const dmgAsset = data.assets.find(a => a.name.endsWith('.dmg'));
+          const dmgAsset = data.assets.find(a => a.name === 'VieLotusIM.dmg');
           const pkgAsset = data.assets.find(a => a.name.endsWith('.pkg'));
+          const labAsset = data.assets.find(a => a.name.includes('Lab') && a.name.endsWith('.dmg'));
           
           if (dmgAsset) {
-            document.getElementById('btn-download-dmg').href = dmgAsset.browser_download_url;
+            const dmgBtn = document.getElementById('btn-download-dmg');
+            if (dmgBtn) dmgBtn.href = dmgAsset.browser_download_url;
           }
           if (pkgAsset) {
-            document.getElementById('btn-download-pkg').href = pkgAsset.browser_download_url;
+            const pkgBtn = document.getElementById('btn-download-pkg');
+            if (pkgBtn) pkgBtn.href = pkgAsset.browser_download_url;
+          }
+          if (labAsset) {
+            const labBtn = document.getElementById('btn-download-lab');
+            if (labBtn) labBtn.href = labAsset.browser_download_url;
+            const labHeroBtn = document.getElementById('btn-download-lab-hero');
+            if (labHeroBtn) labHeroBtn.href = labAsset.browser_download_url;
           }
         }
       } catch (err) {
