@@ -29,7 +29,7 @@ Bộ gõ **Sen Việt (VieLotusIM)** được thiết kế theo triết lý **Ze
 Nếu bạn phát hiện bất kỳ vấn đề bảo mật nào liên quan đến Sen Việt:
 
 1. **Vui lòng KHÔNG mở công khai Issue trên GitHub**.
-2. Gửi thông tin chi tiết qua tính năng [GitHub Security Advisories](https://github.com/stevedat/VietLotus-IM/security/advisories/new) hoặc liên hệ qua email bảo mật của dự án.
+2. Gửi thông tin chi tiết qua tính năng [GitHub Security Advisories](https://github.com/stevedat/VieLotus-IM/security/advisories/new) hoặc liên hệ qua email bảo mật của dự án.
 3. Vui lòng cung cấp:
    - Mô tả chi tiết về lỗ hổng hoặc hành vi bất thường.
    - Phiên bản macOS và phiên bản VieLotusIM đang sử dụng.

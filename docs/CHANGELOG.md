@@ -45,5 +45,5 @@ Tất cả thay đổi đáng chú ý của dự án **Sen Việt (VieLotusIM)**
 
 ---
 
-[1.1.0]: https://github.com/stevedat/VietLotus-IM/releases/tag/v1.1.0
-[1.0.0]: https://github.com/stevedat/VietLotus-IM/releases/tag/v1.0.0
+[1.1.0]: https://github.com/stevedat/VieLotus-IM/releases/tag/v1.1.0
+[1.0.0]: https://github.com/stevedat/VieLotus-IM/releases/tag/v1.0.0

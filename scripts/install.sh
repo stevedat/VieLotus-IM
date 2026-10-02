@@ -5,7 +5,7 @@ echo "=== Cài đặt Sen Việt (VieLotusIM) cho macOS ==="
 TEMP_PKG="/tmp/VieLotusIM.pkg"
 
 echo "1/3 Đang tải bản phát hành mới nhất từ GitHub..."
-curl -sL "https://github.com/stevedat/VietLotus-IM/releases/latest/download/VieLotusIM.pkg" -o "$TEMP_PKG"
+curl -sL "https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg" -o "$TEMP_PKG"
 
 if [ ! -f "$TEMP_PKG" ] || [ $(wc -c <"$TEMP_PKG") -lt 1000 ]; then
     echo "❌ Lỗi: Không thể tải gói cài đặt từ GitHub Releases."

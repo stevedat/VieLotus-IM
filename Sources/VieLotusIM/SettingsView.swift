@@ -170,7 +170,7 @@ struct SettingsView: View {
                 
                 Spacer()
                 
-                Link("GitHub", destination: URL(string: "https://github.com/stevedat/VietLotus-IM")!)
+                Link("GitHub", destination: URL(string: "https://github.com/stevedat/VieLotus-IM")!)
                     .font(.system(size: 11, weight: .medium))
                 
                 Text("•")
@@ -212,7 +212,7 @@ struct SettingsView: View {
     }
 
     private func openGitHubIssue() {
-        if let url = URL(string: "https://github.com/stevedat/VietLotus-IM/issues/new?template=bug_report.md") {
+        if let url = URL(string: "https://github.com/stevedat/VieLotus-IM/issues/new?template=bug_report.md") {
             NSWorkspace.shared.open(url)
         }
     }
@@ -232,7 +232,7 @@ struct SettingsView: View {
         if let appUrl = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "org.vielotus.inputmethod.VieLotusLab") {
             NSWorkspace.shared.open(appUrl)
         } else {
-            if let url = URL(string: "https://github.com/stevedat/VietLotus-IM/releases") {
+            if let url = URL(string: "https://github.com/stevedat/VieLotus-IM/releases") {
                 NSWorkspace.shared.open(url)
             }
         }

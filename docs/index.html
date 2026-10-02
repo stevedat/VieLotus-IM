@@ -4,23 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sen Việt (VieLotusIM) — Bộ gõ tiếng Việt Native cho macOS</title>
-  <meta name="description" content="Bộ gõ tiếng Việt Native cho macOS chuẩn InputMethodKit. Không giật gạch chân CJK, không cần quyền Trợ năng (Accessibility), bảo toàn 100% lịch sử Undo Cmd+Z, bảo mật Zero-Logging.">
+  <meta name="description" content="Bộ gõ tiếng Việt Native mã nguồn mở cho macOS chuẩn InputMethodKit. Không cần quyền Trợ năng (Accessibility), bảo toàn lịch sử Undo Cmd+Z, bảo mật Zero-Logging.">
   
   <!-- Canonical & OpenGraph -->
-  <link rel="canonical" href="https://stevedat.github.io/VietLotus-IM/">
+  <link rel="canonical" href="https://stevedat.github.io/VieLotus-IM/">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://stevedat.github.io/VietLotus-IM/">
+  <meta property="og:url" content="https://stevedat.github.io/VieLotus-IM/">
   <meta property="og:title" content="Sen Việt (VieLotusIM) — Bộ gõ tiếng Việt Native cho macOS">
-  <meta property="og:description" content="Gõ mượt mà như bàn phím hệ thống. Không gạch chân nhấp nháy, nhận diện tiếng Anh thông minh.">
-  <meta property="og:image" content="https://stevedat.github.io/VietLotus-IM/assets/og-card.png">
+  <meta property="og:description" content="Trải nghiệm gõ tiếng Việt tự nhiên chuẩn Apple Native. Hỗ trợ song ngữ thông minh, có phòng thí nghiệm chẩn đoán VieLotusLab.">
+  <meta property="og:image" content="https://stevedat.github.io/VieLotus-IM/assets/og-card.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Sen Việt (VieLotusIM) — Bộ gõ tiếng Việt Native cho macOS">
-  <meta name="twitter:description" content="Bộ gõ tiếng Việt chuẩn Apple Native, lõi Pure Swift vi giây, bảo mật riêng tư tuyệt đối.">
-  <meta name="twitter:image" content="https://stevedat.github.io/VietLotus-IM/assets/og-card.png">
+  <meta name="twitter:description" content="Bộ gõ tiếng Việt mã nguồn mở chuẩn Apple Native, an toàn và bảo mật riêng tư tuyệt đối.">
+  <meta name="twitter:image" content="https://stevedat.github.io/VieLotus-IM/assets/og-card.png">
   
   <!-- Favicons -->
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -139,7 +139,7 @@
           <button id="lang-btn-en" onclick="setLanguage('en')" class="px-2 py-1 rounded-md transition-all text-slate-400 hover:text-white">EN</button>
         </div>
 
-        <a href="https://github.com/stevedat/VietLotus-IM" target="_blank" rel="noopener noreferrer" 
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" 
            class="hidden sm:inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors">
           <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           <span data-i18n="nav.github">Star trên GitHub</span>
@@ -178,7 +178,7 @@
       <!-- Download CTA Group -->
       <div id="download" class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
         <!-- Main DMG Download -->
-        <a id="btn-download-dmg" href="https://github.com/stevedat/VietLotus-IM/releases/latest/download/VieLotusIM.dmg" 
+        <a id="btn-download-dmg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.dmg" 
            class="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl gradient-brand text-white font-medium shadow-lg shadow-lotus-accent/20 hover:opacity-95 active:scale-95 transition-all group">
           <svg class="w-5 h-5 fill-current" viewBox="0 0 170 170"><path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.03-7.64-7.85-11.83-14.45-6.66-10.45-11.75-21.72-15.26-33.8-3.51-12.08-5.27-23.77-5.27-35.07 0-14.15 3.36-25.79 10.08-34.92 6.72-9.13 15.2-13.79 25.43-13.98 4.79 0 10.05 1.34 15.78 4.02 5.73 2.68 9.53 4.07 11.4 4.18 1.45 0 5.48-1.5 12.09-4.5 6.61-3 12.39-4.39 17.34-4.17 12.87.64 23.01 5.43 30.43 14.37-11.33 6.84-16.89 16.29-16.68 28.35.21 9.42 3.86 17.38 10.95 23.88 7.09 6.5 15.62 10.14 25.59 10.92-2.13 6.53-4.7 13.06-7.71 19.59zM119.22 31.84c0-7.39 2.62-14.38 7.86-20.97 5.24-6.59 11.74-10.42 19.5-11.49.21 1.07.32 2.03.32 2.89 0 7.39-2.73 14.48-8.19 21.28-5.46 6.8-12.06 10.6-19.8 11.4-.21-1.07-.32-2.03-.32-2.89z"/></svg>
           <div class="text-left">
@@ -188,7 +188,7 @@
         </a>
 
         <!-- Secondary PKG Download -->
-        <a id="btn-download-pkg" href="https://github.com/stevedat/VietLotus-IM/releases/latest/download/VieLotusIM.pkg" 
+        <a id="btn-download-pkg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg" 
            class="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl glass-card text-white hover:bg-white/10 active:scale-95 transition-all">
           <svg class="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -205,7 +205,7 @@
         <div class="flex items-center justify-between px-4 py-2.5 rounded-xl bg-black/60 border border-white/10 text-xs font-mono text-slate-300 shadow-inner">
           <div class="flex items-center gap-2 overflow-hidden mr-2">
             <span class="text-lotus-accent select-none">$</span>
-            <span id="cmd-text" class="truncate">curl -fsSL https://raw.githubusercontent.com/stevedat/VietLotus-IM/main/scripts/install.sh | bash</span>
+            <span id="cmd-text" class="truncate">curl -fsSL https://raw.githubusercontent.com/stevedat/VieLotus-IM/main/scripts/install.sh | bash</span>
           </div>
           <button id="btn-copy-command" data-i18n-title="hero.copy_title" class="px-2.5 py-1 rounded bg-white/10 hover:bg-white/15 text-slate-200 hover:text-white transition-colors flex items-center gap-1.5 shrink-0" title="Chép lệnh">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -547,7 +547,7 @@
         <p data-i18n="community.desc" class="text-sm text-slate-400 mb-6 max-w-xl mx-auto">
           Sen Việt được phát triển phi thương mại theo giấy phép Apache 2.0. Mọi đóng góp thuật toán, báo lỗi, hoặc ý tưởng cải tiến đều được chào đón nồng nhiệt.
         </p>
-        <a href="https://github.com/stevedat/VietLotus-IM" target="_blank" rel="noopener noreferrer"
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer"
            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-semibold border border-white/10 transition-colors">
           <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           <span data-i18n="community.btn">Tham gia Đóng góp trên GitHub</span>
@@ -609,9 +609,9 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-6">
-        <a href="https://github.com/stevedat/VietLotus-IM" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition-colors">GitHub Repository</a>
-        <a href="https://github.com/stevedat/VietLotus-IM/releases" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases" class="hover:text-slate-300 transition-colors">Bản phát hành</a>
-        <a href="https://github.com/stevedat/VietLotus-IM/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.issues" class="hover:text-slate-300 transition-colors">Báo lỗi</a>
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition-colors">GitHub Repository</a>
+        <a href="https://github.com/stevedat/VieLotus-IM/releases" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases" class="hover:text-slate-300 transition-colors">Bản phát hành</a>
+        <a href="https://github.com/stevedat/VieLotus-IM/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.issues" class="hover:text-slate-300 transition-colors">Báo lỗi</a>
         <a href="#sponsor" data-i18n="footer.sponsor" class="hover:text-slate-300 transition-colors">Tài trợ</a>
         <a href="https://youpersona.com" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 text-slate-400 font-medium transition-colors">YouPersona.com</a>
       </div>
@@ -988,7 +988,7 @@
     // 1. Live Release Asset Links from GitHub API
     async function updateReleaseLinks() {
       try {
-        const response = await fetch('https://api.github.com/repos/stevedat/VietLotus-IM/releases/latest');
+        const response = await fetch('https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest');
         if (response.ok) {
           const data = await response.json();
           const dmgAsset = data.assets.find(a => a.name.endsWith('.dmg'));
@@ -1074,7 +1074,7 @@
 
     // 3. Copy Terminal Command
     copyCmdBtn.addEventListener('click', () => {
-      const cmdText = document.getElementById('cmd-text')?.innerText || 'curl -fsSL https://raw.githubusercontent.com/stevedat/VietLotus-IM/main/scripts/install.sh | bash';
+      const cmdText = document.getElementById('cmd-text')?.innerText || 'curl -fsSL https://raw.githubusercontent.com/stevedat/VieLotus-IM/main/scripts/install.sh | bash';
       navigator.clipboard.writeText(cmdText).then(() => {
         const copyLabel = document.getElementById('copy-label');
         const copiedText = currentLang === 'en' ? 'Copied!' : 'Đã chép!';

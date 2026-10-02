@@ -35,4 +35,4 @@ Kéo và thả ảnh chụp màn hình hoặc GIF minh họa lỗi vào đây.
 
 ## 5. Rà soát bảo mật & Quyền riêng tư (Privacy Checklist)
 - [ ] Tôi đã kiểm tra nội dung gói chẩn đoán và xác nhận **không chứa mật khẩu, token, khóa API hay thông tin cá nhân nhạy cảm**.
-- [ ] Tôi đã đọc và làm theo [Hướng dẫn Kiểm thử Lab](https://github.com/stevedat/VietLotus-IM/blob/main/docs/LAB_TESTING_GUIDE.md).
+- [ ] Tôi đã đọc và làm theo [Hướng dẫn Kiểm thử Lab](https://github.com/stevedat/VieLotus-IM/blob/main/docs/LAB_TESTING_GUIDE.md).

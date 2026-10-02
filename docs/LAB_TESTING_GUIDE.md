@@ -9,7 +9,7 @@ Tài liệu này cung cấp quy trình 6 bước khép kín dành cho người d
 Tất cả các bản phát hành chính thức của Sen Việt đều được Apple Notary Service công chứng và ký số bởi Developer ID `NIDO HOLDINGS NEXT GENERATION COMPANY LIMITED (9QCZ4F58K8)`.
 
 ### 1.1 Tải bộ cài đặt chính thức
-Truy cập trang [Releases chính thức trên GitHub](https://github.com/stevedat/VietLotus-IM/releases):
+Truy cập trang [Releases chính thức trên GitHub](https://github.com/stevedat/VieLotus-IM/releases):
 - **`VieLotusIM.pkg`** (khuyên dùng): Bộ cài đặt tự động đăng ký nguồn nhập (có từ bản `v1.0.0`).
 - **`VieLotusLab.dmg`**: Ứng dụng phòng thí nghiệm chẩn đoán nhịp gõ dành cho Tester (phát hành chính thức từ bản `v1.1.0+` hoặc bản thử nghiệm).
 
@@ -82,7 +82,7 @@ Khi phát hiện chữ gõ sai, nuốt phím hoặc xung đột, bạn có 2 cá
 
 ## 5. Tạo GitHub Issue Báo Cáo Lỗi
 
-1. Truy cập [Trang tạo Issue mới](https://github.com/stevedat/VietLotus-IM/issues/new?template=bug_report.md).
+1. Truy cập [Trang tạo Issue mới](https://github.com/stevedat/VieLotus-IM/issues/new?template=bug_report.md).
 2. Chọn template **Báo cáo lỗi (Bug Report)**.
 3. Dán nội dung Markdown đã kiểm tra từ **VieLotus Lab** hoặc **Cài đặt Sen Việt** vào mục tương ứng.
 4. Điền chuỗi phím bấm mẫu, kết quả thực tế, kết quả mong đợi và tần suất xảy ra.

@@ -944,7 +944,7 @@ private struct LabView: View {
                 
                 Spacer()
                 
-                Link("GitHub", destination: URL(string: "https://github.com/stevedat/VietLotus-IM")!)
+                Link("GitHub", destination: URL(string: "https://github.com/stevedat/VieLotus-IM")!)
                     .font(.system(size: 11, weight: .medium))
                 
                 Text("•")
