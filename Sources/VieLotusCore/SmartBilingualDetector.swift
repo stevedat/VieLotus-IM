@@ -216,7 +216,32 @@ public struct SmartBilingualDetector {
             "ng", "ngh", "nh", "p", "ph", "q", "qu", "r", "s", "t", "th", "tr", "v", "x"
         ]
         let validCodas: Set<String> = ["", "c", "ch", "m", "n", "ng", "nh", "p", "t"]
-        return validOnsets.contains(onset) && validCodas.contains(coda)
+        guard validOnsets.contains(onset) && validCodas.contains(coda) else { return false }
+
+        // Vietnamese phonology rule: Syllables ending with stop codas (c, ch, p, t) MUST have Sac or Nang tone!
+        let stopCodas: Set<String> = ["c", "ch", "p", "t"]
+        if stopCodas.contains(coda) {
+            let sacAndNangVowels: Set<Character> = [
+                "á", "ắ", "ấ", "é", "ế", "í", "ó", "ố", "ớ", "ú", "ứ", "ý",
+                "ạ", "ặ", "ậ", "ẹ", "ệ", "ị", "ọ", "ộ", "ợ", "ụ", "ự", "ỵ"
+            ]
+            let hasSacOrNang = nucleus.contains(where: { sacAndNangVowels.contains($0) })
+            if !hasSacOrNang {
+                return false
+            }
+        }
+
+        // Non-existent Vietnamese diphthongs
+        let nucleusStr = String(nucleus)
+        let impossibleDiphthongs = ["ae", "áe", "àe", "ảe", "ãe", "ạe", "ea", "he", "eá", "eà", "eả", "eã", "eạ", "ốe", "ồe", "ổe", "ỗe", "ộe"]
+        if impossibleDiphthongs.contains(where: { nucleusStr.contains($0) }) {
+            return false
+        }
+        if nucleusStr == "io" || nucleusStr == "ío" || nucleusStr == "ìo" || nucleusStr == "ỉo" || nucleusStr == "ĩo" || nucleusStr == "ịo" {
+            return false
+        }
+
+        return true
     }
 
     private static func isPlausibleVietnameseText(_ text: String) -> Bool {

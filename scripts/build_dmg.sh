@@ -15,31 +15,34 @@ if [ ! -f ".build/dist/VieLotusIM.pkg" ]; then
 fi
 
 PKG=".build/dist/VieLotusIM.pkg"
-DMG_WORK=".build/dmg-work"
+TMP_WORK="/tmp/vielotus-im-work-$$"
+TMP_OUT="/tmp/VieLotusIM-$$.dmg"
 OUT=".build/dist/VieLotusIM.dmg"
 
-rm -rf "$DMG_WORK" "$OUT"
-mkdir -p "$DMG_WORK"
+rm -rf "$TMP_WORK" "$TMP_OUT" "$OUT"
+mkdir -p "$TMP_WORK"
 
-cp "$PKG" "$DMG_WORK/Cài đặt Sen Việt.pkg"
+cp "$PKG" "$TMP_WORK/Cài đặt Sen Việt.pkg"
 
 # Apply volume icon to mounted DMG
 if [ -f "Sources/VieLotusIM/Resources/AppIcon.icns" ]; then
-    cp "Sources/VieLotusIM/Resources/AppIcon.icns" "$DMG_WORK/.VolumeIcon.icns"
-    SetFile -c icnC "$DMG_WORK/.VolumeIcon.icns" 2>/dev/null || true
-    SetFile -a C "$DMG_WORK" 2>/dev/null || true
+    cp "Sources/VieLotusIM/Resources/AppIcon.icns" "$TMP_WORK/.VolumeIcon.icns"
+    SetFile -c icnC "$TMP_WORK/.VolumeIcon.icns" 2>/dev/null || true
+    SetFile -a C "$TMP_WORK" 2>/dev/null || true
 fi
 
 # Clean AppleDouble metadata
-find "$DMG_WORK" -name "._*" -delete 2>/dev/null || true
+find "$TMP_WORK" -name "._*" -delete 2>/dev/null || true
 
 # Create compressed read-only DMG image
 hdiutil create -volname "Sen Việt (VieLotusIM)" \
-        -srcfolder "$DMG_WORK" \
+        -srcfolder "$TMP_WORK" \
         -ov -format UDZO \
-        "$OUT"
+        "$TMP_OUT"
 
-rm -rf "$DMG_WORK"
+rm -rf "$TMP_WORK"
+cp "$TMP_OUT" "$OUT"
+rm -f "$TMP_OUT"
 
 # Apply custom icon to DMG file in Finder
 if [ -f "Sources/VieLotusIM/Resources/AppIcon.icns" ]; then
