@@ -191,57 +191,8 @@ public struct SmartBilingualDetector {
         return englishScore >= 0.75 && englishScore >= vietnameseScore * 2
     }
 
-    private static func isPlausibleVietnameseSyllable(_ word: String) -> Bool {
-        let normalized = word.lowercased()
-        let characters = Array(normalized)
-        let vowels: Set<Character> = [
-            "a", "ă", "â", "e", "ê", "i", "o", "ô", "ơ", "u", "ư", "y",
-            "á", "à", "ả", "ã", "ạ", "ắ", "ằ", "ẳ", "ẵ", "ặ", "ấ", "ầ", "ẩ", "ẫ", "ậ",
-            "é", "è", "ẻ", "ẽ", "ẹ", "ế", "ề", "ể", "ễ", "ệ", "í", "ì", "ỉ", "ĩ", "ị",
-            "ó", "ò", "ỏ", "õ", "ọ", "ố", "ồ", "ổ", "ỗ", "ộ", "ớ", "ờ", "ở", "ỡ", "ợ",
-            "ú", "ù", "ủ", "ũ", "ụ", "ứ", "ừ", "ử", "ữ", "ự", "ý", "ỳ", "ỷ", "ỹ", "ỵ"
-        ]
-        guard let firstVowel = characters.firstIndex(where: { vowels.contains($0) }),
-              let lastVowel = characters.lastIndex(where: { vowels.contains($0) }) else {
-            return false
-        }
-
-        let nucleus = characters[firstVowel...lastVowel]
-        guard nucleus.allSatisfy({ vowels.contains($0) }), nucleus.count <= 3 else { return false }
-
-        let onset = String(characters[..<firstVowel])
-        let coda = String(characters[(lastVowel + 1)...])
-        let validOnsets: Set<String> = [
-            "", "b", "c", "ch", "d", "đ", "g", "gh", "gi", "h", "k", "kh", "l", "m", "n",
-            "ng", "ngh", "nh", "p", "ph", "q", "qu", "r", "s", "t", "th", "tr", "v", "x"
-        ]
-        let validCodas: Set<String> = ["", "c", "ch", "m", "n", "ng", "nh", "p", "t"]
-        guard validOnsets.contains(onset) && validCodas.contains(coda) else { return false }
-
-        // Vietnamese phonology rule: Syllables ending with stop codas (c, ch, p, t) MUST have Sac or Nang tone!
-        let stopCodas: Set<String> = ["c", "ch", "p", "t"]
-        if stopCodas.contains(coda) {
-            let sacAndNangVowels: Set<Character> = [
-                "á", "ắ", "ấ", "é", "ế", "í", "ó", "ố", "ớ", "ú", "ứ", "ý",
-                "ạ", "ặ", "ậ", "ẹ", "ệ", "ị", "ọ", "ộ", "ợ", "ụ", "ự", "ỵ"
-            ]
-            let hasSacOrNang = nucleus.contains(where: { sacAndNangVowels.contains($0) })
-            if !hasSacOrNang {
-                return false
-            }
-        }
-
-        // Non-existent Vietnamese diphthongs
-        let nucleusStr = String(nucleus)
-        let impossibleDiphthongs = ["ae", "áe", "àe", "ảe", "ãe", "ạe", "ea", "he", "eá", "eà", "eả", "eã", "eạ", "ốe", "ồe", "ổe", "ỗe", "ộe"]
-        if impossibleDiphthongs.contains(where: { nucleusStr.contains($0) }) {
-            return false
-        }
-        if nucleusStr == "io" || nucleusStr == "ío" || nucleusStr == "ìo" || nucleusStr == "ỉo" || nucleusStr == "ĩo" || nucleusStr == "ịo" {
-            return false
-        }
-
-        return true
+        private static func isPlausibleVietnameseSyllable(_ word: String) -> Bool {
+        return VietnameseSyllableDictionary.shared.isValidSyllable(word)
     }
 
     private static func isPlausibleVietnameseText(_ text: String) -> Bool {
