@@ -29,7 +29,7 @@ public struct SmartBilingualDetector {
         "aes", "await", "nginx", "nostr", "sizeof", "uefi", "where",
         "there", "their", "share", "before", "sure", "were", "care", "core",
         "search", "our", "use", "year", "years", "next", "music", "post",
-        "very", "does", "research", "life", "way"
+        "very", "does", "research", "life", "way", "oz"
     ]
 
     private static let nonVietnameseLetters: Set<Character> = ["f", "j", "w", "z"]
@@ -77,10 +77,12 @@ public struct SmartBilingualDetector {
         let isUppercaseWord = raw == raw.uppercased() && raw.count > 1
         if let rendered,
            lowerRaw != rendered.lowercased(),
-           !isUppercaseWord,
            !commonEnglishTechWords.contains(lowerRaw),
            isPlausibleVietnameseText(rendered) {
-            return isConfidentEnglishContext(context)
+            if isConfidentEnglishContext(context) {
+                return true
+            }
+            return false
         }
 
         if let rendered,

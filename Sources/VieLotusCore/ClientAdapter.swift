@@ -6,6 +6,7 @@ public enum AppCategory: Sendable, Equatable {
     case msOffice
     case terminal
     case overlay
+    case remoteOrVirtualMachine
     case unknown
 }
 
@@ -19,6 +20,22 @@ public struct ClientAdapter {
     public static func classify(bundleIdentifier: String?) -> AppCategory {
         guard let id = bundleIdentifier?.lowercased() else { return .unknown }
         
+        // Remote Desktop, Screen Sharing & Virtual Machine apps:
+        // Remote targets handle their own keyboard layout or forward raw scancodes.
+        if id.contains("com.microsoft.rdc") ||
+           id.contains("teamviewer") ||
+           id.contains("anydesk") ||
+           id.contains("vmware") ||
+           id.contains("parallels") ||
+           id.contains("utmapp") ||
+           id.contains("vnc") ||
+           id.contains("citrix") ||
+           id.contains("rustdesk") ||
+           id.contains("splashtop") ||
+           id.contains("screens") {
+            return .remoteOrVirtualMachine
+        }
+
         // Terminal / Console emulators: use prefix, domain components, or exact match
         if id == "com.apple.terminal" ||
            id.contains(".iterm") ||
@@ -119,6 +136,9 @@ public struct ClientAdapter {
     public static func presentationMode(for category: AppCategory, bundleIdentifier: String? = nil, terminalDirectEnabled: Bool = false) -> PresentationMode {
         if category == .terminal {
             return terminalDirectEnabled ? .terminalDirect : .markedText
+        }
+        if category == .remoteOrVirtualMachine {
+            return .markedText
         }
         if ["com.google.antigravity", "com.openai.codex"].contains(bundleIdentifier?.lowercased() ?? "") {
             return .markedText

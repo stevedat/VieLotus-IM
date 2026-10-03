@@ -3,6 +3,8 @@ import Cocoa
 import InputMethodKit
 import NaturalLanguage
 import VieLotusTrace
+import Carbon.HIToolbox
+import ApplicationServices
 
 @objc(VieLotusIMController)
 final class VieLotusIMController: IMKInputController {
@@ -20,6 +22,41 @@ final class VieLotusIMController: IMKInputController {
     private var backtickDepth: Int = 0  // 0=normal, odd=inside backticks
     private var labTraceID: String?
     private var labTraceTargetBundleID: String?
+
+    private var lastSecureCheckTime: UInt64 = 0
+    private var cachedIsSecureField: Bool = false
+    private static let secureCheckCacheDurationNs: UInt64 = 250_000_000 // 250ms
+
+    private func isSecureFieldActive() -> Bool {
+        // 1. Check system-wide secure event input (Keychain, sudo in terminal, login window, 1Password)
+        if IsSecureEventInputEnabled() {
+            return true
+        }
+
+        // 2. Throttle checking AXFocusedUIElement to avoid IPC overhead
+        let now = DispatchTime.now().uptimeNanoseconds
+        if now - lastSecureCheckTime < Self.secureCheckCacheDurationNs {
+            return cachedIsSecureField
+        }
+        lastSecureCheckTime = now
+
+        // 3. Inspect focused element subrole (detects <input type="password"> in Chrome/Safari/Firefox and NSSecureTextField)
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+              let focusedEl = focusedRef, CFGetTypeID(focusedEl) == AXUIElementGetTypeID() else {
+            cachedIsSecureField = false
+            return false
+        }
+        var subroleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(focusedEl as! AXUIElement, kAXSubroleAttribute as CFString, &subroleRef) == .success,
+              let subrole = subroleRef as? String else {
+            cachedIsSecureField = false
+            return false
+        }
+        cachedIsSecureField = (subrole == (kAXSecureTextFieldSubrole as String))
+        return cachedIsSecureField
+    }
 
     private func isCursorMovementKey(_ keyCode: UInt16) -> Bool {
         keyCode == 123 || keyCode == 124 || keyCode == 125 || keyCode == 126 ||
@@ -118,11 +155,25 @@ final class VieLotusIMController: IMKInputController {
         // If Vietnamese is toggled off, pass through all events
         guard Preferences.shared.vietnameseEnabled else { return false }
 
+        // 0. Secure Input / Password Field Protection:
+        // When typing in any password field (NSSecureTextField, web password input)
+        // or a system-wide secure session (Terminal sudo, Keychain, 1Password),
+        // passthrough immediately with zero buffering, zero logging, and zero transformation.
+        if isSecureFieldActive() {
+            if engine.isComposing {
+                cancelComposition()
+                rawWord = ""
+            }
+            return false
+        }
+
         let bundleID = client.bundleIdentifier()
         traceLab("keyDown", bundleID: bundleID, key: event.charactersIgnoringModifiers ?? "",
                  detail: "keyCode=\(event.keyCode)", selection: client.selectedRange())
         let clientUID = "\(bundleID ?? ""):\(ObjectIdentifier(sender as AnyObject).debugDescription)"
         if let lastUID = lastClientIdentifier, lastUID != clientUID {
+            lastSecureCheckTime = 0
+            cachedIsSecureField = false
             engine.reset()
             composingWord = ""
             rawWord = ""
@@ -829,11 +880,13 @@ final class VieLotusIMController: IMKInputController {
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         applyPreferences()
+        lastSecureCheckTime = 0
+        cachedIsSecureField = false
         engine.reset()
         composingWord = ""
         rawWord = ""
         editCaretBack = Self.caretDisarmed
-            virtualCursorLocation = NSNotFound
+        virtualCursorLocation = NSNotFound
         NSLog("VieLotusIMController: Activated")
     }
 

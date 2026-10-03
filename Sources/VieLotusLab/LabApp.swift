@@ -54,6 +54,7 @@ private struct TraceTarget: Identifiable, Hashable {
         case .msOffice: tag = "Office"
         case .terminal: tag = "Terminal"
         case .overlay: tag = "Overlay"
+        case .remoteOrVirtualMachine: tag = "Remote/VM"
         case .unknown: tag = "Khác"
         }
         return "\(name) [\(tag)] · \(bundleID)"
@@ -65,6 +66,7 @@ private struct TraceTarget: Identifiable, Hashable {
         case .msOffice: return "Microsoft Office"
         case .terminal: return "Terminal Emulator"
         case .overlay: return "Quick Search / Overlay"
+        case .remoteOrVirtualMachine: return "Remote Desktop / Virtual Machine"
         case .unknown: return "Khác"
         }
     }
@@ -1416,6 +1418,7 @@ private struct LabView: View {
         case .msOffice: return "Office route"
         case .terminal: return "Terminal route"
         case .overlay: return "Overlay route"
+        case .remoteOrVirtualMachine: return "Remote/VM route"
         case .unknown: return "Unknown"
         }
     }

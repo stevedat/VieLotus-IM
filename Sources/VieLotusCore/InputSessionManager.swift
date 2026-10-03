@@ -83,7 +83,7 @@ public class InputSessionManager {
 
     /// Evaluates if a character acts as a word boundary
     public func isWordBoundary(_ char: Character) -> Bool {
-        return char == " " || char.isNewline || ",;:!?\"'()[]{}<>".contains(char)
+        return char == " " || char.isNewline || ",;:!?\"'()[]{}<>-".contains(char)
     }
 
     /// Processes a single character feed
