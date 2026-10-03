@@ -4,7 +4,6 @@ import InputMethodKit
 import NaturalLanguage
 import VieLotusTrace
 import Carbon.HIToolbox
-import ApplicationServices
 
 @objc(VieLotusIMController)
 final class VieLotusIMController: IMKInputController {
@@ -23,39 +22,11 @@ final class VieLotusIMController: IMKInputController {
     private var labTraceID: String?
     private var labTraceTargetBundleID: String?
 
-    private var lastSecureCheckTime: UInt64 = 0
-    private var cachedIsSecureField: Bool = false
-    private static let secureCheckCacheDurationNs: UInt64 = 250_000_000 // 250ms
-
     private func isSecureFieldActive() -> Bool {
-        // 1. Check system-wide secure event input (Keychain, sudo in terminal, login window, 1Password)
-        if IsSecureEventInputEnabled() {
-            return true
-        }
-
-        // 2. Throttle checking AXFocusedUIElement to avoid IPC overhead
-        let now = DispatchTime.now().uptimeNanoseconds
-        if now - lastSecureCheckTime < Self.secureCheckCacheDurationNs {
-            return cachedIsSecureField
-        }
-        lastSecureCheckTime = now
-
-        // 3. Inspect focused element subrole (detects <input type="password"> in Chrome/Safari/Firefox and NSSecureTextField)
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focusedEl = focusedRef, CFGetTypeID(focusedEl) == AXUIElementGetTypeID() else {
-            cachedIsSecureField = false
-            return false
-        }
-        var subroleRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(focusedEl as! AXUIElement, kAXSubroleAttribute as CFString, &subroleRef) == .success,
-              let subrole = subroleRef as? String else {
-            cachedIsSecureField = false
-            return false
-        }
-        cachedIsSecureField = (subrole == (kAXSecureTextFieldSubrole as String))
-        return cachedIsSecureField
+        // Check system-wide secure event input (Keychain, sudo in terminal, login window, 1Password,
+        // and Cocoa NSSecureTextField / WebKit password inputs which activate SecureEventInput).
+        // Uses Carbon HIToolbox with zero Accessibility / AX permissions required.
+        IsSecureEventInputEnabled()
     }
 
     private func isCursorMovementKey(_ keyCode: UInt16) -> Bool {
@@ -172,8 +143,6 @@ final class VieLotusIMController: IMKInputController {
                  detail: "keyCode=\(event.keyCode)", selection: client.selectedRange())
         let clientUID = "\(bundleID ?? ""):\(ObjectIdentifier(sender as AnyObject).debugDescription)"
         if let lastUID = lastClientIdentifier, lastUID != clientUID {
-            lastSecureCheckTime = 0
-            cachedIsSecureField = false
             engine.reset()
             composingWord = ""
             rawWord = ""
@@ -880,8 +849,6 @@ final class VieLotusIMController: IMKInputController {
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         applyPreferences()
-        lastSecureCheckTime = 0
-        cachedIsSecureField = false
         engine.reset()
         composingWord = ""
         rawWord = ""
