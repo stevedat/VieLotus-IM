@@ -90,6 +90,16 @@ struct SettingsView: View {
                         }
                     }
 
+                    Toggle(isOn: $prefs.wordSuggestions) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Gợi ý từ ghép thông minh (Quick Prediction)")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Hiển thị cửa sổ ứng viên gợi ý từ tiếp theo khi gõ")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
                     Toggle(isOn: $prefs.relaxedCoda) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Viết tắt phụ âm cuối")

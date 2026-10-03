@@ -19,6 +19,9 @@ let package = Package(
         .target(
             name: "VieLotusCore",
             dependencies: [],
+            resources: [
+                .process("Resources")
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v5),
             ],

@@ -120,11 +120,12 @@ public struct ClientAdapter {
         if category == .terminal {
             return terminalDirectEnabled ? .terminalDirect : .markedText
         }
+        if ["com.google.antigravity", "com.openai.codex"].contains(bundleIdentifier?.lowercased() ?? "") {
+            return .markedText
+        }
         if let id = bundleIdentifier?.lowercased(), dynamicMarkedTextBundles.contains(id) {
             return .markedText
         }
-        // Note: We universally prefer .directReplacement over .markedText for Chromium, Office, Zalo, and Spotlight
-        // to avoid ghost-characters during rapid backspaces, and to leverage our virtualCursorLocation sync.
         return .directReplacement
     }
 }

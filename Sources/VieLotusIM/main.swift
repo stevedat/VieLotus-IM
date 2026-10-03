@@ -24,6 +24,7 @@ final class VieLotusIMAppDelegate: NSObject, NSApplicationDelegate {
         // Pre-warm NaturalLanguage recognizer & system spell daemon when main runloop is idle
         DispatchQueue.main.async {
             _ = SmartBilingualDetector.isEnglishWord(raw: "test", context: "vietlotus cold start prewarm")
+            _ = WordSuggestionEngine.shared.suggestions(for: "cộng")
         }
     }
 

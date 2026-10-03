@@ -46,5 +46,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+mkdir -p "$APP_DIR/Contents/Resources"
+find .build/scratch-lab-arm64 -name "*.bundle" -type d -maxdepth 5 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+
 bash "$ROOT/scripts/sign_lab_app.sh" "$APP_DIR"
 echo "Built $ROOT/$APP_DIR"

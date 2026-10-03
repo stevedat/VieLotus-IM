@@ -18,6 +18,14 @@ final class ClientAdapterTests: XCTestCase {
 
     func testLabHostProfilesUseExpectedPresentationModes() {
         XCTAssertEqual(
+            ClientAdapter.presentationMode(for: .chromium, bundleIdentifier: "com.google.antigravity"),
+            .markedText
+        )
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(for: .chromium, bundleIdentifier: "com.openai.codex"),
+            .markedText
+        )
+        XCTAssertEqual(
             ClientAdapter.presentationMode(for: .chromium, bundleIdentifier: "org.vielotus.inputmethod.vielotuslab.chromium"),
             .directReplacement
         )

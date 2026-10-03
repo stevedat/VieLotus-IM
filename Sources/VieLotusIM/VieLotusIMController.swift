@@ -17,9 +17,105 @@ final class VieLotusIMController: IMKInputController {
     private var editCaretBack: Int = VieLotusIMController.caretDisarmed
     private var lastClientIdentifier: String?
     private var virtualCursorLocation: Int = NSNotFound
+
+    private func isSelectedMarkedComposition(_ selection: NSRange, mode: PresentationMode) -> Bool {
+        mode == .markedText && engine.isComposing &&
+            selection.location != NSNotFound &&
+            selection.location == virtualCursorLocation &&
+            selection.length == composingWord.utf16.count && !composingWord.isEmpty
+    }
     private var backtickDepth: Int = 0  // 0=normal, odd=inside backticks
     private var labTraceID: String?
     private var labTraceTargetBundleID: String?
+    private var candidatesWindow: IMKCandidates?
+    private var currentCandidates: [String] = []
+    private weak var activeClient: AnyObject?
+    private var candidateClientID: ObjectIdentifier?
+    private var candidateCaretLocation: Int = NSNotFound
+    private var candidateGeneration = 0
+
+    @discardableResult
+    private func ensureCandidatesWindow() -> IMKCandidates? {
+        if let window = candidatesWindow {
+            return window
+        }
+        let imkServer = self.server()
+        let window = IMKCandidates(server: imkServer, panelType: kIMKSingleRowSteppingCandidatePanel)
+        window?.setDismissesAutomatically(true)
+        window?.setAttributes([
+            IMKCandidatesSendServerKeyEventFirst: true as NSNumber
+        ])
+        candidatesWindow = window
+        return window
+    }
+
+    private func showSuggestions(for word: String, client: IMKTextInput) {
+        guard Preferences.shared.wordSuggestions else {
+            hideCandidates()
+            return
+        }
+        let suggestions = WordSuggestionEngine.shared.suggestions(for: word, limit: 9)
+        guard !suggestions.isEmpty else {
+            hideCandidates()
+            return
+        }
+        guard let window = ensureCandidatesWindow() else {
+            return
+        }
+        let selection = client.selectedRange()
+        guard selection.location != NSNotFound, selection.length == 0 else { return }
+        candidateClientID = ObjectIdentifier(client as AnyObject)
+        candidateCaretLocation = selection.location
+        currentCandidates = suggestions
+        window.setCandidateData(suggestions)
+        window.update()
+        window.show(IMKCandidatesLocationHint(kIMKLocateCandidatesBelowHint))
+    }
+
+    private func hideCandidates() {
+        candidateGeneration &+= 1
+        candidateClientID = nil
+        candidateCaretLocation = NSNotFound
+        if !currentCandidates.isEmpty || candidatesWindow?.isVisible() == true {
+            currentCandidates = []
+            candidatesWindow?.hide()
+        }
+    }
+
+    override func candidates(_ sender: Any!) -> [Any]! {
+        return currentCandidates
+    }
+
+    private func selectCandidate(_ candidate: String, client: IMKTextInput) {
+        let insertStr = candidate + " "
+        client.insertText(insertStr, replacementRange: NSRange(location: NSNotFound, length: 0))
+        if virtualCursorLocation != NSNotFound {
+            virtualCursorLocation += insertStr.utf16.count
+        }
+        editCaretBack = Self.caretDisarmed
+        appendContext(candidate)
+        hideCandidates()
+
+        let lastWord = candidate.components(separatedBy: .whitespacesAndNewlines).filter({ !$0.isEmpty }).last ?? candidate
+        showSuggestions(for: lastWord, client: client)
+    }
+
+    override func candidateSelected(_ candidateString: NSAttributedString!) {
+        guard let candidate = candidateString?.string.trimmingCharacters(in: .whitespacesAndNewlines), !candidate.isEmpty else { return }
+        guard Preferences.shared.vietnameseEnabled,
+              Preferences.shared.wordSuggestions,
+              currentCandidates.contains(candidate),
+              let client = activeClient as? IMKTextInput,
+              candidateClientID == ObjectIdentifier(client as AnyObject),
+              client.selectedRange() == NSRange(location: candidateCaretLocation, length: 0) else {
+            hideCandidates()
+            return
+        }
+        selectCandidate(candidate, client: client)
+    }
+
+    override func candidateSelectionChanged(_ candidateString: NSAttributedString!) {
+    }
 
     private func isCursorMovementKey(_ keyCode: UInt16) -> Bool {
         keyCode == 123 || keyCode == 124 || keyCode == 125 || keyCode == 126 ||
@@ -39,6 +135,17 @@ final class VieLotusIMController: IMKInputController {
         applyPreferences()
         LabTraceSpool.cleanupStaleTraces()
 
+        let imkServer = server ?? self.server()
+        if let imkServer {
+            candidatesWindow = IMKCandidates(server: imkServer, panelType: kIMKSingleRowSteppingCandidatePanel)
+        } else {
+            candidatesWindow = IMKCandidates(server: nil, panelType: kIMKSingleRowSteppingCandidatePanel)
+        }
+        candidatesWindow?.setDismissesAutomatically(true)
+        candidatesWindow?.setAttributes([
+            IMKCandidatesSendServerKeyEventFirst: true as NSNumber
+        ])
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(preferencesDidUpdate),
@@ -56,6 +163,7 @@ final class VieLotusIMController: IMKInputController {
     }
 
     deinit {
+        candidatesWindow?.hide()
         NotificationCenter.default.removeObserver(self)
         DistributedNotificationCenter.default().removeObserver(self)
     }
@@ -105,6 +213,9 @@ final class VieLotusIMController: IMKInputController {
         engine.setModernOrthography(prefs.modernOrthography)
         engine.setRelaxedCoda(prefs.relaxedCoda)
         engine.setQuickTelex(prefs.quickTelex)
+        if !prefs.wordSuggestions {
+            hideCandidates()
+        }
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
@@ -114,6 +225,7 @@ final class VieLotusIMController: IMKInputController {
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, event.type == .keyDown else { return false }
         guard let client = sender as? IMKTextInput else { return false }
+        activeClient = client as AnyObject
 
         // If Vietnamese is toggled off, pass through all events
         guard Preferences.shared.vietnameseEnabled else { return false }
@@ -123,6 +235,7 @@ final class VieLotusIMController: IMKInputController {
                  detail: "keyCode=\(event.keyCode)", selection: client.selectedRange())
         let clientUID = "\(bundleID ?? ""):\(ObjectIdentifier(sender as AnyObject).debugDescription)"
         if let lastUID = lastClientIdentifier, lastUID != clientUID {
+            hideCandidates()
             engine.reset()
             composingWord = ""
             rawWord = ""
@@ -151,6 +264,7 @@ final class VieLotusIMController: IMKInputController {
             virtualCursorLocation = NSNotFound
         }
         if bundleID?.lowercased() == "com.google.antigravity",
+           presentationMode == .directReplacement,
            engine.isComposing,
            virtualCursorLocation != NSNotFound,
            selection.location != NSNotFound,
@@ -179,8 +293,12 @@ final class VieLotusIMController: IMKInputController {
         let chordModifiers = rawModifiers.intersection([.command, .control, .option, .shift])
         let nonShiftModifiers = rawModifiers.intersection([.command, .control, .option])
 
-        // Handle Escape: cancel composition
+        // Handle Escape: cancel composition or dismiss candidate window
         if keyCode == 53 { // ESC
+            if candidatesWindow?.isVisible() == true || !currentCandidates.isEmpty {
+                hideCandidates()
+                return true
+            }
             editCaretBack = Self.caretDisarmed
             if engine.isComposing {
                 cancelComposition()
@@ -198,6 +316,7 @@ final class VieLotusIMController: IMKInputController {
 
         // Handle Backspace with modifiers (Cmd+Backspace, Option+Backspace, Ctrl+Backspace)
         if keyCode == 51 && !nonShiftModifiers.isEmpty {
+            hideCandidates()
             engine.reset()
             composingWord = ""
             rawWord = ""
@@ -211,6 +330,7 @@ final class VieLotusIMController: IMKInputController {
 
         // Handle Forward Delete (keyCode 117)
         if keyCode == 117 {
+            hideCandidates()
             editCaretBack = Self.caretDisarmed
             if engine.isComposing {
                 if presentationMode == .terminalDirect {
@@ -224,6 +344,7 @@ final class VieLotusIMController: IMKInputController {
 
         // Non-shift modifier shortcuts (Cmd, Ctrl, Option)
         if !nonShiftModifiers.isEmpty {
+            hideCandidates()
             if presentationMode == .terminalDirect {
                 // In terminal direct mode, control keys (Ctrl+C, Ctrl+D, Ctrl+Z, Ctrl+L,
                 // Ctrl+U, Ctrl+W, Ctrl+K, Ctrl+A, Ctrl+E, etc.) and shortcuts (Cmd+C, Option+...)
@@ -242,6 +363,7 @@ final class VieLotusIMController: IMKInputController {
 
         // Handle Shift + Cursor Movement (Selection shortcuts)
         if chordModifiers.contains(.shift) && isCursorMovementKey(keyCode) {
+            hideCandidates()
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
             if engine.isComposing {
@@ -256,7 +378,9 @@ final class VieLotusIMController: IMKInputController {
 
         // Handle Backspace: keyCode 51 (plain Backspace)
         if keyCode == 51 {
-            if selection.location != NSNotFound && selection.length > 0 {
+            hideCandidates()
+            if selection.location != NSNotFound && selection.length > 0 &&
+                !isSelectedMarkedComposition(selection, mode: presentationMode) {
                 engine.reset()
                 composingWord = ""
                 rawWord = ""
@@ -286,7 +410,9 @@ final class VieLotusIMController: IMKInputController {
                        rawBefore.last == composingWord.last,
                        engine.currentOutput() == String(composingWord.dropLast()) {
                         composingWord = engine.currentOutput()
-                        if virtualCursorLocation != NSNotFound {
+                        if selection.location != NSNotFound {
+                            virtualCursorLocation = max(0, selection.location - 1)
+                        } else if virtualCursorLocation != NSNotFound {
                             virtualCursorLocation = max(0, virtualCursorLocation - 1)
                         }
                         if composingWord.isEmpty {
@@ -340,7 +466,15 @@ final class VieLotusIMController: IMKInputController {
                     } else {
                         let output = engine.currentOutput()
                         let previousOutputLength = (composingWord as NSString).length
-                        let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : selection.location
+                        let currentLoc = selection.location != NSNotFound && selection.length == 0
+                            ? selection.location : virtualCursorLocation
+                        if selection.location != NSNotFound && virtualCursorLocation != NSNotFound &&
+                            selection.location != virtualCursorLocation {
+                            traceLab("backspaceCursorResync", bundleID: bundleID,
+                                     detail: "virtual=\(virtualCursorLocation) actual=\(selection.location)",
+                                     selection: selection)
+                            virtualCursorLocation = selection.location
+                        }
 
                         if ["com.apple.notes", "com.apple.systempreferences"].contains(bundleID?.lowercased() ?? "") {
                             if output.isEmpty {
@@ -450,6 +584,7 @@ final class VieLotusIMController: IMKInputController {
 
         // Handle Return / Enter (keyCode 36, 76)
         if keyCode == 36 || keyCode == 76 {
+            hideCandidates()
             if engine.isComposing {
                 _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
             }
@@ -464,6 +599,7 @@ final class VieLotusIMController: IMKInputController {
 
         // Handle Tab (keyCode 48)
         if keyCode == 48 {
+            hideCandidates()
             editCaretBack = Self.caretDisarmed
             if engine.isComposing {
                 _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
@@ -472,7 +608,10 @@ final class VieLotusIMController: IMKInputController {
         }
 
         // Handle Plain Arrow & Navigation keys (no modifiers)
-        if isCursorMovementKey(keyCode) { virtualCursorLocation = NSNotFound }
+        if isCursorMovementKey(keyCode) {
+            virtualCursorLocation = NSNotFound
+            hideCandidates()
+        }
         if keyCode == 123 { // Plain Left arrow
             if engine.isComposing {
                 _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
@@ -529,6 +668,7 @@ final class VieLotusIMController: IMKInputController {
         }()
 
         if isPUAOrFunctionKey {
+            hideCandidates()
             editCaretBack = Self.caretDisarmed
             if engine.isComposing {
                 if presentationMode == .terminalDirect {
@@ -543,6 +683,10 @@ final class VieLotusIMController: IMKInputController {
         // Printable characters
         guard let characters = event.characters, let firstChar = characters.first else {
             return false
+        }
+
+        if firstChar != " " {
+            hideCandidates()
         }
 
         // Developer Context-Aware Mode (Markdown inline code & blocks)
@@ -569,7 +713,20 @@ final class VieLotusIMController: IMKInputController {
             DiagnosticLogger.shared.log("SPACE | app: \(bundleID ?? "?") | wasComposing: \(engine.isComposing) | output: '\(engine.currentOutput())'")
             var restored = false
             if engine.isComposing {
+                let committedOutput = engine.currentOutput()
                 restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: " ")
+                if !restored && !committedOutput.isEmpty && presentationMode != .terminalDirect {
+                    let generation = candidateGeneration
+                    DispatchQueue.main.async { [weak self, weak client] in
+                        guard let self, let client,
+                              self.candidateGeneration == generation,
+                              self.lastClientIdentifier == clientUID,
+                              !self.engine.isComposing else { return }
+                        self.showSuggestions(for: committedOutput, client: client)
+                    }
+                }
+            } else {
+                hideCandidates()
             }
             traceLab("space", bundleID: bundleID, key: "Space", detail: "restored=\(restored)",
                      selection: client.selectedRange())
@@ -597,7 +754,8 @@ final class VieLotusIMController: IMKInputController {
         DiagnosticLogger.shared.log("CHAR '\(firstChar)' (\(keyCode)) | app: \(bundleID ?? "?") | mode: \(presentationMode) | sel: \(selection.location),\(selection.length)")
 
         // Typing over an active selection replaces the selection
-        if selection.location != NSNotFound && selection.length > 0 {
+        if selection.location != NSNotFound && selection.length > 0 &&
+            !isSelectedMarkedComposition(selection, mode: presentationMode) {
             engine.reset()
             composingWord = ""
             rawWord = ""
@@ -684,7 +842,8 @@ final class VieLotusIMController: IMKInputController {
                     let maxBackspaces = isEditing ? Int.max : composingWord.utf16.count
                     let safeBackspaces = isEditing ? diff.backspaces : min(diff.backspaces, maxBackspaces)
 
-                    let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : selection.location
+                    let currentLoc = selection.location != NSNotFound && selection.length == 0
+                        ? selection.location : virtualCursorLocation
                     let range: NSRange
                     
                     if currentLoc != NSNotFound {
@@ -720,7 +879,8 @@ final class VieLotusIMController: IMKInputController {
                     composingWord = engine.currentOutput()
                     DiagnosticLogger.shared.log("-> DIRECT_PASSTHROUGH '\(firstChar)'")
                     
-                    let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : selection.location
+                    let currentLoc = selection.location != NSNotFound && selection.length == 0
+                        ? selection.location : virtualCursorLocation
                     if currentLoc != NSNotFound {
                         virtualCursorLocation = currentLoc + String(firstChar).utf16.count
                     }
@@ -745,7 +905,8 @@ final class VieLotusIMController: IMKInputController {
             let appendStr = suffixChar != nil ? String(suffixChar!) : ""
             if presentationMode == .directReplacement {
                 let wordLen = output.utf16.count
-                let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : (selection.location != NSNotFound ? selection.location : client.selectedRange().location)
+                let currentLoc = selection.location != NSNotFound && selection.length == 0
+                    ? selection.location : virtualCursorLocation
                 let range: NSRange
                 if currentLoc != NSNotFound && currentLoc >= wordLen {
                     range = NSRange(location: currentLoc - wordLen, length: wordLen)
@@ -807,6 +968,7 @@ final class VieLotusIMController: IMKInputController {
 
 
     override func commitComposition(_ sender: Any!) {
+        hideCandidates()
         guard let client = sender as? IMKTextInput else { return }
         if engine.isComposing {
             let bundleID = client.bundleIdentifier()
@@ -819,37 +981,53 @@ final class VieLotusIMController: IMKInputController {
     }
 
     override func cancelComposition() {
+        hideCandidates()
         engine.reset()
         composingWord = ""
         rawWord = ""
         editCaretBack = Self.caretDisarmed
-            virtualCursorLocation = NSNotFound
+        virtualCursorLocation = NSNotFound
     }
 
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         applyPreferences()
+        hideCandidates()
         engine.reset()
         composingWord = ""
         rawWord = ""
         editCaretBack = Self.caretDisarmed
-            virtualCursorLocation = NSNotFound
+        virtualCursorLocation = NSNotFound
         NSLog("VieLotusIMController: Activated")
     }
 
     override func deactivateServer(_ sender: Any!) {
+        activeClient = nil
+        hideCandidates()
         engine.reset()
         composingWord = ""
         rawWord = ""
         editCaretBack = Self.caretDisarmed
-            virtualCursorLocation = NSNotFound
+        virtualCursorLocation = NSNotFound
         super.deactivateServer(sender)
         NSLog("VieLotusIMController: Deactivated")
+    }
+
+    override func hidePalettes() {
+        hideCandidates()
+        super.hidePalettes()
+    }
+
+    override func inputControllerWillClose() {
+        hideCandidates()
+        activeClient = nil
+        super.inputControllerWillClose()
     }
 
     // MARK: - IMKMouseHandling
 
     override func mouseDown(onCharacterIndex index: Int, coordinate point: NSPoint, withModifier flags: Int, continueTracking keepTracking: UnsafeMutablePointer<ObjCBool>!, client sender: Any!) -> Bool {
+        hideCandidates()
         editCaretBack = Self.caretDisarmed
         if engine.isComposing {
             if let client = sender as? IMKTextInput {
@@ -935,6 +1113,14 @@ final class VieLotusIMController: IMKInputController {
         )
         smartBilingualItem.target = self
         menu.addItem(smartBilingualItem)
+
+        let suggestItem = NSMenuItem(
+            title: prefs.wordSuggestions ? "✓ Gợi ý từ ghép thông minh" : "Gợi ý từ ghép thông minh",
+            action: #selector(toggleWordSuggestions),
+            keyEquivalent: ""
+        )
+        suggestItem.target = self
+        menu.addItem(suggestItem)
         menu.addItem(.separator())
 
         let settingsItem = NSMenuItem(
@@ -997,6 +1183,11 @@ final class VieLotusIMController: IMKInputController {
 
     @objc private func toggleSmartBilingual() {
         Preferences.shared.smartBilingual.toggle()
+        applyPreferences()
+    }
+
+    @objc private func toggleWordSuggestions() {
+        Preferences.shared.wordSuggestions.toggle()
         applyPreferences()
     }
 

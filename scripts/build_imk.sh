@@ -55,6 +55,10 @@ elif [ -f "AppIcon.icns" ]; then
     cp "AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
 
+# Copy SPM module resource bundles (e.g. VietLotusIM_VieLotusCore.bundle)
+find .build/scratch-arm64 -name "*.bundle" -type d -maxdepth 5 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+find .build/out/Products/Release -name "*.bundle" -type d -maxdepth 2 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+
 # Clean any extended attribute metadata files
 find "$APP_DIR" -name "._*" -delete 2>/dev/null || true
 

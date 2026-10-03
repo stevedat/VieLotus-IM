@@ -169,6 +169,7 @@ private final class LabStore: ObservableObject {
     private var traceHeartbeat: Timer?
     private var externalTraceTimer: Timer?
     private var externalTargetBundleID: String?
+    private var lastTraceTargetBundleID: String?
     private var previousExternalText: String?
     private var previousExternalSelection = NSRange(location: NSNotFound, length: 0)
     private var previousFocusedElementHash: CFHashCode?
@@ -338,6 +339,9 @@ private final class LabStore: ObservableObject {
     @discardableResult
     private func beginTrace(targetBundleID: String?) -> Bool {
         stopTrace()
+        entries.removeAll()
+        issueCount = 0
+        lastIssue = ""
         let newTraceID = UUID().uuidString
         if targetBundleID != nil {
             do {
@@ -352,6 +356,7 @@ private final class LabStore: ObservableObject {
         traceSpoolOffset = 0
         traceEnabled = true
         externalTargetBundleID = targetBundleID
+        lastTraceTargetBundleID = targetBundleID
         status = targetBundleID == nil ? "Trace active · Lab host" : "Trace active · \(targetBundleID!)"
         broadcastTraceStart()
         traceHeartbeat = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -576,6 +581,7 @@ private final class LabStore: ObservableObject {
     }
 
     func export() {
+        drainTraceEvents()
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "vielotus-diagnostic-\(Int(Date().timeIntervalSince1970)).json"
         panel.allowedContentTypes = [UTType.json]
@@ -583,7 +589,7 @@ private final class LabStore: ObservableObject {
         do {
             let targetName: String
             let targetCat: String
-            if let targetID = externalTargetBundleID {
+            if let targetID = externalTargetBundleID ?? lastTraceTargetBundleID {
                 let matched = traceTargets.first(where: { $0.bundleID == targetID })
                 targetName = matched?.name ?? targetID
                 targetCat = matched?.categoryDescription ?? "Ứng dụng ngoài"
@@ -619,7 +625,7 @@ private final class LabStore: ObservableObject {
                 ],
                 "target_application": [
                     "name": targetName,
-                    "bundle_id": externalTargetBundleID ?? "org.vielotus.lab.internal",
+                    "bundle_id": externalTargetBundleID ?? lastTraceTargetBundleID ?? "org.vielotus.lab.internal",
                     "category": targetCat
                 ],
                 "reproduction": [
@@ -650,9 +656,10 @@ private final class LabStore: ObservableObject {
     }
 
     func generateReportMarkdown() -> String {
+        drainTraceEvents()
         let targetName: String
         let targetCat: String
-        if let targetID = externalTargetBundleID {
+        if let targetID = externalTargetBundleID ?? lastTraceTargetBundleID {
             let matched = traceTargets.first(where: { $0.bundleID == targetID })
             targetName = matched?.name ?? targetID
             targetCat = matched?.categoryDescription ?? "Ứng dụng ngoài"
@@ -780,9 +787,13 @@ private final class LabStore: ObservableObject {
         do {
             let events = try LabTraceSpool.read(traceID: traceID, offset: &traceSpoolOffset)
             for event in events where event.traceID == traceID {
-                append(TraceEntry(time: event.time, monotonic: event.monotonic, source: "Engine",
-                                  action: event.event, key: event.key, raw: event.raw,
-                                  composing: event.composing, committed: "", detail: event.detail))
+                var entry = TraceEntry(time: event.time, monotonic: event.monotonic, source: "Engine",
+                                       action: event.event, key: event.key, raw: event.raw,
+                                       composing: event.composing, committed: "", detail: event.detail)
+                if event.event == "caretMismatch" || event.event == "backspaceCursorResync" {
+                    entry.issue = "Caret position changed: \(event.detail)"
+                }
+                append(entry)
             }
         } catch {
             recordAXDiagnostic("trace-spool-read", target: externalTargetBundleID ?? "unknown",
@@ -1028,6 +1039,12 @@ private struct LabView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .sheet(isPresented: $showingReportPreview) {
             ReportPreviewSheet(text: $reportPreviewText)
+        }
+        .onDisappear {
+            store.stopTrace()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            store.stopTrace()
         }
     }
 
@@ -1654,4 +1671,3 @@ private struct ReportPreviewSheet: View {
         try? text.write(to: url, atomically: true, encoding: .utf8)
     }
 }
-

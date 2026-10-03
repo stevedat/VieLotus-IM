@@ -20,6 +20,7 @@ final class Preferences: ObservableObject {
         static let terminalDirectMode = "VieLotusIM.terminalDirectMode"
         static let developerMode = "VieLotusIM.developerMode"
         static let engineBackend = "VieLotusIM.engineBackend"
+        static let wordSuggestions = "VieLotusIM.wordSuggestions"
     }
     
     @Published var inputMethod: InputMethodType {
@@ -46,6 +47,10 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(smartBilingual, forKey: Key.smartBilingual) }
     }
 
+    @Published var wordSuggestions: Bool {
+        didSet { defaults.set(wordSuggestions, forKey: Key.wordSuggestions) }
+    }
+
     @Published var terminalDirectMode: Bool {
         didSet { defaults.set(terminalDirectMode, forKey: Key.terminalDirectMode) }
     }
@@ -67,6 +72,7 @@ final class Preferences: ObservableObject {
         self.quickTelex = defaults.bool(forKey: Key.quickTelex)
         self.vietnameseEnabled = defaults.object(forKey: Key.vietnameseEnabled) as? Bool ?? true
         self.smartBilingual = defaults.object(forKey: Key.smartBilingual) as? Bool ?? true
+        self.wordSuggestions = defaults.object(forKey: Key.wordSuggestions) as? Bool ?? false
         self.terminalDirectMode = defaults.object(forKey: Key.terminalDirectMode) as? Bool ?? true
         self.developerMode = defaults.object(forKey: Key.developerMode) as? Bool ?? false
         
