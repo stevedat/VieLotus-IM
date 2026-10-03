@@ -170,20 +170,7 @@ final class VieLotusIMController: IMKInputController {
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
         }
-        if bundleID?.lowercased() == "com.google.antigravity",
-           engine.isComposing,
-           virtualCursorLocation != NSNotFound,
-           selection.location != NSNotFound,
-           (selection.location != virtualCursorLocation || selection.length != 0) {
-            traceLab("caretMismatch", bundleID: bundleID,
-                     detail: "expected=\(virtualCursorLocation) actual=\(selection.location),\(selection.length) output=\(composingWord)",
-                     selection: selection)
-            engine.reset()
-            composingWord = ""
-            rawWord = ""
-            editCaretBack = Self.caretDisarmed
-            virtualCursorLocation = NSNotFound
-        }
+
         if selection.location == NSNotFound && presentationMode == .directReplacement {
             // Dynamic fallback: if a direct replacement app returns NSNotFound,
             // we cannot do backward deletion. We must switch to marked text mode.
