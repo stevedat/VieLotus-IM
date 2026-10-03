@@ -276,12 +276,14 @@ final class VieLotusIMController: IMKInputController {
 
         // Handle Backspace: keyCode 51 (plain Backspace)
         if keyCode == 51 {
-            if selection.location != NSNotFound && selection.length > 0 {
+            let isUserSelection = selection.location != NSNotFound && selection.length > 0 &&
+                !(presentationMode == .markedText && engine.isComposing)
+            if isUserSelection {
                 engine.reset()
                 composingWord = ""
                 rawWord = ""
                 editCaretBack = Self.caretDisarmed
-            virtualCursorLocation = NSNotFound
+                virtualCursorLocation = NSNotFound
                 if presentationMode == .markedText {
                     client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
                 }
@@ -449,6 +451,9 @@ final class VieLotusIMController: IMKInputController {
                         }
                     }
                 }
+                if presentationMode == .markedText {
+                    client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+                }
                 engine.reset()
                 composingWord = ""
                 rawWord = ""
@@ -594,7 +599,7 @@ final class VieLotusIMController: IMKInputController {
             traceLab("space", bundleID: bundleID, key: "Space", detail: "restored=\(restored)",
                      selection: client.selectedRange())
             editCaretBack = -1
-            if restored && presentationMode == .directReplacement {
+            if restored {
                 return true
             }
             return false
@@ -608,7 +613,7 @@ final class VieLotusIMController: IMKInputController {
             if engine.isComposing {
                 restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: firstChar)
             }
-            if restored && presentationMode == .directReplacement {
+            if restored {
                 return true
             }
             return false
@@ -617,7 +622,9 @@ final class VieLotusIMController: IMKInputController {
         DiagnosticLogger.shared.log("CHAR '\(firstChar)' (\(keyCode)) | app: \(bundleID ?? "?") | mode: \(presentationMode) | sel: \(selection.location),\(selection.length)")
 
         // Typing over an active selection replaces the selection
-        if selection.location != NSNotFound && selection.length > 0 {
+        let isUserSelection = selection.location != NSNotFound && selection.length > 0 &&
+            !(presentationMode == .markedText && engine.isComposing)
+        if isUserSelection {
             engine.reset()
             composingWord = ""
             rawWord = ""
