@@ -184,4 +184,16 @@ final class SmartBilingualDetectorTests: XCTestCase {
         // XCTAssertTrue(SmartBilingualDetector.isEnglishWord(raw: "config.json"))
         // XCTAssertTrue(SmartBilingualDetector.isEnglishWord(raw: "localhost:8080"))
     }
+
+    func testWordsStartingWithDdAreNotFalselyRestoredToEnglish() {
+        // Vietnamese words or incomplete syllables starting with "dd" must keep their transformed shape
+        XCTAssertFalse(SmartBilingualDetector.isEnglishWord(raw: "ddacw", rendered: "đăc"))
+        XCTAssertFalse(SmartBilingualDetector.isEnglishWord(raw: "ddac", rendered: "đac"))
+        XCTAssertFalse(SmartBilingualDetector.isEnglishWord(raw: "ddacwj", rendered: "đặc"))
+        XCTAssertFalse(SmartBilingualDetector.isEnglishWord(raw: "ddi", rendered: "đi"))
+        XCTAssertFalse(SmartBilingualDetector.isEnglishWord(raw: "ddung", rendered: "đung"))
+
+        // Pure consonant abbreviations like DDR (đr) with no vowels should restore to DDR
+        XCTAssertTrue(SmartBilingualDetector.isEnglishWord(raw: "ddr", rendered: "đr"))
+    }
 }

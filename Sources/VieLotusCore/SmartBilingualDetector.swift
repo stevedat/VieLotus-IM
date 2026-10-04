@@ -115,6 +115,20 @@ public struct SmartBilingualDetector {
                 return true
             }
             if !isPlausibleVietnameseText(rendered) {
+                if lowerRaw.hasPrefix("dd") && lowerRaw != "dd" {
+                    let vietnameseVowels: Set<Character> = [
+                        "a", "e", "i", "o", "u", "y", "ă", "â", "ê", "ô", "ơ", "ư",
+                        "á", "à", "ả", "ã", "ạ", "ắ", "ằ", "ẳ", "ẵ", "ặ",
+                        "ấ", "ầ", "ẩ", "ẫ", "ậ", "é", "è", "ẻ", "ẽ", "ẹ",
+                        "ế", "ề", "ể", "ễ", "ệ", "í", "ì", "ỉ", "ĩ", "ị",
+                        "ó", "ò", "ỏ", "õ", "ọ", "ố", "ồ", "ổ", "ỗ", "ộ",
+                        "ớ", "ờ", "ở", "ỡ", "ợ", "ú", "ù", "ủ", "ũ", "ụ",
+                        "ứ", "ừ", "ử", "ữ", "ự", "ý", "ỳ", "ỷ", "ỹ", "ỵ"
+                    ]
+                    if rendered.lowercased().contains(where: vietnameseVowels.contains) {
+                        return false
+                    }
+                }
                 return true
             }
         }

@@ -848,6 +848,7 @@ final class VieLotusIMController: IMKInputController {
         rawWord = ""
         editCaretBack = Self.caretDisarmed
         virtualCursorLocation = NSNotFound
+        lastClientIdentifier = nil
         NSLog("VieLotusIMController: Activated")
     }
 
@@ -856,7 +857,8 @@ final class VieLotusIMController: IMKInputController {
         composingWord = ""
         rawWord = ""
         editCaretBack = Self.caretDisarmed
-            virtualCursorLocation = NSNotFound
+        virtualCursorLocation = NSNotFound
+        lastClientIdentifier = nil
         super.deactivateServer(sender)
         NSLog("VieLotusIMController: Deactivated")
     }
