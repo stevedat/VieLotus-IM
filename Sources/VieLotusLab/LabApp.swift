@@ -72,16 +72,123 @@ private struct TraceTarget: Identifiable, Hashable {
     }
 }
 
+private typealias PresentationMode = VieLotusCore.PresentationMode
+
+extension PresentationMode {
+    var title: String {
+        switch self {
+        case .directReplacement: return "Direct Replacement"
+        case .markedText: return "Marked Text"
+        case .terminalDirect: return "Terminal Direct"
+        }
+    }
+}
+
+extension PresentationModePreference {
+    var title: String {
+        switch self {
+        case .automatic: return "Tự động (Khuyên dùng)"
+        case .directReplacement: return "Direct Replacement"
+        case .markedText: return "Marked Text"
+        }
+    }
+}
+
+private struct TargetAppPresentationDetails {
+    let category: AppCategory
+    let resolvedMode: PresentationMode
+    let preferenceUsed: PresentationModePreference
+    let isOverridden: Bool
+    let sourceDescription: String
+
+    var categoryDescription: String {
+        switch category {
+        case .standardAppKit: return "Standard AppKit / Cocoa"
+        case .chromium: return "Chromium / Electron / WebKit"
+        case .msOffice: return "Microsoft Office"
+        case .terminal: return "Terminal Emulator"
+        case .overlay: return "Quick Search / Overlay"
+        case .remoteOrVirtualMachine: return "Remote Desktop / Virtual Machine"
+        case .unknown: return "Khác"
+        }
+    }
+
+    var resolvedModeTitle: String {
+        resolvedMode.title
+    }
+}
+
+private struct EmpiricalTestCase: Identifiable {
+    let id: Int
+    let name: String
+    let description: String
+    var status: TestStatus = .notRun
+
+    enum TestStatus: String, CaseIterable, Identifiable {
+        case notRun = "NOT RUN"
+        case pass = "PASS"
+        case fail = "FAIL"
+        var id: String { rawValue }
+
+        var color: Color {
+            switch self {
+            case .notRun: return .secondary
+            case .pass: return .green
+            case .fail: return .red
+            }
+        }
+    }
+
+    static func defaultCases() -> [EmpiricalTestCase] {
+        [
+            EmpiricalTestCase(id: 1, name: "Gõ dấu cơ bản", description: "Gõ từ hoàn chỉnh (vd: 'tiếng Việt'). Kiểm tra dấu đặt đúng nguyên âm chính, không mất phím."),
+            EmpiricalTestCase(id: 2, name: "Backspace từng bước", description: "Gõ 'tiếng', xóa 2 ký tự rồi gõ 'm' -> 'tiếm'. Kiểm tra buffer quay lui đúng vị trí và tái tạo dấu."),
+            EmpiricalTestCase(id: 3, name: "Xóa hết rồi gõ lại", description: "Gõ 'việt', xóa hết về ô trống rồi gõ 'nam'. Kiểm tra bộ đệm reset hoàn toàn, không sót rác."),
+            EmpiricalTestCase(id: 4, name: "Click đổi vị trí con trỏ", description: "Đang gõ dở một từ, click chuột nhảy sang vị trí khác hoặc giữa từ. Kiểm tra chốt từ hoặc hủy buffer sạch sẽ."),
+            EmpiricalTestCase(id: 5, name: "Chọn vùng chữ & gõ đè", description: "Bôi đen một đoạn văn bản và gõ chữ mới. Kiểm tra thay thế chuẩn xác vùng chọn, không nhân bản ký tự."),
+            EmpiricalTestCase(id: 6, name: "Hoàn tác & Làm lại (Undo/Redo)", description: "Gõ một từ tiếng Việt rồi bấm Cmd+Z. Kiểm tra hoàn tác nguyên từ, không bị vỡ vụn thành từng ký tự."),
+            EmpiricalTestCase(id: 7, name: "Chốt từ bằng phím Space", description: "Gõ 'xin ' + 'chào '. Kiểm tra phím Space chốt từ dứt khoát, giữ đúng 1 dấu cách."),
+            EmpiricalTestCase(id: 8, name: "Chốt từ bằng phím Enter", description: "Gõ một từ rồi bấm Enter (xuống dòng hoặc submit). Kiểm tra không bị lặp ký tự cuối hoặc rơi rớt dấu."),
+            EmpiricalTestCase(id: 9, name: "Chuyển tab / Đổi ứng dụng", description: "Đang gõ dở một từ, bấm Cmd+Tab hoặc click app khác rồi quay lại. Kiểm tra không bị treo trạng thái soạn thảo."),
+            EmpiricalTestCase(id: 10, name: "Gợi ý tự động (Autocomplete)", description: "Gõ vào ô URL hoặc editor có autocomplete popup. Kiểm tra gợi ý mượt mà, không kẹt popup hoặc đè chữ.")
+        ]
+    }
+}
+
 private struct IMEInfo {
     let isRunning: Bool
     let version: String
     let buildNumber: String
     let gitCommit: String
     let bundlePath: String
+    let presentationPreference: PresentationModePreference
+    let appModeOverrides: [String: PresentationModePreference]
+    let inputMethod: InputMethodType
+    let modernOrthography: Bool
+    let smartBilingual: Bool
+
+    var presentationPreferenceTitle: String {
+        presentationPreference.title
+    }
 
     static func current() -> IMEInfo {
         let bundleID = "org.vielotus.inputmethod.VieLotusIM"
-        
+
+        let imeDefaults = UserDefaults(suiteName: bundleID)
+        let prefRaw = imeDefaults?.string(forKey: "VieLotusIM.presentationModePreference") ?? "automatic"
+        let presentationPreference = PresentationModePreference(rawValue: prefRaw) ?? .automatic
+        let overridesDict = imeDefaults?.dictionary(forKey: "VieLotusIM.appModeOverrides") as? [String: String] ?? [:]
+        var appOverrides: [String: PresentationModePreference] = [:]
+        for (k, v) in overridesDict {
+            if let p = PresentationModePreference(rawValue: v) {
+                appOverrides[k.lowercased()] = p
+            }
+        }
+        let inputMethodRaw = imeDefaults?.integer(forKey: "VieLotusIM.inputMethod") ?? 0
+        let inputMethod = InputMethodType(rawValue: Int32(inputMethodRaw)) ?? .telex
+        let modern = imeDefaults?.object(forKey: "VieLotusIM.modernOrthography") as? Bool ?? true
+        let bilingual = imeDefaults?.object(forKey: "VieLotusIM.smartBilingual") as? Bool ?? true
+
         // 1. Check if the IME process is currently active in memory
         if let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
             let bundleURL = runningApp.bundleURL
@@ -95,7 +202,12 @@ private struct IMEInfo {
                 version: version,
                 buildNumber: build,
                 gitCommit: commit,
-                bundlePath: path
+                bundlePath: path,
+                presentationPreference: presentationPreference,
+                appModeOverrides: appOverrides,
+                inputMethod: inputMethod,
+                modernOrthography: modern,
+                smartBilingual: bilingual
             )
         }
 
@@ -115,7 +227,12 @@ private struct IMEInfo {
                     version: version,
                     buildNumber: build,
                     gitCommit: commit,
-                    bundlePath: url.path
+                    bundlePath: url.path,
+                    presentationPreference: presentationPreference,
+                    appModeOverrides: appOverrides,
+                    inputMethod: inputMethod,
+                    modernOrthography: modern,
+                    smartBilingual: bilingual
                 )
             }
         }
@@ -125,7 +242,47 @@ private struct IMEInfo {
             version: "chưa cài đặt hoặc không xác định",
             buildNumber: "N/A",
             gitCommit: "N/A",
-            bundlePath: "N/A"
+            bundlePath: "N/A",
+            presentationPreference: presentationPreference,
+            appModeOverrides: appOverrides,
+            inputMethod: inputMethod,
+            modernOrthography: modern,
+            smartBilingual: bilingual
+        )
+    }
+
+    func targetModeDetails(for bundleID: String?) -> TargetAppPresentationDetails {
+        guard let id = bundleID?.lowercased(), !id.isEmpty else {
+            return TargetAppPresentationDetails(
+                category: .unknown,
+                resolvedMode: .directReplacement,
+                preferenceUsed: presentationPreference,
+                isOverridden: false,
+                sourceDescription: "Chưa chọn ứng dụng"
+            )
+        }
+        let category = ClientAdapter.classify(bundleIdentifier: id)
+        let resolved = ClientAdapter.presentationMode(
+            for: category,
+            bundleIdentifier: id,
+            preference: presentationPreference,
+            appOverrides: appModeOverrides
+        )
+        let isOverridden = appModeOverrides[id] != nil && appModeOverrides[id] != .automatic
+        let source: String
+        if isOverridden, let ov = appModeOverrides[id] {
+            source = "Ghi đè ứng dụng (\(ov.title))"
+        } else if presentationPreference != .automatic {
+            source = "Cấu hình toàn cục (\(presentationPreference.title))"
+        } else {
+            source = "Adapter mặc định"
+        }
+        return TargetAppPresentationDetails(
+            category: category,
+            resolvedMode: resolved,
+            preferenceUsed: presentationPreference,
+            isOverridden: isOverridden,
+            sourceDescription: source
         )
     }
 }
@@ -149,7 +306,26 @@ private final class LabStore: ObservableObject {
     @Published var selectedTargetBundleID = ""
     @Published var accessibilityTrusted = AXIsProcessTrusted()
     @Published var externalMonitorNote = ""
+    @Published var empiricalTests: [EmpiricalTestCase] = EmpiricalTestCase.defaultCases()
     var activeExternalTarget: String? { externalTargetBundleID }
+
+    var empiricalPassCount: Int {
+        empiricalTests.filter { $0.status == .pass }.count
+    }
+
+    var empiricalFailCount: Int {
+        empiricalTests.filter { $0.status == .fail }.count
+    }
+
+    var empiricalRunCount: Int {
+        empiricalTests.filter { $0.status != .notRun }.count
+    }
+
+    func resetEmpiricalTests() {
+        for i in 0..<empiricalTests.count {
+            empiricalTests[i].status = .notRun
+        }
+    }
 
     func clearLog() {
         session.reset()
@@ -329,9 +505,11 @@ private final class LabStore: ObservableObject {
         guard beginTrace(targetBundleID: selectedTargetBundleID) else { return }
         status = "Đang theo dõi · \(selectedTargetBundleID)"
         externalMonitorNote = "Đã bắt đầu theo dõi. Hãy chuyển sang \(selectedTargetBundleID) và gõ thử vào ô nhập"
+        let imeInfo = IMEInfo.current()
+        let modeDetails = imeInfo.targetModeDetails(for: selectedTargetBundleID)
         append(TraceEntry(source: "Lab", action: "external trace started", key: "", raw: "",
                           composing: "", committed: "",
-                          detail: "target=\(selectedTargetBundleID) accessibility=granted"))
+                          detail: "target=\(selectedTargetBundleID) mode=\(modeDetails.resolvedModeTitle) (\(modeDetails.sourceDescription)) accessibility=granted"))
         externalTraceTimer = Timer.scheduledTimer(withTimeInterval: Self.externalTraceSamplingInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.captureExternalSnapshot() }
         }
@@ -601,8 +779,9 @@ private final class LabStore: ObservableObject {
             }
 
             let ime = IMEInfo.current()
+            let targetModeDetails = ime.targetModeDetails(for: externalTargetBundleID ?? lastTraceTargetBundleID)
             var packet: [String: Any] = [
-                "diagnostic_schema_version": "1.1",
+                "diagnostic_schema_version": "1.2",
                 "created_at": TraceEntry.timestamp(),
                 "environment": [
                     "os_version": AppInfo.osVersionString,
@@ -623,13 +802,26 @@ private final class LabStore: ObservableObject {
                 "ime_settings": [
                     "input_method": method == .telex ? "telex" : "vni",
                     "modern_orthography": modern,
-                    "smart_bilingual": smartBilingual
+                    "smart_bilingual": smartBilingual,
+                    "presentation_mode_preference": ime.presentationPreference.rawValue,
+                    "presentation_mode_title": ime.presentationPreference.title
                 ],
                 "target_application": [
                     "name": targetName,
                     "bundle_id": externalTargetBundleID ?? lastTraceTargetBundleID ?? "org.vielotus.lab.internal",
-                    "category": targetCat
+                    "category": targetCat,
+                    "resolved_presentation_mode": targetModeDetails.resolvedModeTitle,
+                    "mode_source": targetModeDetails.sourceDescription,
+                    "is_overridden": targetModeDetails.isOverridden
                 ],
+                "empirical_compatibility_matrix": empiricalTests.map { test in
+                    [
+                        "id": test.id,
+                        "name": test.name,
+                        "description": test.description,
+                        "status": test.status.rawValue
+                    ]
+                },
                 "reproduction": [
                     "raw_keys": session.rawWord,
                     "composing": session.currentOutput(),
@@ -685,14 +877,17 @@ private final class LabStore: ObservableObject {
         report += "#### 2. Cấu hình bộ gõ (IME Settings)\n"
         report += "- **Kiểu gõ:** \(method == .telex ? "TELEX" : "VNI")\n"
         report += "- **Dấu chuẩn mới (oà/uý):** \(modern ? "Bật" : "Tắt")\n"
-        report += "- **Nhận diện tiếng Anh thông minh:** \(smartBilingual ? "Bật" : "Tắt")\n\n"
+        report += "- **Nhận diện tiếng Anh thông minh:** \(smartBilingual ? "Bật" : "Tắt")\n"
+        report += "- **Chế độ hiển thị mặc định:** \(ime.presentationPreference.title)\n\n"
 
+        let targetModeDetails = ime.targetModeDetails(for: externalTargetBundleID ?? lastTraceTargetBundleID)
         report += "#### 3. Ứng dụng mục tiêu (Target Application)\n"
         report += "- **Tên ứng dụng:** \(targetName)\n"
-        if let targetID = externalTargetBundleID {
+        if let targetID = externalTargetBundleID ?? lastTraceTargetBundleID {
             report += "- **Bundle ID:** `\(targetID)`\n"
         }
-        report += "- **Phân loại môi trường:** `\(targetCat)`\n\n"
+        report += "- **Phân loại môi trường:** \(targetCat)\n"
+        report += "- **Chế độ hiển thị áp dụng:** \(targetModeDetails.resolvedModeTitle) (\(targetModeDetails.sourceDescription))\n\n"
 
         report += "#### 4. Dữ liệu thử nghiệm (Reproduction Data)\n"
         if !session.rawWord.isEmpty {
@@ -705,6 +900,25 @@ private final class LabStore: ObservableObject {
             report += "- **Văn bản đã chốt (Committed):** `\(committed)`\n"
         }
         report += "- **Tổng số sự kiện trace:** \(entries.count) (Cảnh báo bất thường: \(issueCount))\n\n"
+
+        report += "#### 5. Ma trận kiểm thử tương thích thực nghiệm (Empirical Compatibility Matrix)\n"
+        let testedCount = empiricalTests.filter { $0.status != .notRun }.count
+        if testedCount == 0 {
+            report += "_Chưa thực hiện ca kiểm thử thực nghiệm nào trong phiên này._\n\n"
+        } else {
+            report += "| STT | Tình huống kiểm thử | Mô tả | Trạng thái |\n"
+            report += "|:---:|:---|:---|:---:|\n"
+            for test in empiricalTests {
+                let badge: String
+                switch test.status {
+                case .pass: badge = "✅ PASS"
+                case .fail: badge = "❌ FAIL"
+                case .notRun: badge = "⚪ NOT RUN"
+                }
+                report += "| \(test.id) | **\(test.name)** | \(test.description) | \(badge) |\n"
+            }
+            report += "\n"
+        }
 
         if !entries.isEmpty {
             report += "<details>\n<summary><b>Chi tiết chuỗi sự kiện Trace (Nhấp để mở)</b></summary>\n\n"
@@ -935,6 +1149,7 @@ private struct LabView: View {
     @StateObject private var store = LabStore()
     @State private var showingReportPreview = false
     @State private var reportPreviewText = ""
+    @State private var showingMatrixSheet = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -965,6 +1180,22 @@ private struct LabView: View {
                 .background(Color.secondary.opacity(0.08), in: Capsule())
 
                 // Quick Action Buttons
+                Button {
+                    showingMatrixSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checklist")
+                        Text("Ma trận 10 ca")
+                        if store.empiricalRunCount > 0 {
+                            Text("(\(store.empiricalPassCount)/\(store.empiricalRunCount))")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(store.empiricalFailCount > 0 ? .red : .green)
+                        }
+                    }
+                }
+                .controlSize(.small)
+                .help("Mở bảng kiểm tra ma trận 10 ca tương thích thực nghiệm")
+
                 Button {
                     reportPreviewText = store.generateReportMarkdown()
                     showingReportPreview = true
@@ -1007,7 +1238,7 @@ private struct LabView: View {
                     replayView
                 }
             }
-            .frame(minHeight: 180, maxHeight: 220)
+            .frame(minHeight: 180, maxHeight: 255)
 
             Divider()
 
@@ -1041,6 +1272,9 @@ private struct LabView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .sheet(isPresented: $showingReportPreview) {
             ReportPreviewSheet(text: $reportPreviewText)
+        }
+        .sheet(isPresented: $showingMatrixSheet) {
+            EmpiricalMatrixSheet(store: store)
         }
         .onDisappear {
             store.stopTrace()
@@ -1185,6 +1419,46 @@ private struct LabView: View {
                     .controlSize(.small)
                     .tint(store.traceEnabled && store.activeExternalTarget != nil ? .red : .accentColor)
                     .disabled(store.selectedTargetBundleID.isEmpty)
+                }
+
+                let ime = IMEInfo.current()
+                let targetDetails = ime.targetModeDetails(for: store.selectedTargetBundleID)
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text("Chế độ:")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(targetDetails.resolvedModeTitle)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(targetDetails.resolvedMode == .markedText ? .purple : .blue)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(targetDetails.resolvedMode == .markedText ? Color.purple.opacity(0.12) : Color.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
+                    }
+                    Text("•")
+                        .foregroundStyle(.tertiary)
+                        .font(.caption2)
+                    Text("Nguồn: \(targetDetails.sourceDescription)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Button {
+                        showingMatrixSheet = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checklist")
+                            Text("Ma trận 10 ca")
+                            if store.empiricalRunCount > 0 {
+                                Text("(\(store.empiricalPassCount)/\(store.empiricalRunCount))")
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(store.empiricalFailCount > 0 ? .red : .green)
+                            }
+                        }
+                    }
+                    .controlSize(.small)
+                    .buttonStyle(.bordered)
                 }
 
                 if !store.externalMonitorNote.isEmpty {
@@ -1672,5 +1946,114 @@ private struct ReportPreviewSheet: View {
         panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+}
+
+// MARK: - Empirical 10-Case Compatibility Matrix Sheet
+private struct EmpiricalMatrixSheet: View {
+    @ObservedObject var store: LabStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "checklist")
+                    .font(.title2)
+                    .foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ma trận kiểm thử tương thích thực nghiệm (10 ca)")
+                        .font(.system(size: 15, weight: .bold))
+                    Text("Kiểm tra hành vi thực tế của Sen Việt trên ứng dụng mục tiêu để xác minh độ tin cậy.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Đặt lại tất cả", systemImage: "arrow.counterclockwise") {
+                    store.resetEmpiricalTests()
+                }
+                .controlSize(.small)
+                .buttonStyle(.bordered)
+
+                Button("Đóng", systemImage: "xmark") {
+                    dismiss()
+                }
+                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
+            }
+
+            // Summary metrics bar
+            HStack(spacing: 16) {
+                HStack(spacing: 5) {
+                    Text("Tiến độ:")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Text("\(store.empiricalRunCount)/10 ca đã thử")
+                        .font(.caption.weight(.bold))
+                }
+                HStack(spacing: 5) {
+                    Circle().fill(.green).frame(width: 8, height: 8)
+                    Text("\(store.empiricalPassCount) PASS")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.green)
+                }
+                HStack(spacing: 5) {
+                    Circle().fill(.red).frame(width: 8, height: 8)
+                    Text("\(store.empiricalFailCount) FAIL")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.red)
+                }
+                HStack(spacing: 5) {
+                    Circle().fill(Color.secondary.opacity(0.5)).frame(width: 8, height: 8)
+                    Text("\(10 - store.empiricalRunCount) Chưa chạy")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+
+            // Test list
+            ScrollView {
+                VStack(spacing: 8) {
+                    ForEach($store.empiricalTests) { $test in
+                        HStack(alignment: .center, spacing: 12) {
+                            Text("\(test.id)")
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .frame(width: 24, height: 24)
+                                .background(Color.secondary.opacity(0.12), in: Circle())
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(test.name)
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text(test.description)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Picker("", selection: $test.status) {
+                                ForEach(EmpiricalTestCase.TestStatus.allCases) { status in
+                                    Text(status.rawValue).tag(status)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 220)
+                        }
+                        .padding(10)
+                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(test.status == .pass ? Color.green.opacity(0.4) : (test.status == .fail ? Color.red.opacity(0.4) : Color(nsColor: .separatorColor)), lineWidth: 1)
+                        )
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .padding(16)
+        .frame(minWidth: 720, minHeight: 560)
     }
 }
