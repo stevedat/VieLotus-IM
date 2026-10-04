@@ -3,6 +3,16 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var prefs = Preferences.shared
+    @State private var newOverrideBundleID = ""
+
+    private let overrideApps: [(name: String, bundleID: String)] = [
+        ("Google Chrome", "com.google.chrome"),
+        ("Safari", "com.apple.safari"),
+        ("Microsoft Edge", "com.microsoft.edgemac"),
+        ("Codex", "com.openai.codex"),
+        ("Antigravity", "com.google.antigravity"),
+        ("Visual Studio Code", "com.microsoft.vscode")
+    ]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -47,6 +57,33 @@ struct SettingsView: View {
                         .labelsHidden()
                     }
                     .padding(.vertical, 4)
+                }
+
+                Section("CÁCH HIỂN THỊ CHỮ ĐANG GÕ") {
+                    Picker("Mặc định", selection: $prefs.presentationModePreference) {
+                        Text("Tự động (Khuyên dùng)").tag(PresentationModePreference.automatic)
+                        Text("Direct Replacement").tag(PresentationModePreference.directReplacement)
+                        Text("Marked Text").tag(PresentationModePreference.markedText)
+                    }
+
+                    Text("Tự động dùng adapter theo ứng dụng và fallback khi client không cung cấp vị trí chọn.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+
+                    ForEach(overrideApps, id: \.bundleID) { app in
+                        appOverrideRow(name: app.name, bundleID: app.bundleID)
+                    }
+
+                    ForEach(customOverrideBundleIDs, id: \.self) { bundleID in
+                        appOverrideRow(name: bundleID, bundleID: bundleID)
+                    }
+
+                    HStack(spacing: 8) {
+                        TextField("Bundle ID ứng dụng", text: $newOverrideBundleID)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Thêm") { addAppOverride() }
+                            .disabled(newOverrideBundleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
                 }
 
                 Section {
@@ -193,10 +230,47 @@ struct SettingsView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
         }
-        .frame(width: 440, height: 550)
+        .frame(width: 460, height: 700)
     }
 
     @State private var copiedDiagnostics = false
+
+    private var customOverrideBundleIDs: [String] {
+        prefs.appModeOverrides.keys
+            .filter { bundleID in !overrideApps.contains(where: { $0.bundleID == bundleID }) }
+            .sorted()
+    }
+
+    private func appOverrideRow(name: String, bundleID: String) -> some View {
+        HStack {
+            Text(name)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Picker("", selection: Binding(
+                get: { prefs.appModeOverrides[bundleID] ?? .automatic },
+                set: { mode in
+                    if mode == .automatic {
+                        prefs.appModeOverrides.removeValue(forKey: bundleID)
+                    } else {
+                        prefs.appModeOverrides[bundleID] = mode
+                    }
+                }
+            )) {
+                Text("Tự động").tag(PresentationModePreference.automatic)
+                Text("Direct").tag(PresentationModePreference.directReplacement)
+                Text("Marked").tag(PresentationModePreference.markedText)
+            }
+            .labelsHidden()
+            .frame(width: 130)
+        }
+    }
+
+    private func addAppOverride() {
+        let bundleID = newOverrideBundleID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !bundleID.isEmpty else { return }
+        prefs.appModeOverrides[bundleID] = .markedText
+        newOverrideBundleID = ""
+    }
 
     private func copyDiagnostics() {
         var text = "### 📋 Thông số Cấu hình & Môi trường VieLotusIM\n\n"
@@ -211,6 +285,13 @@ struct SettingsView: View {
             quickTelex: prefs.quickTelex,
             relaxedCoda: prefs.relaxedCoda
         ) + "\n\n"
+        text += "- **Chế độ hiển thị:** \(prefs.presentationModePreference.rawValue)\n"
+        if !prefs.appModeOverrides.isEmpty {
+            text += "- **Ghi đè ứng dụng:** " + prefs.appModeOverrides.keys.sorted().map { bundleID in
+                "\(bundleID)=\(prefs.appModeOverrides[bundleID]?.rawValue ?? "automatic")"
+            }.joined(separator: ", ") + "\n"
+        }
+        text += "\n"
         text += "> 🔒 Sen Việt áp dụng Zero-logging: Không ghi phím vào đĩa hay mạng.\n"
 
         NSPasteboard.general.clearContents()

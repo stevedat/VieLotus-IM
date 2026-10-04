@@ -18,6 +18,8 @@ final class Preferences: ObservableObject {
         static let vietnameseEnabled = "VieLotusIM.vietnameseEnabled"
         static let smartBilingual = "VieLotusIM.smartBilingual"
         static let terminalDirectMode = "VieLotusIM.terminalDirectMode"
+        static let presentationModePreference = "VieLotusIM.presentationModePreference"
+        static let appModeOverrides = "VieLotusIM.appModeOverrides"
         static let developerMode = "VieLotusIM.developerMode"
         static let engineBackend = "VieLotusIM.engineBackend"
         static let wordSuggestions = "VieLotusIM.wordSuggestions"
@@ -54,6 +56,20 @@ final class Preferences: ObservableObject {
     @Published var terminalDirectMode: Bool {
         didSet { defaults.set(terminalDirectMode, forKey: Key.terminalDirectMode) }
     }
+
+    @Published var presentationModePreference: PresentationModePreference {
+        didSet {
+            defaults.set(presentationModePreference.rawValue, forKey: Key.presentationModePreference)
+            ClientAdapter.resetDynamicMarkedText()
+        }
+    }
+
+    @Published var appModeOverrides: [String: PresentationModePreference] {
+        didSet {
+            defaults.set(appModeOverrides.mapValues(\.rawValue), forKey: Key.appModeOverrides)
+            ClientAdapter.resetDynamicMarkedText()
+        }
+    }
     
     @Published var developerMode: Bool {
         didSet { defaults.set(developerMode, forKey: Key.developerMode) }
@@ -74,6 +90,17 @@ final class Preferences: ObservableObject {
         self.smartBilingual = defaults.object(forKey: Key.smartBilingual) as? Bool ?? true
         self.wordSuggestions = defaults.object(forKey: Key.wordSuggestions) as? Bool ?? false
         self.terminalDirectMode = defaults.object(forKey: Key.terminalDirectMode) as? Bool ?? true
+        let rawPresentationMode = defaults.string(forKey: Key.presentationModePreference) ?? PresentationModePreference.automatic.rawValue
+        self.presentationModePreference = PresentationModePreference(rawValue: rawPresentationMode) ?? .automatic
+        let storedOverrides = defaults.dictionary(forKey: Key.appModeOverrides) as? [String: String] ?? [:]
+        self.appModeOverrides = storedOverrides.reduce(into: [:]) { result, entry in
+            let bundleID = entry.key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if let preference = PresentationModePreference(rawValue: entry.value),
+               preference != .automatic,
+               !bundleID.isEmpty {
+                result[bundleID] = preference
+            }
+        }
         self.developerMode = defaults.object(forKey: Key.developerMode) as? Bool ?? false
         
         let rawBackend = defaults.string(forKey: Key.engineBackend) ?? EngineBackend.pureSwift.rawValue

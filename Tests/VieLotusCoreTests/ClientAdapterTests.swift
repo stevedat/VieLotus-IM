@@ -51,6 +51,37 @@ final class ClientAdapterTests: XCTestCase {
         )
     }
 
+    func testPresentationPreferencesAndPerAppOverrides() {
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(for: .chromium, bundleIdentifier: "com.google.chrome", preference: .directReplacement),
+            .directReplacement
+        )
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(for: .chromium, bundleIdentifier: "com.google.chrome", preference: .markedText),
+            .markedText
+        )
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(
+                for: .chromium,
+                bundleIdentifier: "com.openai.codex",
+                appOverrides: ["com.openai.codex": .directReplacement]
+            ),
+            .directReplacement
+        )
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(
+                for: .chromium,
+                bundleIdentifier: "com.google.chrome",
+                preference: .directReplacement,
+                appOverrides: ["com.google.chrome": .markedText]
+            ),
+            .markedText
+        )
+        XCTAssertTrue(ClientAdapter.allowsDynamicMarkedTextFallback(bundleIdentifier: "com.google.chrome", preference: .automatic, appOverrides: [:]))
+        XCTAssertFalse(ClientAdapter.allowsDynamicMarkedTextFallback(bundleIdentifier: "com.google.chrome", preference: .directReplacement, appOverrides: [:]))
+        XCTAssertFalse(ClientAdapter.allowsDynamicMarkedTextFallback(bundleIdentifier: "com.google.chrome", preference: .automatic, appOverrides: ["com.google.chrome": .directReplacement]))
+    }
+
     func testExpandedAppClassification() {
         let testCases: [(String, AppCategory)] = [
             // Terminals

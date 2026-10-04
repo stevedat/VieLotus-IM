@@ -16,6 +16,14 @@ public enum PresentationMode: Sendable, Equatable {
     case terminalDirect
 }
 
+public enum PresentationModePreference: String, CaseIterable, Sendable, Identifiable {
+    case automatic
+    case directReplacement
+    case markedText
+
+    public var id: String { rawValue }
+}
+
 public struct ClientAdapter {
     public static func classify(bundleIdentifier: String?) -> AppCategory {
         guard let id = bundleIdentifier?.lowercased() else { return .unknown }
@@ -123,17 +131,41 @@ public struct ClientAdapter {
         return .standardAppKit
     }
     
+    private static let dynamicModeLock = NSLock()
     private static var dynamicMarkedTextBundles: Set<String> = []
 
     public static func forceMarkedText(for bundleIdentifier: String) {
+        dynamicModeLock.lock()
+        defer { dynamicModeLock.unlock() }
         dynamicMarkedTextBundles.insert(bundleIdentifier.lowercased())
     }
 
     public static func resetDynamicMarkedText() {
+        dynamicModeLock.lock()
+        defer { dynamicModeLock.unlock() }
         dynamicMarkedTextBundles.removeAll()
     }
 
-    public static func presentationMode(for category: AppCategory, bundleIdentifier: String? = nil, terminalDirectEnabled: Bool = false) -> PresentationMode {
+    public static func presentationMode(
+        for category: AppCategory,
+        bundleIdentifier: String? = nil,
+        terminalDirectEnabled: Bool = false,
+        preference: PresentationModePreference = .automatic,
+        appOverrides: [String: PresentationModePreference] = [:]
+    ) -> PresentationMode {
+        let id = bundleIdentifier?.lowercased()
+        let override = id.flatMap { appOverrides[$0] }
+        let selectedPreference = override ?? preference
+
+        switch selectedPreference {
+        case .directReplacement:
+            return .directReplacement
+        case .markedText:
+            return .markedText
+        case .automatic:
+            break
+        }
+
         if category == .terminal {
             return terminalDirectEnabled ? .terminalDirect : .markedText
         }
@@ -143,9 +175,22 @@ public struct ClientAdapter {
         if ["com.google.antigravity", "com.openai.codex"].contains(bundleIdentifier?.lowercased() ?? "") {
             return .markedText
         }
-        if let id = bundleIdentifier?.lowercased(), dynamicMarkedTextBundles.contains(id) {
-            return .markedText
+        if let id {
+            dynamicModeLock.lock()
+            let isForcedMarkedText = dynamicMarkedTextBundles.contains(id)
+            dynamicModeLock.unlock()
+            if isForcedMarkedText { return .markedText }
         }
         return .directReplacement
+    }
+
+    public static func allowsDynamicMarkedTextFallback(
+        bundleIdentifier: String?,
+        preference: PresentationModePreference,
+        appOverrides: [String: PresentationModePreference]
+    ) -> Bool {
+        guard preference == .automatic else { return false }
+        guard let id = bundleIdentifier?.lowercased() else { return true }
+        return appOverrides[id] == nil
     }
 }

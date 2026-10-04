@@ -153,7 +153,14 @@ final class VieLotusIMController: IMKInputController {
         lastClientIdentifier = clientUID
 
         let appCategory = ClientAdapter.classify(bundleIdentifier: bundleID)
-        var presentationMode = ClientAdapter.presentationMode(for: appCategory, bundleIdentifier: bundleID, terminalDirectEnabled: Preferences.shared.terminalDirectMode)
+        let preferences = Preferences.shared
+        var presentationMode = ClientAdapter.presentationMode(
+            for: appCategory,
+            bundleIdentifier: bundleID,
+            terminalDirectEnabled: preferences.terminalDirectMode,
+            preference: preferences.presentationModePreference,
+            appOverrides: preferences.appModeOverrides
+        )
 
         let selection = client.selectedRange()
         if presentationMode == .terminalDirect,
@@ -171,7 +178,12 @@ final class VieLotusIMController: IMKInputController {
             virtualCursorLocation = NSNotFound
         }
 
-        if selection.location == NSNotFound && presentationMode == .directReplacement {
+        if selection.location == NSNotFound && presentationMode == .directReplacement &&
+            ClientAdapter.allowsDynamicMarkedTextFallback(
+                bundleIdentifier: bundleID,
+                preference: preferences.presentationModePreference,
+                appOverrides: preferences.appModeOverrides
+            ) {
             // Dynamic fallback: if a direct replacement app returns NSNotFound,
             // we cannot do backward deletion. We must switch to marked text mode.
             DiagnosticLogger.shared.log("FALLBACK_TO_MARKED_TEXT | app: \(bundleID ?? "?") | selection: NSNotFound")
@@ -825,7 +837,14 @@ final class VieLotusIMController: IMKInputController {
         if engine.isComposing {
             let bundleID = client.bundleIdentifier()
             let appCategory = ClientAdapter.classify(bundleIdentifier: bundleID)
-            let mode = ClientAdapter.presentationMode(for: appCategory, bundleIdentifier: bundleID, terminalDirectEnabled: Preferences.shared.terminalDirectMode)
+            let prefs = Preferences.shared
+            let mode = ClientAdapter.presentationMode(
+                for: appCategory,
+                bundleIdentifier: bundleID,
+                terminalDirectEnabled: prefs.terminalDirectMode,
+                preference: prefs.presentationModePreference,
+                appOverrides: prefs.appModeOverrides
+            )
             let selection = client.selectedRange()
             _ = commitWordWithBilingualCheck(client: client, presentationMode: mode, selection: selection)
         }
@@ -871,7 +890,14 @@ final class VieLotusIMController: IMKInputController {
             if let client = sender as? IMKTextInput {
                 let bundleID = client.bundleIdentifier()
                 let appCategory = ClientAdapter.classify(bundleIdentifier: bundleID)
-                let mode = ClientAdapter.presentationMode(for: appCategory, bundleIdentifier: bundleID, terminalDirectEnabled: Preferences.shared.terminalDirectMode)
+                let prefs = Preferences.shared
+                let mode = ClientAdapter.presentationMode(
+                    for: appCategory,
+                    bundleIdentifier: bundleID,
+                    terminalDirectEnabled: prefs.terminalDirectMode,
+                    preference: prefs.presentationModePreference,
+                    appOverrides: prefs.appModeOverrides
+                )
                 if mode == .terminalDirect {
                     cancelComposition()
                 } else {
