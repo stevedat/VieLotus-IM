@@ -13,12 +13,19 @@ FileHandle.standardError.write(Data("TISRegisterInputSource -> \(regStatus)\n".u
 
 if let unmanaged = TISCreateInputSourceList(nil, true) {
     let list = unmanaged.takeRetainedValue() as? [TISInputSource] ?? []
+    var primaryEnabled = false
     for src in list {
         guard let idPtr = TISGetInputSourceProperty(src, kTISPropertyInputSourceID) else { continue }
         let id = Unmanaged<CFString>.fromOpaque(idPtr).takeUnretainedValue() as String
         if id.lowercased().contains("vielotus") {
-            let e = TISEnableInputSource(src)
-            FileHandle.standardError.write(Data("enable \(id) -> \(e)\n".utf8))
+            if !primaryEnabled {
+                let e = TISEnableInputSource(src)
+                FileHandle.standardError.write(Data("enable \(id) -> \(e)\n".utf8))
+                primaryEnabled = true
+            } else {
+                let d = TISDisableInputSource(src)
+                FileHandle.standardError.write(Data("disable duplicate \(id) -> \(d)\n".utf8))
+            }
         }
     }
 }

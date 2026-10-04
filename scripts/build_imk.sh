@@ -81,6 +81,6 @@ fi
 
 echo "=== Build complete: $APP_DIR (v${VERSION}) ==="
 echo ""
-echo "To install to ~/Library/Input Methods/:"
-echo "  cp -R \"$APP_DIR\" ~/Library/Input\\ Methods/"
-echo "  killall -9 VieLotusIM 2>/dev/null || true"
+echo "To deploy locally and restart IME cleanly:"
+echo "  ./scripts/deploy_local.sh"
+
