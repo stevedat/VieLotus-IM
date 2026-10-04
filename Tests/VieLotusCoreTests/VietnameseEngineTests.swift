@@ -104,4 +104,66 @@ final class VietnameseEngineTests: XCTestCase {
         _ = session.handleBackspace()
         XCTAssertEqual(session.currentOutput(), "á")
     }
+
+    func testWordCommitOnNewlineWithoutSpaceInInputSessionManager() {
+        let session = InputSessionManager()
+        session.setInputMethod(.telex)
+        for char in "vieejt" {
+            _ = session.handleCharacter(char)
+        }
+        XCTAssertTrue(session.isComposing)
+        XCTAssertEqual(session.currentOutput(), "việt")
+        
+        // Simulate Shift+Enter / Return (\n) boundary
+        XCTAssertTrue(session.isWordBoundary("\n"))
+        let action = session.commitWord(smartBilingualEnabled: true)
+        guard case let .commit(_, text, isOverride) = action else {
+            return XCTFail("Expected commit action on newline")
+        }
+        XCTAssertEqual(text, "việt")
+        XCTAssertFalse(isOverride)
+        XCTAssertFalse(session.isComposing)
+        XCTAssertEqual(session.currentOutput(), "")
+    }
+
+    func testEnglishWordRestoreOnNewlineWithoutSpace() {
+        SmartBilingualDetector.spellCheckerProvider = MacSpellChecker()
+        let session = InputSessionManager()
+        session.setInputMethod(.telex)
+        for char in "there" {
+            _ = session.handleCharacter(char)
+        }
+        XCTAssertTrue(session.isComposing)
+        XCTAssertEqual(session.currentOutput(), "thẻe")
+        
+        // Simulate Shift+Enter / Return (\n) boundary
+        XCTAssertTrue(session.isWordBoundary("\n"))
+        let action = session.commitWord(smartBilingualEnabled: true)
+        guard case let .commit(_, text, isOverride) = action else {
+            return XCTFail("Expected commit action on newline")
+        }
+        XCTAssertEqual(text, "there")
+        XCTAssertTrue(isOverride)
+        XCTAssertFalse(session.isComposing)
+    }
+
+    func testVniWordCommitOnNewlineWithoutSpace() {
+        let session = InputSessionManager()
+        session.setInputMethod(.vni)
+        for char in "viet65" {
+            _ = session.handleCharacter(char)
+        }
+        XCTAssertTrue(session.isComposing)
+        XCTAssertEqual(session.currentOutput(), "việt")
+        
+        XCTAssertTrue(session.isWordBoundary("\n"))
+        let action = session.commitWord(smartBilingualEnabled: true)
+        guard case let .commit(_, text, isOverride) = action else {
+            return XCTFail("Expected commit action on newline")
+        }
+        XCTAssertEqual(text, "việt")
+        XCTAssertFalse(isOverride)
+        XCTAssertFalse(session.isComposing)
+    }
 }
+
