@@ -5,7 +5,8 @@
 ```bash
 swift build                             # Build all targets (Core, App, CLI, Lab, Trace)
 swift test                              # Run unit tests (EngineBridge, InputSessionManager, SmartBilingual)
-swift run VieLotusCLI --benchmark       # Run official 9,091-word regression suite (99.51% pass rate)
+swift run VieLotusCLI --benchmark       # Run official 9,091-word regression suite (99.99% pass rate)
+swift run VieLotusCLI --stress          # Run 250,000-keystroke high-throughput stress & endurance benchmark
 swift run VieLotusCLI                   # Interactive REPL typing test harness
 ./scripts/build_imk.sh                  # Build release universal VieLotusIM.app + ad-hoc codesign
 ./scripts/build_pkg.sh                  # Build auto-registering installer package (VieLotusIM.pkg)
