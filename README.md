@@ -57,20 +57,21 @@ Thực tế, hệ sinh thái phần mềm trên macOS vô cùng phong phú — t
 ### 🗺️ Lộ Trình (Roadmap)
 
 - [x] **macOS v1.0.0**: Bản phát hành chính thức (Universal Binary cho Apple Silicon & Intel).
-- [x] **macOS v1.1.0 & VieLotusLab**: Nâng tỷ lệ kiểm thử lên 99.51% với ràng buộc ngữ âm Pure Swift; ra mắt VieLotusLab chẩn đoán nhịp gõ và xuất gói báo cáo lỗi khép kín.
+- [x] **macOS v1.1.0 & VieLotusLab**: Giới thiệu công cụ VieLotusLab chẩn đoán nhịp gõ và xuất gói báo cáo lỗi khép kín.
+- [x] **macOS v1.1.1 (Mới nhất)**: Chuyển giấy phép sang **MIT License**; sửa triệt để lỗi xóa lùi dở từ (Partial Backspace Retention); hoàn thiện bộ điều phối hiển thị thông minh (Adaptive Presentation Engine); nâng tỷ lệ kiểm thử lên **99.99%** (9,090 / 9,091 từ).
 - [ ] **Mở rộng iOS & iPadOS**: Bàn phím mở rộng cho iPhone/iPad dùng chung lõi `VieLotusCore`.
 - [ ] **Đồng bộ bảng gõ tắt**: Tùy biến viết tắt và từ điển cá nhân hóa.
 
 ### 🚀 Cài Đặt Nhanh
 
-1. Tải **`VieLotusIM.pkg`** (hoặc `.dmg`) từ [Releases](https://github.com/stevedat/VieLotus-IM/releases).
+1. Tải **`VieLotusIM.pkg`** (hoặc `.dmg`) từ [Releases v1.1.1](https://github.com/stevedat/VieLotus-IM/releases/tag/v1.1.1).
 2. Chạy gói cài đặt `.pkg` (Gói cài đặt đã được ký số chính thức Apple Developer ID).
 3. 🔄 **Lưu ý quan trọng (Đăng xuất):** Sau khi cài đặt xong, vui lòng **Đăng xuất (Log Out)** và đăng nhập lại một lần để macOS làm mới danh sách bộ gõ.
 4. Mở **System Settings** $\rightarrow$ **Keyboard** $\rightarrow$ **Text Input** (Nguồn nhập) bấm **Edit...** $\rightarrow$ bấm **`+`** chọn **Vietnamese** $\rightarrow$ thêm **VieLotusIM** (hoặc Sen Việt).
 
 
 Dành cho Tester tham gia thử nghiệm và chẩn đoán nhịp gõ:
-- Tải thêm **`VieLotusLab.dmg`** từ trang Releases để theo dõi ứng dụng ngoài và xuất gói báo cáo lỗi.
+- Tải thêm **`VieLotusLab.dmg`** từ [Releases v1.1.1](https://github.com/stevedat/VieLotus-IM/releases/tag/v1.1.1) để theo dõi ứng dụng ngoài và xuất gói báo cáo lỗi.
 - Xem chi tiết quy trình kiểm thử khép kín tại [docs/LAB_TESTING_GUIDE.md](docs/LAB_TESTING_GUIDE.md).
 - Tham gia thảo luận và đóng góp ý kiến cộng đồng tại [GitHub Discussions](https://github.com/stevedat/VieLotus-IM/discussions).
 
@@ -78,7 +79,7 @@ Tự biên dịch từ mã nguồn:
 ```bash
 git clone https://github.com/stevedat/VieLotus-IM.git
 cd VieLotus-IM
-./scripts/build_pkg.sh 1.1.0
+./scripts/build_pkg.sh 1.1.1
 ```
 
 ---
@@ -125,13 +126,14 @@ In practice, the macOS software landscape is vast — spanning AppKit utilities,
 ### 🗺️ Roadmap
 
 - [x] **macOS v1.0.0**: Universal release for Apple Silicon and Intel.
-- [x] **macOS v1.1.0 & VieLotusLab**: Elevated benchmark pass rate to 99.99% (9,090 / 9,091 words) via pure Swift phonological rules; introduced VieLotusLab typing diagnostics app and closed-loop issue export.
+- [x] **macOS v1.1.0 & VieLotusLab**: Introduced VieLotusLab typing diagnostics app and closed-loop issue export.
+- [x] **macOS v1.1.1 (Latest)**: Transitioned to **MIT License**; fixed partial backspace prefix retention; Adaptive Presentation Engine (Direct Replacement vs W3C Marked Text); elevated benchmark accuracy to **99.99%** (9,090 / 9,091 words).
 - [ ] **iOS & iPadOS Expansion**: Keyboard extension for iPhone/iPad sharing `VieLotusCore`.
 - [ ] **Custom Shorthands**: User-configurable abbreviations and custom vocabulary.
 
 ### 🚀 Quick Install
 
-1. Download **`VieLotusIM.pkg`** (or `.dmg`) from [Releases](https://github.com/stevedat/VieLotus-IM/releases).
+1. Download **`VieLotusIM.pkg`** (or `.dmg`) from [Releases v1.1.1](https://github.com/stevedat/VieLotus-IM/releases/tag/v1.1.1).
 2. Run the `.pkg` installer (Signed with official Apple Developer ID).
 3. 🔄 **Important Note (Log Out):** After installing, please **Log Out** and log back in once for macOS to refresh the Input Sources list.
 4. Open **System Settings** $\rightarrow$ **Keyboard** $\rightarrow$ **Text Input** click **Edit...** $\rightarrow$ click **`+`** select **Vietnamese** $\rightarrow$ add **VieLotusIM** (or Sen Việt).
@@ -140,7 +142,7 @@ Build from source:
 ```bash
 git clone https://github.com/stevedat/VieLotus-IM.git
 cd VieLotus-IM
-./scripts/build_pkg.sh 1.1.0
+./scripts/build_pkg.sh 1.1.1
 ```
 
 ---
