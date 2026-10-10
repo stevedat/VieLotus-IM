@@ -152,6 +152,16 @@ rm -f "$TMP_HELPER"
 # Refresh TextInputMenuAgent to update the macOS input menu bar immediately
 killall -9 TextInputMenuAgent 2>/dev/null || true
 
+# Terminate any lingering or auto-respawned processes from prior/backup bundles
+echo "→ Terminating any lingering or auto-spawned processes before launching..."
+pkill -9 -f VieLotusIM 2>/dev/null || true
+for _ in {1..15}; do
+    if ! pgrep -f VieLotusIM >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.1
+done
+
 # 5. P2 Fix: Launch with Explicit Multi-Stage Health Verification
 echo "→ Launching newly installed VieLotusIM..."
 if ! open "$TARGET"; then
@@ -161,7 +171,7 @@ fi
 # Health check Phase 1: Poll for initial process PID up to 5 seconds
 echo "→ Verifying initial process spawn..."
 RUNNING_PID=""
-for i in {1..10}; do
+for i in {1..15}; do
     RUNNING_PID="$(pgrep -f "$TARGET/Contents/MacOS/VieLotusIM" | head -n 1 || true)"
     if [ -n "$RUNNING_PID" ]; then
         break
@@ -172,6 +182,22 @@ done
 if [ -z "$RUNNING_PID" ]; then
     DO_ROLLBACK "Tiến trình VieLotusIM không xuất hiện sau khi open"
 fi
+
+# Verify the process is executing strictly from $TARGET and not an old or deleted directory
+EXE_PATH="$(lsof -F n -p "$RUNNING_PID" 2>/dev/null | grep -E '^n/.*VieLotusIM$' | sed 's/^n//' | head -n 1)"
+if [ -n "$EXE_PATH" ] && [[ "$EXE_PATH" != "$TARGET"* ]]; then
+    echo "⚠️ Cảnh báo: Tiến trình $RUNNING_PID chạy từ đường dẫn cũ: $EXE_PATH. Đang tái khởi động..."
+    kill -9 "$RUNNING_PID" 2>/dev/null || true
+    sleep 0.5
+    open "$TARGET"
+    sleep 1
+    RUNNING_PID="$(pgrep -f "$TARGET/Contents/MacOS/VieLotusIM" | head -n 1 || true)"
+    EXE_PATH="$(lsof -F n -p "$RUNNING_PID" 2>/dev/null | grep -E '^n/.*VieLotusIM$' | sed 's/^n//' | head -n 1)"
+    if [ -n "$EXE_PATH" ] && [[ "$EXE_PATH" != "$TARGET"* ]]; then
+        DO_ROLLBACK "Tiến trình VieLotusIM vẫn chạy từ bundle cũ ($EXE_PATH)"
+    fi
+fi
+echo "  • Xác thực đường dẫn nhị phân thực tế: $EXE_PATH"
 
 # Health check Phase 2: Process stability check (ensure process does NOT crash immediately)
 echo "→ Verifying process stability (liveness across sampling)..."

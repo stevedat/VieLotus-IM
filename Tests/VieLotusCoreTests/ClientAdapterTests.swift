@@ -26,8 +26,12 @@ final class ClientAdapterTests: XCTestCase {
             .markedText
         )
         XCTAssertEqual(
+            ClientAdapter.presentationMode(for: .chromium, bundleIdentifier: "com.stablyai.orca"),
+            .markedText
+        )
+        XCTAssertEqual(
             ClientAdapter.presentationMode(for: .chromium, bundleIdentifier: "org.vielotus.inputmethod.vielotuslab.chromium"),
-            .directReplacement
+            .markedText
         )
         XCTAssertEqual(
             ClientAdapter.presentationMode(for: .msOffice, bundleIdentifier: "org.vielotus.inputmethod.vielotuslab.com.microsoft.word"),
@@ -43,11 +47,11 @@ final class ClientAdapterTests: XCTestCase {
         )
         XCTAssertEqual(
             ClientAdapter.presentationMode(for: .chromium, bundleIdentifier: "com.microsoft.edgemac"),
-            .directReplacement
+            .markedText
         )
         XCTAssertEqual(
             ClientAdapter.presentationMode(for: .chromium, bundleIdentifier: "com.google.chrome"),
-            .directReplacement
+            .markedText
         )
     }
 
@@ -135,6 +139,12 @@ final class ClientAdapterTests: XCTestCase {
             ("com.microsoft.teams2", .chromium),
             ("net.whatsapp.whatsapp", .chromium),
             ("org.whispersystems.signal-desktop", .chromium),
+            ("com.stablyai.orca", .chromium),
+            ("com.anthropic.claudefordesktop", .chromium),
+            ("com.openai.chat", .chromium),
+            ("com.byteplus.trae", .chromium),
+            ("com.genoffice.app", .chromium),
+            ("com.postmanlabs.mac", .chromium),
 
             // Standard AppKit & Native
             ("com.apple.safari", .standardAppKit),
@@ -148,11 +158,72 @@ final class ClientAdapterTests: XCTestCase {
             ("com.google.android.studio", .standardAppKit),
             ("com.sublimetext.4", .standardAppKit),
             ("org.mozilla.firefox", .standardAppKit),
-            ("dev.zed.Zed", .standardAppKit),
+            // Remote Desktop & VM
+            ("com.microsoft.rdc.macos", .remoteOrVirtualMachine),
+            ("com.p5sys.jump.mac.viewer", .remoteOrVirtualMachine),
+            ("com.apple.remotedesktop", .remoteOrVirtualMachine),
+            ("com.carriez.rustdesk", .remoteOrVirtualMachine),
+            ("com.teamviewer.teamviewer", .remoteOrVirtualMachine),
+            ("com.philandro.anydesk", .remoteOrVirtualMachine),
+            ("com.parsecgaming.parsec", .remoteOrVirtualMachine),
+            ("com.moonlight-stream.moonlight", .remoteOrVirtualMachine),
+            ("com.zuler.deskin", .remoteOrVirtualMachine),
+            ("com.youqu.todesk", .remoteOrVirtualMachine),
+            ("com.oray.sunloginc", .remoteOrVirtualMachine),
+            ("com.splashtop.personal", .remoteOrVirtualMachine),
+            ("com.nomachine.nxplayer", .remoteOrVirtualMachine),
+            ("com.realvnc.vncviewer", .remoteOrVirtualMachine),
+            ("com.edovia.screens5", .remoteOrVirtualMachine),
+            ("com.citrix.receiver.nomas", .remoteOrVirtualMachine),
+            ("com.vmware.fusion", .remoteOrVirtualMachine),
+            ("com.parallels.desktop.console", .remoteOrVirtualMachine),
+            ("com.utmapp.UTM", .remoteOrVirtualMachine),
         ]
 
         for (bundleID, expectedCategory) in testCases {
             XCTAssertEqual(ClientAdapter.classify(bundleIdentifier: bundleID), expectedCategory, "Mismatch for \(bundleID)")
         }
+    }
+
+    func testPassthroughPresentationModeForRemoteApps() {
+        // When passthroughRemoteApps is true, Remote Desktop apps resolve to .passthrough
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(
+                for: .remoteOrVirtualMachine,
+                bundleIdentifier: "com.microsoft.rdc.macos",
+                passthroughRemoteApps: true
+            ),
+            .passthrough
+        )
+
+        // When passthroughRemoteApps is false, Remote Desktop apps default to .markedText
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(
+                for: .remoteOrVirtualMachine,
+                bundleIdentifier: "com.microsoft.rdc.macos",
+                passthroughRemoteApps: false
+            ),
+            .markedText
+        )
+
+        // When per-app override specifies .passthrough, it is honored regardless of category
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(
+                for: .chromium,
+                bundleIdentifier: "com.google.chrome",
+                appOverrides: ["com.google.chrome": .passthrough]
+            ),
+            .passthrough
+        )
+
+        // When global preference is .passthrough, it applies globally
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(
+                for: .standardAppKit,
+                bundleIdentifier: "com.apple.safari",
+                preference: .passthrough
+            ),
+            .passthrough
+        )
     }
 }

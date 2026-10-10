@@ -4,9 +4,29 @@ import NaturalLanguage
 public struct SmartBilingualDetector {
     private static let lock = NSLock()
     private static let sharedRecognizer = NLLanguageRecognizer()
-    private static var spellCheckCache: [String: Bool] = [:]
-    private static var cacheKeys: [String] = []
-    private static let maxCacheEntries = 65536
+    internal static var spellCheckCache: [String: Bool] = [:]
+    internal static var cacheKeys: [String] = []
+    internal static var maxCacheEntries = 65536
+
+    public static var cacheCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return spellCheckCache.count
+    }
+
+    public static func resetCache() {
+        lock.lock()
+        defer { lock.unlock() }
+        spellCheckCache.removeAll(keepingCapacity: true)
+        cacheKeys.removeAll(keepingCapacity: true)
+    }
+
+    internal static func lockForTesting(_ block: () -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        block()
+    }
+
 
     public static var spellCheckerProvider: SpellCheckerProvider?
 
@@ -29,7 +49,11 @@ public struct SmartBilingualDetector {
         "aes", "await", "nginx", "nostr", "sizeof", "uefi", "where",
         "there", "their", "share", "before", "sure", "were", "care", "core",
         "search", "our", "use", "year", "years", "next", "music", "post",
-        "very", "does", "research", "life", "way", "oz"
+        "very", "does", "research", "life", "way", "oz",
+        "test", "tests", "toast", "toasts", "turn", "turns", "cost", "costs",
+        "best", "list", "lists", "host", "hosts", "rest", "fast", "last",
+        "past", "cast", "dust", "must", "rust", "burn", "burns", "born",
+        "corn", "horn", "term", "terms", "storm", "storms", "text", "texts"
     ]
 
     private static let nonVietnameseLetters: Set<Character> = ["f", "j", "w", "z"]
@@ -39,9 +63,61 @@ public struct SmartBilingualDetector {
 
     private static let englishEndings = ["sh", "ck", "ts", "ds", "st", "nd", "ld", "rt", "ct", "pt", "lt", "nt"]
 
-    public static func isEnglishWord(raw: String, context: String = "", rendered: String? = nil) -> Bool {
+    private static let teenCodeWords: Set<String> = [
+        "mún", "bik", "thix", "fải", "đc", "ko", "bâyh", "đug", "tiếg", "k", "f", "j", "z", "w"
+    ]
+
+    private static let codeCharacters: Set<Character> = ["_", "/", "\\", "-", ".", ":", "[", "]", "{", "}", "<", ">", "=", "+", "*", "@", "#", "$", "%", "^", "&", "|"]
+
+    /// Evaluates whether an in-progress word should be restored to English inline (e.g. "post", "fast", "server").
+    /// An in-progress word is ONLY restored inline if it satisfies impossible Vietnamese phonotactic criteria:
+    /// 1. Has an English-only coda (-st, -sh, -ck, -ds, -ts, -ld, -nd, -rt, -pt, -lt) AND is in the English dictionary.
+    /// 2. Has an English-only double consonant (bb, ff, gg, ll, mm, pp, rr, ss, vv) AND is in the English dictionary.
+    /// 3. Is a universally known English tech word (facebook, docker, google, etc.).
+    public static func isInlineEnglishWord(raw: String, rendered: String) -> Bool {
+        let cleanRaw = raw.trimmingCharacters(in: .punctuationCharacters)
+        let lower = cleanRaw.lowercased()
+        guard lower.count >= 3 else { return false }
+        if telexPrimitives.contains(lower) { return false }
+        if lower == "iff" || lower == "orr" { return false }
+        if let escaped = collapsedTelexToneEscapes(lower), escaped == rendered.lowercased() {
+            return false
+        }
+        
+        // Never restore inline if the rendered output is already a plausible Vietnamese syllable
+        if isPlausibleVietnameseSyllable(rendered) {
+            return false
+        }
+        
+        // Check structural impossibility in Vietnamese
+        let hasEnglishEnding = englishEndings.contains(where: { lower.hasSuffix($0) })
+        let nonVietnameseDoubles = ["bb", "ff", "gg", "ll", "mm", "pp", "rr", "ss", "vv"]
+        let hasEnglishDouble = nonVietnameseDoubles.contains(where: { lower.contains($0) })
+        let isTechWord = commonEnglishTechWords.contains(lower)
+        let isKnownCommon = commonEnglishWords.contains(lower)
+        
+        guard hasEnglishEnding || hasEnglishDouble || isTechWord || (isKnownCommon && lower.count >= 4) else {
+            return false
+        }
+        
+        return commonEnglishWords.contains(lower) ||
+               commonEnglishTechWords.contains(lower) ||
+               (spellCheckerProvider?.isWordInEnglishDictionary(cleanRaw) ?? false)
+    }
+
+    public static func isEnglishWord(raw: String, context: String = "", rendered: String? = nil, genZMode: Bool = false) -> Bool {
         let cleanRaw = raw.trimmingCharacters(in: .punctuationCharacters)
         let lowerRaw = cleanRaw.lowercased()
+
+        if genZMode {
+            if let rendered, teenCodeWords.contains(rendered.lowercased()) {
+                return false
+            }
+            if teenCodeWords.contains(lowerRaw) {
+                return false
+            }
+        }
+
         if lowerRaw == "ww" && rendered?.lowercased() == "w" { return false }
         if lowerRaw == "iff" || lowerRaw == "orr" { return false }
 
@@ -58,7 +134,6 @@ public struct SmartBilingualDetector {
         }
 
         // 2. Code/URL structures
-        let codeCharacters: Set<Character> = ["_", "/", "\\", "-", ".", "[", "]", "{", "}", "<", ">", "=", "+", "*", "@", "#", "$", "%", "^", "&", "|"]
         if lowerRaw.contains(where: { codeCharacters.contains($0) }) {
             // Except for hyphen, which might be in Vietnamese words like "viet-nam"
             if !lowerRaw.contains(where: { $0 != "-" && codeCharacters.contains($0) }) {
@@ -133,6 +208,7 @@ public struct SmartBilingualDetector {
             }
         }
 
+
         // 3. SpellChecker
         let isEnglishDictWord: Bool
         lock.lock()
@@ -146,13 +222,13 @@ public struct SmartBilingualDetector {
 
             lock.lock()
             if spellCheckCache.count >= maxCacheEntries {
-                let evictCount = maxCacheEntries / 4
-                for _ in 0..<evictCount {
-                    if !cacheKeys.isEmpty {
-                        let oldKey = cacheKeys.removeFirst()
-                        spellCheckCache.removeValue(forKey: oldKey)
-                    }
+                let evictCount = max(1, maxCacheEntries / 4)
+                let actualEvict = min(evictCount, cacheKeys.count)
+                let keysToEvict = Array(cacheKeys.prefix(actualEvict))
+                for oldKey in keysToEvict {
+                    spellCheckCache.removeValue(forKey: oldKey)
                 }
+                cacheKeys.removeFirst(actualEvict)
             }
             spellCheckCache[lowerRaw] = result
             cacheKeys.append(lowerRaw)

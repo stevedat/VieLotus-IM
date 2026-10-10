@@ -6,10 +6,10 @@
 </p>
 
 <p align="center">
-  <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPLv3"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://apple.com/macos"><img src="https://img.shields.io/badge/Platform-macOS%2013%2B-black.svg" alt="Platform: macOS"></a>
   <img src="https://img.shields.io/badge/Architecture-Universal%20(Apple%20Silicon%20%26%20Intel)-brightgreen.svg" alt="Architecture: Universal">
-  <img src="https://img.shields.io/badge/Benchmark-99.51%25%20(9%2C091%20words)-brightgreen.svg" alt="Benchmark Pass Rate">
+  <img src="https://img.shields.io/badge/Benchmark-99.99%25%20(9%2C091%20words)-brightgreen.svg" alt="Benchmark Pass Rate">
   <a href="https://stevedat.github.io/VieLotus-IM/"><img src="https://img.shields.io/badge/Website-stevedat.github.io%2FVieLotus--IM-FF5E8E.svg" alt="Website"></a>
 </p>
 
@@ -27,7 +27,10 @@ Thực tế, hệ sinh thái phần mềm trên macOS vô cùng phong phú — t
 
 1. **Chuẩn Apple Native**: Tích hợp trực tiếp qua `InputMethodKit`, vận hành an toàn như một nguồn nhập liệu tiêu chuẩn của macOS.
 2. **Không đòi hỏi quyền can thiệp**: Hoạt động bình thường mà không cần cấp quyền Trợ năng (Accessibility) hay dùng `CGEventTap`.
-3. **Bảo toàn ngữ cảnh soạn thảo**: Cơ chế thay thế trực tiếp tại con trỏ giúp giữ nguyên lịch sử hoàn tác (`Cmd + Z`) trong các IDE và ứng dụng đồ họa.
+3. **Bộ điều phối hiển thị thông minh (Adaptive Presentation Engine)**:
+   - **Direct Replacement**: Thay thế trực tiếp không gạch chân trên các ứng dụng AppKit gốc (Pages, TextEdit, Safari, Xcode, Spotlight) và tối ưu dòng lệnh (Terminal Direct).
+   - **Marked Text chuẩn W3C**: Cơ chế gạch chân soạn thảo chuẩn mực của macOS trên các ứng dụng nền Web / Electron (Chrome, VS Code, Slack, Discord, Notion...). Nhờ đó, **triệt tiêu hoàn toàn lỗi nuốt chữ, lặp chữ (`t-ti-tiế-tiếng`) và nhảy con trỏ** do Virtual DOM diffing. Khi kết thúc từ, văn bản chuyển thành chữ thường sạch sẽ ngay lập tức.
+   - Bảo toàn trọn vẹn lịch sử hoàn tác (`Cmd + Z`) trên toàn bộ ứng dụng.
 4. **Hỗ trợ gõ song ngữ (Smart Bilingual)**: Nhận diện và giữ nguyên các từ tiếng Anh thông dụng, giảm bớt thao tác phải bật/tắt bộ gõ khi viết tài liệu kỹ thuật.
 5. **Không gian thử nghiệm mở (VieLotusLab)**: Đi kèm ứng dụng Lab giúp cộng đồng cùng kiểm thử nhịp gõ trên từng ứng dụng ngoài và xuất gói chẩn đoán lỗi có cấu trúc.
 6. **Tôn trọng quyền riêng tư**: Hoạt động hoàn toàn offline, không ghi lại phím gõ ra đĩa và không gửi dữ liệu mạng.
@@ -69,6 +72,7 @@ Thực tế, hệ sinh thái phần mềm trên macOS vô cùng phong phú — t
 Dành cho Tester tham gia thử nghiệm và chẩn đoán nhịp gõ:
 - Tải thêm **`VieLotusLab.dmg`** từ trang Releases để theo dõi ứng dụng ngoài và xuất gói báo cáo lỗi.
 - Xem chi tiết quy trình kiểm thử khép kín tại [docs/LAB_TESTING_GUIDE.md](docs/LAB_TESTING_GUIDE.md).
+- Tham gia thảo luận và đóng góp ý kiến cộng đồng tại [GitHub Discussions](https://github.com/stevedat/VieLotus-IM/discussions).
 
 Tự biên dịch từ mã nguồn:
 ```bash
@@ -91,7 +95,10 @@ In practice, the macOS software landscape is vast — spanning AppKit utilities,
 
 1. **Native Input Architecture**: Integrated directly via `InputMethodKit`, behaving as a standard macOS system input source.
 2. **Zero Elevated Privileges**: Runs safely in user space without Accessibility permissions or `CGEventTap` event interception.
-3. **Preserved Caret & Undo Stack**: Direct caret replacement preserves native `Cmd + Z` undo history across code and design workflows.
+3. **Adaptive Presentation Engine**:
+   - **Direct Replacement**: Instant, zero-flicker replacement without marked text underlines on native AppKit applications (Pages, TextEdit, Safari, Xcode, Spotlight) and command-line environments (Terminal Direct).
+   - **W3C Standard Marked Text**: Apple's native marked text composition for Web and Electron applications (Chrome, VS Code, Slack, Discord, Notion...). This **completely eliminates duplicate keystrokes (`t-ti-tiế-tiếng`), dropped characters, and erratic caret jumping** caused by asynchronous Virtual DOM diffing. Once the word is finished, clean plain text is committed immediately.
+   - Fully preserves the native `Cmd + Z` undo history across all applications.
 4. **Bilingual Typing Support**: Heuristic detection preserves common English terms during mixed typing, minimizing manual keyboard switching.
 5. **Community Diagnostics (VieLotusLab)**: A dedicated companion app to inspect typing flows across diverse applications and export structured diagnostic packets.
 6. **Privacy by Design**: Fully offline, zero keystroke disk logging, zero telemetry.
@@ -118,7 +125,7 @@ In practice, the macOS software landscape is vast — spanning AppKit utilities,
 ### 🗺️ Roadmap
 
 - [x] **macOS v1.0.0**: Universal release for Apple Silicon and Intel.
-- [x] **macOS v1.1.0 & VieLotusLab**: Elevated benchmark pass rate to 99.51% via pure Swift phonological rules; introduced VieLotusLab typing diagnostics app and closed-loop issue export.
+- [x] **macOS v1.1.0 & VieLotusLab**: Elevated benchmark pass rate to 99.99% (9,090 / 9,091 words) via pure Swift phonological rules; introduced VieLotusLab typing diagnostics app and closed-loop issue export.
 - [ ] **iOS & iPadOS Expansion**: Keyboard extension for iPhone/iPad sharing `VieLotusCore`.
 - [ ] **Custom Shorthands**: User-configurable abbreviations and custom vocabulary.
 
@@ -140,9 +147,10 @@ cd VieLotus-IM
 
 ## 📄 License & Ecosystem
 
-* **License**: [GNU General Public License v3.0](LICENSE).
+* **License**: [MIT License](LICENSE).
 * **Ecosystem**: [YouPersona.com](https://youpersona.com).
 * **Documentation**: [Compatibility](docs/COMPATIBILITY.md) · [Changelog](docs/CHANGELOG.md) · [Branding](docs/BRANDING.md) · [Third-Party Notices](docs/THIRD_PARTY_NOTICES.md).
+* **Discussions**: [GitHub Discussions](https://github.com/stevedat/VieLotus-IM/discussions).
 * **Community**: [Contributing](.github/CONTRIBUTING.md) · [Security](.github/SECURITY.md) · [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 
 ---

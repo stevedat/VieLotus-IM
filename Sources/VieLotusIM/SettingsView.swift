@@ -8,10 +8,10 @@ struct SettingsView: View {
     private let overrideApps: [(name: String, bundleID: String)] = [
         ("Google Chrome", "com.google.chrome"),
         ("Safari", "com.apple.safari"),
-        ("Microsoft Edge", "com.microsoft.edgemac"),
-        ("Codex", "com.openai.codex"),
-        ("Antigravity", "com.google.antigravity"),
-        ("Visual Studio Code", "com.microsoft.vscode")
+        ("Microsoft Word", "com.microsoft.Word"),
+        ("Visual Studio Code", "com.microsoft.vscode"),
+        ("Slack", "com.tinyspeck.slackmacgap"),
+        ("Discord", "com.hnc.Discord")
     ]
 
     var body: some View {
@@ -64,9 +64,10 @@ struct SettingsView: View {
                         Text("Tự động (Khuyên dùng)").tag(PresentationModePreference.automatic)
                         Text("Direct Replacement").tag(PresentationModePreference.directReplacement)
                         Text("Marked Text").tag(PresentationModePreference.markedText)
+                        Text("Bỏ qua (Passthrough)").tag(PresentationModePreference.passthrough)
                     }
 
-                    Text("Tự động dùng adapter theo ứng dụng và fallback khi client không cung cấp vị trí chọn.")
+                    Text("Tự động tối ưu theo từng ứng dụng (Direct Replacement không gạch chân cho AppKit/Terminal; Marked Text chuẩn W3C cho Web/Electron chống lặp từ).")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
 
@@ -137,6 +138,27 @@ struct SettingsView: View {
                         }
                     }
 
+                    Toggle(isOn: $prefs.macroEnabled) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Bật bảng gõ tắt (Macro / Shorthand)")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Tự động bung từ viết tắt (vn → Việt Nam, sg → Sài Gòn, dc → được)")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Toggle(isOn: $prefs.genZMode) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Chế độ gõ Gen-Z (Teen Code)")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Cho phép gõ tắt lóng (fải, bik, thix, mún, đc, ko...)")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+
                     Toggle(isOn: $prefs.relaxedCoda) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Viết tắt phụ âm cuối")
@@ -156,6 +178,26 @@ struct SettingsView: View {
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             }
+                        }
+                    }
+
+                    Toggle(isOn: $prefs.passthroughRemoteApps) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Bỏ qua ứng dụng Remote / Máy ảo (Passthrough)")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Tự động ngắt can thiệp khi dùng RDP, VNC, RustDesk, Parallels để tránh gõ trùng dấu")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Toggle(isOn: $prefs.enforceABCBaseLayout) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Khóa bàn phím cơ sở chuẩn ABC (QWERTY)")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Bảo đảm gõ chuẩn khi dùng bàn phím quốc tế (AZERTY, QWERTZ, Dvorak)")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
@@ -186,7 +228,15 @@ struct SettingsView: View {
                             Button {
                                 openGitHubIssue()
                             } label: {
-                                Label("Báo lỗi GitHub", systemImage: "ladybug")
+                                Label("Báo lỗi", systemImage: "ladybug")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+
+                            Button {
+                                openGitHubDiscussions()
+                            } label: {
+                                Label("Thảo luận", systemImage: "bubble.left.and.bubble.right")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
@@ -219,6 +269,13 @@ struct SettingsView: View {
                 
                 Link("GitHub", destination: URL(string: "https://github.com/stevedat/VieLotus-IM")!)
                     .font(.system(size: 11, weight: .medium))
+                
+                Text("•")
+                    .foregroundColor(.secondary)
+
+                Link("Thảo luận", destination: URL(string: "https://github.com/stevedat/VieLotus-IM/discussions")!)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary)
                 
                 Text("•")
                     .foregroundColor(.secondary)
@@ -259,6 +316,7 @@ struct SettingsView: View {
                 Text("Tự động").tag(PresentationModePreference.automatic)
                 Text("Direct").tag(PresentationModePreference.directReplacement)
                 Text("Marked").tag(PresentationModePreference.markedText)
+                Text("Passthrough").tag(PresentationModePreference.passthrough)
             }
             .labelsHidden()
             .frame(width: 130)
@@ -304,6 +362,12 @@ struct SettingsView: View {
 
     private func openGitHubIssue() {
         if let url = URL(string: "https://github.com/stevedat/VieLotus-IM/issues/new?template=bug_report.md") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func openGitHubDiscussions() {
+        if let url = URL(string: "https://github.com/stevedat/VieLotus-IM/discussions") {
             NSWorkspace.shared.open(url)
         }
     }

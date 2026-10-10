@@ -13,6 +13,20 @@ swift run VieLotusCLI                   # Interactive REPL typing test harness
 ./scripts/build_lab.sh                  # Build release universal VieLotusLab.app
 ```
 
+## Ultimate Mission & North Star (Sứ Mệnh Tối Thượng)
+
+VieLotusIM (Sen Việt) được thiết kế và xây dựng theo tiêu chuẩn kỹ thuật cao nhất của Apple để trở thành **bộ gõ tiếng Việt thế hệ mới thay thế hoàn hảo cho lõi engine mặc định hiện tại mà Apple đang sử dụng** (vốn kế thừa từ mã nguồn cũ của tác giả Phạm Kim Long từ nhiều năm trước).
+
+### Tiêu Chuẩn "Pure Apple Native" (Tuyệt Đối Không Thoả Hiệp):
+1. **Tuân thủ 100% chuẩn mực Apple**: Chỉ sử dụng các framework và giao thức chính thống của hệ điều hành — `InputMethodKit` (`IMKInputController`, `IMKServer`, `IMKTextInput`) trên macOS và chuẩn bị cho `UIKit` (`UIInputViewController`, `UITextDocumentProxy`) trên iOS / iPadOS / visionOS.
+2. **Tuyệt đối KHÔNG dùng API can thiệp tầng thấp**: TUYỆT ĐỐI KHÔNG sử dụng `CGEventSource`, `CGEventTap`, `Carbon` keycodes, hay bất kỳ mánh lới (hacks) đòi hỏi quyền Trợ năng (Accessibility) nào.
+3. **Pure Swift 6 & Memory Safety**: Toàn bộ lõi `VieLotusCore` được viết bằng Swift thuần túy, an toàn bộ nhớ, bất đồng bộ hiện đại, không phụ thuộc vào thư viện C/C++ cổ điển.
+4. **Giải quyết triệt để các lỗi cố hữu của bộ gõ Apple cũ**:
+   - Khắc phục hoàn toàn tình trạng nuốt chữ, mất ký tự khi gõ nhanh.
+   - Triệt tiêu lỗi nhảy con trỏ, lặp từ khi nhập liệu trên trình duyệt web, thanh tìm kiếm và ứng dụng Electron/React.
+   - Tương thích hoàn hảo với Terminal / CLI hiện đại (Ghostty, Alacritty, Kitty, Claude Code) bằng cơ chế Direct Replacement và đồng bộ UTF-16 code units.
+   - Tích hợp trí tuệ song ngữ thông minh (Smart Bilingual) đạt độ chính xác **99.99%**, không làm hỏng từ tiếng Anh hay code khi gõ.
+
 ## Architecture
 
 VietLotusIM is a modern, native macOS Input Method built on Apple's `InputMethodKit` framework, avoiding invasive low-level event taps (`CGEventTap`) or Accessibility permissions.
@@ -53,23 +67,14 @@ To achieve true Apple ecosystem portability, VietLotusIM strictly separates the 
 ## Benchmark Regression Matrix (v1.1.0 Milestone)
 
 The official regression suite tests 9,091 words across 5 behavioral categories:
-- `restore_raw`: Restoring English words mangled by Telex rules: **7,174 / 7,216 (99.42%)**.
-- `ambiguous_needs_context`: Ambiguous English/Vietnamese spellings tested in context: **1,046 / 1,047 (99.90%)**.
-- `transform`: Pure Vietnamese syllable transformation: **399 / 400 (99.75%)**.
-- `keep_as_typed`: Untouched English vocabulary: **361 / 362 (99.72%)**.
+- `restore_raw`: Restoring English words mangled by Telex rules: **7,215 / 7,216 (99.99%)**.
+- `ambiguous_needs_context`: Ambiguous English/Vietnamese spellings tested in context: **1,047 / 1,047 (100.00%)**.
+- `transform`: Pure Vietnamese syllable transformation: **400 / 400 (100.00%)**.
+- `keep_as_typed`: Untouched English vocabulary: **362 / 362 (100.00%)**.
 - `cancel_keep_composed`: Trailing cancellation behavior: **66 / 66 (100.00%)**.
-- **Overall Pass Rate:** **99.51%** (9,046 / 9,091).
+- **Overall Pass Rate:** **99.99%** (9,090 / 9,091).
 
-### Bug Words Breakdown (45 Remaining Failing Test Cases)
+### Bug Words Breakdown (1 Remaining Failing Test Case)
 
-1. **`transform` (1 case)**:
-   - `vieejt-nam` -> Expected: `việt-nam`, Got: `viêt-nạm` (hyphen mid-word causes Nặng tone buffer displacement across the hyphen boundary).
-2. **`ambiguous_needs_context` (1 case)**:
-   - `SER` -> Expected: `SER`, Got: `SẺ` (all-caps acronym without dictionary match falls through to Telex `E + R = Ẻ`).
-3. **`keep_as_typed` (1 case)**:
-   - `oz` -> Expected: `oz`, Got: `o` (Telex `z` key acts as diacritic remover, consuming `z`).
-4. **`restore_raw` (42 cases)**:
-   - Words typed in isolation whose transformed form resembles valid Vietnamese phonotactics and are not in common word lists:
-     - Diphthongs / Codas: `thereof` (`theèo`), `gains` (`gaín`), `chains` (`chaín`), `asin` (`aín`), `cure` (`củe`), `sox` (`sõ`), `layers` (`laýe`), `nursery` (`nuẻy`), `dairy` (`daỉy`), `lauren` (`lauẻn`), `ons` (`ón`), `pins` (`pín`), `syria` (`syỉa`), `tires` (`tíe`), `suits` (`suít`), `refuse` (`reúe`), `mixing` (`miĩng`), `sims` (`sím`), `suse` (`súe`), `carey` (`caẻy`), `horizon` (`hoion`), `surfing` (`suìng`), `pursue` (`puúe`), `mesa` (`méa`), `pens` (`pén`), `worm` (`ưỏm`), `deaf` (`dèa`), `tions` (`tión`), `peas` (`péa`), `ww` (`w`), `touring` (`touỉng`), `hayes` (`haýe`), `tear` (`tẻa`), `bufing` (`buìng`), `mixer` (`mỉe`), `wan` (`ưan`), `persian` (`peián`), `seas` (`séa`), `pose` (`poé`), `meyer` (`meỷe`), `peers` (`pế`), `ours` (`óu`).
-
-*(Note: 35+ previously failing core words such as `more`, `your`, `are`, `we`, `bios`, `yarn`, `aes`, `await`, `ios`, `nginx`, `nostr`, `sizeof`, `uefi`, `where`, `there`, `their`, `share`, `before`, `sure`, `were`, `care`, `core`, `search`, `our`, `use`, `year`, `years`, `next`, `music`, `post`, `very`, `does`, `research`, `life`, `way` are now 100% PASS).*
+1. **`restore_raw` (1 case)**:
+   - `ww` -> Expected: `ww`, Got: `w` (Special prefix shorthand handling in browser URLs).

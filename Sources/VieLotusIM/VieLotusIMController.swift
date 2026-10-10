@@ -10,15 +10,28 @@ final class VieLotusIMController: IMKInputController {
     private static let labBundlePrefix = "org.vielotus.inputmethod.vielotuslab."
     private static let labTraceStart = Notification.Name("org.vielotus.inputmethod.vielotuslab.trace.start")
     private static let labTraceStop = Notification.Name("org.vielotus.inputmethod.vielotuslab.trace.stop")
-    private let engine = EngineBridge()
-    private var composingWord = ""
-    private var rawWord = ""
-    private var recentContext = ""
+    private let session = InputSessionManager()
     private static let caretDisarmed: Int = -999
     private var editCaretBack: Int = VieLotusIMController.caretDisarmed
+
+    private var engine: EngineBridge { session.engine }
+    private var composingWord: String {
+        get { session.composingWord }
+        set { session.composingWord = newValue }
+    }
+    private var rawWord: String {
+        get { session.rawWord }
+        set { session.rawWord = newValue }
+    }
+    private var recentContext: String {
+        get { session.context }
+        set { session.context = newValue }
+    }
     private var lastClientIdentifier: String?
     private var virtualCursorLocation: Int = NSNotFound
+    private var compositionStartLocation: Int = NSNotFound
     private var backtickDepth: Int = 0  // 0=normal, odd=inside backticks
+    private var lastBackspaceTime: UInt64 = 0
     private var labTraceID: String?
     private var labTraceTargetBundleID: String?
 
@@ -58,6 +71,9 @@ final class VieLotusIMController: IMKInputController {
         )
         DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(endLabTrace(_:)), name: Self.labTraceStop, object: nil
+        )
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(preferencesDidUpdate), name: Preferences.preferencesChangedNotification, object: nil
         )
 
         NSLog("VieLotusIMController: Initialized session")
@@ -109,10 +125,11 @@ final class VieLotusIMController: IMKInputController {
 
     private func applyPreferences() {
         let prefs = Preferences.shared
-        engine.setInputMethod(prefs.inputMethod)
-        engine.setModernOrthography(prefs.modernOrthography)
-        engine.setRelaxedCoda(prefs.relaxedCoda)
-        engine.setQuickTelex(prefs.quickTelex)
+        session.setInputMethod(prefs.inputMethod)
+        session.setModernOrthography(prefs.modernOrthography)
+        session.setRelaxedCoda(prefs.relaxedCoda)
+        session.setQuickTelex(prefs.quickTelex)
+        session.setGenZMode(prefs.genZMode)
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
@@ -148,6 +165,7 @@ final class VieLotusIMController: IMKInputController {
             rawWord = ""
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
+            compositionStartLocation = NSNotFound
             backtickDepth = 0
         }
         lastClientIdentifier = clientUID
@@ -158,39 +176,93 @@ final class VieLotusIMController: IMKInputController {
             for: appCategory,
             bundleIdentifier: bundleID,
             terminalDirectEnabled: preferences.terminalDirectMode,
+            passthroughRemoteApps: preferences.passthroughRemoteApps,
             preference: preferences.presentationModePreference,
             appOverrides: preferences.appModeOverrides
         )
 
+        if presentationMode == .passthrough {
+            return false
+        }
+
         let selection = client.selectedRange()
-        if presentationMode == .terminalDirect,
+        if (presentationMode == .terminalDirect || presentationMode == .directReplacement),
            engine.isComposing,
            virtualCursorLocation != NSNotFound,
            selection.location != NSNotFound,
            selection.location != virtualCursorLocation {
-            traceLab("terminalCaretMismatch", bundleID: bundleID,
-                     detail: "expected=\(virtualCursorLocation) actual=\(selection.location) output=\(composingWord)",
-                     selection: selection)
-            engine.reset()
-            composingWord = ""
-            rawWord = ""
-            editCaretBack = Self.caretDisarmed
-            virtualCursorLocation = NSNotFound
+            
+            let composingLen = (composingWord as NSString).length
+            let charsDeleted = virtualCursorLocation - selection.location
+            
+            if charsDeleted > 0 && charsDeleted < composingLen {
+                let remainingCount = composingLen - charsDeleted
+                let remainingText = (composingWord as NSString).substring(to: remainingCount)
+                
+                // Rewind the engine to match the remaining prefix on screen
+                var rewound = false
+                while engine.isComposing && (engine.currentOutput() as NSString).length > remainingCount {
+                    _ = engine.backspace()
+                    if !rawWord.isEmpty {
+                        rawWord.removeLast()
+                    }
+                }
+                
+                if (engine.currentOutput() as NSString).length == remainingCount && engine.currentOutput() == remainingText {
+                    rewound = true
+                    composingWord = remainingText
+                    rawWord = engine.rawString()
+                    virtualCursorLocation = selection.location
+                    if compositionStartLocation != NSNotFound {
+                        compositionStartLocation = selection.location - remainingCount
+                    }
+                }
+                
+                if !rewound {
+                    session.setCompositionPrefix(remainingText)
+                    virtualCursorLocation = selection.location
+                    if compositionStartLocation != NSNotFound {
+                        compositionStartLocation = selection.location - remainingCount
+                    }
+                }
+                
+                traceLab("prefixRetained", bundleID: bundleID,
+                         detail: "remaining='\(remainingText)' raw='\(rawWord)' deleted=\(charsDeleted)",
+                         selection: selection)
+            } else {
+                traceLab("terminalCaretMismatch", bundleID: bundleID,
+                         detail: "expected=\(virtualCursorLocation) actual=\(selection.location) output=\(composingWord)",
+                         selection: selection)
+                engine.reset()
+                composingWord = ""
+                rawWord = ""
+                editCaretBack = Self.caretDisarmed
+                virtualCursorLocation = NSNotFound
+                compositionStartLocation = NSNotFound
+            }
         }
 
-        if selection.location == NSNotFound && presentationMode == .directReplacement &&
+        if presentationMode == .directReplacement &&
             ClientAdapter.allowsDynamicMarkedTextFallback(
                 bundleIdentifier: bundleID,
                 preference: preferences.presentationModePreference,
                 appOverrides: preferences.appModeOverrides
             ) {
-            // Dynamic fallback: if a direct replacement app returns NSNotFound,
-            // we cannot do backward deletion. We must switch to marked text mode.
-            DiagnosticLogger.shared.log("FALLBACK_TO_MARKED_TEXT | app: \(bundleID ?? "?") | selection: NSNotFound")
-            if let id = bundleID {
-                ClientAdapter.forceMarkedText(for: id)
+            var shouldFallback = false
+            if selection.location == NSNotFound {
+                shouldFallback = true
+                DiagnosticLogger.shared.log("FALLBACK_TO_MARKED_TEXT | app: \(bundleID ?? "?") | selection: NSNotFound")
+            } else if engine.isComposing && virtualCursorLocation != NSNotFound && selection.location != NSNotFound && abs(selection.location - virtualCursorLocation) > 3 {
+                shouldFallback = true
+                DiagnosticLogger.shared.log("FALLBACK_TO_MARKED_TEXT_RANGE_DESYNC | app: \(bundleID ?? "?") | expected: \(virtualCursorLocation) actual: \(selection.location)")
             }
-            presentationMode = .markedText
+
+            if shouldFallback {
+                if let id = bundleID {
+                    ClientAdapter.forceMarkedText(for: id)
+                }
+                presentationMode = .markedText
+            }
         }
 
         let keyCode = event.keyCode
@@ -222,6 +294,7 @@ final class VieLotusIMController: IMKInputController {
             rawWord = ""
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
+            compositionStartLocation = NSNotFound
             if presentationMode == .markedText {
                 client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
             }
@@ -263,6 +336,7 @@ final class VieLotusIMController: IMKInputController {
         if chordModifiers.contains(.shift) && isCursorMovementKey(keyCode) {
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
+            compositionStartLocation = NSNotFound
             if engine.isComposing {
                 if presentationMode == .terminalDirect {
                     cancelComposition()
@@ -275,201 +349,7 @@ final class VieLotusIMController: IMKInputController {
 
         // Handle Backspace: keyCode 51 (plain Backspace)
         if keyCode == 51 {
-            let isUserSelection = selection.location != NSNotFound && selection.length > 0 &&
-                !(presentationMode == .markedText && engine.isComposing)
-            if isUserSelection {
-                engine.reset()
-                composingWord = ""
-                rawWord = ""
-                editCaretBack = Self.caretDisarmed
-                virtualCursorLocation = NSNotFound
-                if presentationMode == .markedText {
-                    client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
-                }
-                return false // Let macOS delete the highlighted text natively
-            }
-
-            if engine.isComposing {
-                editCaretBack = Self.caretDisarmed
-                if let diff = engine.backspace() {
-                    let rawBefore = rawWord
-                    if !rawWord.isEmpty {
-                        rawWord.removeLast()
-                    }
-                    traceLab("backspace", bundleID: bundleID, key: "Backspace",
-                             detail: "rawBefore=\(rawBefore) rawAfter=\(rawWord) diff=\(diff.backspaces),\(diff.suffix)",
-                             selection: client.selectedRange())
-                    let clientID = bundleID?.lowercased() ?? ""
-                    let isEdgeOrCodex = clientID.contains("edgemac") || clientID.contains("codex")
-                    if isEdgeOrCodex,
-                       presentationMode == .directReplacement,
-                       diff.backspaces == 1, diff.suffix.isEmpty,
-                       rawBefore.last == composingWord.last,
-                       engine.currentOutput() == String(composingWord.dropLast()) {
-                        composingWord = engine.currentOutput()
-                        if virtualCursorLocation != NSNotFound {
-                            virtualCursorLocation = max(0, virtualCursorLocation - 1)
-                        }
-                        if composingWord.isEmpty {
-                            engine.reset()
-                            rawWord = ""
-                        }
-                        traceLab("backspaceNative", bundleID: bundleID,
-                                 detail: "literal suffix; composition retained", selection: selection)
-                        return false
-                    }
-                    if presentationMode == .markedText {
-                        let output = engine.currentOutput()
-                        if output.isEmpty {
-                            client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
-                            engine.reset()
-                            composingWord = ""
-                            rawWord = ""
-                            return true
-                        } else {
-                            client.setMarkedText(output, selectionRange: NSRange(location: output.utf16.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
-                            composingWord = output
-                        }
-                        return true
-                    }
-                    if diff.backspaces == 0 && diff.suffix.isEmpty {
-                        composingWord = engine.currentOutput()
-                        return true
-                    } else if presentationMode == .terminalDirect {
-                        if diff.backspaces > 0 || !diff.suffix.isEmpty {
-                            let maxBackspaces = composingWord.count
-                            let safeBackspaces = min(diff.backspaces, maxBackspaces)
-                            let backspaces = String(repeating: "\u{7F}", count: safeBackspaces)
-                            client.insertText(backspaces + diff.suffix, replacementRange: NSRange(location: NSNotFound, length: 0))
-                            traceLab("insertText", bundleID: bundleID,
-                                     detail: "backspace del=\(safeBackspaces) suffix=\(diff.suffix)",
-                                     selection: client.selectedRange())
-                            if virtualCursorLocation != NSNotFound {
-                                virtualCursorLocation = max(0, virtualCursorLocation - safeBackspaces) + diff.suffix.utf16.count
-                            }
-                            composingWord = engine.currentOutput()
-
-                            if composingWord.isEmpty || !engine.isComposing {
-                                engine.reset()
-                                composingWord = ""
-                                rawWord = ""
-                                editCaretBack = Self.caretDisarmed
-            virtualCursorLocation = NSNotFound
-                            }
-                            return true
-                        }
-                    } else {
-                        let output = engine.currentOutput()
-                        let previousOutputLength = (composingWord as NSString).length
-                        let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : selection.location
-
-                        if ["com.apple.notes", "com.apple.systempreferences"].contains(bundleID?.lowercased() ?? "") {
-                            if output.isEmpty {
-                                engine.reset()
-                                composingWord = ""
-                                rawWord = ""
-                                editCaretBack = Self.caretDisarmed
-                                virtualCursorLocation = NSNotFound
-                                traceLab("backspaceNative", bundleID: bundleID,
-                                         detail: "finish-composition output=empty", selection: selection)
-                                return false
-                            }
-                            if output != composingWord,
-                               selection.location != NSNotFound,
-                               selection.location >= previousOutputLength {
-                                let range = NSRange(location: selection.location - previousOutputLength,
-                                                    length: previousOutputLength)
-                                client.insertText(output, replacementRange: range)
-                                traceLab("insertText", bundleID: bundleID,
-                                         detail: "backspace whole-word range=\(range.location),\(range.length) replacement=\(output)",
-                                         selection: client.selectedRange())
-                                virtualCursorLocation = range.location + (output as NSString).length
-                            } else if output != composingWord {
-                                engine.reset()
-                                composingWord = ""
-                                rawWord = ""
-                                virtualCursorLocation = NSNotFound
-                                traceLab("backspaceNativeFallback", bundleID: bundleID,
-                                         detail: "whole-word range unavailable", selection: selection)
-                                return false
-                            }
-                            composingWord = output
-                            return true
-                        }
-
-                        if output.isEmpty, previousOutputLength > 0 {
-                            let range = currentLoc != NSNotFound && currentLoc >= previousOutputLength
-                                ? NSRange(location: currentLoc - previousOutputLength, length: previousOutputLength)
-                                : NSRange(location: NSNotFound, length: 0)
-                            if range.location != NSNotFound {
-                                client.insertText("", replacementRange: range)
-                                traceLab("insertText", bundleID: bundleID,
-                                         detail: "backspace finish-composition range=\(range.location),\(range.length)",
-                                         selection: client.selectedRange())
-                                virtualCursorLocation = range.location
-                            } else {
-                                traceLab("backspaceNativeFallback", bundleID: bundleID,
-                                         detail: "finish-composition range unavailable currentLoc=\(currentLoc) length=\(previousOutputLength)",
-                                         selection: client.selectedRange())
-                            }
-                            engine.reset()
-                            composingWord = ""
-                            rawWord = ""
-                            editCaretBack = Self.caretDisarmed
-                            if range.location == NSNotFound { virtualCursorLocation = NSNotFound }
-                            return range.location != NSNotFound
-                        }
-
-                        if diff.backspaces > 0 || !diff.suffix.isEmpty {
-                            let maxBackspaces = (composingWord as NSString).length
-                            let safeBackspaces = min(diff.backspaces, maxBackspaces)
-                            let range = currentLoc != NSNotFound && currentLoc >= safeBackspaces
-                                ? NSRange(location: currentLoc - safeBackspaces, length: safeBackspaces)
-                                : NSRange(location: NSNotFound, length: 0)
-                            let replacement = diff.suffix
-                            if range.location != NSNotFound, !replacement.isEmpty {
-                                client.insertText(replacement, replacementRange: range)
-                                traceLab("insertText", bundleID: bundleID,
-                                         detail: "backspace replaceRange=\(range.location),\(range.length) replacement=\(replacement)",
-                                         selection: client.selectedRange())
-                                virtualCursorLocation = range.location + replacement.utf16.count
-                            } else if range.location != NSNotFound, range.length > 0 {
-                                client.insertText("", replacementRange: range)
-                                traceLab("insertText", bundleID: bundleID,
-                                         detail: "backspace empty-replacement range=\(range.location),\(range.length)",
-                                         selection: client.selectedRange())
-                                virtualCursorLocation = range.location
-                            }
-                            composingWord = output
-                            if composingWord.isEmpty {
-                                engine.reset()
-                                rawWord = ""
-                                editCaretBack = Self.caretDisarmed
-                            }
-                            return true
-                        }
-                    }
-                }
-                if presentationMode == .markedText {
-                    client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
-                }
-                engine.reset()
-                composingWord = ""
-                rawWord = ""
-            } else {
-                // Backspace while idle: deleting the space after committed word arms editing
-                if editCaretBack == -1 {
-                    editCaretBack = 0
-                } else {
-                    engine.reset()
-                    editCaretBack = Self.caretDisarmed
-                }
-                // Likely deleted a backtick — decrement depth to stay in sync
-                if backtickDepth > 0 {
-                    backtickDepth -= 1
-                }
-            }
-            return false
+            return handleBackspace(client: client, selection: selection, bundleID: bundleID, presentationMode: presentationMode)
         }
 
         // Handle Return / Enter (keyCode 36, 76)
@@ -482,6 +362,7 @@ final class VieLotusIMController: IMKInputController {
             rawWord = ""
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
+            compositionStartLocation = NSNotFound
             backtickDepth = 0
             return false
         }
@@ -496,7 +377,10 @@ final class VieLotusIMController: IMKInputController {
         }
 
         // Handle Plain Arrow & Navigation keys (no modifiers)
-        if isCursorMovementKey(keyCode) { virtualCursorLocation = NSNotFound }
+        if isCursorMovementKey(keyCode) {
+            virtualCursorLocation = NSNotFound
+            compositionStartLocation = NSNotFound
+        }
         if keyCode == 123 { // Plain Left arrow
             if engine.isComposing {
                 _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
@@ -618,6 +502,22 @@ final class VieLotusIMController: IMKInputController {
             return false
         }
 
+        // Numbers (0-9): In Telex mode, digits are not tone marks or Vietnamese keys.
+        // Commit current composing word so the digit does not corrupt the word into raw English or cause caret jumps.
+        let isDigitInTelex = firstChar.isNumber && Preferences.shared.inputMethod != .vni
+        if isDigitInTelex {
+            DiagnosticLogger.shared.log("DIGIT '\(firstChar)' | app: \(bundleID ?? "?") | wasComposing: \(engine.isComposing)")
+            editCaretBack = Self.caretDisarmed
+            var restored = false
+            if engine.isComposing {
+                restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: firstChar)
+            }
+            if restored {
+                return true
+            }
+            return false
+        }
+
         DiagnosticLogger.shared.log("CHAR '\(firstChar)' (\(keyCode)) | app: \(bundleID ?? "?") | mode: \(presentationMode) | sel: \(selection.location),\(selection.length)")
 
         // Typing over an active selection replaces the selection
@@ -657,6 +557,9 @@ final class VieLotusIMController: IMKInputController {
         if let diff = feedResult {
             if !wasComposing {
                 rawWord = String(firstChar)
+                if compositionStartLocation == NSNotFound {
+                    compositionStartLocation = selection.location != NSNotFound ? selection.location : virtualCursorLocation
+                }
                 if virtualCursorLocation == NSNotFound && selection.location != NSNotFound {
                     virtualCursorLocation = selection.location
                 }
@@ -666,18 +569,37 @@ final class VieLotusIMController: IMKInputController {
             traceLab("feed", bundleID: bundleID, key: String(firstChar),
                      detail: "diff=\(diff.backspaces),\(diff.suffix) raw=\(rawWord)",
                      selection: client.selectedRange())
+            var output = engine.currentOutput()
+            let prefs = Preferences.shared
+            var isInlineEnglish = false
+
+            if prefs.smartBilingual && rawWord.count >= 2 && rawWord.lowercased() != output.lowercased() &&
+               SmartBilingualDetector.isInlineEnglishWord(raw: rawWord, rendered: output) {
+                // Inline Latin Passthrough:
+                // An English word (or English phonotactic pattern) was recognized inline!
+                // Bypass/restore diacritics immediately so the user never sees flickering ("pót" -> "post").
+                output = rawWord
+                isInlineEnglish = true
+                traceLab("inlineEnglish", bundleID: bundleID, detail: "raw=\(rawWord)", selection: client.selectedRange())
+            }
+
             if presentationMode == .markedText {
-                // Marked text mode: when explicitly forced
-                let output = engine.currentOutput()
-                DiagnosticLogger.shared.log("-> MARKED_TEXT '\(output)' (consumed)")
-                client.setMarkedText(output,
-                                     selectionRange: NSRange(location: output.utf16.count, length: 0),
-                                     replacementRange: NSRange(location: NSNotFound, length: 0))
+                // Stealth Composition Mode: delivers zero-underline composition session
+                DiagnosticLogger.shared.log("-> STEALTH_MARKED_TEXT '\(output)' (consumed)")
+                setStealthMarkedText(output, client: client)
                 traceLab("setMarkedText", bundleID: bundleID, detail: "output=\(output)",
                          selection: client.selectedRange())
                 composingWord = output
                 return true
             } else if presentationMode == .terminalDirect {
+                if isInlineEnglish {
+                    let deleteCount = composingWord.count
+                    let deleteChars = String(repeating: "\u{7F}", count: deleteCount)
+                    client.insertText(deleteCount > 0 ? (deleteChars + rawWord) : rawWord, replacementRange: NSRange(location: NSNotFound, length: 0))
+                    traceLab("terminalInlineEnglish", bundleID: bundleID, detail: "raw=\(rawWord)", selection: client.selectedRange())
+                    composingWord = rawWord
+                    return true
+                }
                 // Terminal Direct Mode: Deliver characters immediately to shell pty for
                 // real-time auto-suggestions (e.g. zsh-autosuggestions, fish).
                 // Use \u{7F} (ASCII DEL) to erase characters when diacritics are modified.
@@ -704,13 +626,33 @@ final class VieLotusIMController: IMKInputController {
                     return false
                 }
             } else {
-                // Direct Replacement Mode: For Chrome, Safari, Word, Electron, etc.
+                // Direct Replacement Mode: For Apple Notes, Safari, Pages, Xcode, etc.
+                if isInlineEnglish {
+                    let previousCount = (composingWord as NSString).length
+                    let startLoc: Int
+                    if compositionStartLocation != NSNotFound {
+                        startLoc = compositionStartLocation
+                    } else {
+                        let currentLoc = selection.location != NSNotFound ? selection.location : virtualCursorLocation
+                        startLoc = currentLoc != NSNotFound && currentLoc >= previousCount ? currentLoc - previousCount : NSNotFound
+                    }
+                    let range = startLoc != NSNotFound && previousCount > 0
+                        ? NSRange(location: startLoc, length: previousCount)
+                        : NSRange(location: NSNotFound, length: 0)
+                    client.insertText(rawWord, replacementRange: range)
+                    traceLab("directInlineEnglish", bundleID: bundleID, detail: "raw=\(rawWord) range=\(range.location),\(range.length)", selection: client.selectedRange())
+                    composingWord = rawWord
+                    if startLoc != NSNotFound {
+                        virtualCursorLocation = startLoc + (rawWord as NSString).length
+                    }
+                    return true
+                }
                 if diff.backspaces > 0 || diff.suffix != String(firstChar) {
                     let hasSelection = selection.location != NSNotFound && selection.length > 0
                     let maxBackspaces = isEditing ? Int.max : composingWord.utf16.count
                     let safeBackspaces = isEditing ? diff.backspaces : min(diff.backspaces, maxBackspaces)
 
-                    let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : selection.location
+                    let currentLoc = selection.location != NSNotFound ? selection.location : virtualCursorLocation
                     let range: NSRange
                     
                     if currentLoc != NSNotFound {
@@ -746,7 +688,7 @@ final class VieLotusIMController: IMKInputController {
                     composingWord = engine.currentOutput()
                     DiagnosticLogger.shared.log("-> DIRECT_PASSTHROUGH '\(firstChar)'")
                     
-                    let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : selection.location
+                    let currentLoc = selection.location != NSNotFound ? selection.location : virtualCursorLocation
                     if currentLoc != NSNotFound {
                         virtualCursorLocation = currentLoc + String(firstChar).utf16.count
                     }
@@ -761,23 +703,376 @@ final class VieLotusIMController: IMKInputController {
         }
     }
 
+    // MARK: - Keybinding & Command Handling (Apple InputMethodKit)
+
+    override func didCommand(by aSelector: Selector!, client sender: Any!) -> Bool {
+        guard let aSelector, let client = sender as? IMKTextInput else { return false }
+        let selectorName = NSStringFromSelector(aSelector)
+        let bundleID = client.bundleIdentifier()
+        let selection = client.selectedRange()
+
+        guard Preferences.shared.vietnameseEnabled else { return false }
+        if isSecureFieldActive() {
+            if engine.isComposing {
+                cancelComposition()
+                rawWord = ""
+            }
+            return false
+        }
+
+        let appCategory = ClientAdapter.classify(bundleIdentifier: bundleID)
+        let preferences = Preferences.shared
+        let presentationMode = ClientAdapter.presentationMode(
+            for: appCategory,
+            bundleIdentifier: bundleID,
+            terminalDirectEnabled: preferences.terminalDirectMode,
+            passthroughRemoteApps: preferences.passthroughRemoteApps,
+            preference: preferences.presentationModePreference,
+            appOverrides: preferences.appModeOverrides
+        )
+
+        traceLab("didCommand", bundleID: bundleID, key: selectorName,
+                 detail: "selector=\(selectorName) isComposing=\(engine.isComposing)",
+                 selection: selection)
+
+        switch selectorName {
+        case "deleteBackward:":
+            return handleBackspace(client: client, selection: selection, bundleID: bundleID, presentationMode: presentationMode)
+
+        case "deleteForward:":
+            if engine.isComposing {
+                if presentationMode == .terminalDirect {
+                    cancelComposition()
+                } else {
+                    commitComposition(client)
+                }
+            }
+            return false
+
+        case "deleteWordBackward:", "deleteToBeginningOfLine:", "deleteToEndOfLine:":
+            if engine.isComposing {
+                engine.reset()
+                composingWord = ""
+                rawWord = ""
+                editCaretBack = Self.caretDisarmed
+                virtualCursorLocation = NSNotFound
+                compositionStartLocation = NSNotFound
+                if presentationMode == .markedText {
+                    client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+                }
+            }
+            return false
+
+        case "insertNewline:", "insertLineBreak:", "insertNewlineIgnoringFieldEditor:":
+            if engine.isComposing {
+                _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                engine.reset()
+                composingWord = ""
+                rawWord = ""
+                editCaretBack = Self.caretDisarmed
+                virtualCursorLocation = NSNotFound
+                compositionStartLocation = NSNotFound
+                backtickDepth = 0
+            }
+            return false
+
+        case "insertTab:":
+            if engine.isComposing {
+                _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+            }
+            return false
+
+        case "cancelOperation:": // Escape
+            if engine.isComposing {
+                cancelComposition()
+                rawWord = ""
+                if presentationMode == .markedText {
+                    client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+                }
+                if presentationMode == .terminalDirect {
+                    return false
+                }
+                return true
+            }
+            return false
+
+        case "moveLeft:", "moveRight:", "moveUp:", "moveDown:",
+             "moveToBeginningOfLine:", "moveToEndOfLine:",
+             "moveToBeginningOfParagraph:", "moveToEndOfParagraph:",
+             "pageUp:", "pageDown:":
+            if engine.isComposing {
+                if presentationMode == .terminalDirect {
+                    cancelComposition()
+                } else {
+                    _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
+                }
+                virtualCursorLocation = NSNotFound
+                compositionStartLocation = NSNotFound
+            }
+            return false
+
+        default:
+            return false
+        }
+    }
+
+    @discardableResult
+    private func handleBackspace(client: IMKTextInput, selection: NSRange, bundleID: String?, presentationMode: PresentationMode) -> Bool {
+        let now = DispatchTime.now().uptimeNanoseconds
+        if now - lastBackspaceTime < 25_000_000 {
+            return true
+        }
+        lastBackspaceTime = now
+
+        let isUserSelection = selection.location != NSNotFound && selection.length > 0 &&
+            !(presentationMode == .markedText && engine.isComposing)
+        if isUserSelection {
+            engine.reset()
+            composingWord = ""
+            rawWord = ""
+            editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
+            compositionStartLocation = NSNotFound
+            if presentationMode == .markedText {
+                client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+            return false // Let macOS delete the highlighted text natively
+        }
+
+        if engine.isComposing {
+            editCaretBack = Self.caretDisarmed
+            if let diff = engine.backspace() {
+                let rawBefore = rawWord
+                if !rawWord.isEmpty {
+                    rawWord.removeLast()
+                }
+                traceLab("backspace", bundleID: bundleID, key: "Backspace",
+                         detail: "rawBefore=\(rawBefore) rawAfter=\(rawWord) diff=\(diff.backspaces),\(diff.suffix)",
+                         selection: client.selectedRange())
+                let clientID = bundleID?.lowercased() ?? ""
+                let isEdgeOrCodex = clientID.contains("edgemac") || clientID.contains("codex")
+                if isEdgeOrCodex,
+                   presentationMode == .directReplacement,
+                   diff.backspaces == 1, diff.suffix.isEmpty,
+                   rawBefore.last == composingWord.last,
+                   engine.currentOutput() == String(composingWord.dropLast()) {
+                    composingWord = engine.currentOutput()
+                    if virtualCursorLocation != NSNotFound {
+                        virtualCursorLocation = max(0, virtualCursorLocation - 1)
+                    }
+                    if composingWord.isEmpty {
+                        engine.reset()
+                        rawWord = ""
+                    }
+                    traceLab("backspaceNative", bundleID: bundleID,
+                             detail: "literal suffix; composition retained", selection: selection)
+                    return false
+                }
+                if presentationMode == .markedText {
+                    let output = engine.currentOutput()
+                    if output.isEmpty {
+                        setStealthMarkedText("", client: client)
+                        engine.reset()
+                        composingWord = ""
+                        rawWord = ""
+                        return true
+                    } else {
+                        setStealthMarkedText(output, client: client)
+                        composingWord = output
+                    }
+                    return true
+                }
+                if diff.backspaces == 0 && diff.suffix.isEmpty {
+                    composingWord = engine.currentOutput()
+                    return true
+                } else if presentationMode == .terminalDirect {
+                    if diff.backspaces > 0 || !diff.suffix.isEmpty {
+                        let maxBackspaces = (composingWord as NSString).length
+                        let safeBackspaces = min(diff.backspaces, maxBackspaces)
+                        let backspaces = String(repeating: "\u{7F}", count: safeBackspaces)
+                        client.insertText(backspaces + diff.suffix, replacementRange: NSRange(location: NSNotFound, length: 0))
+                        traceLab("insertText", bundleID: bundleID,
+                                 detail: "backspace del=\(safeBackspaces) suffix=\(diff.suffix)",
+                                 selection: client.selectedRange())
+                        if virtualCursorLocation != NSNotFound {
+                            virtualCursorLocation = max(0, virtualCursorLocation - safeBackspaces) + diff.suffix.utf16.count
+                        }
+                        composingWord = engine.currentOutput()
+
+                        if composingWord.isEmpty || !engine.isComposing {
+                            engine.reset()
+                            composingWord = ""
+                            rawWord = ""
+                            editCaretBack = Self.caretDisarmed
+                            virtualCursorLocation = NSNotFound
+                            compositionStartLocation = NSNotFound
+                        }
+                        return true
+                    }
+                } else {
+                    let output = engine.currentOutput()
+                    let previousOutputLength = (composingWord as NSString).length
+                    
+                    let startLoc: Int
+                    if compositionStartLocation != NSNotFound {
+                        startLoc = compositionStartLocation
+                    } else if selection.location != NSNotFound, selection.location >= previousOutputLength {
+                        startLoc = selection.location - previousOutputLength
+                    } else if virtualCursorLocation != NSNotFound, virtualCursorLocation >= previousOutputLength {
+                        startLoc = virtualCursorLocation - previousOutputLength
+                    } else {
+                        startLoc = NSNotFound
+                    }
+
+                    let wordRange = startLoc != NSNotFound && previousOutputLength > 0
+                        ? NSRange(location: startLoc, length: previousOutputLength)
+                        : NSRange(location: NSNotFound, length: 0)
+
+                    let clientID = bundleID?.lowercased() ?? ""
+                    let isNotesOrPrefs = ["com.apple.notes", "com.apple.systempreferences"].contains(clientID)
+
+                    if output.isEmpty {
+                        if isNotesOrPrefs {
+                            engine.reset()
+                            composingWord = ""
+                            rawWord = ""
+                            editCaretBack = Self.caretDisarmed
+                            virtualCursorLocation = NSNotFound
+                            compositionStartLocation = NSNotFound
+                            traceLab("backspaceNative", bundleID: bundleID,
+                                     detail: "finish-composition output=empty", selection: selection)
+                            return false
+                        }
+
+                        if wordRange.location != NSNotFound {
+                            client.insertText("", replacementRange: wordRange)
+                            traceLab("insertText", bundleID: bundleID,
+                                     detail: "backspace finish-composition range=\(wordRange.location),\(wordRange.length)",
+                                     selection: client.selectedRange())
+                            virtualCursorLocation = wordRange.location
+                        } else {
+                            traceLab("backspaceNativeFallback", bundleID: bundleID,
+                                     detail: "finish-composition range unavailable startLoc=\(startLoc) length=\(previousOutputLength)",
+                                     selection: client.selectedRange())
+                            virtualCursorLocation = NSNotFound
+                        }
+                        engine.reset()
+                        composingWord = ""
+                        rawWord = ""
+                        editCaretBack = Self.caretDisarmed
+                        compositionStartLocation = NSNotFound
+                        return wordRange.location != NSNotFound
+                    }
+
+                    if output != composingWord {
+                        if wordRange.location != NSNotFound {
+                            client.insertText(output, replacementRange: wordRange)
+                            traceLab("insertText", bundleID: bundleID,
+                                     detail: "backspace whole-word range=\(wordRange.location),\(wordRange.length) replacement=\(output)",
+                                     selection: client.selectedRange())
+                            composingWord = output
+                            virtualCursorLocation = wordRange.location + (output as NSString).length
+                            return true
+                        } else {
+                            engine.reset()
+                            composingWord = ""
+                            rawWord = ""
+                            virtualCursorLocation = NSNotFound
+                            compositionStartLocation = NSNotFound
+                            traceLab("backspaceNativeFallback", bundleID: bundleID,
+                                     detail: "whole-word range unavailable startLoc=\(startLoc) length=\(previousOutputLength)",
+                                     selection: selection)
+                            return false
+                        }
+                    }
+                    composingWord = output
+                    return true
+                }
+            }
+            if presentationMode == .markedText {
+                client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+            engine.reset()
+            composingWord = ""
+            rawWord = ""
+            compositionStartLocation = NSNotFound
+            return false
+        } else {
+            // Backspace while idle: deleting the space after committed word arms editing
+            if editCaretBack == -1 {
+                editCaretBack = 0
+            } else {
+                engine.reset()
+                editCaretBack = Self.caretDisarmed
+            }
+            // Likely deleted a backtick — decrement depth to stay in sync
+            if backtickDepth > 0 {
+                backtickDepth -= 1
+            }
+            return false
+        }
+    }
+
     private func commitWordWithBilingualCheck(client: IMKTextInput, presentationMode: PresentationMode, selection: NSRange, suffixChar: Character? = nil) -> Bool {
         guard engine.isComposing else { return false }
-
         let output = engine.currentOutput()
+        let prefs = Preferences.shared
 
-        if Preferences.shared.smartBilingual && !rawWord.isEmpty && rawWord.count >= 2 && rawWord.lowercased() != output.lowercased() && SmartBilingualDetector.isEnglishWord(raw: rawWord, context: recentContext, rendered: output) {
+        let candidateMacroKey = rawWord.isEmpty ? output : rawWord
+        if prefs.macroEnabled, let macroExpansion = MacroEngine.shared.lookup(word: candidateMacroKey) {
+            let appendStr = suffixChar != nil ? String(suffixChar!) : ""
+            if presentationMode == .directReplacement {
+                let wordLen = output.utf16.count
+                let startLoc: Int
+                if compositionStartLocation != NSNotFound {
+                    startLoc = compositionStartLocation
+                } else {
+                    let currentLoc = selection.location != NSNotFound ? selection.location : (virtualCursorLocation != NSNotFound ? virtualCursorLocation : client.selectedRange().location)
+                    startLoc = currentLoc != NSNotFound && currentLoc >= wordLen ? currentLoc - wordLen : NSNotFound
+                }
+                let range = startLoc != NSNotFound ? NSRange(location: startLoc, length: wordLen) : NSRange(location: NSNotFound, length: 0)
+                client.insertText(macroExpansion + appendStr, replacementRange: range)
+                traceLab("commitMacro", bundleID: client.bundleIdentifier(),
+                         detail: "key=\(candidateMacroKey) val=\(macroExpansion) suffix=\(appendStr)",
+                         selection: client.selectedRange())
+                if range.location != NSNotFound {
+                    virtualCursorLocation = range.location + (macroExpansion + appendStr).utf16.count
+                } else if virtualCursorLocation != NSNotFound {
+                    virtualCursorLocation += (macroExpansion + appendStr).utf16.count
+                }
+            } else if presentationMode == .terminalDirect {
+                let deleteChars = String(repeating: "\u{7F}", count: output.count)
+                client.insertText(deleteChars + macroExpansion + appendStr, replacementRange: NSRange(location: NSNotFound, length: 0))
+                traceLab("commitMacro", bundleID: client.bundleIdentifier(),
+                         detail: "key=\(candidateMacroKey) val=\(macroExpansion) terminal=true",
+                         selection: client.selectedRange())
+            } else {
+                client.insertText(macroExpansion + appendStr, replacementRange: NSRange(location: NSNotFound, length: 0))
+                traceLab("commitMacro", bundleID: client.bundleIdentifier(),
+                         detail: "key=\(candidateMacroKey) val=\(macroExpansion) marked=true",
+                         selection: client.selectedRange())
+            }
+            appendContext(macroExpansion)
+            session.reset()
+            editCaretBack = Self.caretDisarmed
+            virtualCursorLocation = NSNotFound
+            compositionStartLocation = NSNotFound
+            return true
+        }
+
+        if prefs.smartBilingual && !rawWord.isEmpty && rawWord.count >= 2 && rawWord.lowercased() != output.lowercased() && SmartBilingualDetector.isEnglishWord(raw: rawWord, context: recentContext, rendered: output, genZMode: prefs.genZMode) {
             // Restore English rawWord
             let appendStr = suffixChar != nil ? String(suffixChar!) : ""
             if presentationMode == .directReplacement {
                 let wordLen = output.utf16.count
-                let currentLoc = virtualCursorLocation != NSNotFound ? virtualCursorLocation : (selection.location != NSNotFound ? selection.location : client.selectedRange().location)
-                let range: NSRange
-                if currentLoc != NSNotFound && currentLoc >= wordLen {
-                    range = NSRange(location: currentLoc - wordLen, length: wordLen)
+                let startLoc: Int
+                if compositionStartLocation != NSNotFound {
+                    startLoc = compositionStartLocation
                 } else {
-                    range = NSRange(location: NSNotFound, length: 0)
+                    let currentLoc = selection.location != NSNotFound ? selection.location : (virtualCursorLocation != NSNotFound ? virtualCursorLocation : client.selectedRange().location)
+                    startLoc = currentLoc != NSNotFound && currentLoc >= wordLen ? currentLoc - wordLen : NSNotFound
                 }
+                let range = startLoc != NSNotFound ? NSRange(location: startLoc, length: wordLen) : NSRange(location: NSNotFound, length: 0)
                 client.insertText(rawWord + appendStr, replacementRange: range)
                 traceLab("commitEnglish", bundleID: client.bundleIdentifier(),
                          detail: "word=\(rawWord) suffix=\(appendStr) range=\(range.location),\(range.length)",
@@ -805,6 +1100,7 @@ final class VieLotusIMController: IMKInputController {
             rawWord = ""
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
+            compositionStartLocation = NSNotFound
             return true
         } else {
             // Commit Vietnamese word
@@ -820,17 +1116,32 @@ final class VieLotusIMController: IMKInputController {
             rawWord = ""
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
+            compositionStartLocation = NSNotFound
             return false
         }
     }
 
     private func appendContext(_ word: String) {
-        recentContext.append(word + " ")
-        if recentContext.count > 200 {
-            recentContext = String(recentContext.suffix(100))
-        }
+        session.appendContext(word)
     }
 
+    private func setStealthMarkedText(_ text: String, client: IMKTextInput) {
+        if text.isEmpty {
+            client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            return
+        }
+        // Stealth Composition: Provide NSAttributedString with explicit zero-underline style.
+        // This activates the W3C IME composition lifecycle in WebKit, Chromium, React & Electron
+        // (freezing asynchronous DOM mutations to prevent duplicate characters "t-ti-tiế-tiếng")
+        // while rendering completely clean and borderless without distracting underlines.
+        let stealthAttributes: [NSAttributedString.Key: Any] = [
+            .underlineStyle: NSUnderlineStyle([]).rawValue
+        ]
+        let attrString = NSAttributedString(string: text, attributes: stealthAttributes)
+        client.setMarkedText(attrString,
+                             selectionRange: NSRange(location: text.utf16.count, length: 0),
+                             replacementRange: NSRange(location: NSNotFound, length: 0))
+    }
 
     override func commitComposition(_ sender: Any!) {
         guard let client = sender as? IMKTextInput else { return }
@@ -842,6 +1153,7 @@ final class VieLotusIMController: IMKInputController {
                 for: appCategory,
                 bundleIdentifier: bundleID,
                 terminalDirectEnabled: prefs.terminalDirectMode,
+                passthroughRemoteApps: prefs.passthroughRemoteApps,
                 preference: prefs.presentationModePreference,
                 appOverrides: prefs.appModeOverrides
             )
@@ -852,31 +1164,33 @@ final class VieLotusIMController: IMKInputController {
     }
 
     override func cancelComposition() {
-        engine.reset()
-        composingWord = ""
-        rawWord = ""
+        session.reset()
         editCaretBack = Self.caretDisarmed
-            virtualCursorLocation = NSNotFound
+        virtualCursorLocation = NSNotFound
+        compositionStartLocation = NSNotFound
     }
 
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
         applyPreferences()
-        engine.reset()
-        composingWord = ""
-        rawWord = ""
+        session.reset()
         editCaretBack = Self.caretDisarmed
         virtualCursorLocation = NSNotFound
+        compositionStartLocation = NSNotFound
         lastClientIdentifier = nil
+
+        if Preferences.shared.enforceABCBaseLayout, let client = sender as? IMKTextInput {
+            client.overrideKeyboard(withKeyboardNamed: "com.apple.keylayout.ABC")
+        }
+
         NSLog("VieLotusIMController: Activated")
     }
 
     override func deactivateServer(_ sender: Any!) {
-        engine.reset()
-        composingWord = ""
-        rawWord = ""
+        session.reset()
         editCaretBack = Self.caretDisarmed
         virtualCursorLocation = NSNotFound
+        compositionStartLocation = NSNotFound
         lastClientIdentifier = nil
         super.deactivateServer(sender)
         NSLog("VieLotusIMController: Deactivated")
@@ -895,6 +1209,7 @@ final class VieLotusIMController: IMKInputController {
                     for: appCategory,
                     bundleIdentifier: bundleID,
                     terminalDirectEnabled: prefs.terminalDirectMode,
+                    passthroughRemoteApps: prefs.passthroughRemoteApps,
                     preference: prefs.presentationModePreference,
                     appOverrides: prefs.appModeOverrides
                 )
@@ -955,7 +1270,7 @@ final class VieLotusIMController: IMKInputController {
 
         // Tùy chọn chính tả
         let modernItem = NSMenuItem(
-            title: prefs.modernOrthography ? "✓ Dấu chuẩn mới (hoà → hoá)" : "Dấu chuẩn mới (hoà → hoá)",
+            title: prefs.modernOrthography ? "✓ Dấu chuẩn mới (hoà, thuỷ)" : "Dấu chuẩn mới (hoà, thuỷ)",
             action: #selector(toggleModernOrthography),
             keyEquivalent: ""
         )
@@ -989,7 +1304,7 @@ final class VieLotusIMController: IMKInputController {
         menu.addItem(.separator())
 
         // Thông tin phiên bản
-        let versionItem = NSMenuItem(title: "Sen Việt (VieLotusIM) v1.1.0", action: nil, keyEquivalent: "")
+        let versionItem = NSMenuItem(title: "Sen Việt (VieLotusIM) v\(AppInfo.appVersion)", action: nil, keyEquivalent: "")
         versionItem.isEnabled = false
         menu.addItem(versionItem)
 
@@ -1043,7 +1358,7 @@ final class VieLotusIMController: IMKInputController {
     }
 
     @objc private func openGitHub() {
-        if let url = URL(string: "https://github.com/uvie-project/uvie-mac") {
+        if let url = URL(string: "https://github.com/stevedat/VieLotus-IM") {
             NSWorkspace.shared.open(url)
         }
     }

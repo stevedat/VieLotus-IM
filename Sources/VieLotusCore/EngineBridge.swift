@@ -34,6 +34,10 @@ public final class EngineBridge {
         engine.quickTelex = enabled
     }
 
+    public func setGenZMode(_ enabled: Bool) {
+        engine.genZMode = enabled
+    }
+
     public func setQuickStart(_ enabled: Bool) {
         engine.quickStart = enabled
     }
@@ -67,14 +71,23 @@ public final class EngineBridge {
             while commonPrefixLen < minLen && oldArr[commonPrefixLen] == newArr[commonPrefixLen] {
                 commonPrefixLen += 1
             }
-            let backspaces = oldArr.count - commonPrefixLen
+            let deletedChars = oldArr[commonPrefixLen...]
+            let backspaces = deletedChars.reduce(0) { $0 + String($1).utf16.count }
             let suffix = String(newArr[commonPrefixLen...])
             return (backspaces, suffix)
         }
-        return (oldWord.count, newWord)
+        return (oldWord.utf16.count, newWord)
     }
 
     public func currentOutput() -> String {
         engine.currentOutput()
+    }
+
+    public func rawString() -> String {
+        engine.rawString()
+    }
+
+    public func setCompositionPrefix(_ text: String) {
+        engine.setCompositionPrefix(text)
     }
 }

@@ -4,6 +4,30 @@ Tất cả thay đổi đáng chú ý của dự án **Sen Việt (VieLotusIM)**
 
 ---
 
+## [1.1.1] - 2026-10-10
+
+### Tính năng mới & Cải tiến (Added & Improved)
+- **Chuyển đổi Giấy phép sang MIT License**:
+  - Toàn bộ dự án chuyển sang chuẩn mã nguồn mở thân thiện nhất hệ sinh thái Apple (**MIT License**), tương thích 100% với Apple App Store và cho phép tái sử dụng lõi `VieLotusCore` qua Swift Package Manager (SPM).
+- **Bộ điều phối hiển thị thông minh (Adaptive Presentation Engine)**:
+  - **Direct Replacement**: Thay thế trực tiếp không gạch chân trên các ứng dụng AppKit gốc (Pages, TextEdit, Safari, Xcode, Spotlight) và dòng lệnh (Terminal Direct).
+  - **Marked Text chuẩn W3C**: Cơ chế gạch chân soạn thảo chuẩn Apple trên các ứng dụng Web / Electron (Chrome, VS Code, Slack, Discord, Notion...). Triệt tiêu hoàn toàn lỗi nuốt chữ, lặp chữ (`t-ti-tiế-tiếng`) và nhảy con trỏ do Virtual DOM diffing. Khi kết thúc từ, văn bản chuyển thành chữ thường sạch sẽ ngay lập tức.
+- **Nâng tỷ lệ kiểm thử hồi quy lên 99.99%**:
+  - Đạt **9,090 / 9,091 từ (99.99%)** trên bộ kiểm thử hồi quy chính thức.
+- **Giao diện Cài đặt Tinh gọn Chuẩn Apple Minimalist**:
+  - Làm sạch danh sách ứng dụng mặc định, tối ưu hóa cho người dùng phổ thông (Chrome, Safari, Word, VS Code, Slack, Discord).
+  - Tích hợp nút và liên kết truy cập nhanh vào **GitHub Discussions** trực tiếp trong menu và chân trang Cài đặt.
+  - Menu trạng thái tự động hiển thị phiên bản động theo `AppInfo.appVersion`.
+- **Nền tảng Mở rộng iOS & Macro**:
+  - Bổ sung `MacroEngine` và `UIKitInputSessionAdapter` chuẩn bị cho bước mở rộng bàn phím iOS/iPadOS theo lộ trình.
+
+### Sửa lỗi (Fixed)
+- **Sửa triệt để lỗi xóa lùi dở từ (Partial Deletion Prefix Retention)**:
+  - Khắc phục hoàn toàn tình trạng khi gõ một từ (ví dụ `đổi`, `trường`), sau đó bấm Backspace giữ lại một phần tiền tố (`đ`, `tr`) và gõ tiếp hậu tố (`ược` $\to$ ra đúng `được` thay vì `uocwj`; `ưởng` $\to$ ra `trưởng` thay vì `uowngr`).
+  - Tích hợp thuật toán `rawKeys(for:inputMethod:)` phân rã NFD Unicode tái tạo trạng thái ngữ âm chính xác cho tiền tố còn lại.
+
+---
+
 ## [1.1.0] - 2026-10-02
 
 ### Tính năng mới & Cải tiến (Added & Improved)
@@ -45,5 +69,6 @@ Tất cả thay đổi đáng chú ý của dự án **Sen Việt (VieLotusIM)**
 
 ---
 
+[1.1.1]: https://github.com/stevedat/VieLotus-IM/releases/tag/v1.1.1
 [1.1.0]: https://github.com/stevedat/VieLotus-IM/releases/tag/v1.1.0
 [1.0.0]: https://github.com/stevedat/VieLotus-IM/releases/tag/v1.0.0

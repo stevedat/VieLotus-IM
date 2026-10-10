@@ -1,6 +1,6 @@
 # Third-Party Notices & Open Source Acknowledgments
 
-VieLotusIM (Sen Việt) is licensed under the [GNU General Public License v3.0 (GPLv3)](../LICENSE). 
+VieLotusIM (Sen Việt) is licensed under the [MIT License](../LICENSE). 
 
 In the spirit of open-source collaboration and engineering excellence, VieLotusIM respects, learns from, and acknowledges foundational research, tools, and prior art in the Vietnamese macOS input method ecosystem:
 

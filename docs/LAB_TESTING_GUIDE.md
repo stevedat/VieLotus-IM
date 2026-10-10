@@ -93,6 +93,8 @@ Khi phát hiện chữ gõ sai, nuốt phím hoặc xung đột, bạn có 2 cá
 > - Gói chẩn đoán chỉ ghi lại đúng chuỗi phím và thao tác bạn đã gõ trong phiên thử nghiệm.
 > - Vui lòng kiểm tra lại nội dung trong cửa sổ xem trước trước khi bấm *Submit new issue*, đảm bảo **không chứa mật khẩu, token bí mật, họ tên thật, số điện thoại hay email cá nhân**.
 
+Nếu bạn có câu hỏi, ý kiến đóng góp tính năng hoặc thảo luận chung, vui lòng tham gia [GitHub Discussions](https://github.com/stevedat/VieLotus-IM/discussions).
+
 ---
 
 ## 6. Gỡ Cài Đặt Hoặc Quay Về Bộ Gõ Cũ (Rollback / Uninstallation)

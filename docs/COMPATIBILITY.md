@@ -12,12 +12,12 @@
 
 ## 2. Application Compatibility Matrix
 
-VieLotusIM uses an adaptive presentation engine to provide flicker-free direct replacement where supported, and standard marked text for terminal emulators and dynamic fallback for edge-case controls:
+VieLotusIM uses an adaptive presentation engine to provide flicker-free direct replacement where supported, standard marked text for web and electron environments to prevent dropped/duplicated characters, and optimized direct input for terminal emulators:
 
 | Application Category | Sample Applications | Presentation Mode | Behavior & Verification |
 | :--- | :--- | :--- | :--- |
-| **Standard AppKit / Cocoa** | TextEdit, Notes, Pages, Keynote, Numbers, Mail, Safari, Xcode, Finder | Direct Replacement | Zero flicker, no CJK underline, native Cmd+Z undo stack. |
-| **Chromium, Electron & CEF** | Chrome, Edge, Arc, Brave, Opera, Vivaldi, VS Code, Cursor, Windsurf, Slack, Discord, Notion, Obsidian, Logseq, Linear, Figma, Zalo, Telegram, Teams, WhatsApp, Signal, Codex, Antigravity | Direct Replacement | Instant syllable replacement via `replacementRange` and synchronized virtual cursor. |
+| **Standard AppKit / Cocoa** | TextEdit, Notes, Pages, Keynote, Numbers, Mail, Safari, Xcode, Finder | Direct Replacement | Zero flicker, no underline, native Cmd+Z undo stack. |
+| **Chromium, Electron & CEF** | Chrome, Edge, Arc, Brave, Opera, Vivaldi, VS Code, Cursor, Windsurf, Slack, Discord, Notion, Obsidian, Logseq, Linear, Figma, Zalo, Telegram, Teams, WhatsApp, Signal, Postman | Marked Text (W3C IME Standard) | Synchronizes with W3C IME composition events (`compositionstart`, `compositionupdate`, `compositionend`). Eliminates character duplication (`t-ti-tiế-tiếng`) and caret jumping caused by asynchronous DOM/React diffing. Once the word completes, the underline clears immediately. |
 | **Microsoft Office** | Word, Excel, PowerPoint, OneNote, Outlook | Direct Replacement | Clean typing buffer with accurate caret position. |
 | **Terminal Emulators** | Terminal.app, iTerm2, Warp, Ghostty, Alacritty, Kitty, WezTerm, Rio, Hyper, Tabby | Terminal Direct / Marked Text | Real-time direct PTY emission (`\u{7F}`) or marked text inline composition. |
 | **Quick Search & Overlays** | Spotlight, Raycast, Alfred, LaunchBar, Sol | Direct Replacement | Instant focus response without selection locking. |
@@ -56,5 +56,7 @@ Test typing in the following 5 representative application environments:
 ---
 
 ## 4. External Tester & Diagnostic Guide
-
+ 
 For a complete step-by-step walkthrough covering automated diagnostic packet exports, trace event collection with `VieLotusLab`, and clean uninstallation, see [docs/LAB_TESTING_GUIDE.md](LAB_TESTING_GUIDE.md).
+
+For feedback, questions, and feature suggestions, visit [GitHub Discussions](https://github.com/stevedat/VieLotus-IM/discussions).

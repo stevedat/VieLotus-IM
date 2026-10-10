@@ -15,6 +15,9 @@ public class InputSessionManager {
     public var rawWord: String = ""
     public var context: String = ""
     public var editCaretBack: Int = -1
+    public var smartBilingualEnabled: Bool = true
+    public var inlineBilingualEnabled: Bool = false
+    public var genZMode: Bool = false
 
     public var isComposing: Bool {
         return engine.isComposing
@@ -43,6 +46,13 @@ public class InputSessionManager {
         editCaretBack = -1
     }
 
+    public func setCompositionPrefix(_ text: String) {
+        engine.setCompositionPrefix(text)
+        composingWord = text
+        rawWord = engine.rawString()
+        editCaretBack = -1
+    }
+
     public func currentOutput() -> String {
         if !composingWord.isEmpty { return composingWord }
         return engine.currentOutput()
@@ -62,6 +72,11 @@ public class InputSessionManager {
 
     public func setQuickTelex(_ enabled: Bool) {
         engine.setQuickTelex(enabled)
+    }
+
+    public func setGenZMode(_ enabled: Bool) {
+        self.genZMode = enabled
+        engine.setGenZMode(enabled)
     }
 
     public func setQuickStart(_ enabled: Bool) {
@@ -121,6 +136,7 @@ public class InputSessionManager {
             }
             
             // Visual logic with UTF-16 code unit precision
+            let priorComposingCount = (composingWord as NSString).length
             var utf16Backspaces = 0
             if diff.backspaces > 0 {
                 let safeBackspaces = min(diff.backspaces, composingWord.count)
@@ -134,6 +150,12 @@ public class InputSessionManager {
                 engine.reset()
                 rawWord = ""
                 editCaretBack = -1
+            }
+
+            if inlineBilingualEnabled && smartBilingualEnabled && rawWord.count >= 2 && rawWord.lowercased() != composingWord.lowercased() &&
+               SmartBilingualDetector.isInlineEnglishWord(raw: rawWord, rendered: composingWord) {
+                composingWord = rawWord
+                return .replace(backspaces: priorComposingCount, text: rawWord)
             }
 
             return .replace(backspaces: utf16Backspaces, text: diff.suffix)
@@ -183,15 +205,27 @@ public class InputSessionManager {
         }
     }
 
-    /// Commit the current composition, applying Smart Bilingual if needed
-    public func commitWord(smartBilingualEnabled: Bool) -> SessionAction {
+    public var macroEngine: MacroEngine? = MacroEngine.shared
+    public var macroEnabled: Bool = true
+
+    /// Commit the current composition, applying Macro and Smart Bilingual if needed
+    public func commitWord(
+        smartBilingualEnabled: Bool,
+        genZMode: Bool = false,
+        macroEngine: MacroEngine? = nil
+    ) -> SessionAction {
         guard isComposing else { return .passThrough }
         
         let output = currentOutput()
         let finalWord: String
         var isOverride = false
         
-        if smartBilingualEnabled && !rawWord.isEmpty && rawWord.count >= 2 && rawWord.lowercased() != output.lowercased() && SmartBilingualDetector.isEnglishWord(raw: rawWord, context: context, rendered: output) {
+        let activeMacro = macroEngine ?? (self.macroEnabled ? self.macroEngine : nil)
+        let candidateKey = rawWord.isEmpty ? output : rawWord
+        if let expansion = activeMacro?.lookup(word: candidateKey) {
+            finalWord = expansion
+            isOverride = true
+        } else if smartBilingualEnabled && !rawWord.isEmpty && rawWord.count >= 2 && rawWord.lowercased() != output.lowercased() && SmartBilingualDetector.isEnglishWord(raw: rawWord, context: context, rendered: output, genZMode: genZMode) {
             finalWord = rawWord
             isOverride = true
         } else {

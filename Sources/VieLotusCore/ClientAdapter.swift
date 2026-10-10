@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 public enum AppCategory: Sendable, Equatable {
     case standardAppKit
@@ -14,12 +17,14 @@ public enum PresentationMode: Sendable, Equatable {
     case directReplacement
     case markedText
     case terminalDirect
+    case passthrough
 }
 
 public enum PresentationModePreference: String, CaseIterable, Sendable, Identifiable {
     case automatic
     case directReplacement
     case markedText
+    case passthrough
 
     public var id: String { rawValue }
 }
@@ -31,8 +36,18 @@ public struct ClientAdapter {
         // Remote Desktop, Screen Sharing & Virtual Machine apps:
         // Remote targets handle their own keyboard layout or forward raw scancodes.
         if id.contains("com.microsoft.rdc") ||
+           id.contains("jump.mac.viewer") ||
+           id.contains("apple.remotedesktop") ||
            id.contains("teamviewer") ||
            id.contains("anydesk") ||
+           id.contains("parsec") ||
+           id.contains("moonlight") ||
+           id.contains("deskin") ||
+           id.contains("youqu.todesk") ||
+           (id.contains("todesk") && !id.contains("todesktop")) ||
+           id.contains("sunlogin") ||
+           id.contains("nomachine") ||
+           id.contains("realvnc") ||
            id.contains("vmware") ||
            id.contains("parallels") ||
            id.contains("utmapp") ||
@@ -108,8 +123,17 @@ public struct ClientAdapter {
            id.contains("viber") ||
            id.contains("signal") ||
            id.contains("codex") ||
-           id.contains("antigravity") {
-            // Zalo, Telegram, Slack, VSCode, etc. use CEF/Electron/Chromium
+           id.contains("antigravity") ||
+           id.contains("orca") ||
+           id.contains("stablyai") ||
+           id.contains("claude") ||
+           id.contains("anthropic") ||
+           id.contains("chatgpt") ||
+           id.contains("openai") ||
+           id.contains("trae") ||
+           id.contains("genoffice") ||
+           id.contains("postman") {
+            // Zalo, Telegram, Slack, VSCode, Orca, Cursor, GenOffice, etc. use CEF/Electron/Chromium
             return .chromium
         }
         
@@ -127,9 +151,49 @@ public struct ClientAdapter {
            id.contains("dev.zed") {
             return .standardAppKit
         }
+
+        #if canImport(AppKit)
+        if isElectronOrChromiumApp(bundleIdentifier: id) {
+            return .chromium
+        }
+        #endif
         
         return .standardAppKit
     }
+
+    #if canImport(AppKit)
+    private static let appFrameworkCheckLock = NSLock()
+    private static var isChromiumAppCache: [String: Bool] = [:]
+
+    private static func isElectronOrChromiumApp(bundleIdentifier: String) -> Bool {
+        appFrameworkCheckLock.lock()
+        if let cached = isChromiumAppCache[bundleIdentifier] {
+            appFrameworkCheckLock.unlock()
+            return cached
+        }
+        appFrameworkCheckLock.unlock()
+
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
+        var isChromium = false
+        let fileManager = FileManager.default
+
+        for app in running {
+            guard let bundleURL = app.bundleURL else { continue }
+            let frameworksURL = bundleURL.appendingPathComponent("Contents/Frameworks", isDirectory: true)
+            let electronPath = frameworksURL.appendingPathComponent("Electron Framework.framework").path
+            let cefPath = frameworksURL.appendingPathComponent("Chromium Embedded Framework.framework").path
+            if fileManager.fileExists(atPath: electronPath) || fileManager.fileExists(atPath: cefPath) {
+                isChromium = true
+                break
+            }
+        }
+
+        appFrameworkCheckLock.lock()
+        isChromiumAppCache[bundleIdentifier] = isChromium
+        appFrameworkCheckLock.unlock()
+        return isChromium
+    }
+    #endif
     
     private static let dynamicModeLock = NSLock()
     private static var dynamicMarkedTextBundles: Set<String> = []
@@ -150,6 +214,7 @@ public struct ClientAdapter {
         for category: AppCategory,
         bundleIdentifier: String? = nil,
         terminalDirectEnabled: Bool = false,
+        passthroughRemoteApps: Bool = false,
         preference: PresentationModePreference = .automatic,
         appOverrides: [String: PresentationModePreference] = [:]
     ) -> PresentationMode {
@@ -162,17 +227,26 @@ public struct ClientAdapter {
             return .directReplacement
         case .markedText:
             return .markedText
+        case .passthrough:
+            return .passthrough
         case .automatic:
             break
         }
 
+        if category == .remoteOrVirtualMachine && passthroughRemoteApps {
+            return .passthrough
+        }
         if category == .terminal {
             return terminalDirectEnabled ? .terminalDirect : .markedText
         }
         if category == .remoteOrVirtualMachine {
             return .markedText
         }
-        if ["com.google.antigravity", "com.openai.codex"].contains(bundleIdentifier?.lowercased() ?? "") {
+        if category == .chromium {
+            // Chromium / Electron / CEF apps (Chrome, Slack, VSCode, Discord, Notion, Figma, etc.):
+            // Use Stealth Composition (Zero-Underline Marked Text) to synchronize with the W3C IME
+            // composition lifecycle. This completely eliminates duplicate characters ("t-ti-tiế-tiếng")
+            // and swallowed keystrokes caused by asynchronous React/DOM virtual diffing.
             return .markedText
         }
         if let id {

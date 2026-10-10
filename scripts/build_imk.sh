@@ -8,6 +8,9 @@ cd "$SCRIPT_DIR"
 
 VERSION="${1:-$(git describe --tags --always 2>/dev/null || echo '1.0.0')}"
 VERSION="${VERSION#v}" # Strip leading 'v' if present
+if [ -z "$1" ] && [ -n "$(git status --porcelain 2>/dev/null)" ] && [[ "$VERSION" != *"-dev"* ]]; then
+    VERSION="${VERSION}-dev"
+fi
 BUILD_NUMBER="${2:-1}"
 
 echo "=== Building VieLotusIM v${VERSION} (Sen Việt - Apple InputMethodKit Native) ==="
@@ -41,6 +44,9 @@ cp "Sources/VieLotusIM/Info.plist" "$APP_DIR/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$APP_DIR/Contents/Info.plist"
 
 GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    GIT_COMMIT="${GIT_COMMIT}-dev"
+fi
 BUILD_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 /usr/libexec/PlistBuddy -c "Set :GitCommitHash $GIT_COMMIT" "$APP_DIR/Contents/Info.plist" 2>/dev/null || \

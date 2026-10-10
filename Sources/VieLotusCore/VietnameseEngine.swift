@@ -33,6 +33,7 @@ public final class VietnameseEngine: @unchecked Sendable {
     public var relaxedCoda: Bool = false
     public var quickTelex: Bool = false
     public var quickStart: Bool = false
+    public var genZMode: Bool = false
     
     // MARK: - Internal Syllable State
     
@@ -72,6 +73,59 @@ public final class VietnameseEngine: @unchecked Sendable {
         return String(rawChars)
     }
     
+    // MARK: - Prefix & Re-composition API
+    
+    /// Converts a rendered Vietnamese string into canonical raw keystrokes according to the input method.
+    public static func rawKeys(for text: String, inputMethod: InputMethodType) -> String {
+        var raw = ""
+        var toneKey: Character? = nil
+        let isVni = inputMethod == .vni
+        
+        for scalar in text.decomposedStringWithCanonicalMapping.unicodeScalars {
+            switch scalar.value {
+            case 0x0111: // đ
+                raw.append(isVni ? "d9" : "dd")
+            case 0x0110: // Đ
+                raw.append(isVni ? "D9" : "DD")
+            case 0x0300: // grave (huyền)
+                toneKey = isVni ? "2" : "f"
+            case 0x0301: // acute (sắc)
+                toneKey = isVni ? "1" : "s"
+            case 0x0303: // tilde (ngã)
+                toneKey = isVni ? "4" : "x"
+            case 0x0309: // hook above (hỏi)
+                toneKey = isVni ? "3" : "r"
+            case 0x0323: // dot below (nặng)
+                toneKey = isVni ? "5" : "j"
+            case 0x0302: // circumflex (â, ê, ô)
+                if isVni {
+                    raw.append("6")
+                } else if let last = raw.last {
+                    raw.append(last)
+                }
+            case 0x0306: // breve (ă)
+                raw.append(isVni ? "8" : "w")
+            case 0x031B: // horn (ơ, ư)
+                raw.append(isVni ? "7" : "w")
+            default:
+                raw.append(String(scalar))
+            }
+        }
+        if let toneKey {
+            raw.append(toneKey)
+        }
+        return raw
+    }
+    
+    /// Re-initializes composition state with an existing prefix already rendered on screen.
+    public func setCompositionPrefix(_ text: String) {
+        let raw = VietnameseEngine.rawKeys(for: text, inputMethod: inputMethod)
+        reset()
+        for ch in raw {
+            _ = feed(ch)
+        }
+    }
+    
     // MARK: - Core Feed / Edit / Commit API
     
     /// Feeds a single character into the engine.
@@ -104,7 +158,7 @@ public final class VietnameseEngine: @unchecked Sendable {
         
         if rawChars.isEmpty {
             renderedOutput = ""
-            return (previousOutput.count, "")
+            return (previousOutput.utf16.count, "")
         }
         
         let newOutput = transform(rawChars)
@@ -179,7 +233,7 @@ public final class VietnameseEngine: @unchecked Sendable {
         let lowerRaw = String(chars).lowercased()
         
         // Non-Vietnamese initials: 'f', 'j', 'z' cannot start a Vietnamese syllable
-        if let first = lowerRaw.first, first == "f" || first == "j" || first == "z" {
+        if let first = lowerRaw.first, (first == "f" || first == "j" || first == "z") && !genZMode {
             return String(chars)
         }
         

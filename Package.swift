@@ -2,13 +2,12 @@
 import PackageDescription
 import Foundation
 
-let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
-let frameworksPath = URL(fileURLWithPath: packageRoot)
-    .appendingPathComponent("Frameworks").path
-
 let package = Package(
     name: "VietLotusIM",
-    platforms: [.macOS(.v13)],
+    platforms: [
+        .macOS(.v13),
+        .iOS(.v16)
+    ],
     products: [
         .executable(name: "VieLotusIM", targets: ["VieLotusIM"]),
         .executable(name: "VieLotusCLI", targets: ["VieLotusCLI"]),
@@ -26,7 +25,7 @@ let package = Package(
                 .swiftLanguageMode(.v5),
             ],
             linkerSettings: [
-                .linkedFramework("Cocoa"),
+                .linkedFramework("Cocoa", .when(platforms: [.macOS])),
                 .linkedFramework("NaturalLanguage"),
             ]
         ),

@@ -80,6 +80,7 @@ extension PresentationMode {
         case .directReplacement: return "Direct Replacement"
         case .markedText: return "Marked Text"
         case .terminalDirect: return "Terminal Direct"
+        case .passthrough: return "Bỏ qua (Passthrough)"
         }
     }
 }
@@ -90,6 +91,7 @@ extension PresentationModePreference {
         case .automatic: return "Tự động (Khuyên dùng)"
         case .directReplacement: return "Direct Replacement"
         case .markedText: return "Marked Text"
+        case .passthrough: return "Bỏ qua (Passthrough)"
         }
     }
 }
@@ -166,6 +168,7 @@ private struct IMEInfo {
     let inputMethod: InputMethodType
     let modernOrthography: Bool
     let smartBilingual: Bool
+    let terminalDirectMode: Bool
 
     var presentationPreferenceTitle: String {
         presentationPreference.title
@@ -188,6 +191,7 @@ private struct IMEInfo {
         let inputMethod = InputMethodType(rawValue: Int32(inputMethodRaw)) ?? .telex
         let modern = imeDefaults?.object(forKey: "VieLotusIM.modernOrthography") as? Bool ?? true
         let bilingual = imeDefaults?.object(forKey: "VieLotusIM.smartBilingual") as? Bool ?? true
+        let terminalDirect = imeDefaults?.object(forKey: "VieLotusIM.terminalDirectMode") as? Bool ?? true
 
         // 1. Check if the IME process is currently active in memory
         if let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
@@ -207,7 +211,8 @@ private struct IMEInfo {
                 appModeOverrides: appOverrides,
                 inputMethod: inputMethod,
                 modernOrthography: modern,
-                smartBilingual: bilingual
+                smartBilingual: bilingual,
+                terminalDirectMode: terminalDirect
             )
         }
 
@@ -232,7 +237,8 @@ private struct IMEInfo {
                     appModeOverrides: appOverrides,
                     inputMethod: inputMethod,
                     modernOrthography: modern,
-                    smartBilingual: bilingual
+                    smartBilingual: bilingual,
+                    terminalDirectMode: terminalDirect
                 )
             }
         }
@@ -247,7 +253,8 @@ private struct IMEInfo {
             appModeOverrides: appOverrides,
             inputMethod: inputMethod,
             modernOrthography: modern,
-            smartBilingual: bilingual
+            smartBilingual: bilingual,
+            terminalDirectMode: terminalDirect
         )
     }
 
@@ -265,6 +272,7 @@ private struct IMEInfo {
         let resolved = ClientAdapter.presentationMode(
             for: category,
             bundleIdentifier: id,
+            terminalDirectEnabled: terminalDirectMode,
             preference: presentationPreference,
             appOverrides: appModeOverrides
         )
@@ -433,6 +441,28 @@ private final class LabStore: ObservableObject {
             selectedTargetBundleID = traceTargets.first?.bundleID ?? ""
         }
         checkAccessibilityState(prompt: false)
+    }
+
+    func setAppOverride(bundleID: String, mode: PresentationModePreference?) {
+        guard !bundleID.isEmpty else { return }
+        let suite = "org.vielotus.inputmethod.VieLotusIM"
+        let defaults = UserDefaults(suiteName: suite) ?? UserDefaults.standard
+        var overrides = defaults.dictionary(forKey: "VieLotusIM.appModeOverrides") as? [String: String] ?? [:]
+        let key = bundleID.lowercased()
+        if let mode {
+            overrides[key] = mode.rawValue
+        } else {
+            overrides.removeValue(forKey: key)
+        }
+        defaults.set(overrides, forKey: "VieLotusIM.appModeOverrides")
+        defaults.synchronize()
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("org.vielotus.inputmethod.preferencesChanged"),
+            object: nil,
+            userInfo: nil,
+            deliverImmediately: true
+        )
+        objectWillChange.send()
     }
 
     func checkAccessibilityState(prompt: Bool = false) {
@@ -803,6 +833,7 @@ private final class LabStore: ObservableObject {
                     "input_method": method == .telex ? "telex" : "vni",
                     "modern_orthography": modern,
                     "smart_bilingual": smartBilingual,
+                    "terminal_direct_mode": ime.terminalDirectMode,
                     "presentation_mode_preference": ime.presentationPreference.rawValue,
                     "presentation_mode_title": ime.presentationPreference.title
                 ],
@@ -878,6 +909,7 @@ private final class LabStore: ObservableObject {
         report += "- **Kiểu gõ:** \(method == .telex ? "TELEX" : "VNI")\n"
         report += "- **Dấu chuẩn mới (oà/uý):** \(modern ? "Bật" : "Tắt")\n"
         report += "- **Nhận diện tiếng Anh thông minh:** \(smartBilingual ? "Bật" : "Tắt")\n"
+        report += "- **Chế độ dòng lệnh trực tiếp (Terminal Direct):** \(ime.terminalDirectMode ? "Bật" : "Tắt")\n"
         report += "- **Chế độ hiển thị mặc định:** \(ime.presentationPreference.title)\n\n"
 
         let targetModeDetails = ime.targetModeDetails(for: externalTargetBundleID ?? lastTraceTargetBundleID)
@@ -1006,7 +1038,7 @@ private final class LabStore: ObservableObject {
                 var entry = TraceEntry(time: event.time, monotonic: event.monotonic, source: "Engine",
                                        action: event.event, key: event.key, raw: event.raw,
                                        composing: event.composing, committed: "", detail: event.detail)
-                if event.event == "caretMismatch" || event.event == "backspaceCursorResync" {
+                if event.event == "caretMismatch" || event.event == "backspaceCursorResync" || event.event == "backspaceNativeFallback" {
                     entry.issue = "Caret position changed: \(event.detail)"
                 }
                 append(entry)
@@ -1062,17 +1094,67 @@ private final class LabStore: ObservableObject {
         }
         let isHostBoundary = !host.insertedText.isEmpty &&
             host.insertedText.allSatisfy { $0.isWhitespace || $0.isPunctuation }
-        if host.action == "insertText", !isHostBoundary,
-           let latest = nearbyEngine.filter({ ["feed", "backspace", "commitVietnamese", "commitEnglish"].contains($0.action) })
-                .min(by: { distance($0) < distance($1) }),
-           latest.action != "commitEnglish", !latest.composing.isEmpty {
-            let output = latest.composing as NSString
-            let document = host.documentText as NSString
-            let caret = host.selectionLocation
-            if caret >= output.length, caret <= document.length {
-                let visible = document.substring(with: NSRange(location: caret - output.length, length: output.length))
-                if visible != latest.composing {
-                    entries[index].compositionIssue = "visible text differs from IMK composition: expected \(latest.composing.debugDescription), found \(visible.debugDescription)"
+        if (host.action == "insertText" || host.action == "AX value/selection changed"), !isHostBoundary {
+            let candidates = nearbyEngine.filter { entry in
+                ["feed", "backspace", "commitVietnamese", "commitEnglish"].contains(entry.action) &&
+                entry.monotonic <= host.monotonic + 20_000_000
+            }
+            if let latest = candidates.min(by: { distance($0) < distance($1) }) {
+                if latest.action == "commitEnglish" {
+                    let document = host.documentText as NSString
+                    let caret = host.selectionLocation
+                    let word = latest.raw
+                    let wordLen = (word as NSString).length
+                    let matchesEnglish = (caret >= wordLen && caret <= document.length &&
+                        document.substring(with: NSRange(location: caret - wordLen, length: wordLen)).lowercased() == word.lowercased()) ||
+                        (caret >= wordLen + 1 && caret <= document.length &&
+                        document.substring(with: NSRange(location: caret - wordLen - 1, length: wordLen)).lowercased() == word.lowercased())
+                    if !matchesEnglish {
+                        let visible = caret > 0 && caret <= document.length ? document.substring(with: NSRange(location: max(0, caret - wordLen), length: min(caret, wordLen))) : ""
+                        entries[index].compositionIssue = "visible text differs from IMK English restore: expected \(word.debugDescription), found \(visible.debugDescription)"
+                    }
+                    entries[index].issue = [entries[index].mutationIssue, entries[index].compositionIssue]
+                        .filter { !$0.isEmpty }.joined(separator: "; ")
+                    refreshIssueSummary()
+                    return
+                }
+
+                if latest.action == "backspace" && (latest.composing.isEmpty || latest.raw.isEmpty) {
+                    entries[index].issue = [entries[index].mutationIssue, entries[index].compositionIssue]
+                        .filter { !$0.isEmpty }.joined(separator: "; ")
+                    refreshIssueSummary()
+                    return
+                }
+            }
+
+            let activeCandidates = candidates.filter { $0.action != "commitEnglish" && !$0.composing.isEmpty }
+            if !activeCandidates.isEmpty {
+                let document = host.documentText as NSString
+                let caret = host.selectionLocation
+                let matchesAny = activeCandidates.contains { candidate in
+                    let output = candidate.composing as NSString
+                    guard caret <= document.length else { return false }
+                    if caret >= output.length {
+                        let visible = document.substring(with: NSRange(location: caret - output.length, length: output.length))
+                        if visible == candidate.composing { return true }
+                    }
+                    if caret >= output.length + 1 {
+                        let visibleWithSpace = document.substring(with: NSRange(location: caret - output.length - 1, length: output.length))
+                        if visibleWithSpace == candidate.composing { return true }
+                    }
+                    return false
+                }
+                if !matchesAny, let latest = activeCandidates.min(by: { distance($0) < distance($1) }) {
+                    let output = latest.composing as NSString
+                    let hasTrailingSeparator = caret >= 1 && caret <= document.length && {
+                        let c = document.substring(with: NSRange(location: caret - 1, length: 1))
+                        return c.first?.isWhitespace == true || c.first?.isPunctuation == true
+                    }()
+                    let offset = (hasTrailingSeparator && caret >= output.length + 1) ? (output.length + 1) : output.length
+                    if caret >= offset, caret <= document.length {
+                        let visible = document.substring(with: NSRange(location: caret - offset, length: output.length))
+                        entries[index].compositionIssue = "visible text differs from IMK composition: expected \(latest.composing.debugDescription), found \(visible.debugDescription)"
+                    }
                 }
             }
         }
@@ -1094,7 +1176,7 @@ private final class LabStore: ObservableObject {
         liveSelection = "\(selectionAfter.location),\(selectionAfter.length)"
         let issueText = issue
         append(TraceEntry(source: "Host", action: action, key: "", raw: "", composing: "", committed: "",
-                          documentBefore: "", documentText: insertedText, operationID: operationID,
+                          documentBefore: before, documentText: after, operationID: operationID,
                           selectionBeforeLocation: selectionBefore.location,
                           selectionLocation: selectionAfter.location,
                           insertedText: insertedText,
@@ -1428,12 +1510,35 @@ private struct LabView: View {
                         Text("Chế độ:")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                        Text(targetDetails.resolvedModeTitle)
+                        Menu {
+                            Button("Tự động (Khuyên dùng)") {
+                                store.setAppOverride(bundleID: store.selectedTargetBundleID, mode: nil)
+                            }
+                            Divider()
+                            Button("Stealth Composition (Dành cho Web/Electron)") {
+                                store.setAppOverride(bundleID: store.selectedTargetBundleID, mode: .markedText)
+                            }
+                            Button("Direct Replacement (Gõ trực tiếp)") {
+                                store.setAppOverride(bundleID: store.selectedTargetBundleID, mode: .directReplacement)
+                            }
+                            Button("Passthrough (Tắt gõ tiếng Việt)") {
+                                store.setAppOverride(bundleID: store.selectedTargetBundleID, mode: .passthrough)
+                            }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Text(targetDetails.resolvedModeTitle)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 8))
+                            }
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(targetDetails.resolvedMode == .markedText ? .purple : .blue)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(targetDetails.resolvedMode == .markedText ? Color.purple.opacity(0.12) : Color.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .help("Nhấp để thử nghiệm các chế độ gõ khác nhau cho ứng dụng này")
                     }
                     Text("•")
                         .foregroundStyle(.tertiary)
@@ -1441,6 +1546,15 @@ private struct LabView: View {
                     Text("Nguồn: \(targetDetails.sourceDescription)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                    if targetDetails.isOverridden {
+                        Button("Đặt lại") {
+                            store.setAppOverride(bundleID: store.selectedTargetBundleID, mode: nil)
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .help("Khôi phục về chế độ tự động mặc định")
+                    }
 
                     Spacer()
 
