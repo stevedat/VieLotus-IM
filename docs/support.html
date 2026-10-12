@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trung tâm Hỗ trợ — Sen Việt (VieLotusIM)</title>
+  <meta name="description" content="Hướng dẫn kích hoạt, xử lý sự cố, câu hỏi thường gặp (FAQ) và liên hệ hỗ trợ cho bộ gõ tiếng Việt Sen Việt trên iOS, iPadOS và macOS.">
+  
+  <link rel="canonical" href="https://stevedat.github.io/VieLotus-IM/support.html">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://stevedat.github.io/VieLotus-IM/support.html">
+  <meta property="og:title" content="Trung tâm Hỗ trợ — Sen Việt (VieLotusIM)">
+  <meta property="og:description" content="Hướng dẫn cài đặt, kích hoạt bàn phím trên iOS & macOS, giải đáp thắc mắc và tiếp nhận báo lỗi.">
+  <meta property="og:image" content="https://stevedat.github.io/VieLotus-IM/assets/og-card.png">
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            lotus: {
+              accent: '#FF5E8E',
+              magenta: '#A828B8',
+              indigo: '#4F46E5',
+              dark: '#090714',
+              card: 'rgba(255, 255, 255, 0.03)',
+              border: 'rgba(255, 255, 255, 0.08)'
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #090714;
+      color: #F8FAFC;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+    }
+    .gradient-brand {
+      background: linear-gradient(135deg, #FF5E8E 0%, #A828B8 50%, #4F46E5 100%);
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #FF8EB2 0%, #C084FC 50%, #818CF8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-nav {
+      background: rgba(9, 7, 20, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glow-ambient {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.12;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-lotus-accent/30 selection:text-white">
+
+  <!-- Ambient Glow -->
+  <div class="glow-ambient top-[-100px] left-1/2 -translate-x-1/2 bg-gradient-to-br from-lotus-accent via-lotus-magenta to-lotus-indigo"></div>
+
+  <!-- Header / Navbar -->
+  <header class="sticky top-0 z-50 glass-nav transition-all duration-200">
+    <div class="max-w-[1112px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-3 group">
+        <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-8 h-8 rounded-lg shadow-sm group-hover:scale-105 transition-transform duration-200">
+        <span class="font-semibold text-lg tracking-tight text-white flex items-center gap-2">
+          Sen Việt
+          <span class="text-[11px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/10">v1.0.0</span>
+        </span>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-4 text-sm font-medium text-slate-300">
+        <a href="index.html" data-i18n="nav.home" class="hover:text-white transition-colors py-2">Trang chủ</a>
+        <a href="support.html" data-i18n="nav.support" class="text-white font-semibold py-2">Hỗ trợ</a>
+        <a href="terms.html" data-i18n="nav.terms" class="hover:text-white transition-colors py-2">Điều khoản</a>
+        <a href="privacy.html" data-i18n="nav.privacy" class="hover:text-white transition-colors py-2">Quyền riêng tư</a>
+      </nav>
+
+      <div class="flex items-center gap-3">
+        <!-- Language Switcher -->
+        <div class="flex items-center p-0.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold" role="group" aria-label="Language selection">
+          <button id="lang-btn-vi" onclick="setLanguage('vi')" class="px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-white bg-white/15 shadow-sm">VI</button>
+          <button id="lang-btn-en" onclick="setLanguage('en')" class="px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-slate-400 hover:text-white">EN</button>
+        </div>
+
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" 
+           class="inline-flex items-center justify-center min-h-[36px] gap-2 text-xs font-medium px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span class="hidden sm:inline">GitHub</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-grow z-10 py-12 px-4 sm:px-6 max-w-[860px] mx-auto w-full">
+    
+    <!-- Hero / Header -->
+    <div class="mb-10 text-center sm:text-left">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-lotus-indigo/20 border border-lotus-indigo/30 text-xs font-medium text-indigo-300 mb-4">
+        <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+        <span data-i18n="badge">Trung tâm Trợ giúp & Hỗ trợ Kỹ thuật</span>
+      </div>
+      <h1 data-i18n="title" class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight mb-3">
+        Trung tâm Hỗ trợ
+      </h1>
+      <p data-i18n="subtitle" class="text-slate-400 text-sm sm:text-base">
+        Hướng dẫn kích hoạt bàn phím, giải đáp câu hỏi thường gặp và kênh hỗ trợ trực tiếp từ tác giả.
+      </p>
+    </div>
+
+    <!-- Quick Help Links Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+      <a href="#ios-activation" class="glass-card rounded-xl p-5 hover:border-lotus-accent/40 transition-all flex flex-col justify-between group">
+        <div>
+          <div class="text-2xl mb-2">📱</div>
+          <h3 data-i18n="quick_ios" class="text-sm font-bold text-white group-hover:text-lotus-accent transition-colors">Kích hoạt trên iOS / iPadOS</h3>
+          <p data-i18n="quick_ios_sub" class="text-xs text-slate-400 mt-1">Các bước bật bàn phím trong Settings của Apple.</p>
+        </div>
+        <span class="text-xs text-indigo-400 mt-4 font-medium flex items-center gap-1">Xem chi tiết &rarr;</span>
+      </a>
+
+      <a href="#macos-activation" class="glass-card rounded-xl p-5 hover:border-lotus-accent/40 transition-all flex flex-col justify-between group">
+        <div>
+          <div class="text-2xl mb-2">💻</div>
+          <h3 data-i18n="quick_macos" class="text-sm font-bold text-white group-hover:text-lotus-accent transition-colors">Cài đặt trên macOS</h3>
+          <p data-i18n="quick_macos_sub" class="text-xs text-slate-400 mt-1">Cài đặt bằng file .pkg và kích hoạt Input Source.</p>
+        </div>
+        <span class="text-xs text-indigo-400 mt-4 font-medium flex items-center gap-1">Xem chi tiết &rarr;</span>
+      </a>
+
+      <a href="#faq" class="glass-card rounded-xl p-5 hover:border-lotus-accent/40 transition-all flex flex-col justify-between group">
+        <div>
+          <div class="text-2xl mb-2">💬</div>
+          <h3 data-i18n="quick_faq" class="text-sm font-bold text-white group-hover:text-lotus-accent transition-colors">Câu hỏi thường gặp</h3>
+          <p data-i18n="quick_faq_sub" class="text-xs text-slate-400 mt-1">Giải đáp về Telex/VNI, gõ song ngữ và quyền riêng tư.</p>
+        </div>
+        <span class="text-xs text-indigo-400 mt-4 font-medium flex items-center gap-1">Xem chi tiết &rarr;</span>
+      </a>
+    </div>
+
+    <!-- Section: iOS Activation Guide -->
+    <section id="ios-activation" class="glass-card rounded-2xl p-6 sm:p-8 mb-8">
+      <h2 data-i18n="ios_title" class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-sm font-mono font-bold">iOS</span>
+        Hướng dẫn Kích hoạt trên iPhone & iPad
+      </h2>
+      <p data-i18n="ios_p1" class="text-slate-300 text-sm mb-6">
+        Sau khi tải ứng dụng <strong>Sen Việt</strong> từ App Store, hãy thực hiện 4 bước sau để thêm bàn phím:
+      </p>
+
+      <ol class="space-y-4 text-sm text-slate-300">
+        <li class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-white/10 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+          <div>
+            <strong data-i18n="ios_step1_t" class="text-white">Mở Cài đặt hệ thống (Settings):</strong>
+            <p data-i18n="ios_step1_d" class="text-slate-400 text-xs mt-1">Vào <em>Cài đặt</em> (Settings) ➔ <em>Cài đặt chung</em> (General) ➔ <em>Bàn phím</em> (Keyboards).</p>
+          </div>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-white/10 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+          <div>
+            <strong data-i18n="ios_step2_t" class="text-white">Thêm bàn phím mới:</strong>
+            <p data-i18n="ios_step2_d" class="text-slate-400 text-xs mt-1">Nhấn <em>Thêm bàn phím mới...</em> (Add New Keyboard...) và chọn <strong>Sen Việt</strong> dưới mục <em>Bàn phím bên thứ ba</em>.</p>
+          </div>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-white/10 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+          <div>
+            <strong data-i18n="ios_step3_t" class="text-white">Không cần Cho phép truy cập đầy đủ (No Full Access):</strong>
+            <p data-i18n="ios_step3_d" class="text-slate-400 text-xs mt-1">Sen Việt được thiết kế bảo mật tuyệt đối, hoạt động hoàn toàn offline mà không cần gạt nút <em>Cho phép truy cập đầy đủ</em>.</p>
+          </div>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">4</span>
+          <div>
+            <strong data-i18n="ios_step4_t" class="text-white">Chuyển sang Sen Việt khi gõ:</strong>
+            <p data-i18n="ios_step4_d" class="text-slate-400 text-xs mt-1">Khi gõ ở bất kỳ ứng dụng nào, nhấn và giữ biểu tượng <strong>Quả địa cầu (🌐)</strong> và chọn bàn phím <em>Sen Việt</em>.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- Section: macOS Activation Guide -->
+    <section id="macos-activation" class="glass-card rounded-2xl p-6 sm:p-8 mb-8">
+      <h2 data-i18n="mac_title" class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm font-mono font-bold">Mac</span>
+        Hướng dẫn Cài đặt trên macOS
+      </h2>
+      <p data-i18n="mac_p1" class="text-slate-300 text-sm mb-6">
+        Trên máy Mac (macOS 13 Ventura, 14 Sonoma, 15 Sequoia trở lên), bộ gõ được phân phối dưới dạng gói cài đặt chuẩn Apple:
+      </p>
+
+      <ol class="space-y-4 text-sm text-slate-300">
+        <li class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-white/10 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+          <div>
+            <strong data-i18n="mac_step1_t" class="text-white">Cài đặt gói VieLotusIM.pkg:</strong>
+            <p data-i18n="mac_step1_d" class="text-slate-400 text-xs mt-1">Mở file <code class="text-slate-200 bg-white/10 px-1 rounded">VieLotusIM.pkg</code> và làm theo hướng dẫn. Trình cài đặt tự động đăng ký bộ gõ vào hệ thống mà không cần khởi động lại máy.</p>
+          </div>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-white/10 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+          <div>
+            <strong data-i18n="mac_step2_t" class="text-white">Thêm vào Nguồn nhập (Input Sources):</strong>
+            <p data-i18n="mac_step2_d" class="text-slate-400 text-xs mt-1">Vào <em>System Settings</em> ➔ <em>Keyboard</em> ➔ <em>Input Sources</em>, bấm <strong>(+)</strong>, tìm <em>Tiếng Việt</em> và chọn <strong>Sen Việt</strong>.</p>
+          </div>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-white/10 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+          <div>
+            <strong data-i18n="mac_step3_t" class="text-white">Xoá bộ gõ cũ & Sử dụng:</strong>
+            <p data-i18n="mac_step3_d" class="text-slate-400 text-xs mt-1">Xóa bộ gõ tiếng Việt cũ của Apple để tránh xung đột phím tắt. Dùng phím <strong>Fn / 🌐</strong> hoặc <strong>Ctrl + Space</strong> để chuyển đổi ngôn ngữ.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- Section: FAQ -->
+    <section id="faq" class="glass-card rounded-2xl p-6 sm:p-8 mb-8">
+      <h2 data-i18n="faq_title" class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+        <svg class="w-5 h-5 text-lotus-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Câu hỏi thường gặp (FAQ)
+      </h2>
+
+      <div class="space-y-6 text-sm">
+        
+        <div>
+          <h3 data-i18n="faq1_q" class="text-white font-semibold mb-1.5">1. Sen Việt hỗ trợ những kiểu gõ nào?</h3>
+          <p data-i18n="faq1_a" class="text-slate-400 leading-relaxed">
+            Sen Việt hỗ trợ đầy đủ 2 kiểu gõ phổ biến nhất hiện nay: <strong>Telex</strong> (bao gồm Telex Simple, gõ tự do, chuẩn chính tả mới) và <strong>VNI</strong> (dùng phím số để bỏ dấu). Bạn có thể dễ dàng chuyển đổi ngay trong ứng dụng cài đặt.
+          </p>
+        </div>
+
+        <div>
+          <h3 data-i18n="faq2_q" class="text-white font-semibold mb-1.5">2. Cơ chế Smart Bilingual (Song ngữ thông minh) hoạt động ra sao?</h3>
+          <p data-i18n="faq2_a" class="text-slate-400 leading-relaxed">
+            Khi bạn gõ các từ tiếng Anh thông dụng (như <em>apple, wifi, server, system, code</em>...), engine tự động nhận diện từ vựng và khôi phục ký tự nguyên bản, tránh việc bị bỏ dấu sai thành từ tiếng Việt ngoài ý muốn.
+          </p>
+        </div>
+
+        <div>
+          <h3 data-i18n="faq3_q" class="text-white font-semibold mb-1.5">3. Tại sao Sen Việt không làm mất lệnh Undo (Cmd + Z)?</h3>
+          <p data-i18n="faq3_a" class="text-slate-400 leading-relaxed">
+            Khác với các bộ gõ truyền thống gửi hàng loạt phím Backspace giả lập làm hỏng stack hoàn tác, Sen Việt sử dụng giao thức chuẩn Apple Native (<code class="bg-white/10 px-1 py-0.5 rounded text-xs text-slate-200">IMKInputController</code> &amp; <code class="bg-white/10 px-1 py-0.5 rounded text-xs text-slate-200">UITextDocumentProxy</code>) để thay thế đoạn văn bản nguyên tử (atomic replacement), bảo toàn 100% lịch sử Undo.
+          </p>
+        </div>
+
+        <div>
+          <h3 data-i18n="faq4_q" class="text-white font-semibold mb-1.5">4. Tôi có thể thêm từ viết tắt (Macro) được không?</h3>
+          <p data-i18n="faq4_a" class="text-slate-400 leading-relaxed">
+            Có! Ứng dụng hỗ trợ bảng từ viết tắt tùy chỉnh linh hoạt. Bạn chỉ cần mở app Sen Việt trên iOS hoặc bấm vào biểu tượng khay hệ thống trên macOS để mở giao diện quản lý từ viết tắt.
+          </p>
+        </div>
+
+        <div>
+          <h3 data-i18n="faq5_q" class="text-white font-semibold mb-1.5">5. Bàn phím có thu thập mật khẩu hay số thẻ ngân hàng không?</h3>
+          <p data-i18n="faq5_a" class="text-slate-400 leading-relaxed">
+            <strong>Tuyệt đối không!</strong> Tiện ích mở rộng của Sen Việt không kích hoạt Full Access và không có quyền truy cập Internet. Ngoài ra, khi bạn nhập liệu tại các trường mật khẩu (Secure Text Field), hệ điều hành iOS sẽ tự động kích hoạt bàn phím hệ thống của Apple để đảm bảo an toàn tuyệt đối.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Section: Contact & Bug Report -->
+    <section class="glass-card rounded-2xl p-6 sm:p-8">
+      <h2 data-i18n="contact_title" class="text-xl font-bold text-white mb-3 flex items-center gap-2">
+        <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        Kênh Tiếp nhận Hỗ trợ & Báo lỗi
+      </h2>
+      <p data-i18n="contact_p1" class="text-slate-300 text-sm mb-4 leading-relaxed">
+        Chúng tôi luôn lắng nghe ý kiến đóng góp từ người dùng và cộng đồng để hoàn thiện bộ gõ ngày một tốt hơn. Bạn có thể liên hệ qua các kênh:
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+        <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+          <div class="text-slate-400 mb-1 font-medium">Báo lỗi kỹ thuật (Khuyên dùng)</div>
+          <a href="https://github.com/stevedat/VieLotus-IM/issues" target="_blank" class="text-white font-semibold text-sm hover:text-lotus-accent flex items-center gap-1.5">
+            GitHub Issue Tracker &rarr;
+          </a>
+          <div class="text-slate-500 mt-1">Được xử lý và phản hồi bởi nhóm kỹ thuật.</div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+          <div class="text-slate-400 mb-1 font-medium">Thảo luận & Góp ý tính năng</div>
+          <a href="https://github.com/stevedat/VieLotus-IM/discussions" target="_blank" class="text-white font-semibold text-sm hover:text-lotus-accent flex items-center gap-1.5">
+            GitHub Discussions &rarr;
+          </a>
+          <div class="text-slate-500 mt-1">Cộng đồng người dùng Sen Việt.</div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-white/5 border border-white/5 sm:col-span-2">
+          <div class="text-slate-400 mb-1 font-medium">Liên hệ Email trực tiếp</div>
+          <a href="mailto:support@vielotus.org" class="text-white font-semibold text-sm hover:text-lotus-accent">
+            support@vielotus.org
+          </a>
+          <div class="text-slate-500 mt-1">Giải đáp các vấn đề liên quan đến phân phối App Store, bản quyền và hợp tác.</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/[0.08] py-8 px-4 sm:px-6 bg-black/40 z-10 text-xs text-slate-500">
+    <div class="max-w-[1112px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-5 h-5 opacity-75">
+        <span>Sen Việt (VieLotusIM) · Mã nguồn mở MIT License.</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-5">
+        <a href="index.html" class="hover:text-slate-300 transition-colors">Trang chủ</a>
+        <a href="support.html" class="text-slate-300 font-medium transition-colors">Hỗ trợ (Support)</a>
+        <a href="terms.html" class="hover:text-slate-300 transition-colors">Điều khoản (Terms)</a>
+        <a href="privacy.html" class="hover:text-slate-300 transition-colors">Quyền riêng tư (Privacy)</a>
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition-colors">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Bilingual Logic -->
+  <script>
+    const translations = {
+      vi: {
+        'nav.home': 'Trang chủ',
+        'nav.support': 'Hỗ trợ',
+        'nav.terms': 'Điều khoản',
+        'nav.privacy': 'Quyền riêng tư',
+        'badge': 'Trung tâm Trợ giúp & Hỗ trợ Kỹ thuật',
+        'title': 'Trung tâm Hỗ trợ',
+        'subtitle': 'Hướng dẫn kích hoạt bàn phím, giải đáp câu hỏi thường gặp và kênh hỗ trợ trực tiếp từ tác giả.',
+        'quick_ios': 'Kích hoạt trên iOS / iPadOS',
+        'quick_ios_sub': 'Các bước bật bàn phím trong Settings của Apple.',
+        'quick_macos': 'Cài đặt trên macOS',
+        'quick_macos_sub': 'Cài đặt bằng file .pkg và kích hoạt Input Source.',
+        'quick_faq': 'Câu hỏi thường gặp',
+        'quick_faq_sub': 'Giải đáp về Telex/VNI, gõ song ngữ và quyền riêng tư.',
+        'ios_title': 'Hướng dẫn Kích hoạt trên iPhone & iPad',
+        'ios_p1': 'Sau khi tải ứng dụng <strong>Sen Việt</strong> từ App Store, hãy thực hiện 4 bước sau để thêm bàn phím:',
+        'ios_step1_t': 'Mở Cài đặt hệ thống (Settings):',
+        'ios_step1_d': 'Vào Cài đặt (Settings) ➔ Cài đặt chung (General) ➔ Bàn phím (Keyboards).',
+        'ios_step2_t': 'Thêm bàn phím mới:',
+        'ios_step2_d': 'Nhấn Thêm bàn phím mới... (Add New Keyboard...) và chọn Sen Việt dưới mục Bàn phím bên thứ ba.',
+        'ios_step3_t': 'Không cần Cho phép truy cập đầy đủ (No Full Access):',
+        'ios_step3_d': 'Sen Việt được thiết kế bảo mật tuyệt đối, hoạt động hoàn toàn offline mà không cần gạt nút Cho phép truy cập đầy đủ.',
+        'ios_step4_t': 'Chuyển sang Sen Việt khi gõ:',
+        'ios_step4_d': 'Khi gõ ở bất kỳ ứng dụng nào, nhấn và giữ biểu tượng Quả địa cầu (🌐) và chọn bàn phím Sen Việt.',
+        'mac_title': 'Hướng dẫn Cài đặt trên macOS',
+        'mac_p1': 'Trên máy Mac (macOS 13 Ventura, 14 Sonoma, 15 Sequoia trở lên), bộ gõ được phân phối dưới dạng gói cài đặt chuẩn Apple:',
+        'mac_step1_t': 'Cài đặt gói VieLotusIM.pkg:',
+        'mac_step1_d': 'Mở file VieLotusIM.pkg và làm theo hướng dẫn. Trình cài đặt tự động đăng ký bộ gõ vào hệ thống mà không cần khởi động lại máy.',
+        'mac_step2_t': 'Thêm vào Nguồn nhập (Input Sources):',
+        'mac_step2_d': 'Vào System Settings ➔ Keyboard ➔ Input Sources, bấm (+) tìm Tiếng Việt và chọn Sen Việt.',
+        'mac_step3_t': 'Xoá bộ gõ cũ & Sử dụng:',
+        'mac_step3_d': 'Xóa bộ gõ tiếng Việt cũ của Apple để tránh xung đột phím tắt. Dùng phím Fn / 🌐 hoặc Ctrl + Space để chuyển đổi ngôn ngữ.',
+        'faq_title': 'Câu hỏi thường gặp (FAQ)',
+        'faq1_q': '1. Sen Việt hỗ trợ những kiểu gõ nào?',
+        'faq1_a': 'Sen Việt hỗ trợ đầy đủ 2 kiểu gõ phổ biến nhất hiện nay: Telex (bao gồm Telex Simple, gõ tự do, chuẩn chính tả mới) và VNI (dùng phím số để bỏ dấu). Bạn có thể dễ dàng chuyển đổi ngay trong ứng dụng cài đặt.',
+        'faq2_q': '2. Cơ chế Smart Bilingual (Song ngữ thông minh) hoạt động ra sao?',
+        'faq2_a': 'Khi bạn gõ các từ tiếng Anh thông dụng (như apple, wifi, server, system, code...), engine tự động nhận diện từ vựng và khôi phục ký tự nguyên bản, tránh việc bị bỏ dấu sai thành từ tiếng Việt ngoài ý muốn.',
+        'faq3_q': '3. Tại sao Sen Việt không làm mất lệnh Undo (Cmd + Z)?',
+        'faq3_a': 'Khác với các bộ gõ truyền thống gửi hàng loạt phím Backspace giả lập làm hỏng stack hoàn tác, Sen Việt sử dụng giao thức chuẩn Apple Native (IMKInputController & UITextDocumentProxy) để thay thế đoạn văn bản nguyên tử (atomic replacement), bảo toàn 100% lịch sử Undo.',
+        'faq4_q': '4. Tôi có thể thêm từ viết tắt (Macro) được không?',
+        'faq4_a': 'Có! Ứng dụng hỗ trợ bảng từ viết tắt tùy chỉnh linh hoạt. Bạn chỉ cần mở app Sen Việt trên iOS hoặc bấm vào biểu tượng khay hệ thống trên macOS để mở giao diện quản lý từ viết tắt.',
+        'faq5_q': '5. Bàn phím có thu thập mật khẩu hay số thẻ ngân hàng không?',
+        'faq5_a': 'Tuyệt đối không! Tiện ích mở rộng của Sen Việt không kích hoạt Full Access và không có quyền truy cập Internet. Ngoài ra, khi bạn nhập liệu tại các trường mật khẩu (Secure Text Field), hệ điều hành iOS sẽ tự động kích hoạt bàn phím hệ thống của Apple để đảm bảo an toàn tuyệt đối.',
+        'contact_title': 'Kênh Tiếp nhận Hỗ trợ & Báo lỗi',
+        'contact_p1': 'Chúng tôi luôn lắng nghe ý kiến đóng góp từ người dùng và cộng đồng để hoàn thiện bộ gõ ngày một tốt hơn. Bạn có thể liên hệ qua các kênh:'
+      },
+      en: {
+        'nav.home': 'Home',
+        'nav.support': 'Support',
+        'nav.terms': 'Terms',
+        'nav.privacy': 'Privacy Policy',
+        'badge': 'Help Center & Technical Support',
+        'title': 'Support Center',
+        'subtitle': 'Keyboard setup guide, answers to frequently asked questions, and direct support channels.',
+        'quick_ios': 'iOS / iPadOS Setup',
+        'quick_ios_sub': 'Steps to enable the keyboard in Apple Settings.',
+        'quick_macos': 'macOS Installation',
+        'quick_macos_sub': 'Install via .pkg package and enable Input Source.',
+        'quick_faq': 'Frequently Asked Questions',
+        'quick_faq_sub': 'Answers regarding Telex/VNI, bilingual typing, and privacy.',
+        'ios_title': 'Activation Guide for iPhone & iPad',
+        'ios_p1': 'After installing <strong>Sen Việt</strong> from the App Store, follow these 4 steps to enable the keyboard:',
+        'ios_step1_t': 'Open Apple Settings:',
+        'ios_step1_d': 'Go to Settings ➔ General ➔ Keyboards.',
+        'ios_step2_t': 'Add New Keyboard:',
+        'ios_step2_d': 'Tap "Add New Keyboard..." and select "Sen Việt" under Third-Party Keyboards.',
+        'ios_step3_t': 'No Full Access Required:',
+        'ios_step3_d': 'Sen Việt operates completely offline and securely by design; do NOT enable "Allow Full Access".',
+        'ios_step4_t': 'Switch to Sen Việt when typing:',
+        'ios_step4_d': 'In any app, long press the Globe (🌐) icon and pick Sen Việt.',
+        'mac_title': 'Installation Guide for macOS',
+        'mac_p1': 'On macOS (Ventura 13, Sonoma 14, Sequoia 15+), the input method is packaged as a standard Apple package:',
+        'mac_step1_t': 'Run VieLotusIM.pkg:',
+        'mac_step1_d': 'Open VieLotusIM.pkg and follow the installer. It registers the input method automatically without restarting.',
+        'mac_step2_t': 'Add to Input Sources:',
+        'mac_step2_d': 'Go to System Settings ➔ Keyboard ➔ Input Sources, click (+) and add Vietnamese ➔ Sen Việt.',
+        'mac_step3_t': 'Remove legacy input method & Enjoy:',
+        'mac_step3_d': 'Remove Apple\'s built-in Vietnamese input source to avoid shortcut collision. Switch smoothly with Fn / 🌐 or Ctrl + Space.',
+        'faq_title': 'Frequently Asked Questions (FAQ)',
+        'faq1_q': '1. Which typing modes are supported?',
+        'faq1_a': 'Sen Việt fully supports the two most popular input methods: Telex (including modern orthography and free diacritics) and VNI (number keys for tones). Switch anytime in the app settings.',
+        'faq2_q': '2. How does Smart Bilingual work?',
+        'faq2_a': 'When you type common English terms (apple, wifi, server, system, code...), the engine automatically identifies vocabulary and preserves Latin characters without erroneous accenting.',
+        'faq3_q': '3. Why does Sen Việt preserve Undo (Cmd + Z)?',
+        'faq3_a': 'Unlike legacy engines sending synthetic backspaces, Sen Việt leverages Apple native protocols (IMKInputController & UITextDocumentProxy) for atomic text replacements, preserving 100% of the Undo stack.',
+        'faq4_q': '4. Can I configure text replacement (Macros)?',
+        'faq4_a': 'Yes! Customizable shorthand macros are fully supported. Open the Sen Việt companion app on iOS or click the menu bar icon on macOS to edit your shortcuts.',
+        'faq5_q': '5. Does the keyboard collect passwords or bank credentials?',
+        'faq5_a': 'Never! The keyboard extension does not request Full Access and has zero internet connectivity. Furthermore, in password fields (Secure Text Fields), iOS automatically forces the native Apple system keyboard.',
+        'contact_title': 'Support & Feedback Channels',
+        'contact_p1': 'We actively welcome community feedback and bug reports to make Sen Việt the premier Vietnamese typing engine:'
+      }
+    };
+
+    function setLanguage(lang) {
+      localStorage.setItem('vielotus_lang', lang);
+      document.documentElement.lang = lang;
+      
+      const viBtn = document.getElementById('lang-btn-vi');
+      const enBtn = document.getElementById('lang-btn-en');
+      if (lang === 'vi') {
+        viBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-white bg-white/15 shadow-sm';
+        enBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-slate-400 hover:text-white';
+      } else {
+        enBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-white bg-white/15 shadow-sm';
+        viBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-slate-400 hover:text-white';
+      }
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang] && translations[lang][key]) {
+          el.innerHTML = translations[lang][key];
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedLang = localStorage.getItem('vielotus_lang') || 'vi';
+      setLanguage(savedLang);
+    });
+  </script>
+</body>
+</html>

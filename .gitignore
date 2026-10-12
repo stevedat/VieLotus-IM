@@ -1,0 +1,61 @@
+# macOS System & Metadata
+.DS_Store
+._*
+
+# Swift & Xcode Build Artifacts
+.build/
+.swiftpm/
+xcuserdata/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+
+# Distribution & Binaries
+.build/dist/
+VieLotusIM.app/
+*.pkg
+*.dmg
+*.zip
+*.ipa
+*.xcarchive
+*.appex
+appstore_media_manager/
+
+# iOS & iPadOS Private Sources & Workflows (Local only)
+Sources/VieLotusAppIOS/
+Sources/VieLotusKeyboard/
+project.yml
+.github/workflows/ios-release.yml
+scripts/build_ios.sh
+scripts/distribute_ios.sh
+
+# Sensitive Keys, Secrets & Certificates
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.pem
+*.key
+*.keychain
+*.keychain-db
+*.cer
+*.mobileprovision
+
+# Dependencies & Sub-builds
+Frameworks/*.a
+Frameworks/*.h
+Frameworks/Sparkle.framework/
+Frameworks/sparkle-bin/
+references/
+
+# IDE & Editor Rules
+.idea/
+.vscode/
+.venv/
+.windsurfrules
+*.cursorrules
+
+# Diagnostic & Temp Files
+*.log
+*.tmp

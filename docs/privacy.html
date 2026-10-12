@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chính sách Quyền riêng tư — Sen Việt (VieLotusIM)</title>
+  <meta name="description" content="Chính sách quyền riêng tư của Sen Việt (VieLotusIM). Cam kết 100% bảo mật offline, không thu thập dữ liệu phím, không cần Full Access, zero-logging.">
+  
+  <link rel="canonical" href="https://stevedat.github.io/VieLotus-IM/privacy.html">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://stevedat.github.io/VieLotus-IM/privacy.html">
+  <meta property="og:title" content="Chính sách Quyền riêng tư — Sen Việt (VieLotusIM)">
+  <meta property="og:description" content="Cam kết bảo mật 100% offline, không thu thập dữ liệu phím bấm, không cần Full Access, mã nguồn mở minh bạch.">
+  <meta property="og:image" content="https://stevedat.github.io/VieLotus-IM/assets/og-card.png">
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            lotus: {
+              accent: '#FF5E8E',
+              magenta: '#A828B8',
+              indigo: '#4F46E5',
+              dark: '#090714',
+              card: 'rgba(255, 255, 255, 0.03)',
+              border: 'rgba(255, 255, 255, 0.08)'
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #090714;
+      color: #F8FAFC;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+    }
+    .gradient-brand {
+      background: linear-gradient(135deg, #FF5E8E 0%, #A828B8 50%, #4F46E5 100%);
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #FF8EB2 0%, #C084FC 50%, #818CF8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-nav {
+      background: rgba(9, 7, 20, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glow-ambient {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.12;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-lotus-accent/30 selection:text-white">
+
+  <!-- Ambient Glows -->
+  <div class="glow-ambient top-[-100px] left-1/2 -translate-x-1/2 bg-gradient-to-br from-lotus-accent via-lotus-magenta to-lotus-indigo"></div>
+
+  <!-- Header / Navbar -->
+  <header class="sticky top-0 z-50 glass-nav transition-all duration-200">
+    <div class="max-w-[1112px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-3 group">
+        <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-8 h-8 rounded-lg shadow-sm group-hover:scale-105 transition-transform duration-200">
+        <span class="font-semibold text-lg tracking-tight text-white flex items-center gap-2">
+          Sen Việt
+          <span class="text-[11px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/10">v1.0.0</span>
+        </span>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-4 text-sm font-medium text-slate-300">
+        <a href="index.html" data-i18n="nav.home" class="hover:text-white transition-colors py-2">Trang chủ</a>
+        <a href="support.html" data-i18n="nav.support" class="hover:text-white transition-colors py-2">Hỗ trợ</a>
+        <a href="terms.html" data-i18n="nav.terms" class="hover:text-white transition-colors py-2">Điều khoản</a>
+        <a href="privacy.html" data-i18n="nav.privacy" class="text-white font-semibold py-2">Quyền riêng tư</a>
+      </nav>
+
+      <div class="flex items-center gap-3">
+        <!-- Language Switcher -->
+        <div class="flex items-center p-0.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold" role="group" aria-label="Language selection">
+          <button id="lang-btn-vi" onclick="setLanguage('vi')" class="px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-white bg-white/15 shadow-sm">VI</button>
+          <button id="lang-btn-en" onclick="setLanguage('en')" class="px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-slate-400 hover:text-white">EN</button>
+        </div>
+
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" 
+           class="inline-flex items-center justify-center min-h-[36px] gap-2 text-xs font-medium px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span class="hidden sm:inline">GitHub</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-grow z-10 py-12 px-4 sm:px-6 max-w-[860px] mx-auto w-full">
+    
+    <!-- Hero / Title -->
+    <div class="mb-10 text-center sm:text-left">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-medium text-emerald-400 mb-4">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span data-i18n="badge">100% Bảo mật Ngoại tuyến · Zero Data Collection</span>
+      </div>
+      <h1 data-i18n="title" class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight mb-3">
+        Chính sách Quyền riêng tư
+      </h1>
+      <p data-i18n="subtitle" class="text-slate-400 text-sm sm:text-base">
+        Áp dụng cho ứng dụng bàn phím Sen Việt (VieLotusIM & VieLotus Keyboard) trên iOS, iPadOS và macOS.
+      </p>
+      <div class="mt-4 flex items-center gap-4 text-xs text-slate-500">
+        <span data-i18n="effective_date">Hiệu lực từ: Ngày 12 tháng 10 năm 2026</span>
+        <span>•</span>
+        <span data-i18n="version">Phiên bản: 1.1.2</span>
+      </div>
+    </div>
+
+    <!-- Core Privacy Statement Card -->
+    <div class="glass-card rounded-2xl p-6 sm:p-8 mb-8 border-l-4 border-l-emerald-400">
+      <h2 data-i18n="core_title" class="text-lg sm:text-xl font-bold text-white mb-3 flex items-center gap-2">
+        <svg class="w-5 h-5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+        Tuyên ngôn Bảo mật Cốt lõi
+      </h2>
+      <p data-i18n="core_p1" class="text-slate-300 text-sm leading-relaxed mb-3">
+        Sen Việt (VieLotusIM) được xây dựng với nguyên tắc cao nhất: <strong>Tôn trọng và bảo vệ tuyệt đối quyền riêng tư của bạn</strong>. Chúng tôi không bao giờ thu thập, lưu trữ, truyền tải hoặc bán bất kỳ dữ liệu nào mà bạn gõ.
+      </p>
+      <p data-i18n="core_p2" class="text-slate-300 text-sm leading-relaxed">
+        Bàn phím hoạt động <strong>hoàn toàn ngoại tuyến (offline 100%)</strong>. Ứng dụng không có quyền truy cập mạng, không có máy chủ nhận dữ liệu và không yêu cầu quyền "Cho phép truy cập đầy đủ" (Allow Full Access) trên hệ điều hành iOS/iPadOS.
+      </p>
+    </div>
+
+    <!-- Section Details -->
+    <div class="space-y-6 text-sm text-slate-300 leading-relaxed">
+      
+      <!-- Section 1 -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s1_title" class="text-base font-bold text-white mb-3 flex items-center gap-2">
+          <span>1.</span> Dữ liệu phím bấm và nội dung văn bản
+        </h3>
+        <p data-i18n="s1_p1" class="mb-3">
+          Mọi ký tự bạn gõ (bao gồm văn bản, mật khẩu, tin nhắn, thông tin tài chính hoặc dữ liệu nhạy cảm) được xử lý ngay tại bộ nhớ tạm (RAM) của thiết bị thông qua lõi engine Pure Swift.
+        </p>
+        <ul class="list-disc list-inside space-y-1.5 text-slate-400 pl-2">
+          <li data-i18n="s1_li1"><strong>Không ghi đĩa (No disk I/O):</strong> Nội dung gõ không bao giờ được ghi vào tệp nhật ký (log) hoặc bộ lưu trữ vĩnh viễn trên máy.</li>
+          <li data-i18n="s1_li2"><strong>Không truyền mạng:</strong> Bàn phím không có bất kỳ dòng lệnh gọi API hoặc kết nối ra ngoài Internet.</li>
+          <li data-i18n="s1_li3"><strong>Tự hủy ngay sau khi gõ:</strong> Trạng thái ghép từ (composing state) tự động được xóa khỏi RAM ngay khi kết thúc một từ hoặc cụm từ.</li>
+        </ul>
+      </section>
+
+      <!-- Section 2 -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s2_title" class="text-base font-bold text-white mb-3 flex items-center gap-2">
+          <span>2.</span> Quyền "Cho phép truy cập đầy đủ" (Full Access) trên iOS
+        </h3>
+        <p data-i18n="s2_p1" class="mb-3">
+          Trong tệp cấu hình chính thức (<code class="bg-white/10 px-1.5 py-0.5 rounded font-mono text-xs text-slate-200">Info.plist</code>) của tiện ích bàn phím mở rộng iOS, chúng tôi thiết lập:
+        </p>
+        <div class="bg-black/60 rounded-xl p-3 font-mono text-xs text-emerald-400 border border-white/5 mb-3">
+          &lt;key&gt;RequestsOpenAccess&lt;/key&gt;<br>
+          &lt;false/&gt;
+        </div>
+        <p data-i18n="s2_p2">
+          Điều này đồng nghĩa iOS chạy bàn phím Sen Việt trong môi trường sandbox khép kín nghiêm ngặt: bàn phím <strong>bị cấm truy cập mạng, không thể đọc clipboard toàn cục, không thể truy cập vị trí, danh bạ hay microphone</strong>.
+        </p>
+      </section>
+
+      <!-- Section 3 -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s3_title" class="text-base font-bold text-white mb-3 flex items-center gap-2">
+          <span>3.</span> Quyền Trợ năng (Accessibility Permissions) trên macOS
+        </h3>
+        <p data-i18n="s3_p1">
+          Phiên bản dành cho máy Mac được triển khai chuẩn chỉnh 100% bằng giao thức hệ thống chính thức <strong>InputMethodKit</strong> của Apple. Sen Việt <strong>hoàn toàn không đòi hỏi quyền Trợ năng (Accessibility)</strong>, không sử dụng <code class="bg-white/10 px-1.5 py-0.5 rounded font-mono text-xs text-slate-200">CGEventTap</code> để chặn bắt phím tầng thấp và không can thiệp sâu vào các ứng dụng khác.
+        </p>
+      </section>
+
+      <!-- Section 4 -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s4_title" class="text-base font-bold text-white mb-3 flex items-center gap-2">
+          <span>4.</span> Không chứa SDK bên thứ ba & Quảng cáo
+        </h3>
+        <p data-i18n="s4_p1">
+          Sen Việt là ứng dụng mã nguồn mở độc lập, sạch 100%. Ứng dụng:
+        </p>
+        <ul class="list-disc list-inside space-y-1 text-slate-400 pl-2 mt-2">
+          <li data-i18n="s4_li1">Không tích hợp Google Analytics, Firebase, Facebook SDK hay bất kỳ thư viện theo dõi (tracking) nào.</li>
+          <li data-i18n="s4_li2">Không phân phối quảng cáo dưới bất kỳ hình thức nào.</li>
+          <li data-i18n="s4_li3">Không thu thập số nhận dạng thiết bị (IDFA, IDFV) hoặc vị trí địa lý.</li>
+        </ul>
+      </section>
+
+      <!-- Section 5 -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s5_title" class="text-base font-bold text-white mb-3 flex items-center gap-2">
+          <span>5.</span> Mã nguồn mở & Khả năng kiểm chứng độc lập
+        </h3>
+        <p data-i18n="s5_p1">
+          Toàn bộ mã nguồn của Sen Việt (VieLotusIM) được xuất bản công khai trên GitHub theo giấy phép <strong>MIT License</strong>. Mọi lập trình viên, chuyên gia bảo mật và người dùng đều có quyền tải về, biên dịch và tự mình kiểm tra từng dòng mã để xác minh cam kết bảo mật này:
+        </p>
+        <div class="mt-3">
+          <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-xs font-semibold text-lotus-accent hover:underline">
+            <span>https://github.com/stevedat/VieLotus-IM</span>
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
+        </div>
+      </section>
+
+      <!-- Section 6 -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s6_title" class="text-base font-bold text-white mb-3 flex items-center gap-2">
+          <span>6.</span> Liên hệ về Quyền riêng tư
+        </h3>
+        <p data-i18n="s6_p1" class="mb-3">
+          Nếu bạn có bất kỳ câu hỏi hoặc phản hồi nào liên quan đến Chính sách Quyền riêng tư này, vui lòng liên hệ với chúng tôi qua:
+        </p>
+        <div class="p-4 rounded-xl bg-white/5 border border-white/5 space-y-2 text-xs">
+          <div><strong class="text-slate-200">Dự án:</strong> Sen Việt (VieLotusIM)</div>
+          <div><strong class="text-slate-200">Kênh hỗ trợ / Báo lỗi:</strong> <a href="https://github.com/stevedat/VieLotus-IM/issues" target="_blank" class="text-lotus-accent hover:underline">GitHub Issues</a></div>
+          <div><strong class="text-slate-200">Email:</strong> <a href="mailto:support@vielotus.org" class="text-lotus-accent hover:underline">support@vielotus.org</a> (hoặc liên hệ qua tài khoản tác giả trên GitHub)</div>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/[0.08] py-8 px-4 sm:px-6 bg-black/40 z-10 text-xs text-slate-500">
+    <div class="max-w-[1112px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-5 h-5 opacity-75">
+        <span>Sen Việt (VieLotusIM) · Mã nguồn mở MIT License.</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-5">
+        <a href="index.html" class="hover:text-slate-300 transition-colors">Trang chủ</a>
+        <a href="support.html" class="hover:text-slate-300 transition-colors">Hỗ trợ (Support)</a>
+        <a href="terms.html" class="hover:text-slate-300 transition-colors">Điều khoản (Terms)</a>
+        <a href="privacy.html" class="text-slate-300 font-medium transition-colors">Quyền riêng tư (Privacy)</a>
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition-colors">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Bilingual Dictionary & Logic -->
+  <script>
+    const translations = {
+      vi: {
+        'nav.home': 'Trang chủ',
+        'nav.support': 'Hỗ trợ',
+        'nav.terms': 'Điều khoản',
+        'nav.privacy': 'Quyền riêng tư',
+        'badge': '100% Bảo mật Ngoại tuyến · Zero Data Collection',
+        'title': 'Chính sách Quyền riêng tư',
+        'subtitle': 'Áp dụng cho ứng dụng bàn phím Sen Việt (VieLotusIM & VieLotus Keyboard) trên iOS, iPadOS và macOS.',
+        'effective_date': 'Hiệu lực từ: Ngày 12 tháng 10 năm 2026',
+        'version': 'Phiên bản: 1.1.2',
+        'core_title': 'Tuyên ngôn Bảo mật Cốt lõi',
+        'core_p1': 'Sen Việt (VieLotusIM) được xây dựng với nguyên tắc cao nhất: <strong>Tôn trọng và bảo vệ tuyệt đối quyền riêng tư của bạn</strong>. Chúng tôi không bao giờ thu thập, lưu trữ, truyền tải hoặc bán bất kỳ dữ liệu nào mà bạn gõ.',
+        'core_p2': 'Bàn phím hoạt động <strong>hoàn toàn ngoại tuyến (offline 100%)</strong>. Ứng dụng không có quyền truy cập mạng, không có máy chủ nhận dữ liệu và không yêu cầu quyền "Cho phép truy cập đầy đủ" (Allow Full Access) trên hệ điều hành iOS/iPadOS.',
+        's1_title': '1. Dữ liệu phím bấm và nội dung văn bản',
+        's1_p1': 'Mọi ký tự bạn gõ (bao gồm văn bản, mật khẩu, tin nhắn, thông tin tài chính hoặc dữ liệu nhạy cảm) được xử lý ngay tại bộ nhớ tạm (RAM) của thiết bị thông qua lõi engine Pure Swift.',
+        's1_li1': '<strong>Không ghi đĩa (No disk I/O):</strong> Nội dung gõ không bao giờ được ghi vào tệp nhật ký (log) hoặc bộ lưu trữ vĩnh viễn trên máy.',
+        's1_li2': '<strong>Không truyền mạng:</strong> Bàn phím không có bất kỳ dòng lệnh gọi API hoặc kết nối ra ngoài Internet.',
+        's1_li3': '<strong>Tự hủy ngay sau khi gõ:</strong> Trạng thái ghép từ (composing state) tự động được xóa khỏi RAM ngay khi kết thúc một từ hoặc cụm từ.',
+        's2_title': '2. Quyền "Cho phép truy cập đầy đủ" (Full Access) trên iOS',
+        's2_p1': 'Trong tệp cấu hình chính thức (Info.plist) của tiện ích bàn phím mở rộng iOS, chúng tôi thiết lập:',
+        's2_p2': 'Điều này đồng nghĩa iOS chạy bàn phím Sen Việt trong môi trường sandbox khép kín nghiêm ngặt: bàn phím <strong>bị cấm truy cập mạng, không thể đọc clipboard toàn cục, không thể truy cập vị trí, danh bạ hay microphone</strong>.',
+        's3_title': '3. Quyền Trợ năng (Accessibility Permissions) trên macOS',
+        's3_p1': 'Phiên bản dành cho máy Mac được triển khai chuẩn chỉnh 100% bằng giao thức hệ thống chính thức <strong>InputMethodKit</strong> của Apple. Sen Việt <strong>hoàn toàn không đòi hỏi quyền Trợ năng (Accessibility)</strong>, không sử dụng CGEventTap để chặn bắt phím tầng thấp và không can thiệp sâu vào các ứng dụng khác.',
+        's4_title': '4. Không chứa SDK bên thứ ba & Quảng cáo',
+        's4_p1': 'Sen Việt là ứng dụng mã nguồn mở độc lập, sạch 100%. Ứng dụng:',
+        's4_li1': 'Không tích hợp Google Analytics, Firebase, Facebook SDK hay bất kỳ thư viện theo dõi (tracking) nào.',
+        's4_li2': 'Không phân phối quảng cáo dưới bất kỳ hình thức nào.',
+        's4_li3': 'Không thu thập số nhận dạng thiết bị (IDFA, IDFV) hoặc vị trí địa lý.',
+        's5_title': '5. Mã nguồn mở & Khả năng kiểm chứng độc lập',
+        's5_p1': 'Toàn bộ mã nguồn của Sen Việt (VieLotusIM) được xuất bản công khai trên GitHub theo giấy phép <strong>MIT License</strong>. Mọi lập trình viên, chuyên gia bảo mật và người dùng đều có quyền tải về, biên dịch và tự mình kiểm tra từng dòng mã để xác minh cam kết bảo mật này:',
+        's6_title': '6. Liên hệ về Quyền riêng tư',
+        's6_p1': 'Nếu bạn có bất kỳ câu hỏi hoặc phản hồi nào liên quan đến Chính sách Quyền riêng tư này, vui lòng liên hệ với chúng tôi qua:'
+      },
+      en: {
+        'nav.home': 'Home',
+        'nav.support': 'Support',
+        'nav.terms': 'Terms',
+        'nav.privacy': 'Privacy Policy',
+        'badge': '100% Offline by Design · Zero Data Collection',
+        'title': 'Privacy Policy',
+        'subtitle': 'Applicable to Sen Việt (VieLotusIM & VieLotus Keyboard) on iOS, iPadOS, and macOS.',
+        'effective_date': 'Effective date: October 12, 2026',
+        'version': 'Version: 1.1.2',
+        'core_title': 'Core Privacy Pledge',
+        'core_p1': 'Sen Việt (VieLotusIM) is built on one foundational principle: <strong>Strict, uncompromising respect for your privacy</strong>. We never collect, store, transmit, or sell any keystrokes or data you enter.',
+        'core_p2': 'The keyboard operates <strong>strictly 100% offline</strong>. It contains no network capabilities, has no remote receiving servers, and does not require "Allow Full Access" on iOS/iPadOS.',
+        's1_title': '1. Keystroke and Text Processing',
+        's1_p1': 'All keystrokes (including text, passwords, messages, financial data, and sensitive inputs) are processed solely in volatile local memory (RAM) by the Pure Swift engine.',
+        's1_li1': '<strong>Zero Disk I/O:</strong> Keystroke content is never written to disk or log files.',
+        's1_li2': '<strong>Zero Network Transmission:</strong> The keyboard has no network socket or outgoing API calls.',
+        's1_li3': '<strong>Ephemeral Lifecycle:</strong> Composition states are immediately discarded from memory once a word or syllable is committed.',
+        's2_title': '2. "Allow Full Access" on iOS / iPadOS',
+        's2_p1': 'In the official Info.plist configuration of the iOS keyboard extension, we strictly declare:',
+        's2_p2': 'This guarantees that iOS enforces an isolated sandbox: the keyboard is <strong>strictly blocked from network access, cannot read global pasteboard, and cannot access location, contacts, or microphone</strong>.',
+        's3_title': '3. macOS Accessibility Permissions',
+        's3_p1': 'On macOS, Sen Việt adheres strictly to Apple\'s official <strong>InputMethodKit</strong> framework. It <strong>never requires Accessibility permissions</strong>, avoids low-level CGEventTap key intercept hacks, and respects Apple\'s secure input architecture.',
+        's4_title': '4. Zero Third-Party SDKs & Zero Ads',
+        's4_p1': 'Sen Việt is a pure, independent open-source utility. It:',
+        's4_li1': 'Contains zero analytics or tracking SDKs (no Firebase, no Mixpanel, no Facebook SDK).',
+        's4_li2': 'Serves zero advertisements in any form.',
+        's4_li3': 'Collects zero device identifiers (IDFA, IDFV) or geolocation data.',
+        's5_title': '5. Open Source & Independent Auditing',
+        's5_p1': 'The entire codebase of Sen Việt is public on GitHub under the <strong>MIT License</strong>. Developers and security auditors can inspect and verify every single line of code directly:',
+        's6_title': '6. Contact Regarding Privacy',
+        's6_p1': 'If you have any questions or feedback regarding this Privacy Policy, please reach out via:'
+      }
+    };
+
+    function setLanguage(lang) {
+      localStorage.setItem('vielotus_lang', lang);
+      document.documentElement.lang = lang;
+      
+      const viBtn = document.getElementById('lang-btn-vi');
+      const enBtn = document.getElementById('lang-btn-en');
+      if (lang === 'vi') {
+        viBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-white bg-white/15 shadow-sm';
+        enBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-slate-400 hover:text-white';
+      } else {
+        enBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-white bg-white/15 shadow-sm';
+        viBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-slate-400 hover:text-white';
+      }
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang] && translations[lang][key]) {
+          el.innerHTML = translations[lang][key];
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedLang = localStorage.getItem('vielotus_lang') || 'vi';
+      setLanguage(savedLang);
+    });
+  </script>
+</body>
+</html>

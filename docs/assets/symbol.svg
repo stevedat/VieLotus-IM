@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient: Lotus Pink to Deep Magenta to Royal Indigo -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF5E8E" />
+      <stop offset="45%" stop-color="#A828B8" />
+      <stop offset="100%" stop-color="#4F46E5" />
+    </linearGradient>
+
+    <!-- Subtle Inner Glow & Depth -->
+    <linearGradient id="highlightGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.0" />
+    </linearGradient>
+
+    <radialGradient id="centerGlow" cx="50%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#FFD6E8" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#A828B8" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Drop shadow for the glyph -->
+    <filter id="glyphShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#1E0B36" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- macOS Continuous Squircle Base (512x512) -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bgGradient)" />
+
+  <!-- Inner Soft Highlight Border -->
+  <rect x="18" y="18" width="476" height="476" rx="106" fill="none" stroke="url(#highlightGrad)" stroke-width="4" opacity="0.8" />
+  
+  <!-- Subtle Ambient Glow -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#centerGlow)" />
+
+  <!-- Stylized Vietnamese 'Ṽ' Diacritic Glyph (Sen Việt) -->
+  <g filter="url(#glyphShadow)" transform="translate(0, 10)">
+    <!-- Circumflex & Tilde Accent (Dấu Mũ & Dấu Ngã Cách Điệu Cánh Sen) -->
+    <path d="M 200 135 C 224 108, 288 108, 312 135 C 292 122, 220 122, 200 135 Z" fill="#FFFFFF" opacity="0.9" />
+    
+    <!-- Tilde wave (Dấu Ngã mềm mại) -->
+    <path d="M 215 110 C 235 90, 255 115, 275 102 C 285 96, 298 96, 305 102 C 295 108, 280 92, 260 106 C 242 118, 225 118, 215 110 Z" fill="#FFFFFF" />
+
+    <!-- Main Typographic 'V' Glyph -->
+    <path d="M 148 175 C 158 175, 168 180, 174 192 L 256 368 L 338 192 C 344 180, 354 175, 364 175 C 378 175, 388 186, 388 200 C 388 206, 385 214, 380 224 L 278 412 C 270 426, 256 428, 256 428 C 256 428, 242 426, 234 412 L 132 224 C 127 214, 124 206, 124 200 C 124 186, 134 175, 148 175 Z" fill="#FFFFFF" />
+  </g>
+</svg>

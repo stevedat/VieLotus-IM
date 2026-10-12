@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sen Việt (VieLotusIM) — Gõ là gõ. Đừng biến việc gõ thành một vấn đề.</title>
+  <meta name="description" content="Bộ gõ tiếng Việt nhỏ gọn, thuần Apple Native cho macOS, iPhone & iPad. Gõ song ngữ Telex & VNI nhẹ tênh, gõ Gen Z phá cách vui nhộn, không nuốt chữ, 100% offline.">
+  
+  <!-- Canonical & OpenGraph -->
+  <link rel="canonical" href="https://stevedat.github.io/VieLotus-IM/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://stevedat.github.io/VieLotus-IM/">
+  <meta property="og:title" content="Sen Việt (VieLotusIM) — Gõ là gõ. Đừng biến việc gõ thành một vấn đề.">
+  <meta property="og:description" content="Bộ gõ tiếng Việt thuần Apple Native cho macOS, iPhone & iPad. Gõ song ngữ Telex & VNI mượt mà, gõ Gen Z vui nhộn, không nuốt chữ, 100% offline.">
+  <meta property="og:image" content="https://stevedat.github.io/VieLotus-IM/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Sen Việt (VieLotusIM) — Gõ là gõ. Đừng biến việc gõ thành một vấn đề.">
+  <meta name="twitter:description" content="Gõ song ngữ Telex & VNI mượt mà, gõ Gen Z vui nhộn, không nuốt chữ, 100% offline. Cho macOS, iPhone & iPad.">
+  <meta name="twitter:image" content="https://stevedat.github.io/VieLotus-IM/assets/og-card.png">
+  
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            lotus: {
+              accent: '#FF5E8E',
+              magenta: '#A828B8',
+              indigo: '#4F46E5',
+              dark: '#050507',
+              card: 'rgba(255, 255, 255, 0.03)',
+              border: 'rgba(255, 255, 255, 0.08)'
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['"SF Mono"', 'Menlo', 'Monaco', 'Courier New', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    html, body {
+      overflow-x: hidden;
+      max-width: 100vw;
+    }
+    body {
+      background-color: #050507;
+      color: #F8FAFC;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Subtle ambient aura */
+    .ambient-glow {
+      position: absolute;
+      width: min(500px, 90vw);
+      height: min(500px, 90vw);
+      background: radial-gradient(circle, rgba(255, 94, 142, 0.12) 0%, rgba(79, 70, 229, 0.06) 50%, transparent 70%);
+      filter: blur(60px);
+      pointer-events: none;
+    }
+
+    .apple-glass {
+      background: rgba(255, 255, 255, 0.025);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .apple-glass-hover:hover {
+      background: rgba(255, 255, 255, 0.045);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .gradient-accent {
+      background: linear-gradient(135deg, #FF6B98 0%, #C084FC 45%, #818CF8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .btn-gradient {
+      background: linear-gradient(135deg, #FF5E8E 0%, #A828B8 50%, #4F46E5 100%);
+    }
+
+    /* Scrollytelling Reveal Animations: Cinematic Blur-to-Sharp Fade-Up */
+    .reveal {
+      opacity: 0;
+      transform: translateY(32px) scale(0.98);
+      filter: blur(10px);
+      transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+                  filter 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: opacity, transform, filter;
+    }
+
+    .reveal.active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .reveal {
+        opacity: 1 !important;
+        transform: none !important;
+        filter: none !important;
+        transition: none !important;
+      }
+    }
+
+    .delay-100 { transition-delay: 0.1s; }
+    .delay-200 { transition-delay: 0.2s; }
+    .delay-300 { transition-delay: 0.3s; }
+
+    /* Custom underline effect like macOS */
+    .ime-composing {
+      text-decoration: underline;
+      text-decoration-color: #FF5E8E;
+      text-underline-offset: 4px;
+      text-decoration-thickness: 2px;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans selection:bg-lotus-accent/30 selection:text-white relative">
+
+  <!-- Ambient Background Lighting (strictly contained to avoid mobile horizontal scroll) -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
+    <div class="ambient-glow top-0 left-1/2 -translate-x-1/2"></div>
+    <div class="ambient-glow top-[40%] right-0 translate-x-1/4 opacity-40"></div>
+    <div class="ambient-glow bottom-[10%] left-0 -translate-x-1/4 opacity-30"></div>
+  </div>
+
+  <!-- Minimal Navigation Bar -->
+  <header class="sticky top-0 z-50 bg-[#050507]/80 backdrop-blur-xl border-b border-white/[0.07] transition-all">
+    <div class="max-w-5xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between relative z-10">
+      <!-- Brand Identity -->
+      <a href="#" class="flex items-center gap-2.5 sm:gap-3 group shrink-0">
+        <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg shadow-sm group-hover:scale-105 transition-transform">
+        <div class="flex flex-col">
+          <span class="text-xs sm:text-sm font-bold tracking-tight text-white flex items-center gap-1 sm:gap-1.5">
+            Sen Việt
+            <span class="text-[9px] sm:text-[10px] font-mono px-1 py-0.2 rounded bg-white/10 text-lotus-accent">v1.0.0</span>
+          </span>
+          <span class="text-[9px] sm:text-[10px] text-slate-400 font-mono tracking-wider">VieLotusIM</span>
+        </div>
+      </a>
+
+      <!-- Quick Navigation (Tablet & Desktop) -->
+      <nav class="hidden lg:flex items-center gap-6 xl:gap-8 text-xs font-medium text-slate-400">
+        <a href="#stage" data-i18n="nav.stage" class="hover:text-white transition-colors">Gõ thử</a>
+        <a href="#story" data-i18n="nav.story" class="hover:text-white transition-colors">Câu chuyện</a>
+        <a href="#ecosystem" data-i18n="nav.ecosystem" class="hover:text-white transition-colors">Hệ sinh thái</a>
+        <a href="#install" data-i18n="nav.install" class="hover:text-white transition-colors">Cài đặt 3 giây</a>
+      </nav>
+
+      <!-- Right Action Items -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Language Switcher -->
+        <div class="flex items-center bg-white/5 rounded-lg p-0.5 border border-white/10 text-xs font-mono">
+          <button id="lang-btn-vi" onclick="setLanguage('vi')" class="px-2 sm:px-2.5 py-1 rounded-md transition-all font-semibold bg-white/20 text-white min-h-[34px] sm:min-h-0 flex items-center">VI</button>
+          <button id="lang-btn-en" onclick="setLanguage('en')" class="px-2 sm:px-2.5 py-1 rounded-md transition-all text-slate-400 hover:text-white min-h-[34px] sm:min-h-0 flex items-center">EN</button>
+        </div>
+
+        <!-- GitHub -->
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" 
+           class="hidden sm:inline-flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span>GitHub</span>
+        </a>
+
+        <!-- Install Link -->
+        <a href="#install" class="inline-flex items-center justify-center text-xs font-semibold px-3 sm:px-3.5 py-1.5 rounded-lg btn-gradient text-white shadow-sm hover:opacity-90 active:scale-95 transition-all min-h-[34px] sm:min-h-0">
+          <span data-i18n="nav.get">Tải ngay</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-grow relative z-10 w-full overflow-hidden">
+
+    <!-- ACT 1: The Core Philosophy (Hero) -->
+    <section class="pt-16 pb-12 sm:pt-28 sm:pb-20 px-3 sm:px-6 max-w-4xl mx-auto text-center w-full">
+      
+      <!-- Humble Badge -->
+      <div class="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-white/5 border border-white/10 text-[11px] sm:text-xs font-mono text-slate-300 mb-6 sm:mb-8 backdrop-blur-md max-w-full">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+        <span data-i18n="hero.pill" class="truncate">Thuần chuẩn Apple · 100% Ngoại tuyến · Miễn phí</span>
+      </div>
+
+      <!-- Philosophical Punchline -->
+      <h1 class="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-white mb-6 sm:mb-8 leading-[1.15] break-words">
+        <span data-i18n="hero.h1_line1">Gõ là gõ.</span><br>
+        <span class="gradient-accent" data-i18n="hero.h1_line2">Đừng biến nó thành một vấn đề. :D</span>
+      </h1>
+
+      <!-- Warm, Simple Subtitle -->
+      <p data-i18n="hero.sub" class="max-w-2xl mx-auto text-sm sm:text-base md:text-lg text-slate-400 font-normal leading-relaxed mb-8 sm:mb-12 px-2">
+        Không nuốt chữ khi gõ nhanh. Thoải mái gõ song ngữ cả Telex lẫn VNI, gõ từ lóng Gen Z vui vẻ mà không bị "sửa lưng". Sinh ra để bạn gõ tự nhiên như hơi thở.
+      </p>
+
+      <!-- ACT 2: Interactive Typing Canvas (Stage) -->
+      <div id="stage" class="max-w-3xl mx-auto apple-glass rounded-2xl overflow-hidden shadow-2xl text-left border border-white/10">
+        <!-- Minimal Mac Window Bar -->
+        <div class="px-3.5 sm:px-5 py-3 sm:py-3.5 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#FF5F56]/80 inline-block shrink-0"></span>
+            <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#FFBD2E]/80 inline-block shrink-0"></span>
+            <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#27C93F]/80 inline-block shrink-0"></span>
+            <span class="ml-1.5 sm:ml-3 text-[11px] sm:text-xs font-mono text-slate-400 truncate max-w-[130px] sm:max-w-none" data-i18n="stage.title">Khung gõ thử trực tiếp</span>
+          </div>
+
+          <!-- Typing Method Toggles: Telex & VNI -->
+          <div class="flex items-center gap-1 text-xs bg-black/40 p-0.5 sm:p-1 rounded-lg border border-white/10 shrink-0">
+            <button id="mode-telex" onclick="setTypingMode('telex')" class="px-2.5 sm:px-3 py-1 rounded bg-white/20 text-white font-mono text-[11px] font-semibold transition-all min-h-[30px] sm:min-h-0 flex items-center">Telex</button>
+            <button id="mode-vni" onclick="setTypingMode('vni')" class="px-2.5 sm:px-3 py-1 rounded bg-transparent hover:bg-white/5 text-slate-400 font-mono text-[11px] transition-all min-h-[30px] sm:min-h-0 flex items-center">VNI</button>
+          </div>
+        </div>
+
+        <!-- Live Typing Area -->
+        <div class="p-4 sm:p-6 md:p-8 relative min-h-[160px] sm:min-h-[175px] cursor-text" id="stage-editor-box" onclick="switchToManualTyping()">
+          
+          <!-- Auto-Typewriter Display (with genuine Apple composing underline) -->
+          <div id="auto-display" class="text-lg sm:text-xl md:text-2xl text-white font-sans leading-relaxed break-words min-h-[80px] sm:min-h-[85px] selection:bg-lotus-accent/40">
+            <span id="typed-text"></span><span id="composing-text" class="ime-composing text-pink-300"></span><span id="caret" class="inline-block w-2 sm:w-2.5 h-5 sm:h-6 bg-lotus-accent translate-y-0.5 sm:translate-y-1 ml-0.5 animate-pulse"></span>
+          </div>
+
+          <!-- Manual Interactive Textarea (revealed when user wants to type themselves) -->
+          <textarea id="live-input" rows="3" 
+                    class="hidden w-full bg-transparent border-0 text-lg sm:text-xl md:text-2xl text-white placeholder-slate-600 focus:outline-none resize-none font-sans leading-relaxed selection:bg-lotus-accent/40"
+                    placeholder="Gõ thử bất kỳ ở đây nhé: test, restrict, blood, floor, fải thix quá trùi..."></textarea>
+
+          <!-- Smart Feedback Indicator -->
+          <div class="mt-4 pt-3.5 sm:pt-4 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 text-xs">
+            <div id="smart-badge" class="inline-flex items-center gap-1.5 sm:gap-2 font-mono text-[10px] sm:text-[11px] text-slate-400 min-w-0 flex-1">
+              <span id="badge-dot" class="w-2 h-2 rounded-full bg-lotus-accent animate-ping shrink-0"></span>
+              <span id="badge-text" data-i18n="stage.hint" class="truncate sm:whitespace-normal">Đang diễn hoạt gõ thực tế...</span>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+              <button id="btn-toggle-auto" onclick="toggleAutoPlay(event)" class="text-[11px] sm:text-xs text-slate-400 hover:text-white font-mono transition-colors flex items-center gap-1 sm:gap-1.5 py-1 px-1.5">
+                <span id="toggle-icon">⏸</span> <span id="toggle-label">Tạm dừng</span>
+              </button>
+              <button id="btn-clear-demo" onclick="clearLiveEditor(event)" class="text-[11px] sm:text-xs text-slate-500 hover:text-slate-300 font-mono transition-colors py-1 px-1.5" data-i18n="stage.clear">
+                Xoá chữ
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Story Chips -->
+        <div class="px-3.5 sm:px-6 py-3 bg-white/[0.015] border-t border-white/[0.06] flex items-center gap-2 text-xs overflow-x-auto no-scrollbar sm:flex-wrap">
+          <span class="text-slate-500 font-mono text-[10px] sm:text-[11px] shrink-0" data-i18n="stage.sample_label">Mẫu xem:</span>
+          
+          <button class="chip-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5 transition-colors font-mono text-[10px] sm:text-[11px] min-h-[32px] flex items-center" data-quote-index="0">
+            💻 Git & Code
+          </button>
+          
+          <button class="chip-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-pink-300 border border-pink-500/20 hover:border-pink-500/40 transition-colors font-mono text-[10px] sm:text-[11px] min-h-[32px] flex items-center" data-quote-index="1">
+            🌸 Gen Z & English
+          </button>
+          
+          <button class="chip-btn shrink-0 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-emerald-300 border border-emerald-500/20 hover:border-emerald-500/40 transition-colors font-mono text-[10px] sm:text-[11px] min-h-[32px] flex items-center" data-quote-index="2">
+            ✨ Triết lý gõ
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ACT 3: Scrollytelling - Hé lộ từng lát cắt câu chuyện -->
+    <section id="story" class="py-12 sm:py-20 px-3 sm:px-6 max-w-4xl mx-auto space-y-16 sm:space-y-24 md:space-y-32">
+      
+      <!-- Scene 1: Vấn đề nuốt chữ (Tối giản, thân thiện, không đối đầu) -->
+      <div class="reveal max-w-2xl mx-auto text-center space-y-3 sm:space-y-4 px-2">
+        <div class="text-[11px] sm:text-xs font-mono text-lotus-accent uppercase tracking-wider" data-i18n="s1.tag">01 · Trải nghiệm gõ</div>
+        <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white tracking-tight leading-snug break-words" data-i18n="s1.title">
+          Gõ nhanh mấy cũng êm.<br>Không nuốt chữ, không nhảy dòng.
+        </h2>
+        <p class="text-sm sm:text-base text-slate-400 leading-relaxed max-w-xl mx-auto" data-i18n="s1.desc">
+          Ai hay gõ trên Google Docs, Notion, Slack hay chat Telegram chắc từng bực mình vì chữ bị giật, nuốt mất dấu hoặc lặp từ khó chịu. Sen Việt dùng cơ chế gạch chân nhẹ tự nhiên: chữ ghép đến đâu bảo vệ đến đó, nhấn phím cách là chữ vào ngay ngắn.
+        </p>
+        <div class="pt-1.5 sm:pt-2">
+          <div class="text-[11px] sm:text-xs font-mono text-slate-400 inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-3.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md max-w-full text-left">
+            <span class="text-emerald-400 shrink-0">✓</span>
+            <span data-i18n="s1.note" class="leading-normal">Phím Cmd + Z hoàn tác từng bước chuẩn xác, không mất cả đoạn văn.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 2: Song ngữ & Phá cách Gen Z -->
+      <div class="reveal grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8 items-center">
+        <div class="md:col-span-7 order-2 md:order-1 apple-glass rounded-2xl p-4 sm:p-6 border border-white/10 space-y-3 sm:space-y-4 font-mono text-xs sm:text-sm">
+          <div class="text-[10px] sm:text-[11px] text-slate-500 uppercase tracking-wider">Hiểu ý bạn từng nhịp gõ</div>
+          <div class="p-3 sm:p-4 rounded-xl bg-black/50 border border-white/10 space-y-1.5 sm:space-y-2">
+            <div class="text-slate-400 text-[11px] sm:text-xs">// Đang gõ tiếng Việt nhưng xen kẽ tiếng Anh & code:</div>
+            <div class="text-white text-xs sm:text-sm leading-relaxed">
+              Gửi feedback qua <span class="text-amber-300 font-semibold">Slack</span> và <span class="text-indigo-300 font-semibold">Notion</span> cho team nhé!
+            </div>
+          </div>
+          <div class="p-3 sm:p-4 rounded-xl bg-pink-950/20 border border-pink-500/20 space-y-1.5 sm:space-y-2">
+            <div class="text-pink-400 text-[11px] sm:text-xs">// Chat vui cùng bạn bè với từ lóng quen thuộc:</div>
+            <div class="text-pink-200 text-xs sm:text-sm leading-relaxed">
+              <span class="font-bold">fải</span> công nhận là <span class="font-bold">thix</span> quá trùi, <span class="font-bold">ko</span> lo bị sửa lưng!
+            </div>
+          </div>
+        </div>
+
+        <div class="md:col-span-5 order-1 md:order-2 space-y-2.5 sm:space-y-3">
+          <div class="text-[11px] sm:text-xs font-mono text-lotus-accent uppercase tracking-wider" data-i18n="s2.tag">02 · Song ngữ & Tự do</div>
+          <h2 class="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight leading-snug break-words" data-i18n="s2.title">
+            Song ngữ mượt mà.<br>Lóng Gen Z phá cách vui nhộn.
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400 leading-relaxed" data-i18n="s2.desc">
+            Không cần bận tâm đổi qua đổi lại giữa E và V. Đang viết tiếng Việt mà gõ từ tiếng Anh, link web hay mã code thì chữ vẫn giữ nguyên. Bạn thích gõ tắt kiểu quen tay như <em>fải, bik, thix, mún, ko, đc</em> thì cứ tự nhiên gõ, bộ gõ hiểu ý ngay chứ không ép uổng.
+          </p>
+          <div class="pt-1.5 text-[11px] sm:text-xs font-mono text-slate-500 flex items-center gap-1.5 sm:gap-2">
+            <span class="text-emerald-400 shrink-0">✓</span>
+            <span data-i18n="s2.note">Hỗ trợ trọn vẹn cả 2 kiểu gõ yêu thích: Telex và VNI.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 3: Nhẹ nhàng, Không quyền trợ năng -->
+      <div class="reveal grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8 items-center">
+        <div class="md:col-span-5 space-y-2.5 sm:space-y-3">
+          <div class="text-[11px] sm:text-xs font-mono text-lotus-accent uppercase tracking-wider" data-i18n="s3.tag">03 · Riêng tư & Nhẹ nhàng</div>
+          <h2 class="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight leading-snug break-words" data-i18n="s3.title">
+            Không xin quyền Trợ năng.<br>Hoàn toàn ngoại tuyến 100%.
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400 leading-relaxed" data-i18n="s3.desc">
+            Nhiều bộ gõ bên ngoài đòi hỏi quyền Trợ năng (Accessibility) để đọc lén phím bấm và can thiệp ngầm. Sen Việt chạy trực tiếp như bàn phím gốc của Apple: không đọc trộm mật khẩu, không kết nối Internet. Mọi phím bạn gõ nằm trọn vẹn trên máy bạn.
+          </p>
+          <div class="pt-1.5 text-[11px] sm:text-xs font-mono text-slate-500 flex items-center gap-1.5 sm:gap-2">
+            <span class="text-emerald-400 shrink-0">✓</span>
+            <span data-i18n="s3.note">Dung lượng siêu nhẹ ~2.8MB, độ trễ phản hồi 0ms.</span>
+          </div>
+        </div>
+
+        <div class="md:col-span-7 apple-glass rounded-2xl p-4 sm:p-6 border border-white/10 space-y-2 sm:space-y-3 font-mono text-xs sm:text-sm">
+          <div class="flex items-center justify-between p-3 sm:p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs sm:text-sm">
+            <span class="text-slate-300">Quyền Trợ năng (Accessibility)</span>
+            <span class="text-emerald-400 font-bold shrink-0 ml-2">KHÔNG CẦN</span>
+          </div>
+          <div class="flex items-center justify-between p-3 sm:p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs sm:text-sm">
+            <span class="text-slate-300">Kết nối mạng & gửi dữ liệu</span>
+            <span class="text-emerald-400 font-bold shrink-0 ml-2">100% OFFLINE</span>
+          </div>
+          <div class="flex items-center justify-between p-3 sm:p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs sm:text-sm">
+            <span class="text-slate-300">Ghi lại lịch sử gõ phím</span>
+            <span class="text-emerald-400 font-bold shrink-0 ml-2">ZERO-LOGGING</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ACT 4: Unified Ecosystem (Mac & iPhone) -->
+    <section id="ecosystem" class="py-14 sm:py-20 px-3 sm:px-6 max-w-4xl mx-auto border-t border-white/[0.07]">
+      <div class="reveal text-center max-w-xl mx-auto mb-10 sm:mb-14">
+        <span class="text-xs font-mono uppercase tracking-widest text-lotus-accent" data-i18n="eco.tag">HỆ MÁY APPLE</span>
+        <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mt-3 tracking-tight break-words" data-i18n="eco.title">
+          Một cảm giác gõ thân quen trên mọi màn hình
+        </h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+        <!-- Mac Panel -->
+        <div class="reveal delay-100 apple-glass rounded-2xl p-5 sm:p-7 flex flex-col justify-between apple-glass-hover transition-all">
+          <div>
+            <div class="flex items-center justify-between mb-3 sm:mb-4 gap-2">
+              <span class="text-[11px] sm:text-xs font-mono text-slate-400 truncate">macOS 13+ (Ventura, Sonoma, Sequoia)</span>
+              <span class="text-[10px] sm:text-xs font-mono text-emerald-400 shrink-0">Universal Binary</span>
+            </div>
+            <h3 class="text-lg sm:text-xl font-bold text-white mb-2" data-i18n="eco.mac_title">Sen Việt cho Mac</h3>
+            <p class="text-xs sm:text-sm text-slate-400 leading-relaxed mb-5 sm:mb-6" data-i18n="eco.mac_desc">
+              Chạy nhẹ nhàng trên cả Apple Silicon (M-series) và Intel. Tích hợp trực tiếp vào thanh Menu Bar và Cài đặt bàn phím của macOS.
+            </p>
+          </div>
+          <div class="pt-3.5 sm:pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-slate-500">
+            <span class="truncate">Homebrew · PKG · DMG</span>
+            <span class="text-slate-300 shrink-0 ml-2">Gõ mượt Terminal</span>
+          </div>
+        </div>
+
+        <!-- iPhone & iPad Panel -->
+        <div class="reveal delay-200 apple-glass rounded-2xl p-5 sm:p-7 flex flex-col justify-between apple-glass-hover transition-all">
+          <div>
+            <div class="flex items-center justify-between mb-3 sm:mb-4 gap-2">
+              <span class="text-[11px] sm:text-xs font-mono text-slate-400 truncate">iOS & iPadOS 16+</span>
+              <span class="text-[10px] sm:text-xs font-mono text-emerald-400 shrink-0">Official App Store</span>
+            </div>
+            <h3 class="text-lg sm:text-xl font-bold text-white mb-2" data-i18n="eco.ios_title">Sen Việt cho iPhone & iPad</h3>
+            <p class="text-xs sm:text-sm text-slate-400 leading-relaxed mb-5 sm:mb-6" data-i18n="eco.ios_desc">
+              Bàn phím chính thức trên App Store, không cần bật Full Access. Có thanh gợi ý từ ghép tiếng Việt, rê phím Space để chỉnh con trỏ và rung nhẹ êm tay.
+            </p>
+          </div>
+          <div class="pt-3.5 sm:pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-slate-500">
+            <span class="truncate">Rê phím Space</span>
+            <span class="text-slate-300 shrink-0 ml-2">Tải trên App Store</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACT 5: Zero-Friction Installation (Quick Setup) -->
+    <section id="install" class="py-14 sm:py-20 px-3 sm:px-6 max-w-3xl mx-auto border-t border-white/[0.07]">
+      <div class="reveal text-center max-w-md mx-auto mb-10 sm:mb-12">
+        <span class="text-xs font-mono uppercase tracking-widest text-lotus-accent" data-i18n="inst.tag">CÀI ĐẶT TRONG VÀI GIÂY</span>
+        <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mt-3 tracking-tight" data-i18n="inst.title">
+          Bắt đầu ngay hôm nay
+        </h2>
+        <p class="text-xs sm:text-sm text-slate-400 mt-2" data-i18n="inst.sub">
+          Chọn cách cài đặt nhanh và thuận tiện nhất cho bạn.
+        </p>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Homebrew Option -->
+        <div class="reveal apple-glass rounded-2xl p-4 sm:p-6 border border-white/10">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-amber-400 text-sm">🍺</span>
+              <span class="text-xs sm:text-sm font-bold text-white" data-i18n="inst.brew_title">Cài nhanh qua Homebrew (macOS)</span>
+            </div>
+            <span class="text-[10px] sm:text-[11px] font-mono text-emerald-400 shrink-0" data-i18n="inst.brew_badge">Khuyên dùng</span>
+          </div>
+          
+          <div class="flex items-center justify-between p-3 sm:p-3.5 rounded-xl bg-black/70 border border-white/10 font-mono text-xs sm:text-sm text-slate-200">
+            <div class="flex items-center gap-2 overflow-x-auto min-w-0 pr-2">
+              <span class="text-lotus-accent select-none shrink-0">$</span>
+              <code id="brew-code" class="truncate sm:whitespace-normal">brew install stevedat/tap/vielotus</code>
+            </div>
+            <button onclick="copyCode('brew install stevedat/tap/vielotus', this)" 
+                    class="ml-2 sm:ml-3 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white font-sans shrink-0 transition-colors min-h-[36px] flex items-center">
+              Sao chép
+            </button>
+          </div>
+          <p class="text-[10px] sm:text-[11px] text-slate-500 mt-2.5 font-mono" data-i18n="inst.brew_hint">
+            Mở Terminal, dán lệnh vào là máy tự động tải và kích hoạt xong ngay.
+          </p>
+        </div>
+
+        <!-- Download Buttons Grid -->
+        <div class="reveal delay-100 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <!-- PKG File -->
+          <a id="btn-download-pkg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg"
+             class="apple-glass rounded-2xl p-4 sm:p-5 border border-white/10 apple-glass-hover flex items-center justify-between transition-all group min-h-[56px]">
+            <div class="flex items-center gap-3 sm:gap-3.5 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 group-hover:text-white transition-colors shrink-0">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs sm:text-sm font-bold text-white truncate" data-i18n="inst.pkg_title">Tải gói cài đặt .pkg</div>
+                <div class="text-[11px] sm:text-xs text-slate-400 font-mono truncate" data-i18n="inst.pkg_sub">Mở lên bấm Cài đặt là xong</div>
+              </div>
+            </div>
+            <span class="text-slate-500 group-hover:text-white transition-colors ml-2 shrink-0">➔</span>
+          </a>
+
+          <!-- App Store -->
+          <a href="https://apps.apple.com/app/id6743389045" target="_blank" rel="noopener noreferrer"
+             class="apple-glass rounded-2xl p-4 sm:p-5 border border-white/10 apple-glass-hover flex items-center justify-between transition-all group min-h-[56px]">
+            <div class="flex items-center gap-3 sm:gap-3.5 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 group-hover:text-white transition-colors shrink-0">
+                <svg class="w-5 h-5 fill-current" viewBox="0 0 170 170"><path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.03-7.64-7.85-11.83-14.45-6.66-10.45-11.75-21.72-15.26-33.8-3.51-12.08-5.27-23.77-5.27-35.07 0-14.15 3.36-25.79 10.08-34.92 6.72-9.13 15.2-13.79 25.43-13.98 4.79 0 10.05 1.34 15.78 4.02 5.73 2.68 9.53 4.07 11.4 4.18 1.45 0 5.48-1.5 12.09-4.5 6.61-3 12.39-4.39 17.34-4.17 12.87.64 23.01 5.43 30.43 14.37-11.33 6.84-16.89 16.29-16.68 28.35.21 9.42 3.86 17.38 10.95 23.88 7.09 6.5 15.62 10.14 25.59 10.92-2.13 6.53-4.7 13.06-7.71 19.59zM119.22 31.84c0-7.39 2.62-14.38 7.86-20.97 5.24-6.59 11.74-10.42 19.5-11.49.21 1.07.32 2.03.32 2.89 0 7.39-2.73 14.48-8.19 21.28-5.46 6.8-12.06 10.6-19.8 11.4-.21-1.07-.32-2.03-.32-2.89z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs sm:text-sm font-bold text-white truncate" data-i18n="inst.ios_title">Tải trên App Store</div>
+                <div class="text-[11px] sm:text-xs text-slate-400 font-mono truncate" data-i18n="inst.ios_sub">Miễn phí cho iPhone & iPad</div>
+              </div>
+            </div>
+            <span class="text-slate-500 group-hover:text-white transition-colors ml-2 shrink-0">➔</span>
+          </a>
+        </div>
+
+        <!-- DMG Link -->
+        <div class="reveal delay-200 text-center pt-2">
+          <a id="btn-download-dmg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.dmg" 
+             class="text-[11px] sm:text-xs text-slate-500 hover:text-slate-300 font-mono underline transition-colors px-2 py-1 inline-block" data-i18n="inst.dmg_link">
+            Hoặc tải tệp ảnh đĩa .dmg nếu bạn thích kéo thả thủ công
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Clean, Poetic Footer -->
+  <footer class="py-10 sm:py-12 px-4 sm:px-6 max-w-5xl mx-auto border-t border-white/[0.08] text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10 text-center sm:text-left">
+    <div class="flex items-center gap-2 justify-center sm:justify-start">
+      <img src="assets/symbol.svg" alt="Sen Việt" class="w-4 h-4 opacity-70 shrink-0">
+      <span data-i18n="footer.note" class="leading-relaxed">Sen Việt (VieLotusIM) — Một dự án nhỏ phi lợi nhuận gửi gắm đến cộng đồng người dùng Apple tại Việt Nam.</span>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-mono text-[11px] shrink-0">
+      <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition-colors p-1">Mã nguồn GitHub</a>
+      <a href="https://github.com/stevedat/VieLotus-IM/discussions" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition-colors p-1">Góp ý & Thảo luận</a>
+      <a href="https://buymeacoffee.com/stevedat" target="_blank" rel="noopener noreferrer" class="text-amber-400 hover:text-amber-300 transition-colors p-1">Mời cà phê ☕️</a>
+    </div>
+  </footer>
+
+  <!-- Script: Translations, Typing Engine & Scrollytelling Observer -->
+  <script>
+    const translations = {
+      vi: {
+        'nav.stage': 'Gõ thử',
+        'nav.story': 'Câu chuyện',
+        'nav.ecosystem': 'Hệ sinh thái',
+        'nav.install': 'Cài đặt 3 giây',
+        'nav.get': 'Tải ngay',
+        'hero.pill': 'Thuần chuẩn Apple · 100% Ngoại tuyến · Miễn phí',
+        'hero.h1_line1': 'Gõ là gõ.',
+        'hero.h1_line2': 'Đừng biến nó thành một vấn đề. :D',
+        'hero.sub': 'Không nuốt chữ khi gõ nhanh. Thoải mái gõ song ngữ cả Telex lẫn VNI, gõ từ lóng Gen Z vui vẻ mà không bị "sửa lưng". Sinh ra để bạn gõ tự nhiên như hơi thở.',
+        'stage.title': 'Khung gõ thử trực tiếp',
+        'stage.hint': 'Thử gõ kết hợp: tiếng Việt, tiếng Anh hoặc từ lóng Gen Z.',
+        'stage.clear': 'Xoá chữ',
+        'stage.sample_label': 'Chọn thử nhanh:',
+        's1.tag': '01 · Trải nghiệm gõ',
+        's1.title': 'Gõ nhanh mấy cũng êm.<br>Không nuốt chữ, không nhảy dòng.',
+        's1.desc': 'Ai hay gõ trên Google Docs, Notion, Slack hay chat Telegram chắc từng bực mình vì chữ bị giật, nuốt mất dấu hoặc lặp từ khó chịu. Sen Việt dùng cơ chế gạch chân nhẹ tự nhiên: chữ ghép đến đâu bảo vệ đến đó, nhấn phím cách là chữ vào ngay ngắn.',
+        's1.note': 'Phím Cmd + Z hoàn tác từng bước chuẩn xác, không mất cả đoạn văn.',
+        's2.tag': '02 · Song ngữ & Tự do',
+        's2.title': 'Song ngữ mượt mà.<br>Lóng Gen Z phá cách vui nhộn.',
+        's2.desc': 'Không cần bận tâm đổi qua đổi lại giữa E và V. Đang viết tiếng Việt mà gõ từ tiếng Anh, link web hay mã code thì chữ vẫn giữ nguyên. Bạn thích gõ tắt kiểu quen tay như fải, bik, thix, mún, ko, đc thì cứ tự nhiên gõ, bộ gõ hiểu ý ngay chứ không ép uổng.',
+        's2.note': 'Hỗ trợ trọn vẹn cả 2 kiểu gõ yêu thích: Telex và VNI.',
+        's3.tag': '03 · Riêng tư & Nhẹ nhàng',
+        's3.title': 'Không xin quyền Trợ năng.<br>Hoàn toàn ngoại tuyến 100%.',
+        's3.desc': 'Nhiều bộ gõ bên ngoài đòi hỏi quyền Trợ năng (Accessibility) để đọc lén phím bấm và can thiệp ngầm. Sen Việt chạy trực tiếp như bàn phím gốc của Apple: không đọc trộm mật khẩu, không kết nối Internet. Mọi phím bạn gõ nằm trọn vẹn trên máy bạn.',
+        's3.note': 'Dung lượng siêu nhẹ ~2.8MB, độ trễ phản hồi 0ms.',
+        'eco.tag': 'HỆ MÁY APPLE',
+        'eco.title': 'Một cảm giác gõ thân quen trên mọi màn hình',
+        'eco.mac_title': 'Sen Việt cho Mac',
+        'eco.mac_desc': 'Chạy nhẹ nhàng trên cả Apple Silicon (M-series) và Intel. Tích hợp trực tiếp vào thanh Menu Bar và Cài đặt bàn phím của macOS.',
+        'eco.ios_title': 'Sen Việt cho iPhone & iPad',
+        'eco.ios_desc': 'Bàn phím chính thức trên App Store, không cần bật Full Access. Có thanh gợi ý từ ghép tiếng Việt, rê phím Space để chỉnh con trỏ và rung nhẹ êm tay.',
+        'inst.tag': 'CÀI ĐẶT TRONG VÀI GIÂY',
+        'inst.title': 'Bắt đầu ngay hôm nay',
+        'inst.sub': 'Chọn cách cài đặt nhanh và thuận tiện nhất cho bạn.',
+        'inst.brew_title': 'Cài nhanh qua Homebrew (macOS)',
+        'inst.brew_badge': 'Khuyên dùng',
+        'inst.brew_hint': 'Mở Terminal, dán lệnh vào là máy tự động tải và kích hoạt xong ngay.',
+        'inst.pkg_title': 'Tải gói cài đặt .pkg',
+        'inst.pkg_sub': 'Mở lên bấm Cài đặt là xong',
+        'inst.ios_title': 'Tải trên App Store',
+        'inst.ios_sub': 'Miễn phí cho iPhone & iPad',
+        'inst.dmg_link': 'Hoặc tải tệp ảnh đĩa .dmg nếu bạn thích kéo thả thủ công',
+        'footer.note': 'Sen Việt (VieLotusIM) — Một dự án nhỏ phi lợi nhuận gửi gắm đến cộng đồng người dùng Apple tại Việt Nam.'
+      },
+      en: {
+        'nav.stage': 'Try It Out',
+        'nav.story': 'The Story',
+        'nav.ecosystem': 'Ecosystem',
+        'nav.install': 'Instant Setup',
+        'nav.get': 'Get Free',
+        'hero.pill': 'Pure Apple Native · 100% Offline · Community Free',
+        'hero.h1_line1': 'Typing is just typing.',
+        'hero.h1_line2': "Don't let it become a problem. :D",
+        'hero.sub': 'No swallowed letters during fast typing. Effortlessly type bilingual in both Telex and VNI, plus playful Gen-Z chat slang without awkward autocorrect. Designed to feel as natural as breathing.',
+        'stage.title': 'Live Interactive Playground',
+        'stage.hint': 'Try typing mixed text: Vietnamese, English, or casual chat slang.',
+        'stage.clear': 'Clear',
+        'stage.sample_label': 'Quick samples:',
+        's1.tag': '01 · Typing Comfort',
+        's1.title': 'Type as fast as you want.<br>No dropped letters, zero stutter.',
+        's1.desc': 'Anyone typing fast in Google Docs, Notion, Slack, or Telegram has experienced annoying stuttering, dropped accents, or repeated characters. Sen Việt uses Apple’s native gentle underline mechanism: syllables are assembled cleanly in-flight and committed upon pressing space.',
+        's1.note': 'Undo (Cmd + Z) steps back smoothly, never wiping out your entire paragraph.',
+        's2.tag': '02 · Bilingual & Freedom',
+        's2.title': 'Fluid bilingual typing.<br>Fun, playful Gen-Z slang.',
+        's2.desc': 'No need to constantly switch between English and Vietnamese keyboards. Seamlessly type English words, URLs, or code syntax without unwanted accents. Type modern casual slang (fải, bik, thix, mún, ko, đc) freely without being auto-corrected.',
+        's2.note': 'Full first-class support for both typing styles: Telex and VNI.',
+        's3.tag': '03 · Pure Privacy & Lightness',
+        's3.title': 'Zero Accessibility hooks.<br>100% Offline on-device.',
+        's3.desc': 'Many third-party input methods demand invasive Accessibility permissions to hook into your system. Sen Việt operates natively like Apple’s stock keyboard: zero keystroke logging, zero network calls. Everything stays strictly on your Mac.',
+        's3.note': 'Feather-light ~2.8MB binary footprint with 0ms input latency.',
+        'eco.tag': 'APPLE ECOSYSTEM',
+        'eco.title': 'One familiar typing feel across every screen',
+        'eco.mac_title': 'Sen Việt for Mac',
+        'eco.mac_desc': 'Runs natively on Apple Silicon (M-series) and Intel Macs. Plugs directly into your Menu Bar and macOS Keyboard Settings.',
+        'eco.ios_title': 'Sen Việt for iPhone & iPad',
+        'eco.ios_desc': 'Official keyboard on the App Store requiring zero Full Access. Features smart compound suggestions, smooth spacebar cursor swiping, and gentle haptics.',
+        'inst.tag': 'INSTANT SETUP',
+        'inst.title': 'Get started in a few seconds',
+        'inst.sub': 'Choose whichever method suits your workflow best.',
+        'inst.brew_title': 'Quick Install via Homebrew (macOS)',
+        'inst.brew_badge': 'Recommended',
+        'inst.brew_hint': 'Open Terminal, paste the command, and it installs automatically.',
+        'inst.pkg_title': 'Download .pkg Installer',
+        'inst.pkg_sub': 'Open and click Install to finish',
+        'inst.ios_title': 'Get on App Store',
+        'inst.ios_sub': 'Free for iPhone & iPad',
+        'inst.dmg_link': 'Or download .dmg disk image if you prefer manual drag-and-drop',
+        'footer.note': 'Sen Việt (VieLotusIM) — A non-profit community project dedicated to Apple users in Vietnam.'
+      }
+    };
+
+    let currentLang = 'vi';
+    let currentTypingMode = 'telex';
+
+    function setLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('vielotus_lang', lang);
+      document.documentElement.lang = lang;
+
+      const btnVi = document.getElementById('lang-btn-vi');
+      const btnEn = document.getElementById('lang-btn-en');
+      if (lang === 'vi') {
+        btnVi.className = 'px-2.5 py-1 rounded-md transition-all font-semibold bg-white/20 text-white';
+        btnEn.className = 'px-2.5 py-1 rounded-md transition-all text-slate-400 hover:text-white';
+      } else {
+        btnEn.className = 'px-2.5 py-1 rounded-md transition-all font-semibold bg-white/20 text-white';
+        btnVi.className = 'px-2.5 py-1 rounded-md transition-all text-slate-400 hover:text-white';
+      }
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang] && translations[lang][key]) {
+          el.innerHTML = translations[lang][key];
+        }
+      });
+    }
+
+    function setTypingMode(mode) {
+      currentTypingMode = mode;
+      const telexBtn = document.getElementById('mode-telex');
+      const vniBtn = document.getElementById('mode-vni');
+      if (mode === 'telex') {
+        telexBtn.className = 'px-2.5 sm:px-3 py-1 rounded bg-white/20 text-white font-mono text-[11px] font-semibold transition-all min-h-[30px] sm:min-h-0 flex items-center';
+        vniBtn.className = 'px-2.5 sm:px-3 py-1 rounded bg-transparent hover:bg-white/5 text-slate-400 font-mono text-[11px] transition-all min-h-[30px] sm:min-h-0 flex items-center';
+      } else {
+        vniBtn.className = 'px-2.5 sm:px-3 py-1 rounded bg-white/20 text-white font-mono text-[11px] font-semibold transition-all min-h-[30px] sm:min-h-0 flex items-center';
+        telexBtn.className = 'px-2.5 sm:px-3 py-1 rounded bg-transparent hover:bg-white/5 text-slate-400 font-mono text-[11px] transition-all min-h-[30px] sm:min-h-0 flex items-center';
+      }
+    }
+
+    // Auto init language (Default to Vietnamese)
+    (function initLanguage() {
+      const saved = localStorage.getItem('vielotus_lang');
+      if (saved === 'vi' || saved === 'en') {
+        setLanguage(saved);
+      } else {
+        setLanguage('vi');
+      }
+    })();
+
+    // Copy to clipboard helper
+    function copyCode(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.innerText;
+        btn.innerText = currentLang === 'en' ? 'Copied!' : 'Đã chép!';
+        setTimeout(() => { btn.innerText = orig; }, 2000);
+      });
+    }
+
+    // Auto-Typewriter Keystroke Simulation Engine
+    const autoDisplay = document.getElementById('auto-display');
+    const typedTextEl = document.getElementById('typed-text');
+    const composingTextEl = document.getElementById('composing-text');
+    const liveInput = document.getElementById('live-input');
+    const badgeText = document.getElementById('badge-text');
+    const badgeDot = document.getElementById('badge-dot');
+    const toggleIcon = document.getElementById('toggle-icon');
+    const toggleLabel = document.getElementById('toggle-label');
+    const chipBtns = document.querySelectorAll('.chip-btn');
+
+    const quoteScenarios = [
+      {
+        mode: 'telex',
+        badge: '<span class="text-amber-300 font-bold">⚡️ Song ngữ:</span> test, restrict, toast không bị nhảy dấu s!',
+        tokens: [
+          { raw: 'git ', text: 'git ' },
+          { raw: 'commit ', text: 'commit ' },
+          { raw: '-m ', text: '-m ' },
+          { raw: '"test ', text: '<span class="text-amber-300 font-semibold">"test</span> ' },
+          { raw: 'feature ', text: 'feature ' },
+          { raw: 'restrict ', text: '<span class="text-amber-300 font-semibold">restrict</span> ' },
+          { raw: 'zoom ', text: 'zoom ' },
+          { raw: 'vaf ', text: 'và ' },
+          { raw: 'fix ', text: 'fix ' },
+          { raw: 'toast ', text: '<span class="text-amber-300 font-semibold">toast</span> ' },
+          { raw: 'error ', text: 'error ' },
+          { raw: 'treen ', text: 'trên ' },
+          { raw: 'macOS"', text: '<span class="text-amber-300 font-semibold">macOS"</span>' }
+        ]
+      },
+      {
+        mode: 'vni',
+        badge: '<span class="text-pink-400 font-bold">🌸 Gen Z & English:</span> blood, floor, door chuẩn chỉnh, hong lo bị sửa lưng :D',
+        tokens: [
+          { raw: 'fai ', text: '<span class="text-pink-300 font-semibold">fải</span> ' },
+          { raw: 'cong ', text: 'công ' },
+          { raw: 'nhan65 ', text: 'nhận ' },
+          { raw: 'thix ', text: '<span class="text-pink-300 font-semibold">thix</span> ' },
+          { raw: 'qua1 ', text: 'quá ' },
+          { raw: 'tru2i: ', text: '<span class="text-pink-300 font-semibold">trùi:</span> ' },
+          { raw: 'go74 ', text: 'gõ ' },
+          { raw: 'blood, ', text: '<span class="text-amber-300 font-semibold">blood,</span> ' },
+          { raw: 'floor ', text: '<span class="text-amber-300 font-semibold">floor</span> ' },
+          { raw: 'hay ', text: 'hay ' },
+          { raw: 'door ', text: '<span class="text-amber-300 font-semibold">door</span> ' },
+          { raw: 'de62u ', text: 'đều ' },
+          { raw: 'mu7o75t ', text: 'mượt ' },
+          { raw: 'ru, ', text: 'ru, ' },
+          { raw: 'hong ', text: '<span class="text-pink-300 font-semibold">hong</span> ' },
+          { raw: 'lo ', text: 'lo ' },
+          { raw: 'bi5 ', text: 'bị ' },
+          { raw: 'su73a ', text: 'sửa ' },
+          { raw: 'lu7ng ', text: 'lưng ' },
+          { raw: ':D', text: ':D' }
+        ]
+      },
+      {
+        mode: 'telex',
+        badge: '<span class="text-emerald-400 font-bold">✨ Tự nhiên như hơi thở:</span> Gõ là gõ, đừng biến việc gõ thành một vấn đề!',
+        tokens: [
+          { raw: 'Gox ', text: 'Gõ ' },
+          { raw: 'laf ', text: 'là ' },
+          { raw: 'gox. ', text: 'gõ. ' },
+          { raw: 'Duwngf ', text: 'Đừng ' },
+          { raw: 'bieens ', text: 'biến ' },
+          { raw: 'vieecj ', text: 'việc ' },
+          { raw: 'gox ', text: 'gõ ' },
+          { raw: 'thanhf ', text: 'thành ' },
+          { raw: 'moojt ', text: 'một ' },
+          { raw: 'vaans ', text: 'vấn ' },
+          { raw: 'deef! ', text: 'đề! ' },
+          { raw: '✨', text: '✨' }
+        ]
+      }
+    ];
+
+    let currentScenarioIndex = 0;
+    let isAutoPlaying = true;
+    let autoPlayTimer = null;
+    let isManualMode = false;
+    let idleResumeTimer = null;
+
+    function sleep(ms) {
+      return new Promise(resolve => {
+        autoPlayTimer = setTimeout(resolve, ms);
+      });
+    }
+
+    async function runTypewriterLoop() {
+      while (true) {
+        if (!isAutoPlaying || isManualMode) {
+          await new Promise(r => setTimeout(r, 400));
+          continue;
+        }
+
+        const scenario = quoteScenarios[currentScenarioIndex];
+        setTypingMode(scenario.mode);
+        badgeText.innerHTML = scenario.badge;
+        typedTextEl.innerHTML = '';
+        composingTextEl.innerText = '';
+
+        for (const token of scenario.tokens) {
+          if (!isAutoPlaying || isManualMode) break;
+
+          // Type out raw characters with composing underline
+          for (let i = 1; i <= token.raw.length; i++) {
+            if (!isAutoPlaying || isManualMode) break;
+            composingTextEl.innerText = token.raw.slice(0, i);
+            await sleep(40 + Math.random() * 35);
+          }
+
+          // Commit word to final output
+          if (!isAutoPlaying || isManualMode) break;
+          composingTextEl.innerText = '';
+          typedTextEl.innerHTML += token.text;
+          await sleep(65);
+        }
+
+        // Pause to let user read the complete sentence
+        if (isAutoPlaying && !isManualMode) {
+          await sleep(3400);
+        }
+
+        // Smooth backspace / erase before next scenario
+        if (isAutoPlaying && !isManualMode) {
+          const plainLength = typedTextEl.innerText.length;
+          const eraseStep = Math.max(1, Math.floor(plainLength / 22));
+          while (typedTextEl.innerText.length > 0 && isAutoPlaying && !isManualMode) {
+            typedTextEl.innerText = typedTextEl.innerText.slice(0, -eraseStep);
+            await sleep(18);
+          }
+          typedTextEl.innerHTML = '';
+          await sleep(400);
+        }
+
+        currentScenarioIndex = (currentScenarioIndex + 1) % quoteScenarios.length;
+      }
+    }
+
+    // Manual typing activation
+    function switchToManualTyping() {
+      if (isManualMode) return;
+      isManualMode = true;
+      isAutoPlaying = false;
+      clearTimeout(autoPlayTimer);
+
+      autoDisplay.classList.add('hidden');
+      liveInput.classList.remove('hidden');
+      liveInput.value = typedTextEl.innerText;
+      liveInput.focus();
+
+      toggleIcon.innerText = '▶️';
+      toggleLabel.innerText = 'Tự động gõ';
+      badgeDot.classList.remove('animate-ping');
+      badgeText.innerHTML = '<span class="text-lotus-accent font-bold">⌨️ Chế độ gõ tự do:</span> Bạn đang trực tiếp gõ phím.';
+      scheduleIdleResume();
+    }
+
+    function toggleAutoPlay(e) {
+      if (e) e.stopPropagation();
+      if (isAutoPlaying) {
+        isAutoPlaying = false;
+        clearTimeout(autoPlayTimer);
+        toggleIcon.innerText = '▶️';
+        toggleLabel.innerText = 'Tự động gõ';
+        badgeDot.classList.remove('animate-ping');
+      } else {
+        isManualMode = false;
+        isAutoPlaying = true;
+        autoDisplay.classList.remove('hidden');
+        liveInput.classList.add('hidden');
+        toggleIcon.innerText = '⏸';
+        toggleLabel.innerText = 'Tạm dừng';
+        badgeDot.classList.add('animate-ping');
+        clearTimeout(autoPlayTimer);
+      }
+    }
+
+    function clearLiveEditor(e) {
+      if (e) e.stopPropagation();
+      liveInput.value = '';
+      typedTextEl.innerHTML = '';
+      composingTextEl.innerText = '';
+      badgeText.innerText = translations[currentLang]['stage.hint'];
+      if (!isManualMode) {
+        switchToManualTyping();
+      } else {
+        liveInput.focus();
+      }
+      scheduleIdleResume();
+    }
+
+    function scheduleIdleResume() {
+      clearTimeout(idleResumeTimer);
+      idleResumeTimer = setTimeout(() => {
+        if (isManualMode && liveInput.value.trim() === '') {
+          toggleAutoPlay();
+        }
+      }, 9000);
+    }
+
+    // Chip triggers
+    chipBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const quoteIdx = parseInt(btn.getAttribute('data-quote-index'), 10);
+        if (!isNaN(quoteIdx)) {
+          currentScenarioIndex = quoteIdx;
+          if (isManualMode) {
+            isManualMode = false;
+            autoDisplay.classList.remove('hidden');
+            liveInput.classList.add('hidden');
+          }
+          isAutoPlaying = true;
+          toggleIcon.innerText = '⏸';
+          toggleLabel.innerText = 'Tạm dừng';
+          badgeDot.classList.add('animate-ping');
+          clearTimeout(autoPlayTimer);
+          typedTextEl.innerHTML = '';
+          composingTextEl.innerText = '';
+        }
+      });
+    });
+
+    // Real-time manual typing feedback
+    const englishWords = new Set(['apple', 'macbook', 'iphone', 'wifi', 'design', 'ui/ux', 'hello', 'world', 'const', 'export', 'default', 'count', 'slack', 'notion', 'test', 'restrict', 'blood', 'floor', 'door', 'toast', 'cost', 'post', 'zoom', 'error']);
+    const teenCodeWords = new Set(['thix', 'bik', 'mun', 'mún', 'fai', 'fải', 'ko', 'dc', 'đc', 'xiu', 'xỉu', 'hom', 'hơm', 'trui', 'trùi', 'ak', 'hong']);
+
+    liveInput.addEventListener('input', (e) => {
+      scheduleIdleResume();
+      const val = e.target.value.toLowerCase();
+      let hasEnglish = false;
+      let hasGenz = false;
+      const tokens = val.split(/\s+/);
+      
+      tokens.forEach(token => {
+        if (teenCodeWords.has(token)) hasGenz = true;
+        if (englishWords.has(token)) hasEnglish = true;
+      });
+
+      if (hasGenz) {
+        badgeText.innerHTML = '<span class="text-pink-400 font-bold">🌸 Gen-Z Mode:</span> Đang nhận diện từ lóng tự nhiên, gõ thoải mái nha!';
+      } else if (hasEnglish) {
+        badgeText.innerHTML = '<span class="text-emerald-400 font-bold">⚡️ Song ngữ:</span> Tự động giữ nguyên từ tiếng Anh và mã code!';
+      } else if (val.trim().length > 0) {
+        badgeText.innerHTML = '<span class="text-lotus-accent font-bold">✓ Gõ mượt mà:</span> Nét gạch chân nhẹ, êm ái từng phím.';
+      } else {
+        badgeText.innerText = translations[currentLang]['stage.hint'];
+      }
+    });
+
+    // Start auto loop on load
+    runTypewriterLoop();
+
+    // Dynamic Latest Release URLs
+    async function updateReleaseLinks() {
+      try {
+        const response = await fetch('https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest');
+        if (response.ok) {
+          const data = await response.json();
+          const pkgAsset = data.assets.find(a => a.name.endsWith('.pkg'));
+          const dmgAsset = data.assets.find(a => a.name === 'VieLotusIM.dmg');
+          if (pkgAsset) {
+            const el = document.getElementById('btn-download-pkg');
+            if (el) el.href = pkgAsset.browser_download_url;
+          }
+          if (dmgAsset) {
+            const el = document.getElementById('btn-download-dmg');
+            if (el) el.href = dmgAsset.browser_download_url;
+          }
+        }
+      } catch (e) {}
+    }
+    updateReleaseLinks();
+
+    // Scrollytelling: High-performance IntersectionObserver Reveal
+    function initReveal() {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('active');
+          }
+        });
+      }, {
+        threshold: 0.08,
+        rootMargin: '0px 0px -20px 0px'
+      });
+
+      document.querySelectorAll('.reveal').forEach(el => {
+        const rect = el.getBoundingClientRect();
+        if (rect.top < window.innerHeight) {
+          el.classList.add('active');
+        }
+        revealObserver.observe(el);
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initReveal);
+    } else {
+      initReveal();
+    }
+  </script>
+</body>
+</html>

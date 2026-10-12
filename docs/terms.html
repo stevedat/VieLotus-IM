@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Điều khoản Sử dụng — Sen Việt (VieLotusIM)</title>
+  <meta name="description" content="Điều khoản sử dụng (Terms of Service) của Sen Việt (VieLotusIM). Giấy phép mã nguồn mở MIT, quyền và trách nhiệm khi sử dụng ứng dụng.">
+  
+  <link rel="canonical" href="https://stevedat.github.io/VieLotus-IM/terms.html">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://stevedat.github.io/VieLotus-IM/terms.html">
+  <meta property="og:title" content="Điều khoản Sử dụng — Sen Việt (VieLotusIM)">
+  <meta property="og:description" content="Điều khoản sử dụng, giấy phép mã nguồn mở MIT và quy định pháp lý cho người dùng Sen Việt.">
+  <meta property="og:image" content="https://stevedat.github.io/VieLotus-IM/assets/og-card.png">
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            lotus: {
+              accent: '#FF5E8E',
+              magenta: '#A828B8',
+              indigo: '#4F46E5',
+              dark: '#090714',
+              card: 'rgba(255, 255, 255, 0.03)',
+              border: 'rgba(255, 255, 255, 0.08)'
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #090714;
+      color: #F8FAFC;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+    }
+    .gradient-brand {
+      background: linear-gradient(135deg, #FF5E8E 0%, #A828B8 50%, #4F46E5 100%);
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #FF8EB2 0%, #C084FC 50%, #818CF8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-nav {
+      background: rgba(9, 7, 20, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glow-ambient {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.12;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-lotus-accent/30 selection:text-white">
+
+  <!-- Ambient Glow -->
+  <div class="glow-ambient top-[-100px] left-1/2 -translate-x-1/2 bg-gradient-to-br from-lotus-accent via-lotus-magenta to-lotus-indigo"></div>
+
+  <!-- Header / Navbar -->
+  <header class="sticky top-0 z-50 glass-nav transition-all duration-200">
+    <div class="max-w-[1112px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-3 group">
+        <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-8 h-8 rounded-lg shadow-sm group-hover:scale-105 transition-transform duration-200">
+        <span class="font-semibold text-lg tracking-tight text-white flex items-center gap-2">
+          Sen Việt
+          <span class="text-[11px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/10">v1.0.0</span>
+        </span>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-4 text-sm font-medium text-slate-300">
+        <a href="index.html" data-i18n="nav.home" class="hover:text-white transition-colors py-2">Trang chủ</a>
+        <a href="support.html" data-i18n="nav.support" class="hover:text-white transition-colors py-2">Hỗ trợ</a>
+        <a href="terms.html" data-i18n="nav.terms" class="text-white font-semibold py-2">Điều khoản</a>
+        <a href="privacy.html" data-i18n="nav.privacy" class="hover:text-white transition-colors py-2">Quyền riêng tư</a>
+      </nav>
+
+      <div class="flex items-center gap-3">
+        <!-- Language Switcher -->
+        <div class="flex items-center p-0.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold" role="group" aria-label="Language selection">
+          <button id="lang-btn-vi" onclick="setLanguage('vi')" class="px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-white bg-white/15 shadow-sm">VI</button>
+          <button id="lang-btn-en" onclick="setLanguage('en')" class="px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-slate-400 hover:text-white">EN</button>
+        </div>
+
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" 
+           class="inline-flex items-center justify-center min-h-[36px] gap-2 text-xs font-medium px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span class="hidden sm:inline">GitHub</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-grow z-10 py-12 px-4 sm:px-6 max-w-[860px] mx-auto w-full">
+    
+    <!-- Hero / Title -->
+    <div class="mb-10 text-center sm:text-left">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-300 mb-4">
+        <span class="w-2 h-2 rounded-full bg-lotus-accent"></span>
+        <span data-i18n="badge">Thỏa thuận Pháp lý & Giấy phép Mã nguồn mở</span>
+      </div>
+      <h1 data-i18n="title" class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight mb-3">
+        Điều khoản Sử dụng
+      </h1>
+      <p data-i18n="subtitle" class="text-slate-400 text-sm sm:text-base">
+        Quy định và điều khoản khi tải, cài đặt và sử dụng phần mềm Sen Việt (VieLotusIM).
+      </p>
+      <div class="mt-4 flex items-center gap-4 text-xs text-slate-500">
+        <span data-i18n="effective_date">Cập nhật lần cuối: Ngày 12 tháng 10 năm 2026</span>
+        <span>•</span>
+        <span data-i18n="version">Phiên bản: 1.1.2</span>
+      </div>
+    </div>
+
+    <!-- Content Sections -->
+    <div class="space-y-6 text-sm text-slate-300 leading-relaxed">
+      
+      <!-- Section 1: Acceptance -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s1_title" class="text-base font-bold text-white mb-3">1. Chấp thuận Điều khoản</h3>
+        <p data-i18n="s1_p1">
+          Bằng việc tải về, cài đặt hoặc sử dụng ứng dụng bàn phím <strong>Sen Việt</strong> (VieLotusIM) trên bất kỳ thiết bị Apple nào (bao gồm iPhone, iPad, Mac), bạn đồng ý tuân thủ các Điều khoản Sử dụng này cùng với Chính sách Quyền riêng tư của chúng tôi. Nếu không đồng ý với bất kỳ điều khoản nào, bạn có thể ngừng sử dụng và gỡ bỏ ứng dụng khỏi thiết bị của mình.
+        </p>
+      </section>
+
+      <!-- Section 2: Open Source License -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s2_title" class="text-base font-bold text-white mb-3">2. Giấy phép Mã nguồn mở (MIT License)</h3>
+        <p data-i18n="s2_p1" class="mb-3">
+          Mã nguồn của bộ gõ Sen Việt được phân phối theo giấy phép <strong>MIT License</strong>. Theo đó, bạn được toàn quyền sử dụng, sao chép, sửa đổi, hợp nhất, xuất bản, phân phối và/hoặc bán các bản sao của phần mềm, với điều kiện giữ nguyên thông báo bản quyền gốc.
+        </p>
+        <div class="p-4 rounded-xl bg-black/60 border border-white/5 font-mono text-xs text-slate-300 space-y-1">
+          <div>Copyright (c) 2026 Steve Dat & Contributors</div>
+          <div class="text-slate-400 text-[11px] leading-relaxed pt-1">
+            Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction...
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: App Store EULA -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s3_title" class="text-base font-bold text-white mb-3">3. Thỏa thuận Người dùng Cuối của Apple (Standard EULA)</h3>
+        <p data-i18n="s3_p1">
+          Đối với phiên bản được phân phối thông qua Apple App Store, việc cấp phép sử dụng ứng dụng này tuân theo <em>Thỏa thuận Cấp phép Người dùng Cuối Tiêu chuẩn của Apple</em> (<a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" class="text-lotus-accent hover:underline">Apple Standard EULA</a>). Apple Inc. không chịu trách nhiệm cung cấp dịch vụ bảo trì hoặc hỗ trợ nào liên quan đến ứng dụng này.
+        </p>
+      </section>
+
+      <!-- Section 4: Acceptable Use -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s4_title" class="text-base font-bold text-white mb-3">4. Quyền & Trách nhiệm của Người dùng</h3>
+        <p data-i18n="s4_p1" class="mb-3">
+          Sen Việt là công cụ hỗ trợ soạn thảo văn bản. Bạn chịu trách nhiệm về nội dung văn bản mà bạn nhập liệu. Bạn cam kết không cố ý sửa đổi hoặc sử dụng phần mềm nhằm mục đích độc hại, gây phương hại đến hệ thống hoặc vi phạm pháp luật hiện hành.
+        </p>
+      </section>
+
+      <!-- Section 5: Disclaimer -->
+      <section class="glass-card rounded-2xl p-6 border-l-4 border-l-amber-400">
+        <h3 data-i18n="s5_title" class="text-base font-bold text-white mb-3">5. Miễn trừ Trách nhiệm (Disclaimer of Warranties)</h3>
+        <p data-i18n="s5_p1" class="mb-3">
+          Phần mềm được cung cấp theo nguyên trạng <strong>"AS IS"</strong> (như vốn có), không có bất kỳ sự bảo đảm nào, dù rõ ràng hay ngụ ý, bao gồm nhưng không giới hạn ở các bảo đảm về khả năng thương mại, tính phù hợp cho một mục đích cụ thể hoặc tính không vi phạm.
+        </p>
+        <p data-i18n="s5_p2">
+          Trong mọi trường hợp, tác giả hoặc những người đóng góp vào dự án sẽ không chịu trách nhiệm đối với bất kỳ khiếu nại, thiệt hại (bao gồm trực tiếp, gián tiếp, đặc biệt hoặc ngẫu nhiên) phát sinh từ việc sử dụng hoặc không thể sử dụng phần mềm.
+        </p>
+      </section>
+
+      <!-- Section 6: Modifications -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s6_title" class="text-base font-bold text-white mb-3">6. Thay đổi Điều khoản</h3>
+        <p data-i18n="s6_p1">
+          Chúng tôi có thể cập nhật các Điều khoản Sử dụng này theo thời gian để phản ánh các cải tiến về tính năng hoặc tuân thủ các quy định mới của các nền tảng phân phối. Mọi thay đổi sẽ được công bố trực tiếp trên trang web này kèm theo ngày cập nhật mới nhất.
+        </p>
+      </section>
+
+      <!-- Section 7: Contact -->
+      <section class="glass-card rounded-2xl p-6">
+        <h3 data-i18n="s7_title" class="text-base font-bold text-white mb-3">7. Thông tin Liên hệ</h3>
+        <p data-i18n="s7_p1">
+          Mọi thắc mắc về Điều khoản Sử dụng có thể được gửi tới qua kênh GitHub chính thức:
+        </p>
+        <div class="mt-2 text-xs">
+          <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="text-lotus-accent hover:underline">
+            https://github.com/stevedat/VieLotus-IM
+          </a>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/[0.08] py-8 px-4 sm:px-6 bg-black/40 z-10 text-xs text-slate-500">
+    <div class="max-w-[1112px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <img src="assets/symbol.svg" alt="Sen Việt Logo" class="w-5 h-5 opacity-75">
+        <span>Sen Việt (VieLotusIM) · Mã nguồn mở MIT License.</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-5">
+        <a href="index.html" class="hover:text-slate-300 transition-colors">Trang chủ</a>
+        <a href="support.html" class="hover:text-slate-300 transition-colors">Hỗ trợ (Support)</a>
+        <a href="terms.html" class="text-slate-300 font-medium transition-colors">Điều khoản (Terms)</a>
+        <a href="privacy.html" class="hover:text-slate-300 transition-colors">Quyền riêng tư (Privacy)</a>
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition-colors">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Bilingual Logic -->
+  <script>
+    const translations = {
+      vi: {
+        'nav.home': 'Trang chủ',
+        'nav.support': 'Hỗ trợ',
+        'nav.terms': 'Điều khoản',
+        'nav.privacy': 'Quyền riêng tư',
+        'badge': 'Thỏa thuận Pháp lý & Giấy phép Mã nguồn mở',
+        'title': 'Điều khoản Sử dụng',
+        'subtitle': 'Quy định và điều khoản khi tải, cài đặt và sử dụng phần mềm Sen Việt (VieLotusIM).',
+        'effective_date': 'Cập nhật lần cuối: Ngày 12 tháng 10 năm 2026',
+        'version': 'Phiên bản: 1.1.2',
+        's1_title': '1. Chấp thuận Điều khoản',
+        's1_p1': 'Bằng việc tải về, cài đặt hoặc sử dụng ứng dụng bàn phím <strong>Sen Việt</strong> (VieLotusIM) trên bất kỳ thiết bị Apple nào (bao gồm iPhone, iPad, Mac), bạn đồng ý tuân thủ các Điều khoản Sử dụng này cùng với Chính sách Quyền riêng tư của chúng tôi. Nếu không đồng ý với bất kỳ điều khoản nào, bạn có thể ngừng sử dụng và gỡ bỏ ứng dụng khỏi thiết bị của mình.',
+        's2_title': '2. Giấy phép Mã nguồn mở (MIT License)',
+        's2_p1': 'Mã nguồn của bộ gõ Sen Việt được phân phối theo giấy phép <strong>MIT License</strong>. Theo đó, bạn được toàn quyền sử dụng, sao chép, sửa đổi, hợp nhất, xuất bản, phân phối và/hoặc bán các bản sao của phần mềm, với điều kiện giữ nguyên thông báo bản quyền gốc.',
+        's3_title': '3. Thỏa thuận Người dùng Cuối của Apple (Standard EULA)',
+        's3_p1': 'Đối với phiên bản được phân phối thông qua Apple App Store, việc cấp phép sử dụng ứng dụng này tuân theo <em>Thỏa thuận Cấp phép Người dùng Cuối Tiêu chuẩn của Apple</em> (Apple Standard EULA). Apple Inc. không chịu trách nhiệm cung cấp dịch vụ bảo trì hoặc hỗ trợ nào liên quan đến ứng dụng này.',
+        's4_title': '4. Quyền & Trách nhiệm của Người dùng',
+        's4_p1': 'Sen Việt là công cụ hỗ trợ soạn thảo văn bản. Bạn chịu trách nhiệm về nội dung văn bản mà bạn nhập liệu. Bạn cam kết không cố ý sửa đổi hoặc sử dụng phần mềm nhằm mục đích độc hại, gây phương hại đến hệ thống hoặc vi phạm pháp luật hiện hành.',
+        's5_title': '5. Miễn trừ Trách nhiệm (Disclaimer of Warranties)',
+        's5_p1': 'Phần mềm được cung cấp theo nguyên trạng <strong>"AS IS"</strong> (như vốn có), không có bất kỳ sự bảo đảm nào, dù rõ ràng hay ngụ ý, bao gồm nhưng không giới hạn ở các bảo đảm về khả năng thương mại, tính phù hợp cho một mục đích cụ thể hoặc tính không vi phạm.',
+        's5_p2': 'Trong mọi trường hợp, tác giả hoặc những người đóng góp vào dự án sẽ không chịu trách nhiệm đối với bất kỳ khiếu nại, thiệt hại (bao gồm trực tiếp, gián tiếp, đặc biệt hoặc ngẫu nhiên) phát sinh từ việc sử dụng hoặc không thể sử dụng phần mềm.',
+        's6_title': '6. Thay đổi Điều khoản',
+        's6_p1': 'Chúng tôi có thể cập nhật các Điều khoản Sử dụng này theo thời gian để phản ánh các cải tiến về tính năng hoặc tuân thủ các quy định mới của các nền tảng phân phối. Mọi thay đổi sẽ được công bố trực tiếp trên trang web này kèm theo ngày cập nhật mới nhất.',
+        's7_title': '7. Thông tin Liên hệ',
+        's7_p1': 'Mọi thắc mắc về Điều khoản Sử dụng có thể được gửi tới qua kênh GitHub chính thức:'
+      },
+      en: {
+        'nav.home': 'Home',
+        'nav.support': 'Support',
+        'nav.terms': 'Terms',
+        'nav.privacy': 'Privacy Policy',
+        'badge': 'Legal Agreement & Open-Source License',
+        'title': 'Terms of Service',
+        'subtitle': 'Terms and conditions governing the download, installation, and usage of Sen Việt (VieLotusIM).',
+        'effective_date': 'Last updated: October 12, 2026',
+        'version': 'Version: 1.1.2',
+        's1_title': '1. Acceptance of Terms',
+        's1_p1': 'By downloading, installing, or using the <strong>Sen Việt</strong> (VieLotusIM) keyboard application on any Apple device (including iPhone, iPad, Mac), you agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree, discontinue use and delete the application.',
+        's2_title': '2. Open-Source License (MIT License)',
+        's2_p1': 'The source code of Sen Việt is licensed under the <strong>MIT License</strong>. You are granted permission to use, copy, modify, merge, publish, and distribute copies of the software freely, subject to retaining original copyright notices.',
+        's3_title': '3. Apple Standard EULA Compatibility',
+        's3_p1': 'For distributions via the Apple App Store, usage is governed by Apple\'s Standard Licensed Application End User License Agreement (Standard EULA). Apple Inc. is not responsible for any maintenance or support services.',
+        's4_title': '4. User Responsibilities',
+        's4_p1': 'Sen Việt provides text composition functionality. You are solely responsible for all textual content entered. You agree not to attempt to inject malicious code or manipulate the software to compromise device integrity.',
+        's5_title': '5. Disclaimer of Warranties',
+        's5_p1': 'The software is provided <strong>"AS IS"</strong>, without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.',
+        's5_p2': 'In no event shall the authors or copyright holders be liable for any claim, damages, or other liability arising from the use of the software.',
+        's6_title': '6. Modifications to Terms',
+        's6_p1': 'We reserve the right to amend these terms to reflect feature improvements or distribution platform regulatory updates. Updates take effect upon posting.',
+        's7_title': '7. Contact Information',
+        's7_p1': 'Any questions regarding these Terms may be directed to our official GitHub repository:'
+      }
+    };
+
+    function setLanguage(lang) {
+      localStorage.setItem('vielotus_lang', lang);
+      document.documentElement.lang = lang;
+      
+      const viBtn = document.getElementById('lang-btn-vi');
+      const enBtn = document.getElementById('lang-btn-en');
+      if (lang === 'vi') {
+        viBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-white bg-white/15 shadow-sm';
+        enBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-slate-400 hover:text-white';
+      } else {
+        enBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-white bg-white/15 shadow-sm';
+        viBtn.className = 'px-3 py-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-md transition-all text-slate-400 hover:text-white';
+      }
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang] && translations[lang][key]) {
+          el.innerHTML = translations[lang][key];
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedLang = localStorage.getItem('vielotus_lang') || 'vi';
+      setLanguage(savedLang);
+    });
+  </script>
+</body>
+</html>

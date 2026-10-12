@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hướng Dẫn Kích Hoạt Sen Việt (VieLotusIM)</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f5f7;
+      --surface: #ffffff;
+      --text: #1d1d1f;
+      --secondary: #6e6e73;
+      --border: #d2d2d7;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --danger-bg: rgba(255, 59, 48, 0.08);
+      --danger-border: rgba(255, 59, 48, 0.25);
+      --danger-text: #d70015;
+      --warning-bg: rgba(255, 149, 0, 0.1);
+      --warning-border: rgba(255, 149, 0, 0.3);
+      --warning-text: #b25000;
+      --success-bg: rgba(52, 199, 89, 0.1);
+      --success-border: rgba(52, 199, 89, 0.3);
+      --success-text: #248a3d;
+      --kbd-bg: #fbfbfd;
+      --kbd-border: #c8c8cc;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1c1e;
+        --surface: #2c2c2e;
+        --text: #f5f5f7;
+        --secondary: #a1a1a6;
+        --border: #38383a;
+        --accent: #2997ff;
+        --accent-hover: #40a9ff;
+        --danger-bg: rgba(255, 69, 58, 0.15);
+        --danger-border: rgba(255, 69, 58, 0.35);
+        --danger-text: #ff6961;
+        --warning-bg: rgba(255, 159, 10, 0.15);
+        --warning-border: rgba(255, 159, 10, 0.35);
+        --warning-text: #ffb340;
+        --success-bg: rgba(48, 209, 88, 0.15);
+        --success-border: rgba(48, 209, 88, 0.35);
+        --success-text: #30d158;
+        --kbd-bg: #3a3a3c;
+        --kbd-border: #545458;
+      }
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+      background-color: var(--bg);
+      padding: 32px 16px;
+    }
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+      background: var(--surface);
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .header {
+      padding: 32px 32px 24px 32px;
+      background: linear-gradient(180deg, rgba(236, 72, 153, 0.08) 0%, transparent 100%);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .logo-badge {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 30px;
+      font-weight: 700;
+      box-shadow: 0 6px 16px rgba(236, 72, 153, 0.3);
+      flex-shrink: 0;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 4px;
+    }
+    .header-desc {
+      font-size: 13px;
+      color: var(--secondary);
+    }
+    .content {
+      padding: 28px 32px;
+    }
+    .alert-banner {
+      background: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      color: var(--warning-text);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .alert-banner strong {
+      font-weight: 600;
+    }
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 24px 0 14px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h2:first-of-type {
+      margin-top: 0;
+    }
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .step-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-content {
+      flex: 1;
+    }
+    .step-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .step-desc {
+      font-size: 13px;
+      color: var(--secondary);
+      line-height: 1.5;
+    }
+    .danger-highlight {
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      border-radius: 8px;
+      color: var(--danger-text);
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+    kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      font-weight: 600;
+      color: var(--text);
+      background-color: var(--kbd-bg);
+      border: 1px solid var(--kbd-border);
+      border-radius: 5px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+      margin: 0 2px;
+    }
+    .tip-box {
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-top: 24px;
+      font-size: 13px;
+      color: var(--success-text);
+      line-height: 1.5;
+    }
+    .tip-box strong {
+      font-weight: 600;
+    }
+    .footer {
+      padding: 20px 32px;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12.5px;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    a:hover {
+      text-decoration: underline;
+      color: var(--accent-hover);
+    }
+    .links-group {
+      display: flex;
+      gap: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo-badge">Ṽ</div>
+      <div>
+        <h1>Hướng Dẫn Kích Hoạt Sen Việt</h1>
+        <p class="header-desc">Bộ gõ tiếng Việt thế hệ mới chuẩn Apple Native dành cho macOS</p>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="alert-banner">
+        🛡️ <strong>Chính sách bảo mật macOS:</strong> Hệ điều hành macOS không cho phép ứng dụng tự động kích hoạt bộ gõ bên thứ ba mà yêu cầu người dùng xác nhận trong Cài đặt hệ thống.
+      </div>
+
+      <h2>🚀 3 Bước Kích Hoạt Nhanh</h2>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">Mở Cài Đặt Nguồn Đầu Vào</div>
+            <p class="step-desc">
+              Vào <strong> Menu</strong> → <strong>Cài đặt hệ thống (System Settings)</strong> → chọn <strong>Bàn phím (Keyboard)</strong> ở danh mục bên trái → cuộn xuống phần <strong>Nguồn nhập (Input Sources)</strong> và nhấn nút <strong>Sửa... (Edit...)</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Thêm Bộ Gõ Sen Việt</div>
+            <p class="step-desc">
+              Bấm dấu <kbd>+</kbd> ở góc dưới bên trái → chọn mục <strong>Tiếng Việt</strong> ở danh sách bên trái → chọn <strong>Sen Việt</strong> bên phải → bấm nút <strong>Thêm (Add)</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Xoá Bỏ Bộ Gõ Cũ Của Apple (Cực Kỳ Quan Trọng)</div>
+            <p class="step-desc">
+              Trong danh sách nguồn nhập, chọn bộ gõ tiếng Việt cũ của Apple (ví dụ: <em>Tiếng Việt - Telex</em> hoặc <em>Tiếng Việt - VNI</em>) và nhấn dấu <kbd>−</kbd> để xoá.
+            </p>
+            <div class="danger-highlight">
+              ⚠️ <strong>Tại sao cần xoá?</strong> Giữ đồng thời hai bộ gõ tiếng Việt sẽ làm phím chuyển đổi ngôn ngữ (<kbd>Fn</kbd> / <kbd>🌐</kbd> hoặc <kbd>Ctrl</kbd> + <kbd>Space</kbd>) xoay vòng qua bộ gõ cũ, gây tái diễn lỗi nuốt chữ kinh niên của hệ thống Apple.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tip-box">
+        💡 <strong>Mẹo sử dụng:</strong> Sau khi xoá bộ gõ cũ, danh sách của bạn chỉ còn <strong>ABC</strong> (Tiếng Anh) và <strong>Sen Việt</strong> (Tiếng Việt). Bạn có thể bấm phím <kbd>Fn</kbd> hoặc <kbd>Ctrl</kbd> + <kbd>Space</kbd> để chuyển đổi tức thì giữa Tiếng Anh và Tiếng Việt siêu mượt mà!
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>© 2026 Sen Việt (VieLotusIM) • Pure Apple Native</div>
+      <div class="links-group">
+        <a href="https://stevedat.github.io/VieLotus-IM/" target="_blank">🌐 Trang chủ chính thức</a>
+        <a href="https://github.com/stevedat/VieLotus-IM/issues" target="_blank">💬 Hỗ trợ & Góp ý</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

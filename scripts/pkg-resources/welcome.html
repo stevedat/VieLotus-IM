@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --text: #1d1d1f;
+      --secondary: #6e6e73;
+      --card-bg: #f5f5f7;
+      --border: #d2d2d7;
+      --accent: #0071e3;
+      --lotus: #d946ef;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1e1e1e;
+        --text: #f5f5f7;
+        --secondary: #a1a1a6;
+        --card-bg: #2d2d2d;
+        --border: #424245;
+        --accent: #2997ff;
+        --lotus: #e879f9;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text);
+      background-color: var(--bg);
+      margin: 0;
+      padding: 16px 20px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo-badge {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 26px;
+      font-weight: 700;
+      box-shadow: 0 4px 10px rgba(236, 72, 153, 0.3);
+    }
+    h1 {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0 0 2px 0;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: var(--secondary);
+      margin: 0;
+    }
+    .features {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .feature-card {
+      background: var(--card-bg);
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .feature-title {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .feature-desc {
+      font-size: 12px;
+      color: var(--secondary);
+      margin: 0;
+    }
+    .link-box {
+      margin-top: 14px;
+      padding: 8px 12px;
+      background: rgba(0, 113, 227, 0.08);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-badge">Ṽ</div>
+    <div>
+      <h1>Sen Việt (VieLotusIM)</h1>
+      <p class="subtitle">Bộ gõ tiếng Việt thế hệ mới chuẩn Apple InputMethodKit</p>
+    </div>
+  </div>
+
+  <p>Chào mừng bạn đến với gói cài đặt <strong>Sen Việt (VieLotusIM)</strong> cho macOS. Bộ gõ được thiết kế và xây dựng theo tiêu chuẩn kỹ thuật cao nhất của Apple:</p>
+
+  <div class="features">
+    <div class="feature-card">
+      <div class="feature-title">🛡️ Pure Apple Native & An Toàn Bộ Nhớ</div>
+      <p class="feature-desc">100% Pure Swift an toàn bộ nhớ. Tuyệt đối KHÔNG đòi hỏi quyền Trợ năng (Accessibility), không can thiệp API tầng thấp.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-title">⚡ Khắc Phục Triệt Để Nuốt Chữ & Nhảy Con Trỏ</div>
+      <p class="feature-desc">Loại bỏ hoàn toàn lỗi nuốt chữ, lặp chữ và giật lag trên trình duyệt web, thanh tìm kiếm và Terminal / CLI.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-title">🌐 Trí Tuệ Song Ngữ Thông Minh (Smart Bilingual)</div>
+      <p class="feature-desc">Đạt độ chính xác 99.97% trên 9.091 ca kiểm thử, không làm hỏng từ tiếng Anh hay cú pháp lập trình khi gõ.</p>
+    </div>
+  </div>
+
+  <div class="link-box">
+    🌐 Trang chủ & Tài liệu chính thức: <a href="https://stevedat.github.io/VieLotus-IM/" target="_blank">https://stevedat.github.io/VieLotus-IM/</a>
+  </div>
+</body>
+</html>
