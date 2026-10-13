@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Platforms-macOS%20%7C%20iPadOS%20%7C%20iOS-black.svg)](#architecture)
+[![App Store](https://img.shields.io/badge/App_Store-Sen_Việt-000000.svg?logo=apple&logoColor=white)](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799)
 [![Language](https://img.shields.io/badge/Swift-6.0-orange.svg)](#tech-stack)
 [![Accuracy](https://img.shields.io/badge/Regression-99.97%25%20(9%2C088%2F9%2C091)-emerald.svg)](#benchmark-matrix)
 [![Website](https://img.shields.io/badge/Website-stevedat.github.io%2FVieLotus--IM-FF5E8E.svg)](https://stevedat.github.io/VieLotus-IM/)
@@ -109,6 +110,19 @@ brew install stevedat/tap/vielotus
 3. Open **System Settings** $\rightarrow$ **Keyboard** $\rightarrow$ **Text Input** $\rightarrow$ **Edit...**
 4. Add **Vietnamese** $\rightarrow$ **Sen Việt** (`VieLotusIM`).
 5. Remove the legacy Apple Vietnamese keyboard to prevent input conflicts.
+
+### iOS & iPadOS Installation (iPhone & iPad)
+
+[![Download on the App Store](https://img.shields.io/badge/App_Store-Sen_Việt_(Free)-000000?style=for-the-badge&logo=apple&logoColor=white)](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799)
+
+Install directly from Apple's official App Store:
+👉 **[Tải Sen Việt trên App Store](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799)**
+
+1. Install **Sen Việt** from the App Store.
+2. Open **Settings** $\rightarrow$ **General** $\rightarrow$ **Keyboard** $\rightarrow$ **Keyboards**.
+3. Tap **Add New Keyboard...** and select **Sen Việt** under *Third-Party Keyboards*.
+4. **Zero Full Access Required**: Sen Việt works 100% offline with zero network connectivity or permission prompts.
+5. In any app, switch to Sen Việt by tapping or holding the **Globe (🌐)** key.
 
 ### Building from Source
 
