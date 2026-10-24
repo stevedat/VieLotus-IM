@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Sen Việt — Bộ gõ thuần Việt dành cho người Việt</title>
+  <meta name="description" content="Bộ gõ thuần Việt dành cho người Việt. Gõ tiếng Việt và tiếng Anh tự nhiên, êm ái trên macOS, Windows, Linux, iOS và Android.">
+
+  <!-- Canonical & OpenGraph -->
+  <link rel="canonical" href="https://stevedat.github.io/VieLotus-IM/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://stevedat.github.io/VieLotus-IM/">
+  <meta property="og:title" content="Sen Việt — Bộ gõ thuần Việt dành cho người Việt">
+  <meta property="og:description" content="Gõ là gõ. Viết tiếng Việt xen lẫn tiếng Anh tự nhiên như hơi thở trên macOS, Windows, Linux, iOS và Android.">
+  <meta property="og:image" content="https://stevedat.github.io/VieLotus-IM/assets/app-icon-512x512.png">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Sen Việt — Bộ gõ thuần Việt dành cho người Việt">
+  <meta name="twitter:description" content="Gõ là gõ. Viết tiếng Việt xen lẫn tiếng Anh tự nhiên như hơi thở trên macOS, Windows, Linux, iOS và Android.">
+  <meta name="twitter:image" content="https://stevedat.github.io/VieLotus-IM/assets/app-icon-512x512.png">
+
+  <!-- Favicons (New SV Lotus Keycap Icon) -->
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+
+  <style>
+    :root {
+      --bg-canvas: #F4F7F6;
+      --bg-surface: #FCFDFD;
+      --bg-subtle: #E9F0EE;
+      --border-hairline: #D5E0DD;
+      --border-keycap: #B8C9C5;
+      --text-primary: #15241E;
+      --text-secondary: #4A5E56;
+      --text-muted: #6E827A;
+      --lotus-green: #1F5B3A;
+      --lotus-green-hover: #17472D;
+      --lotus-teal: #1E6B7B;
+      --lotus-petal: #DF8FA3;
+      --lotus-petal-bg: #F9EFF2;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* =========================================================
+       BASE STYLES: MOBILE-FIRST (320px – 599px)
+       ========================================================= */
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+      overflow-x: hidden;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    /* Header (Mobile-first) */
+    header {
+      padding: 16px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+      color: var(--text-primary);
+      min-height: 44px;
+    }
+
+    .brand img {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      flex-shrink: 0;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .lang-switch {
+      display: inline-flex;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-hairline);
+      border-radius: 8px;
+      padding: 2px;
+    }
+
+    .lang-btn {
+      border: 0;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 600;
+      min-height: 34px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .lang-btn.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      box-shadow: 0 1px 2px rgba(21, 36, 30, 0.06);
+    }
+
+    .header-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 4px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      transition: color 0.15s ease;
+    }
+
+    .header-link:hover {
+      color: var(--text-primary);
+    }
+
+    /* Main & Hero (Mobile-first) */
+    main {
+      flex: 1;
+      padding: 20px 0 40px;
+    }
+
+    .hero {
+      text-align: center;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .hero-icon-wrap {
+      display: inline-flex;
+      padding: 5px;
+      border-radius: 22px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      box-shadow: 0 6px 18px rgba(21, 36, 30, 0.06);
+      margin-bottom: 18px;
+    }
+
+    .hero-icon {
+      width: 76px;
+      height: 76px;
+      border-radius: 17px;
+      display: block;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--lotus-green);
+      margin-bottom: 12px;
+    }
+
+    .lead {
+      font-size: 15px;
+      color: var(--text-secondary);
+      max-width: 520px;
+      margin: 0 auto 24px;
+      line-height: 1.6;
+    }
+
+    /* Primary Actions (Stacked full-width on Mobile, >=46px touch height) */
+    .cta-group {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 46px;
+      background-color: var(--lotus-green);
+      color: #FFFFFF;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 11px 20px;
+      border-radius: 10px;
+      transition: background-color 0.15s ease, transform 0.1s ease;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--lotus-green-hover);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.99);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      min-height: 46px;
+      background-color: var(--bg-surface);
+      color: var(--text-primary);
+      border: 1px solid var(--border-keycap);
+      font-size: 14.5px;
+      font-weight: 500;
+      padding: 10px 18px;
+      border-radius: 10px;
+      transition: background-color 0.15s ease;
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--bg-subtle);
+    }
+
+    .brew-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 10px;
+      padding: 6px 8px 6px 12px;
+      font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .brew-bar code {
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow-x: auto;
+      min-width: 0;
+      flex: 1;
+      text-align: left;
+    }
+
+    .copy-btn {
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      min-height: 34px;
+      padding: 5px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background-color 0.15s ease;
+    }
+
+    .copy-btn:hover {
+      background: #DCE7E4;
+    }
+
+    /* Quiet Values (Mobile-first stacked) */
+    .values {
+      padding: 28px 0;
+      border-bottom: 1px solid var(--border-hairline);
+      display: grid;
+      gap: 20px;
+    }
+
+    .value-item {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+
+    .value-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .value-desc {
+      font-size: 14.5px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Multi-Platform Section (Mobile-first) */
+    .platforms-section {
+      padding-top: 28px;
+    }
+
+    .section-heading {
+      font-size: 15.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .section-sub {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+
+    .platform-list {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .platform-row {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      padding: 13px 15px;
+      border-bottom: 1px solid var(--border-hairline);
+      font-size: 14px;
+    }
+
+    .platform-row:last-child {
+      border-bottom: 0;
+    }
+
+    .platform-name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .platform-note {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .platform-action {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--lotus-teal);
+    }
+
+    a.platform-action:hover {
+      text-decoration: underline;
+    }
+
+    .platform-tag {
+      font-size: 12.5px;
+      color: var(--text-muted);
+    }
+
+    /* Footer & VietQR Drawer (Mobile-first) */
+    footer {
+      padding: 20px 0 max(28px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border-hairline);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .footer-bar {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      column-gap: 16px;
+      row-gap: 6px;
+    }
+
+    .footer-links a,
+    .footer-donate {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+    }
+
+    .footer-links a:hover {
+      color: var(--text-primary);
+    }
+
+    .footer-donate {
+      color: var(--lotus-green);
+      font-weight: 600;
+      background: transparent;
+      border: 0;
+      font-family: inherit;
+      font-size: inherit;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .footer-donate:hover {
+      text-decoration: underline;
+    }
+
+    .vietqr-drawer {
+      display: none;
+      width: 100%;
+      margin-top: 6px;
+      padding: 16px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 12px;
+    }
+
+    .vietqr-drawer.open {
+      display: block;
+    }
+
+    .vietqr-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
+    }
+
+    .vietqr-img {
+      width: 132px;
+      height: 132px;
+      border-radius: 10px;
+      border: 1px solid var(--border-hairline);
+      background: #FFFFFF;
+      padding: 6px;
+      display: block;
+    }
+
+    .vietqr-meta {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      width: 100%;
+    }
+
+    .vietqr-meta strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .vietqr-acc-row {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 4px 0;
+    }
+
+    .vietqr-acc {
+      font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--lotus-green);
+    }
+
+    /* =========================================================
+       TABLET & DESKTOP ENHANCEMENT (min-width: 600px)
+       ========================================================= */
+    @media (min-width: 600px) {
+      body {
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+
+      header {
+        padding: 24px 0;
+      }
+
+      main {
+        padding: 36px 0 56px;
+      }
+
+      .hero {
+        padding-bottom: 40px;
+      }
+
+      .hero-icon-wrap {
+        padding: 6px;
+        border-radius: 24px;
+        margin-bottom: 22px;
+      }
+
+      .hero-icon {
+        width: 84px;
+        height: 84px;
+        border-radius: 18px;
+      }
+
+      h1 {
+        font-size: 36px;
+      }
+
+      .subtitle {
+        font-size: 19px;
+      }
+
+      .lead {
+        font-size: 15.5px;
+        margin-bottom: 28px;
+      }
+
+      .cta-group {
+        flex-direction: row;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+
+      .btn-primary,
+      .btn-secondary {
+        width: auto;
+        min-height: 44px;
+      }
+
+      .brew-bar {
+        display: inline-flex;
+        width: auto;
+        font-size: 12.5px;
+        padding: 6px 8px 6px 14px;
+      }
+
+      .values {
+        padding: 36px 0;
+        gap: 24px;
+      }
+
+      .value-item {
+        grid-template-columns: 165px 1fr;
+        gap: 16px;
+        align-items: baseline;
+      }
+
+      .platforms-section {
+        padding-top: 36px;
+      }
+
+      .platform-row {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 13px 16px;
+      }
+
+      .platform-note {
+        display: inline;
+        margin-left: 8px;
+        font-size: 13.5px;
+      }
+
+      .footer-bar {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .vietqr-left {
+        flex-direction: row;
+        text-align: left;
+        gap: 16px;
+      }
+
+      .vietqr-img {
+        width: 96px;
+        height: 96px;
+        padding: 4px;
+      }
+
+      .vietqr-acc-row {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <a href="#" class="brand">
+        <img src="assets/app-icon-512x512.png" alt="Sen Việt">
+        <span>Sen Việt</span>
+      </a>
+
+      <div class="header-actions">
+        <div class="lang-switch" role="group" aria-label="Ngôn ngữ">
+          <button id="btn-vi" class="lang-btn active" onclick="setLang('vi')">VI</button>
+          <button id="btn-en" class="lang-btn" onclick="setLang('en')">EN</button>
+        </div>
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="header-link">GitHub</a>
+      </div>
+    </header>
+
+    <main>
+      <!-- Hero -->
+      <section class="hero">
+        <div class="hero-icon-wrap">
+          <img src="assets/app-icon-512x512.png" alt="Biểu tượng phím Sen Việt" class="hero-icon">
+        </div>
+
+        <h1>Sen Việt</h1>
+        <p class="subtitle" data-i18n="hero.subtitle">Bộ gõ thuần Việt dành cho người Việt</p>
+        <p class="lead" data-i18n="hero.lead">
+          Gõ là gõ. Viết tiếng Việt xen lẫn tiếng Anh tự nhiên như hơi thở — êm ái, không nuốt chữ, không làm phiền bạn.
+        </p>
+
+        <div class="cta-group">
+          <a id="btn-download-pkg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg" class="btn-primary">
+            <span data-i18n="cta.pkg">Tải về cho macOS (.pkg)</span>
+          </a>
+          <a href="https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799" target="_blank" rel="noopener noreferrer" class="btn-secondary">
+            <span data-i18n="cta.ios">App Store (iPhone & iPad)</span>
+          </a>
+          <a href="https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard" target="_blank" rel="noopener noreferrer" class="btn-secondary">
+            <span data-i18n="cta.android">Google Play (Android)</span>
+          </a>
+        </div>
+
+        <div>
+          <div class="brew-bar">
+            <code>brew install stevedat/tap/vielotus</code>
+            <button class="copy-btn" onclick="copyBrew(this)" data-i18n="cta.copy">Sao chép</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 Quiet Values -->
+      <section class="values">
+        <div class="value-item">
+          <div class="value-title" data-i18n="v1.title">Gõ nhanh không hụt chữ</div>
+          <div class="value-desc" data-i18n="v1.desc">
+            Dù bạn viết liền mạch trên trình duyệt, ô tìm kiếm hay ứng dụng trò chuyện, từng dấu thanh vẫn vào ngay ngắn, không bị giật hay lặp từ.
+          </div>
+        </div>
+
+        <div class="value-item">
+          <div class="value-title" data-i18n="v2.title">Song ngữ tự nhiên</div>
+          <div class="value-desc" data-i18n="v2.desc">
+            Đang gõ tiếng Việt mà viết xen từ tiếng Anh hay cách viết tắt quen tay thì chữ vẫn giữ nguyên, không cần bấm đổi bộ gõ qua lại. Hỗ trợ cả Telex và VNI.
+          </div>
+        </div>
+
+        <div class="value-item">
+          <div class="value-title" data-i18n="v3.title">Thuần khiết & riêng tư</div>
+          <div class="value-desc" data-i18n="v3.desc">
+            Cài vào là dùng ngay như bàn phím mặc định của máy. Không xin quyền theo dõi bàn phím, không kết nối mạng, mọi chữ bạn viết chỉ nằm trên máy của bạn.
+          </div>
+        </div>
+      </section>
+
+      <!-- All 5 Platforms -->
+      <section class="platforms-section">
+        <h2 class="section-heading" data-i18n="plat.heading">Đồng hành trên mọi thiết bị</h2>
+        <p class="section-sub" data-i18n="plat.sub">Cùng một cảm giác gõ quen thuộc trên máy tính và điện thoại.</p>
+
+        <div class="platform-list">
+          <div class="platform-row">
+            <div>
+              <span class="platform-name">macOS</span>
+              <span class="platform-note" data-i18n="plat.mac_note">macOS 13 trở lên (Apple Silicon & Intel)</span>
+            </div>
+            <a id="link-mac-release" href="https://github.com/stevedat/VieLotus-IM/releases/latest" class="platform-action" data-i18n="plat.mac_act">Tải bộ cài .pkg / .dmg</a>
+          </div>
+
+          <div class="platform-row">
+            <div>
+              <span class="platform-name">Windows</span>
+              <span class="platform-note" data-i18n="plat.win_note">Windows 10 & 11</span>
+            </div>
+            <span class="platform-tag" data-i18n="plat.win_act">Đồng bộ nhân gõ</span>
+          </div>
+
+          <div class="platform-row">
+            <div>
+              <span class="platform-name">Linux</span>
+              <span class="platform-note" data-i18n="plat.lin_note">Ubuntu, Debian, Fedora, Arch (IBus & Fcitx5)</span>
+            </div>
+            <span class="platform-tag" data-i18n="plat.lin_act">Đồng bộ nhân gõ</span>
+          </div>
+
+          <div class="platform-row">
+            <div>
+              <span class="platform-name">iOS & iPadOS</span>
+              <span class="platform-note" data-i18n="plat.ios_note">Bàn phím cho iPhone & iPad</span>
+            </div>
+            <a href="https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799" target="_blank" rel="noopener noreferrer" class="platform-action" data-i18n="plat.ios_act">Tải trên App Store</a>
+          </div>
+
+          <div class="platform-row">
+            <div>
+              <span class="platform-name">Android</span>
+              <span class="platform-note" data-i18n="plat.and_note">Bàn phím cảm ứng & bàn phím rời</span>
+            </div>
+            <a href="https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard" target="_blank" rel="noopener noreferrer" class="platform-action" data-i18n="plat.and_act">Tải trên Google Play</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-bar">
+        <span data-i18n="footer.copy">Sen Việt — Miễn phí cho cộng đồng người Việt.</span>
+        <div class="footer-links">
+          <a href="support.html" data-i18n="footer.support">Hỗ trợ</a>
+          <a href="privacy.html" data-i18n="footer.privacy">Quyền riêng tư</a>
+          <a href="https://zalo.me/g/6wwyvywyvhsb0n6rwkze" target="_blank" rel="noopener noreferrer" data-i18n="footer.discuss">Thảo luận (Zalo)</a>
+          <a href="https://www.linkedin.com/in/stevedat/?isSelfProfile=true" target="_blank" rel="noopener noreferrer" data-i18n="footer.author">Tác giả</a>
+          <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <button type="button" class="footer-donate" onclick="toggleVietQR()" data-i18n="footer.donate">Mời cà phê ☕ (VietQR)</button>
+        </div>
+      </div>
+
+      <div id="vietqr-box" class="vietqr-drawer">
+        <div class="vietqr-left">
+          <a href="assets/vietqr.png" target="_blank" rel="noopener noreferrer" title="Mở ảnh VietQR cỡ lớn">
+            <img src="assets/vietqr.svg" alt="VietQR MB Bank 0979266045 - Trần Phát Đạt" class="vietqr-img">
+          </a>
+          <div class="vietqr-meta">
+            <div><strong data-i18n="qr.bank">Ngân hàng Quân đội (MB Bank)</strong></div>
+            <div class="vietqr-acc-row">
+              <span data-i18n="qr.acc_label">STK:</span>
+              <span class="vietqr-acc">0979266045</span>
+              <button type="button" class="copy-btn" onclick="copyText('0979266045', this)" data-i18n="cta.copy">Sao chép</button>
+            </div>
+            <div><span data-i18n="qr.holder_label">Chủ TK:</span> <strong>Trần Phát Đạt</strong> · <span data-i18n="qr.memo_label">Nội dung:</span> <code>Ung ho Sen Viet</code></div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const i18n = {
+      vi: {
+        'hero.subtitle': 'Bộ gõ thuần Việt dành cho người Việt',
+        'hero.lead': 'Gõ là gõ. Viết tiếng Việt xen lẫn tiếng Anh tự nhiên như hơi thở — êm ái, không nuốt chữ, không làm phiền bạn.',
+        'cta.pkg': 'Tải về cho macOS (.pkg)',
+        'cta.ios': 'App Store (iPhone & iPad)',
+        'cta.android': 'Google Play (Android)',
+        'cta.copy': 'Sao chép',
+        'v1.title': 'Gõ nhanh không hụt chữ',
+        'v1.desc': 'Dù bạn viết liền mạch trên trình duyệt, ô tìm kiếm hay ứng dụng trò chuyện, từng dấu thanh vẫn vào ngay ngắn, không bị giật hay lặp từ.',
+        'v2.title': 'Song ngữ tự nhiên',
+        'v2.desc': 'Đang gõ tiếng Việt mà viết xen từ tiếng Anh hay cách viết tắt quen tay thì chữ vẫn giữ nguyên, không cần bấm đổi bộ gõ qua lại. Hỗ trợ cả Telex và VNI.',
+        'v3.title': 'Thuần khiết & riêng tư',
+        'v3.desc': 'Cài vào là dùng ngay như bàn phím mặc định của máy. Không xin quyền theo dõi bàn phím, không kết nối mạng, mọi chữ bạn viết chỉ nằm trên máy của bạn.',
+        'plat.heading': 'Đồng hành trên mọi thiết bị',
+        'plat.sub': 'Cùng một cảm giác gõ quen thuộc trên máy tính và điện thoại.',
+        'plat.mac_note': 'macOS 13 trở lên (Apple Silicon & Intel)',
+        'plat.mac_act': 'Tải bộ cài .pkg / .dmg',
+        'plat.win_note': 'Windows 10 & 11',
+        'plat.win_act': 'Đồng bộ nhân gõ',
+        'plat.lin_note': 'Ubuntu, Debian, Fedora, Arch (IBus & Fcitx5)',
+        'plat.lin_act': 'Đồng bộ nhân gõ',
+        'plat.ios_note': 'Bàn phím cho iPhone & iPad',
+        'plat.ios_act': 'Tải trên App Store',
+        'plat.and_note': 'Bàn phím cảm ứng & bàn phím rời',
+        'plat.and_act': 'Tải trên Google Play',
+        'footer.copy': 'Sen Việt — Miễn phí cho cộng đồng người Việt.',
+        'footer.support': 'Hỗ trợ',
+        'footer.privacy': 'Quyền riêng tư',
+        'footer.discuss': 'Thảo luận (Zalo)',
+        'footer.author': 'Tác giả',
+        'footer.donate': 'Mời cà phê ☕ (VietQR)',
+        'qr.bank': 'Ngân hàng Quân đội (MB Bank)',
+        'qr.acc_label': 'STK:',
+        'qr.holder_label': 'Chủ TK:',
+        'qr.memo_label': 'Nội dung:'
+      },
+      en: {
+        'hero.subtitle': 'A native Vietnamese input method crafted for Vietnamese people',
+        'hero.lead': 'Typing is just typing. Write Vietnamese mixed with English as naturally as breathing — quiet, smooth, and out of your way.',
+        'cta.pkg': 'Download for macOS (.pkg)',
+        'cta.ios': 'App Store (iPhone & iPad)',
+        'cta.android': 'Google Play (Android)',
+        'cta.copy': 'Copy',
+        'v1.title': 'Smooth at any speed',
+        'v1.desc': 'Whether writing in browsers, search bars, or chat apps, every accent lands cleanly in place without dropped letters or repeated words.',
+        'v2.title': 'Naturally bilingual',
+        'v2.desc': 'Type English words or familiar shorthand right in the middle of a Vietnamese sentence without switching keyboards. Full support for Telex and VNI.',
+        'v3.title': 'Private by default',
+        'v3.desc': 'Works just like your built-in system keyboard. No keystroke monitoring permissions, no internet connection — everything stays on your device.',
+        'plat.heading': 'Across all your devices',
+        'plat.sub': 'One familiar typing feel on desktop and mobile.',
+        'plat.mac_note': 'macOS 13+ (Apple Silicon & Intel)',
+        'plat.mac_act': 'Download .pkg / .dmg',
+        'plat.win_note': 'Windows 10 & 11',
+        'plat.win_act': 'Unified core',
+        'plat.lin_note': 'Ubuntu, Debian, Fedora, Arch (IBus & Fcitx5)',
+        'plat.lin_act': 'Unified core',
+        'plat.ios_note': 'Keyboard for iPhone & iPad',
+        'plat.ios_act': 'Get on App Store',
+        'plat.and_note': 'Touch & hardware keyboard',
+        'plat.and_act': 'Get on Google Play',
+        'footer.copy': 'Sen Việt — Free for the Vietnamese community.',
+        'footer.support': 'Support',
+        'footer.privacy': 'Privacy',
+        'footer.discuss': 'Community (Zalo)',
+        'footer.author': 'Author',
+        'footer.donate': 'Coffee via VietQR ☕',
+        'qr.bank': 'Military Commercial Joint Stock Bank (MB Bank)',
+        'qr.acc_label': 'Account:',
+        'qr.holder_label': 'Holder:',
+        'qr.memo_label': 'Memo:'
+      }
+    };
+
+    let currentLang = 'vi';
+
+    function setLang(lang) {
+      currentLang = lang;
+      document.documentElement.lang = lang;
+      localStorage.setItem('vielotus_lang', lang);
+
+      document.getElementById('btn-vi').classList.toggle('active', lang === 'vi');
+      document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (i18n[lang] && i18n[lang][key]) {
+          el.textContent = i18n[lang][key];
+        }
+      });
+    }
+
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.textContent;
+        btn.textContent = currentLang === 'en' ? 'Copied' : 'Đã chép';
+        setTimeout(() => { btn.textContent = original; }, 1800);
+      });
+    }
+
+    function copyBrew(btn) {
+      copyText('brew install stevedat/tap/vielotus', btn);
+    }
+
+    function toggleVietQR() {
+      const box = document.getElementById('vietqr-box');
+      box.classList.toggle('open');
+      if (box.classList.contains('open')) {
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    (function init() {
+      const saved = localStorage.getItem('vielotus_lang');
+      if (saved === 'en' || saved === 'vi') {
+        setLang(saved);
+      }
+    })();
+  </script>
+</body>
+</html>

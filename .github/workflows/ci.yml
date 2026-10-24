@@ -1,0 +1,139 @@
+name: CI (Open-Core Desktop)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-build:
+    name: macOS (Native IMK + Prebuilt Core XCFramework)
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify prebuilt binary SHA-256 checksums
+        run: shasum -a 256 -c Binaries/checksums.sha256
+
+      - name: Build Open-Core targets
+        run: swift build --configuration release
+
+      - name: Build universal App bundle (VieLotusIM.app)
+        run: ./scripts/build_imk.sh 1.1.1
+
+      - name: Build installer package (VieLotusIM.pkg)
+        run: ./scripts/build_pkg.sh 1.1.1
+
+      - name: Build disk image (VieLotusIM.dmg)
+        run: ./scripts/build_dmg.sh 1.1.1
+
+      - name: Upload macOS build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: VieLotus-macOS
+          path: |
+            .build/dist/VieLotusIM.app
+            .build/dist/VieLotusIM.pkg
+            .build/dist/VieLotusIM.dmg
+
+  linux-build:
+    name: Linux (Ubuntu 24.04 — Fcitx5 & IBus + Prebuilt Core .so)
+    runs-on: ubuntu-latest
+    container:
+      image: swift:6.0-noble
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools, Fcitx5, and IBus dev dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            dpkg-dev \
+            extra-cmake-modules \
+            fcitx5 \
+            fcitx5-modules-dev \
+            libfcitx5core-dev \
+            libfcitx5utils-dev \
+            libglib2.0-dev \
+            libibus-1.0-dev \
+            ninja-build \
+            pkg-config
+
+      - name: Extract libVieLotusCAPI.so from prebuilt libvielotus .deb
+        run: |
+          dpkg-deb -x Binaries/linux/libvielotus_1.1.1_amd64.deb /tmp/vielotus-core
+          cp /tmp/vielotus-core/usr/lib/libVieLotusCAPI.so Binaries/linux/libVieLotusCAPI.so
+
+      - name: Build Fcitx5 Plugin (vielotus.so) against prebuilt libVieLotusCAPI.so
+        run: |
+          cd CrossPlatform/fcitx5-vielotus
+          mkdir -p build && cd build
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
+          ninja
+
+      - name: Build IBus Engine (ibus-engine-vielotus) against prebuilt libVieLotusCAPI.so
+        run: |
+          cd CrossPlatform/ibus-vielotus
+          mkdir -p build && cd build
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
+          ninja
+
+      - name: Stage Linux distribution artifacts & build Debian packages (.deb)
+        run: |
+          mkdir -p dist/linux
+          cp Binaries/linux/libVieLotusCAPI.so dist/linux/
+          cp CrossPlatform/fcitx5-vielotus/build/vielotus.so dist/linux/
+          cp CrossPlatform/fcitx5-vielotus/build/vielotus.conf dist/linux/
+          cp CrossPlatform/ibus-vielotus/build/ibus-engine-vielotus dist/linux/
+          cp CrossPlatform/ibus-vielotus/build/vielotus.xml dist/linux/
+          ./scripts/build_deb.sh 1.1.1 amd64
+
+      - name: Upload Linux build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: VieLotus-Linux
+          path: |
+            dist/linux/*.deb
+
+  windows-build:
+    name: Windows (x64 — TSF C++ Shell + Installer Verification)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify prebuilt Windows installer exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "Binaries\windows\VieLotus-Setup-x64.exe")) {
+            Write-Error "Missing Binaries\windows\VieLotus-Setup-x64.exe"
+            exit 1
+          }
+          $item = Get-Item "Binaries\windows\VieLotus-Setup-x64.exe"
+          Write-Host "Verified VieLotus-Setup-x64.exe ($($item.Length) bytes)"
+
+      - name: Build Windows TSF COM Shell (VieLotusTIP.dll) via CMake & MSVC
+        shell: pwsh
+        run: |
+          cmake -B build-tsf-x64 -S CrossPlatform/windows-tsf -A x64 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-tsf-x64 --config Release
+
+      - name: Upload Windows build artifacts (x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: VieLotus-Windows-x64
+          path: |
+            Binaries/windows/VieLotus-Setup-x64.exe
+            build-tsf-x64/Release/VieLotusTIP.dll

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    VieLotusIM (Sen Việt) - IBus Component Specification
+    Pure Native Vietnamese Input Method Engine
+-->
+<component>
+    <name>org.freedesktop.IBus.VieLotus</name>
+    <description>VieLotusIM (Sen Việt) Vietnamese Input Method</description>
+    <version>1.1.1</version>
+    <author>VieLotusIM Team</author>
+    <homepage>https://github.com/vietlotus/vielotus</homepage>
+    <license>MIT</license>
+    <exec>@LIBEXECDIR@/ibus-engine-vielotus --ibus</exec>
+    <textdomain>ibus-vielotus</textdomain>
+    <observed-paths>
+        <path>@LIBEXECDIR@/ibus-engine-vielotus</path>
+    </observed-paths>
+    <engines>
+        <engine>
+            <name>vielotus</name>
+            <longname>Tiếng Việt (Sen Việt - Telex)</longname>
+            <description>Bộ gõ tiếng Việt Sen Việt thế hệ mới (Telex)</description>
+            <language>vi</language>
+            <license>MIT</license>
+            <author>VieLotusIM Team</author>
+            <icon>vielotus</icon>
+            <layout>us</layout>
+            <rank>99</rank>
+            <symbol>🇻🇳</symbol>
+            <setup></setup>
+        </engine>
+        <engine>
+            <name>vielotus-vni</name>
+            <longname>Tiếng Việt (Sen Việt - VNI)</longname>
+            <description>Bộ gõ tiếng Việt Sen Việt thế hệ mới (VNI)</description>
+            <language>vi</language>
+            <license>MIT</license>
+            <author>VieLotusIM Team</author>
+            <icon>vielotus</icon>
+            <layout>us</layout>
+            <rank>98</rank>
+            <symbol>🇻🇳</symbol>
+            <setup></setup>
+        </engine>
+    </engines>
+</component>

@@ -1,0 +1,37 @@
+#!/bin/bash
+# pkg preinstall — runs BEFORE the payload is written by PackageKit / Installer.app.
+#
+# Prevents dirty payload merges: macOS Installer MERGES payload into an existing bundle,
+# leaving behind orphaned files from prior versions which breaks code seal.
+# Also terminates any running instance to avoid file locks.
+set +e
+
+consoleUser="$(stat -f%Su /dev/console 2>/dev/null)"
+if [ -z "$consoleUser" ] || [ "$consoleUser" = "root" ]; then
+    consoleUser="$(id -un)"
+fi
+
+if [ -n "$consoleUser" ] && [ "$consoleUser" != "root" ]; then
+    homeDir="$(dscl . -read "/Users/$consoleUser" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+    [ -z "$homeDir" ] && homeDir="/Users/$consoleUser"
+    USER_TARGET="$homeDir/Library/Input Methods/VieLotusIM.app"
+fi
+
+SYS_TARGET="/Library/Input Methods/VieLotusIM.app"
+
+# Terminate running instance first
+pkill -9 -f VieLotusIM 2>/dev/null || true
+
+# Clean / backup old system bundle to prevent dirty payload merge
+if [ -d "$SYS_TARGET" ]; then
+    rm -rf "$SYS_TARGET.previous" 2>/dev/null || true
+    mv "$SYS_TARGET" "$SYS_TARGET.previous" 2>/dev/null || rm -rf "$SYS_TARGET"
+fi
+
+# Clean / quarantine old user bundle if present
+if [ -n "$USER_TARGET" ] && [ -d "$USER_TARGET" ]; then
+    rm -rf "$USER_TARGET.previous" 2>/dev/null || true
+    mv "$USER_TARGET" "$USER_TARGET.previous" 2>/dev/null || rm -rf "$USER_TARGET"
+fi
+
+exit 0

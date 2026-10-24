@@ -1,0 +1,59 @@
+# VieLotusIM (Sen Việt) — per-app presentation rules
+# ============================================================================
+# Adding support for an application is a DATA change, not a Swift change.
+#
+# Each line is:   bundle-id: mode
+#
+# mode is one of:
+#   directReplacement  - insertText(_:replacementRange:), no underline, native undo
+#   markedText         - IMKit composition (W3C IME lifecycle); the safe default for
+#                        Chromium / Electron / CEF and for clients that ignore
+#                        replacementRange
+#   passthrough        - the input method steps aside entirely and forwards raw keys;
+#                        correct for remote desktop, VM and screen-sharing clients,
+#                        which do their own keyboard handling on the far side
+#   automatic          - the rule expresses no opinion; fall through to the built-in
+#                        heuristic in ClientAdapter.classify
+#
+# Keys are matched case-insensitively:
+#   com.apple.preview         exact bundle identifier
+#   *ghostty*                 substring, anywhere
+#   com.microsoft.*           prefix
+#   *.slack                   suffix
+#
+# The FIRST matching line wins, so put specific rules above broad ones.
+#
+# Precedence, highest first:
+#   1. the user's per-app override in Settings > Bảng cơ chế gõ
+#   2. the user's global presentation-mode choice in Settings
+#   3. this file
+#   4. the built-in category heuristic in ClientAdapter.classify
+#
+# Where this file is read from (first existing file wins):
+#   1. ~/Library/Application Support/VieLotusIM/typing-modes.yml
+#      -> editable with NO rebuild. Copy this file there to reproduce a bug, add a
+#         rule and retest in seconds. This is the contribution path.
+#   2. VieLotusIM.app/Contents/Resources/typing-modes.yml   (shipped copy)
+#   3. the SwiftPM resource bundle (CLI, tests, library consumers)
+#
+# Malformed lines are ignored on purpose: a hand-edited rule file must never be able
+# to take the input method down.
+# ============================================================================
+
+# This file ships with no active rules. The built-in heuristic already classifies the
+# applications listed in docs/COMPATIBILITY.md, so an active rule here is only needed
+# when that heuristic guesses wrong for a specific app — or to pin a mode while a fix
+# is being verified. Start from the commented examples below.
+
+# --- Examples (uncomment and adapt) -----------------------------------------
+# A client that silently ignores replacementRange, leaving stray characters behind:
+# com.example.brokenclient: markedText
+
+# An app that renders composition inline badly but handles direct replacement well:
+# com.example.canvasapp: directReplacement
+
+# A whole vendor family that forwards keys to a remote session:
+# com.example.remote*: passthrough
+
+# A terminal whose bundle id the built-in heuristic does not recognise yet:
+# com.example.newterm: markedText

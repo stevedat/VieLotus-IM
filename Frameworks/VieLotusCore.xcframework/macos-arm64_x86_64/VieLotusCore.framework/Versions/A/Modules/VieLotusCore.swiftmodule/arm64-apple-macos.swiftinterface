@@ -1,0 +1,481 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.4 effective-5.10 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+// swift-module-flags: -target arm64-apple-macos13.0 -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -module-name VieLotusCore -package-name vietlotusim
+// swift-module-flags-ignorable:  -formal-cxx-interoperability-mode=off -interface-compiler-version 6.4
+import AppKit
+import Cocoa
+import CryptoKit
+import Dispatch
+import Foundation
+import Foundation/*.Bundle*/
+import Foundation/*.ProcessInfo*/
+import Foundation/*.URL*/
+import NaturalLanguage
+import Network
+import Swift
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+import os.lock
+import os
+public struct AppInfo {
+  public static var appVersion: Swift.String {
+    get
+  }
+  public static var buildNumber: Swift.String {
+    get
+  }
+  public static var gitCommit: Swift.String {
+    get
+  }
+  public static var buildDate: Swift.String {
+    get
+  }
+  public static var bundleIdentifier: Swift.String {
+    get
+  }
+  public static var osVersionString: Swift.String {
+    get
+  }
+  public static var architecture: Swift.String {
+    get
+  }
+  public static var systemSummary: Swift.String {
+    get
+  }
+  public static func formattedConfiguration(inputMethod: Swift.String, smartBilingual: Swift.Bool, modernOrthography: Swift.Bool, developerMode: Swift.Bool? = nil, terminalDirectMode: Swift.Bool? = nil, quickTelex: Swift.Bool? = nil, relaxedCoda: Swift.Bool? = nil) -> Swift.String
+}
+extension Foundation.Bundle {
+  public static let vieLotusCore: Foundation.Bundle
+}
+@frozen public enum AppCategory : Swift.Sendable, Swift.Equatable {
+  case standardAppKit
+  case chromium
+  case msOffice
+  case terminal
+  case overlay
+  case remoteOrVirtualMachine
+  case unknown
+  public static func == (a: VieLotusCore.AppCategory, b: VieLotusCore.AppCategory) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@frozen public enum PresentationMode : Swift.Sendable, Swift.Equatable {
+  case directReplacement
+  case markedText
+  case terminalDirect
+  case passthrough
+  public static func == (a: VieLotusCore.PresentationMode, b: VieLotusCore.PresentationMode) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@frozen public enum PresentationModePreference : Swift.String, Swift.CaseIterable, Swift.Sendable, Swift.Identifiable {
+  case automatic
+  case directReplacement
+  case markedText
+  case passthrough
+  public var id: Swift.String {
+    get
+  }
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [VieLotusCore.PresentationModePreference]
+  public typealias ID = Swift.String
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [VieLotusCore.PresentationModePreference] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct ClientAdapter {
+  public static func resolveBundleIdentifier(_ bundleIdentifier: Swift.String?) -> Swift.String?
+  public static func classify(bundleIdentifier: Swift.String?) -> VieLotusCore.AppCategory
+  public static var presentationRules: VieLotusCore.PresentationRuleSet {
+    get
+  }
+  @discardableResult
+  public static func reloadPresentationRules() -> VieLotusCore.PresentationRuleSet
+  public static func reloadPresentationRulesIfChanged()
+  public static func setPresentationRules(_ rules: VieLotusCore.PresentationRuleSet)
+  public static func forceMarkedText(for bundleIdentifier: Swift.String)
+  public static func resetDynamicMarkedText()
+  public static func presentationMode(for category: VieLotusCore.AppCategory, bundleIdentifier: Swift.String? = nil, terminalDirectEnabled: Swift.Bool = false, passthroughRemoteApps: Swift.Bool = false, preference: VieLotusCore.PresentationModePreference = .automatic, appOverrides: [Swift.String : VieLotusCore.PresentationModePreference] = [:]) -> VieLotusCore.PresentationMode
+  public static func allowsDynamicMarkedTextFallback(bundleIdentifier: Swift.String?, preference: VieLotusCore.PresentationModePreference, appOverrides: [Swift.String : VieLotusCore.PresentationModePreference]) -> Swift.Bool
+  public static func isBrowserApp(bundleIdentifier: Swift.String?) -> Swift.Bool
+  public static func isHighlightedURLOrDomain(_ text: Swift.String) -> Swift.Bool
+  public static func isInlineURLAutocompleteTail(_ selectedText: Swift.String, matchingNextChar nextChar: Swift.Character? = nil) -> Swift.Bool
+}
+@frozen public enum DirectReplacementOwnership : Swift.Sendable, Swift.Equatable {
+  case owned
+  case invalidRange
+  case exceedsOwnedSessionLength
+  case outsideCompositionBounds
+  case hostTextDiverged
+  public static func == (a: VieLotusCore.DirectReplacementOwnership, b: VieLotusCore.DirectReplacementOwnership) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@frozen public enum DirectReplacementCursorEvaluation : Swift.Sendable, Swift.Equatable {
+  case inSync
+  case invalidSelectionFallbackToMarkedText
+  case ignoredReplacementFallbackToMarkedText
+  case prefixRetained(charsDeleted: Swift.Int)
+  case compositionCleared
+  case externalCursorJumpResetSession
+  public static func == (a: VieLotusCore.DirectReplacementCursorEvaluation, b: VieLotusCore.DirectReplacementCursorEvaluation) -> Swift.Bool
+}
+public enum DirectReplacementGuard {
+  public static func verifyRangeOwnership(replacementRange: Foundation.NSRange, composingWord: Swift.String, compositionStartLocation: Swift.Int = NSNotFound, virtualCursorLocation: Swift.Int = NSNotFound, hostSubstring: Swift.String? = nil, isEditingCommittedWord: Swift.Bool = false, extraAutocompleteLength: Swift.Int = 0) -> VieLotusCore.DirectReplacementOwnership
+  public static func evaluateCursorState(selection: Foundation.NSRange, virtualCursorLocation: Swift.Int, compositionStartLocation: Swift.Int, composingWordUTF16Length: Swift.Int, lastReplacementLength: Swift.Int = 0, hostWindowSubstring: Swift.String? = nil, expectedIgnoredWindowText: Swift.String? = nil) -> VieLotusCore.DirectReplacementCursorEvaluation
+}
+final public class ClientStallBreaker : @unchecked Swift.Sendable {
+  public static let shared: VieLotusCore.ClientStallBreaker
+  final public var anyDegraded: Swift.Bool {
+    get
+  }
+  final public var stallThresholdMs: Swift.Double
+  final public var degradationDurationSec: Swift.Double
+  public init()
+  final public func isDegraded(bundleIdentifier: Swift.String?) -> Swift.Bool
+  final public func markDegraded(bundleIdentifier: Swift.String, durationSec: Swift.Double? = nil)
+  final public func clear(bundleIdentifier: Swift.String? = nil)
+  final public func recordLatency(bundleIdentifier: Swift.String?, operation: Swift.String, durationMs: Swift.Double)
+  final public func executeWithWatchdog<T>(bundleIdentifier: Swift.String?, operation: Swift.String, block: () throws -> T) rethrows -> T
+  @objc deinit
+}
+public enum InputMethodType : Swift.Int32, Swift.Sendable {
+  case telex
+  case vni
+  public init?(rawValue: Swift.Int32)
+  public typealias RawValue = Swift.Int32
+  public var rawValue: Swift.Int32 {
+    get
+  }
+}
+final public class EngineBridge {
+  final public var isComposing: Swift.Bool {
+    get
+  }
+  public init()
+  final public var inputMethod: VieLotusCore.InputMethodType {
+    get
+  }
+  final public func setInputMethod(_ method: VieLotusCore.InputMethodType)
+  final public func setGrammarProfile(_ profile: VieLotusCore.GrammarProfile)
+  final public func setModernOrthography(_ enabled: Swift.Bool)
+  final public func setRelaxedCoda(_ enabled: Swift.Bool)
+  final public func setQuickTelex(_ enabled: Swift.Bool)
+  final public func setGenZMode(_ enabled: Swift.Bool)
+  final public func setQuickStart(_ enabled: Swift.Bool)
+  final public var simpleTelex: Swift.Bool {
+    get
+    set
+  }
+  final public func setSimpleTelex(_ enabled: Swift.Bool)
+  final public var literalOverrideEnabled: Swift.Bool {
+    get
+    set
+  }
+  final public var lastFeedWasRejectedNoOp: Swift.Bool {
+    get
+  }
+  final public func feedLiteral(_ ch: Swift.Character) -> (backspaces: Swift.Int, suffix: Swift.String)?
+  final public func reset()
+  final public func feed(_ ch: Swift.Character) -> (backspaces: Swift.Int, suffix: Swift.String)?
+  final public func backspace(displayedAsRaw: Swift.Bool = false) -> (backspaces: Swift.Int, suffix: Swift.String)?
+  final public func commit() -> (backspaces: Swift.Int, suffix: Swift.String)?
+  final public var lastCommittedWord: Swift.String? {
+    get
+  }
+  final public var lastCommittedRaw: Swift.String? {
+    get
+  }
+  final public func commitWord(raw: Swift.String, rendered: Swift.String)
+  final public func clearHistory()
+  final public func editAt(caretBack: Swift.Int, char: Swift.Character) -> (backspaces: Swift.Int, suffix: Swift.String)?
+  final public func editBackspaceAt(caretBack: Swift.Int) -> (backspaces: Swift.Int, suffix: Swift.String)?
+  final public func currentOutput() -> Swift.String
+  final public func rawString() -> Swift.String
+  final public func setCompositionPrefix(_ text: Swift.String)
+  public static func rawKeys(for text: Swift.String, inputMethod: VieLotusCore.InputMethodType) -> Swift.String
+  @objc deinit
+}
+@frozen public enum SessionAction {
+  case passThrough
+  case consumed
+  case replace(backspaces: Swift.Int, text: Swift.String)
+  case commit(backspaces: Swift.Int, text: Swift.String, isOverride: Swift.Bool)
+  case reset
+}
+public class InputSessionManager {
+  public static let caretDisarmed: Swift.Int
+  final public let engine: VieLotusCore.EngineBridge
+  public var composingWord: Swift.String
+  public var rawWord: Swift.String
+  public var context: Swift.String
+  public var editCaretBack: Swift.Int
+  public var smartBilingualEnabled: Swift.Bool
+  public var inlineBilingualEnabled: Swift.Bool
+  public var genZMode: Swift.Bool
+  public var hasExplicitAccentSelection: Swift.Bool
+  public var sessionGeneration: Swift.UInt64 {
+    get
+  }
+  public var isComposing: Swift.Bool {
+    get
+  }
+  public init()
+  public func isCurrentGeneration(_ generation: Swift.UInt64) -> Swift.Bool
+  @discardableResult
+  public func advanceSessionGeneration() -> Swift.UInt64
+  public func reset()
+  public func stepCaretBack()
+  public func stepCaretForward()
+  public func resetCaret()
+  public func setCompositionPrefix(_ text: Swift.String)
+  public func currentOutput() -> Swift.String
+  public var inputMethod: VieLotusCore.InputMethodType {
+    get
+  }
+  public func setInputMethod(_ method: VieLotusCore.InputMethodType)
+  public func setGrammarProfile(_ profile: VieLotusCore.GrammarProfile)
+  public func setModernOrthography(_ enabled: Swift.Bool)
+  public func setRelaxedCoda(_ enabled: Swift.Bool)
+  public func setQuickTelex(_ enabled: Swift.Bool)
+  public func setGenZMode(_ enabled: Swift.Bool)
+  public func setQuickStart(_ enabled: Swift.Bool)
+  public var simpleTelex: Swift.Bool {
+    get
+    set
+  }
+  public func setSimpleTelex(_ enabled: Swift.Bool)
+  public var literalOverrideEnabled: Swift.Bool {
+    get
+    set
+  }
+  public func setLiteralOverride(_ enabled: Swift.Bool)
+  public var lastFeedWasRejectedNoOp: Swift.Bool {
+    get
+  }
+  public func handleLiteralCharacter(_ char: Swift.Character) -> VieLotusCore.SessionAction
+  public var recentWords: [Swift.String]
+  public func clearContext()
+  public func appendContext(_ word: Swift.String)
+  public func isWordBoundary(_ char: Swift.Character) -> Swift.Bool
+  public func handleCharacter(_ char: Swift.Character) -> VieLotusCore.SessionAction
+  public func handleBackspace() -> VieLotusCore.SessionAction
+  public var macroEngine: VieLotusCore.MacroEngine?
+  public var macroEnabled: Swift.Bool
+  public func commitWord(smartBilingualEnabled: Swift.Bool, genZMode: Swift.Bool? = nil, macroEngine: VieLotusCore.MacroEngine? = nil, boundaryChar: Swift.Character? = nil) -> VieLotusCore.SessionAction
+  @objc deinit
+}
+public protocol LocalLoopbackBridgeDelegate : AnyObject, Swift.Sendable {
+  func currentImeMode() -> Swift.String
+  func setImeMode(_ mode: Swift.String) -> Swift.Bool
+  func getWeaknessVector() -> [Swift.String : Any]
+  func publicKeyHex() -> Swift.String?
+  func signTelemetry(sessionId: Swift.String, challenge: Swift.String, timestamp: Swift.Int64) -> (signature: Swift.String, publicKey: Swift.String, entropy: Swift.Double, verified: Swift.Bool)?
+}
+extension VieLotusCore.LocalLoopbackBridgeDelegate {
+  public func publicKeyHex() -> Swift.String?
+  public func signTelemetry(sessionId: Swift.String, challenge: Swift.String) -> (signature: Swift.String, entropy: Swift.Double, verified: Swift.Bool)?
+}
+final public class VieLotusBridgeCoordinator : VieLotusCore.LocalLoopbackBridgeDelegate, @unchecked Swift.Sendable {
+  public init(getMode: @escaping @Sendable () -> Swift.String, applyMode: @escaping @Sendable (Swift.String) -> Swift.Void)
+  final public func currentImeMode() -> Swift.String
+  final public func setImeMode(_ mode: Swift.String) -> Swift.Bool
+  final public func getWeaknessVector() -> [Swift.String : Any]
+  final public func publicKeyHex() -> Swift.String?
+  final public func signTelemetry(sessionId: Swift.String, challenge: Swift.String, timestamp: Swift.Int64) -> (signature: Swift.String, publicKey: Swift.String, entropy: Swift.Double, verified: Swift.Bool)?
+  @objc deinit
+}
+final public class LocalLoopbackBridge : @unchecked Swift.Sendable {
+  public static let defaultPort: Swift.UInt16
+  public static let shared: VieLotusCore.LocalLoopbackBridge
+  final public var isRunning: Swift.Bool {
+    get
+  }
+  weak final public var delegate: (any VieLotusCore.LocalLoopbackBridgeDelegate)?
+  final public var fallbackMode: Swift.String
+  final public var sessionToken: Swift.String {
+    get
+  }
+  public static let allowedOriginHosts: Swift.Set<Swift.String>
+  final public var publicKeyHex: Swift.String {
+    get
+  }
+  public static let supportedModes: Swift.Set<Swift.String>
+  public init(port: Swift.UInt16 = defaultPort, delegate: (any VieLotusCore.LocalLoopbackBridgeDelegate)? = nil)
+  public static var currentPlatformName: Swift.String {
+    get
+  }
+  public static var supportsSocketListener: Swift.Bool {
+    get
+  }
+  @discardableResult
+  final public func start() -> Swift.Bool
+  final public func stop()
+  final public func processHttpRequest(_ rawRequest: Swift.String) -> Foundation.Data
+  public static func sha256Hex(_ input: Swift.String) -> Swift.String
+  public static func isAllowedOrigin(_ origin: Swift.String) -> Swift.Bool
+  @objc deinit
+}
+public struct MacSpellChecker : VieLotusCore.SpellCheckerProvider {
+  public init()
+  public func isWordInEnglishDictionary(_ word: Swift.String) -> Swift.Bool
+}
+public struct MachineTypingDetector : Swift.Sendable {
+  public let thresholdNs: Swift.UInt64
+  public let requiredStreak: Swift.Int
+  public var inBurst: Swift.Bool {
+    get
+  }
+  public init(thresholdNs: Swift.UInt64 = 12_000_000, requiredStreak: Swift.Int = 6)
+  public mutating func observe(eventTimestampSeconds: Foundation.TimeInterval, arrivalNanoseconds: Swift.UInt64, isRepeat: Swift.Bool) -> Swift.Bool
+  public mutating func reset()
+}
+public struct MacroEntry : Swift.Identifiable, Swift.Equatable, Swift.Sendable {
+  public var id: Swift.String {
+    get
+  }
+  public let key: Swift.String
+  public let value: Swift.String
+  public init(key: Swift.String, value: Swift.String)
+  public static func == (a: VieLotusCore.MacroEntry, b: VieLotusCore.MacroEntry) -> Swift.Bool
+  public typealias ID = Swift.String
+}
+final public class MacroEngine : @unchecked Swift.Sendable {
+  public static let shared: VieLotusCore.MacroEngine
+  public static let macrosDidChangeNotification: Foundation.Notification.Name
+  final public var isEnabled: Swift.Bool
+  final public var autoSaveToDisk: Swift.Bool
+  final public var storageURL: Foundation.URL?
+  public static let defaultMacros: [Swift.String : Swift.String]
+  public static var defaultStorageURL: Foundation.URL? {
+    get
+  }
+  public init(initialMacros: [Swift.String : Swift.String]? = nil, autoLoadFromDisk: Swift.Bool = false, storageURL: Foundation.URL? = nil, autoSaveToDisk: Swift.Bool? = nil)
+  final public func lookup(word: Swift.String) -> Swift.String?
+  final public func setMacro(key: Swift.String, value: Swift.String)
+  final public func removeMacro(key: Swift.String)
+  final public func getAllMacros() -> [Swift.String : Swift.String]
+  final public func getMacroEntries() -> [VieLotusCore.MacroEntry]
+  final public func replaceAllMacros(_ newMacros: [Swift.String : Swift.String])
+  final public func resetToDefaults()
+  final public func exportJSON() throws -> Foundation.Data
+  final public func importJSON(data: Foundation.Data, replaceAll: Swift.Bool = false) throws
+  @discardableResult
+  final public func loadFromDisk(url: Foundation.URL? = nil) -> Swift.Bool
+  final public func saveToDisk(url: Foundation.URL? = nil) throws
+  @discardableResult
+  final public func reloadFromDiskIfChanged(url: Foundation.URL? = nil) -> Swift.Bool
+  @objc deinit
+}
+public struct PresentationRule : Swift.Sendable, Swift.Equatable {
+  public let key: Swift.String
+  public let preference: VieLotusCore.PresentationModePreference
+  public init(key: Swift.String, preference: VieLotusCore.PresentationModePreference)
+  public func matches(_ bundleIdentifier: Swift.String) -> Swift.Bool
+  public static func == (a: VieLotusCore.PresentationRule, b: VieLotusCore.PresentationRule) -> Swift.Bool
+}
+public struct PresentationRuleSet : Swift.Sendable, Swift.Equatable {
+  public let rules: [VieLotusCore.PresentationRule]
+  public init(rules: [VieLotusCore.PresentationRule])
+  public static let empty: VieLotusCore.PresentationRuleSet
+  public var isEmpty: Swift.Bool {
+    get
+  }
+  public func preference(forBundleIdentifier bundleIdentifier: Swift.String?) -> VieLotusCore.PresentationModePreference?
+  public static func == (a: VieLotusCore.PresentationRuleSet, b: VieLotusCore.PresentationRuleSet) -> Swift.Bool
+}
+public enum PresentationRulesParser {
+  public static func parse(_ text: Swift.String) -> VieLotusCore.PresentationRuleSet
+}
+public enum PresentationRulesLoader {
+  public static let resourceBaseName: Swift.String
+  public static let resourceExtension: Swift.String
+  public static func searchPaths() -> [Foundation.URL]
+  public static func resolvedURL() -> Foundation.URL?
+  public static func modificationDate(of url: Foundation.URL) -> Foundation.Date?
+  public static func load() -> (url: Foundation.URL, rules: VieLotusCore.PresentationRuleSet)?
+}
+public struct SecureInputState : Swift.Equatable, Swift.Sendable {
+  public let isActive: Swift.Bool
+  public let holderPID: Swift.Int32?
+  public let holderName: Swift.String?
+  public let holderBundleID: Swift.String?
+  public init(isActive: Swift.Bool, holderPID: Swift.Int32? = nil, holderName: Swift.String? = nil, holderBundleID: Swift.String? = nil)
+  public static let inactive: VieLotusCore.SecureInputState
+  public static func == (a: VieLotusCore.SecureInputState, b: VieLotusCore.SecureInputState) -> Swift.Bool
+}
+public protocol SecureInputProvider : Swift.Sendable {
+  func queryState() -> VieLotusCore.SecureInputState
+}
+final public class SystemSecureInputProvider : VieLotusCore.SecureInputProvider, @unchecked Swift.Sendable {
+  public init()
+  final public func queryState() -> VieLotusCore.SecureInputState
+  @objc deinit
+}
+final public class SecureInputMonitor : @unchecked Swift.Sendable {
+  public static let shared: VieLotusCore.SecureInputMonitor
+  final public var provider: any VieLotusCore.SecureInputProvider
+  public init(provider: any VieLotusCore.SecureInputProvider = SystemSecureInputProvider())
+  final public var isSecureInputActive: Swift.Bool {
+    get
+  }
+  final public var currentState: VieLotusCore.SecureInputState {
+    get
+  }
+  @discardableResult
+  final public func refresh() -> VieLotusCore.SecureInputState
+  @objc deinit
+}
+public struct SmartBilingualDetector {
+  public static var spellCheckerProvider: (any VieLotusCore.SpellCheckerProvider)?
+  public static func isInlineEnglishWord(raw: Swift.String, rendered: Swift.String, genZMode: Swift.Bool = false) -> Swift.Bool
+  public static func isExplicitTelexEscape(raw: Swift.String, rendered: Swift.String) -> Swift.Bool
+  public static func isEnglishWord(raw: Swift.String, context: Swift.String = "", rendered: Swift.String? = nil, genZMode: Swift.Bool = false) -> Swift.Bool
+}
+public protocol SpellCheckerProvider {
+  func isWordInEnglishDictionary(_ word: Swift.String) -> Swift.Bool
+}
+public enum GrammarProfile : Swift.String, Swift.CaseIterable, Swift.Sendable {
+  case classic
+  case preVowel
+  case smartHybrid
+  case senFlex
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [VieLotusCore.GrammarProfile]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [VieLotusCore.GrammarProfile] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+extension VieLotusCore.AppCategory : Swift.Hashable {}
+extension VieLotusCore.AppCategory : Swift.BitwiseCopyable {}
+extension VieLotusCore.PresentationMode : Swift.Hashable {}
+extension VieLotusCore.PresentationMode : Swift.BitwiseCopyable {}
+extension VieLotusCore.PresentationModePreference : Swift.Equatable {}
+extension VieLotusCore.PresentationModePreference : Swift.Hashable {}
+extension VieLotusCore.PresentationModePreference : Swift.RawRepresentable {}
+extension VieLotusCore.PresentationModePreference : Swift.BitwiseCopyable {}
+extension VieLotusCore.DirectReplacementOwnership : Swift.Hashable {}
+extension VieLotusCore.DirectReplacementOwnership : Swift.BitwiseCopyable {}
+extension VieLotusCore.DirectReplacementCursorEvaluation : Swift.BitwiseCopyable {}
+extension VieLotusCore.InputMethodType : Swift.Equatable {}
+extension VieLotusCore.InputMethodType : Swift.Hashable {}
+extension VieLotusCore.InputMethodType : Swift.RawRepresentable {}
+extension VieLotusCore.SessionAction : Swift.Sendable {}
+extension VieLotusCore.GrammarProfile : Swift.Equatable {}
+extension VieLotusCore.GrammarProfile : Swift.Hashable {}
+extension VieLotusCore.GrammarProfile : Swift.RawRepresentable {}
