@@ -9,6 +9,9 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
   <style>
     :root {
       --bg-canvas: #F4F7F6;
@@ -18,10 +21,13 @@
       --text-secondary: #4A5E56;
       --text-muted: #6E827A;
       --lotus-teal: #1E6B7B;
+      --font-display: 'Bricolage Grotesque', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+      --font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: var(--font-body);
       background-color: var(--bg-canvas);
       color: var(--text-primary);
       -webkit-font-smoothing: antialiased;
@@ -47,14 +53,16 @@
       display: inline-flex;
       align-items: center;
       gap: 9px;
-      font-weight: 600;
-      font-size: 15px;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16.5px;
+      letter-spacing: -0.015em;
       color: var(--text-primary);
     }
     .brand:hover { text-decoration: none; }
     .brand img { width: 30px; height: 30px; border-radius: 7px; }
     main { flex: 1; padding: 28px 0 44px; }
-    h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+    h1 { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
     .updated { font-size: 13.5px; color: var(--text-muted); margin-bottom: 24px; }
     .card {
       background: var(--bg-surface);
@@ -63,7 +71,8 @@
       padding: 20px;
       margin-bottom: 16px;
     }
-    h2 { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+    h2 { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+    code, kbd { font-family: var(--font-mono); font-size: 0.9em; }
     p { font-size: 14.5px; color: var(--text-secondary); }
     footer {
       padding: 20px 0 28px;

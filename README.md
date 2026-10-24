@@ -103,13 +103,13 @@ brew install stevedat/tap/vielotus
 
 ### Linux (Ubuntu / Debian — `amd64` & `arm64`)
 
-Install the prebuilt `.deb` packages from the [Latest Release](https://github.com/stevedat/VieLotus-IM/releases/latest) (or `Binaries/linux/`):
+Install the all-in-one `.deb` package (includes Core Engine + both IBus & Fcitx5 plugins) from the [Latest Release](https://github.com/stevedat/VieLotus-IM/releases/latest) (or `Binaries/linux/`):
 ```bash
 # For x86_64 (amd64):
-sudo apt install ./Binaries/linux/*_amd64.deb ./Binaries/linux/vielotus_1.1.1_all.deb
+sudo apt install ./Binaries/linux/vielotus_1.1.1_amd64.deb
 
 # For ARM64 (aarch64):
-sudo apt install ./Binaries/linux/*_arm64.deb ./Binaries/linux/vielotus_1.1.1_all.deb
+sudo apt install ./Binaries/linux/vielotus_1.1.1_arm64.deb
 ```
 
 ### iOS & iPadOS (iPhone & iPad)

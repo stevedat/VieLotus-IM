@@ -25,6 +25,11 @@
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
 
+  <!-- Google Fonts: Bricolage Grotesque (Display), Be Vietnam Pro (Body), JetBrains Mono (Code) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
+
   <style>
     :root {
       --bg-canvas: #F4F7F6;
@@ -40,6 +45,10 @@
       --lotus-teal: #1E6B7B;
       --lotus-petal: #DF8FA3;
       --lotus-petal-bg: #F9EFF2;
+
+      --font-display: 'Bricolage Grotesque', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+      --font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     }
 
     * {
@@ -50,12 +59,12 @@
     }
 
     html {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: var(--font-body);
       background-color: var(--bg-canvas);
       color: var(--text-primary);
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
-      line-height: 1.6;
+      line-height: 1.65;
       overflow-x: hidden;
     }
 
@@ -96,9 +105,10 @@
       display: inline-flex;
       align-items: center;
       gap: 9px;
-      font-weight: 600;
-      font-size: 15px;
-      letter-spacing: -0.01em;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16.5px;
+      letter-spacing: -0.015em;
       color: var(--text-primary);
       min-height: 44px;
     }
@@ -189,10 +199,12 @@
     }
 
     h1 {
-      font-size: 28px;
-      font-weight: 700;
+      font-family: var(--font-display);
+      font-size: 32px;
+      font-weight: 800;
       letter-spacing: -0.025em;
-      line-height: 1.2;
+      line-height: 1.15;
+      text-wrap: balance;
       color: var(--text-primary);
       margin-bottom: 6px;
     }
@@ -277,12 +289,13 @@
       border: 1px solid var(--border-hairline);
       border-radius: 10px;
       padding: 6px 8px 6px 12px;
-      font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
       color: var(--text-secondary);
     }
 
     .brew-bar code {
+      font-family: var(--font-mono);
       color: var(--text-primary);
       white-space: nowrap;
       overflow-x: auto;
@@ -295,7 +308,7 @@
       border: 1px solid var(--border-hairline);
       background: var(--bg-subtle);
       color: var(--text-primary);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      font-family: var(--font-body);
       font-size: 12px;
       font-weight: 500;
       min-height: 34px;
@@ -342,8 +355,10 @@
     }
 
     .section-heading {
-      font-size: 15.5px;
-      font-weight: 600;
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.015em;
       color: var(--text-primary);
       margin-bottom: 4px;
     }
@@ -384,6 +399,18 @@
       display: block;
       color: var(--text-secondary);
       font-size: 13px;
+    }
+
+    .platform-actions {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .action-sep {
+      color: var(--border-keycap);
+      user-select: none;
     }
 
     .platform-action {
@@ -512,9 +539,10 @@
     }
 
     .vietqr-acc {
-      font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      font-family: var(--font-mono);
       font-size: 14px;
       font-weight: 600;
+      font-variant-numeric: tabular-nums;
       color: var(--lotus-green);
     }
 
@@ -552,7 +580,7 @@
       }
 
       h1 {
-        font-size: 36px;
+        font-size: 40px;
       }
 
       .subtitle {
@@ -650,6 +678,8 @@
           <button id="btn-vi" class="lang-btn active" onclick="setLang('vi')">VI</button>
           <button id="btn-en" class="lang-btn" onclick="setLang('en')">EN</button>
         </div>
+        <a href="support.html" class="header-link" data-i18n="footer.support">Hỗ trợ</a>
+        <a href="https://github.com/stevedat/VieLotus-IM/releases/latest" target="_blank" rel="noopener noreferrer" class="header-link" id="header-release-tag">v1.1.1</a>
         <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="header-link">GitHub</a>
       </div>
     </header>
@@ -722,15 +752,21 @@
               <span class="platform-name">macOS</span>
               <span class="platform-note" data-i18n="plat.mac_note">macOS 13 trở lên (Apple Silicon & Intel)</span>
             </div>
-            <a id="link-mac-release" href="https://github.com/stevedat/VieLotus-IM/releases/latest" class="platform-action" data-i18n="plat.mac_act">Tải bộ cài .pkg / .dmg</a>
+            <div class="platform-actions">
+              <a id="link-mac-pkg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg" class="platform-action" data-i18n="plat.mac_pkg">Tải bộ cài .pkg</a>
+              <span class="action-sep" aria-hidden="true">·</span>
+              <a id="link-mac-dmg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.dmg" class="platform-action" data-i18n="plat.mac_dmg">Tải .dmg</a>
+            </div>
           </div>
 
           <div class="platform-row">
             <div>
               <span class="platform-name">Windows</span>
-              <span class="platform-note" data-i18n="plat.win_note">Windows 10 & 11</span>
+              <span class="platform-note" data-i18n="plat.win_note">Windows 10 & 11 (64-bit)</span>
             </div>
-            <span class="platform-tag" data-i18n="plat.win_act">Đồng bộ nhân gõ</span>
+            <div class="platform-actions">
+              <a id="link-win-exe" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe" class="platform-action" data-i18n="plat.win_act">Tải bộ cài .exe (x64)</a>
+            </div>
           </div>
 
           <div class="platform-row">
@@ -738,7 +774,11 @@
               <span class="platform-name">Linux</span>
               <span class="platform-note" data-i18n="plat.lin_note">Ubuntu, Debian, Fedora, Arch (IBus & Fcitx5)</span>
             </div>
-            <span class="platform-tag" data-i18n="plat.lin_act">Đồng bộ nhân gõ</span>
+            <div class="platform-actions">
+              <a id="link-lin-deb" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_1.1.1_amd64.deb" class="platform-action" data-i18n="plat.lin_deb">Tải bộ cài .deb (x64)</a>
+              <span class="action-sep" aria-hidden="true">·</span>
+              <a id="link-lin-release" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_1.1.1_arm64.deb" class="platform-action" data-i18n="plat.lin_act">Tải .deb (ARM64)</a>
+            </div>
           </div>
 
           <div class="platform-row">
@@ -746,7 +786,9 @@
               <span class="platform-name">iOS & iPadOS</span>
               <span class="platform-note" data-i18n="plat.ios_note">Bàn phím cho iPhone & iPad</span>
             </div>
-            <a href="https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799" target="_blank" rel="noopener noreferrer" class="platform-action" data-i18n="plat.ios_act">Tải trên App Store</a>
+            <div class="platform-actions">
+              <a href="https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799" target="_blank" rel="noopener noreferrer" class="platform-action" data-i18n="plat.ios_act">Tải trên App Store</a>
+            </div>
           </div>
 
           <div class="platform-row">
@@ -754,7 +796,9 @@
               <span class="platform-name">Android</span>
               <span class="platform-note" data-i18n="plat.and_note">Bàn phím cảm ứng & bàn phím rời</span>
             </div>
-            <a href="https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard" target="_blank" rel="noopener noreferrer" class="platform-action" data-i18n="plat.and_act">Tải trên Google Play</a>
+            <div class="platform-actions">
+              <a href="https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard" target="_blank" rel="noopener noreferrer" class="platform-action" data-i18n="plat.and_act">Tải trên Google Play</a>
+            </div>
           </div>
         </div>
       </section>
@@ -766,6 +810,8 @@
         <div class="footer-links">
           <a href="support.html" data-i18n="footer.support">Hỗ trợ</a>
           <a href="privacy.html" data-i18n="footer.privacy">Quyền riêng tư</a>
+          <a href="terms.html" data-i18n="footer.terms">Điều khoản</a>
+          <a id="link-footer-releases" href="https://github.com/stevedat/VieLotus-IM/releases/latest" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases">Bản phát hành</a>
           <a href="https://zalo.me/g/6wwyvywyvhsb0n6rwkze" target="_blank" rel="noopener noreferrer" data-i18n="footer.discuss">Thảo luận (Zalo)</a>
           <a href="https://www.linkedin.com/in/stevedat/?isSelfProfile=true" target="_blank" rel="noopener noreferrer" data-i18n="footer.author">Tác giả</a>
           <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer">GitHub</a>
@@ -810,11 +856,13 @@
         'plat.heading': 'Đồng hành trên mọi thiết bị',
         'plat.sub': 'Cùng một cảm giác gõ quen thuộc trên máy tính và điện thoại.',
         'plat.mac_note': 'macOS 13 trở lên (Apple Silicon & Intel)',
-        'plat.mac_act': 'Tải bộ cài .pkg / .dmg',
-        'plat.win_note': 'Windows 10 & 11',
-        'plat.win_act': 'Đồng bộ nhân gõ',
+        'plat.mac_pkg': 'Tải bộ cài .pkg',
+        'plat.mac_dmg': 'Tải .dmg',
+        'plat.win_note': 'Windows 10 & 11 (64-bit)',
+        'plat.win_act': 'Tải bộ cài .exe (x64)',
         'plat.lin_note': 'Ubuntu, Debian, Fedora, Arch (IBus & Fcitx5)',
-        'plat.lin_act': 'Đồng bộ nhân gõ',
+        'plat.lin_deb': 'Tải bộ cài .deb (x64)',
+        'plat.lin_act': 'Tải .deb (ARM64)',
         'plat.ios_note': 'Bàn phím cho iPhone & iPad',
         'plat.ios_act': 'Tải trên App Store',
         'plat.and_note': 'Bàn phím cảm ứng & bàn phím rời',
@@ -822,6 +870,8 @@
         'footer.copy': 'Sen Việt — Miễn phí cho cộng đồng người Việt.',
         'footer.support': 'Hỗ trợ',
         'footer.privacy': 'Quyền riêng tư',
+        'footer.terms': 'Điều khoản',
+        'footer.releases': 'Bản phát hành',
         'footer.discuss': 'Thảo luận (Zalo)',
         'footer.author': 'Tác giả',
         'footer.donate': 'Mời cà phê ☕ (VietQR)',
@@ -846,11 +896,13 @@
         'plat.heading': 'Across all your devices',
         'plat.sub': 'One familiar typing feel on desktop and mobile.',
         'plat.mac_note': 'macOS 13+ (Apple Silicon & Intel)',
-        'plat.mac_act': 'Download .pkg / .dmg',
-        'plat.win_note': 'Windows 10 & 11',
-        'plat.win_act': 'Unified core',
+        'plat.mac_pkg': 'Download .pkg',
+        'plat.mac_dmg': 'Download .dmg',
+        'plat.win_note': 'Windows 10 & 11 (64-bit)',
+        'plat.win_act': 'Download .exe (x64)',
         'plat.lin_note': 'Ubuntu, Debian, Fedora, Arch (IBus & Fcitx5)',
-        'plat.lin_act': 'Unified core',
+        'plat.lin_deb': 'Download .deb (x64)',
+        'plat.lin_act': 'Download .deb (ARM64)',
         'plat.ios_note': 'Keyboard for iPhone & iPad',
         'plat.ios_act': 'Get on App Store',
         'plat.and_note': 'Touch & hardware keyboard',
@@ -858,6 +910,8 @@
         'footer.copy': 'Sen Việt — Free for the Vietnamese community.',
         'footer.support': 'Support',
         'footer.privacy': 'Privacy',
+        'footer.terms': 'Terms',
+        'footer.releases': 'Releases',
         'footer.discuss': 'Community (Zalo)',
         'footer.author': 'Author',
         'footer.donate': 'Coffee via VietQR ☕',
@@ -911,6 +965,39 @@
       if (saved === 'en' || saved === 'vi') {
         setLang(saved);
       }
+
+      // Auto-sync latest GitHub Release tag & asset download URLs (.pkg, .dmg, .exe, .deb)
+      fetch('https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest')
+        .then(r => r.ok ? r.json() : null)
+        .then(rel => {
+          if (!rel || !Array.isArray(rel.assets)) return;
+          if (rel.tag_name) {
+            const tagEl = document.getElementById('header-release-tag');
+            if (tagEl) tagEl.textContent = rel.tag_name;
+          }
+          rel.assets.forEach(asset => {
+            if (!asset || !asset.name || !asset.browser_download_url) return;
+            if (asset.name === 'VieLotusIM.pkg') {
+              const btnPkg = document.getElementById('btn-download-pkg');
+              const rowPkg = document.getElementById('link-mac-pkg');
+              if (btnPkg) btnPkg.href = asset.browser_download_url;
+              if (rowPkg) rowPkg.href = asset.browser_download_url;
+            } else if (asset.name === 'VieLotusIM.dmg') {
+              const rowDmg = document.getElementById('link-mac-dmg');
+              if (rowDmg) rowDmg.href = asset.browser_download_url;
+            } else if (asset.name === 'VieLotus-Setup-x64.exe') {
+              const rowExe = document.getElementById('link-win-exe');
+              if (rowExe) rowExe.href = asset.browser_download_url;
+            } else if (asset.name.startsWith('vielotus_') && asset.name.endsWith('_amd64.deb')) {
+              const rowDeb = document.getElementById('link-lin-deb');
+              if (rowDeb) rowDeb.href = asset.browser_download_url;
+            } else if (asset.name.startsWith('vielotus_') && asset.name.endsWith('_arm64.deb')) {
+              const rowArm = document.getElementById('link-lin-release');
+              if (rowArm) rowArm.href = asset.browser_download_url;
+            }
+          });
+        })
+        .catch(() => {});
     })();
   </script>
 </body>
