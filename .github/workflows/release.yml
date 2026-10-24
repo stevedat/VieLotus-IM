@@ -153,7 +153,7 @@ jobs:
           - **Build Timestamp:** ${BUILD_DATE}
           - **macOS:** \`VieLotusIM.dmg\` / \`VieLotusIM.pkg\` / \`VieLotusIM.app.zip\` (Universal Apple Silicon & Intel)
           - **Windows (x64):** \`VieLotus-Setup-x64.exe\` (Native Windows Text Services Framework COM Installer)
-          - **Linux (Debian/Ubuntu amd64 & arm64):** \`vielotus_*.deb\`, \`libvielotus_*.deb\`, \`fcitx5-vielotus_*.deb\`, \`ibus-vielotus_*.deb\`
+          - **Linux (Debian/Ubuntu All-in-One \`amd64\` & \`arm64\`):** \`vielotus_${{ steps.version.outputs.version }}_amd64.deb\`, \`vielotus_${{ steps.version.outputs.version }}_arm64.deb\` (IBus & Fcitx5 + Core Engine)
 
           #### 📊 Chỉ số kiểm thử hồi quy chính thức (Benchmark Regression Matrix)
           - **Overall Primary Suite:** **100.00% (9,091 / 9,091)**

@@ -70,9 +70,9 @@ jobs:
             ninja-build \
             pkg-config
 
-      - name: Extract libVieLotusCAPI.so from prebuilt libvielotus .deb
+      - name: Extract libVieLotusCAPI.so from prebuilt vielotus .deb
         run: |
-          dpkg-deb -x Binaries/linux/libvielotus_1.1.1_amd64.deb /tmp/vielotus-core
+          dpkg-deb -x Binaries/linux/vielotus_1.1.1_amd64.deb /tmp/vielotus-core
           cp /tmp/vielotus-core/usr/lib/libVieLotusCAPI.so Binaries/linux/libVieLotusCAPI.so
 
       - name: Build Fcitx5 Plugin (vielotus.so) against prebuilt libVieLotusCAPI.so

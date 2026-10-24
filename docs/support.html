@@ -14,6 +14,9 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
   <style>
     :root {
       --bg-canvas: #F4F7F6;
@@ -25,10 +28,13 @@
       --text-muted: #6E827A;
       --lotus-green: #1F5B3A;
       --lotus-teal: #1E6B7B;
+      --font-display: 'Bricolage Grotesque', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+      --font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: var(--font-body);
       background-color: var(--bg-canvas);
       color: var(--text-primary);
       -webkit-font-smoothing: antialiased;
@@ -54,14 +60,16 @@
       display: inline-flex;
       align-items: center;
       gap: 9px;
-      font-weight: 600;
-      font-size: 15px;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16.5px;
+      letter-spacing: -0.015em;
       color: var(--text-primary);
     }
     .brand:hover { text-decoration: none; }
     .brand img { width: 30px; height: 30px; border-radius: 7px; }
     main { flex: 1; padding: 28px 0 44px; }
-    h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+    h1 { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
     .sub { font-size: 14.5px; color: var(--text-secondary); margin-bottom: 24px; }
     .card {
       background: var(--bg-surface);
@@ -70,7 +78,8 @@
       padding: 20px;
       margin-bottom: 16px;
     }
-    h2 { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+    h2 { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+    code, kbd { font-family: var(--font-mono); font-size: 0.9em; }
     p, li { font-size: 14.5px; color: var(--text-secondary); }
     ol, ul { padding-left: 18px; display: grid; gap: 6px; margin-top: 6px; }
     footer {
@@ -103,16 +112,33 @@
       <p class="sub">Các bước kích hoạt nhanh bàn phím Sen Việt trên thiết bị của bạn.</p>
 
       <div class="card">
-        <h2>1. Trên macOS</h2>
+        <h2>1. Trên macOS (macOS 13 trở lên)</h2>
         <ol>
-          <li>Tải bộ cài <a href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg">VieLotusIM.pkg</a> và mở để cài đặt.</li>
+          <li>Tải bộ cài tự động <a href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg">VieLotusIM.pkg</a> (hoặc <a href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.dmg">VieLotusIM.dmg</a>) và mở để cài đặt, hoặc cài qua Homebrew: <code>brew install stevedat/tap/vielotus</code>.</li>
           <li>Vào <strong>Cài đặt hệ thống (System Settings) → Bàn phím (Keyboard) → Nguồn đầu vào (Input Sources) → Sửa (Edit...)</strong>.</li>
           <li>Nhấn dấu <strong>(+)</strong>, chọn <strong>Tiếng Việt</strong> → thêm <strong>Sen Việt</strong>.</li>
         </ol>
       </div>
 
       <div class="card">
-        <h2>2. Trên iPhone & iPad (iOS / iPadOS)</h2>
+        <h2>2. Trên Windows (Windows 10 & 11 64-bit)</h2>
+        <ol>
+          <li>Tải bộ cài <a href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe">VieLotus-Setup-x64.exe</a> và chạy trình cài đặt để tự động đăng ký bộ gõ chuẩn Windows TSF.</li>
+          <li>Nhấn tổ hợp phím <kbd>Win</kbd> + <kbd>Space</kbd> trên thanh tác vụ để chuyển sang <strong>Sen Việt (VieLotus)</strong>.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>3. Trên Linux (Ubuntu, Debian, Fedora, Arch — IBus & Fcitx5)</h2>
+        <ol>
+          <li>Tải các gói <code>.deb</code> (<code>amd64</code> hoặc <code>arm64</code>) từ trang <a href="https://github.com/stevedat/VieLotus-IM/releases/latest" target="_blank" rel="noopener noreferrer">Bản phát hành mới nhất (v1.1.1)</a>.</li>
+          <li>Cài đặt qua APT: <code>sudo apt install ./*_amd64.deb ./vielotus_1.1.1_all.deb</code> (hoặc <code>*_arm64.deb</code> trên ARM64).</li>
+          <li>Mở <strong>IBus Preferences</strong> hoặc <strong>Fcitx5 Configuration</strong> và thêm bộ gõ <strong>Sen Việt (VieLotus)</strong>.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>4. Trên iPhone & iPad (iOS / iPadOS)</h2>
         <ol>
           <li>Tải <strong>Sen Việt</strong> trên <a href="https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799" target="_blank" rel="noopener noreferrer">App Store</a>.</li>
           <li>Mở <strong>Cài đặt (Settings) → Cài đặt chung (General) → Bàn phím (Keyboard) → Các bàn phím (Keyboards)</strong>.</li>
@@ -121,15 +147,15 @@
       </div>
 
       <div class="card">
-        <h2>3. Trên Android</h2>
+        <h2>5. Trên Android</h2>
         <ol>
           <li>Tải <strong>Sen Việt</strong> trên <a href="https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard" target="_blank" rel="noopener noreferrer">Google Play</a>.</li>
-          <li>Mở ứng dụng <strong>Sen Việt</strong> và làm theo hướng dẫn trên màn hình để bật bàn phím trong phần Cài đặt hệ thống.</li>
+          <li>Mở ứng dụng <strong>Sen Việt</strong> và làm theo hướng dẫn trên màn hình để bật bàn phím ảo và bàn phím cứng trong phần Cài đặt hệ thống.</li>
         </ol>
       </div>
 
       <div class="card">
-        <h2>4. Góp ý, Thảo luận & Tác giả</h2>
+        <h2>6. Góp ý, Thảo luận & Tác giả</h2>
         <p>
           Nếu bạn gặp bất kỳ vấn đề nào trong quá trình sử dụng hoặc muốn trao đổi cùng cộng đồng, vui lòng tham gia <a href="https://zalo.me/g/6wwyvywyvhsb0n6rwkze" target="_blank" rel="noopener noreferrer">Kênh Thảo luận Cộng đồng (Zalo)</a>, gửi báo lỗi tại <a href="https://github.com/stevedat/VieLotus-IM/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>, hoặc kết nối với tác giả <a href="https://www.linkedin.com/in/stevedat/?isSelfProfile=true" target="_blank" rel="noopener noreferrer">Trần Phát Đạt trên LinkedIn</a>.
         </p>
