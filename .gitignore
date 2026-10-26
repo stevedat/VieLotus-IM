@@ -1,0 +1,48 @@
+# macOS System & Metadata
+.DS_Store
+._*
+
+# Swift & Xcode Build Artifacts
+.build/
+.swiftpm/
+xcuserdata/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+
+# Local build outputs (except official prebuilt Binaries/)
+*.pkg
+!Binaries/*.pkg
+*.dmg
+*.zip
+*.ipa
+*.xcarchive
+*.apk
+*.aab
+CrossPlatform/**/.gradle/
+CrossPlatform/**/.kotlin/
+CrossPlatform/**/build/
+CrossPlatform/**/.cxx/
+CrossPlatform/**/local.properties
+
+# Sensitive Keys, Secrets & Certificates
+.env
+.env.*
+*.p12
+*.p8
+*.pem
+*.key
+*.cer
+*.mobileprovision
+*.jks
+*.keystore
+key.properties
+**/key.properties
+
+# IDE & Editor
+.idea/
+.vscode/
+
+# Diagnostic & Temp Files
+*.log
+*.tmp

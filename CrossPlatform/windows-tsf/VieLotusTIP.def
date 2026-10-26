@@ -1,0 +1,10 @@
+LIBRARY "VieLotusTIP.dll"
+
+EXPORTS
+    DllGetClassObject        PRIVATE
+    DllCanUnloadNow          PRIVATE
+    DllRegisterServer        PRIVATE
+    DllUnregisterServer      PRIVATE
+    ActivateUserProfilesW
+    DeactivateUserProfilesW
+    ShowSettingsDialogW

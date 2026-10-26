@@ -1,0 +1,23 @@
+[Addon]
+Name=VieLotus (Sen Việt)
+Comment=Next-Gen Pure Vietnamese Input Engine for Fcitx5
+Category=InputMethod
+Type=SharedLibrary
+OnDemand=True
+Configurable=True
+Library=vielotus
+
+[Addon/Dependencies]
+0=core
+
+[InputMethod/vielotus-telex]
+Name=Sen Việt (Telex)
+Icon=vielotus
+LangCode=vi
+Configurable=True
+
+[InputMethod/vielotus-vni]
+Name=Sen Việt (VNI)
+Icon=vielotus
+LangCode=vi
+Configurable=True

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Hỗ trợ & Hướng dẫn — Sen Việt</title>
+  <meta name="description" content="Hướng dẫn cài đặt, kích hoạt và sử dụng bộ gõ tiếng Việt Sen Việt trên macOS, iOS/iPadOS và Android.">
+  <link rel="canonical" href="https://stevedat.github.io/VieLotus-IM/support.html">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://stevedat.github.io/VieLotus-IM/support.html">
+  <meta property="og:title" content="Hỗ trợ & Hướng dẫn — Sen Việt">
+  <meta property="og:description" content="Hướng dẫn kích hoạt nhanh bàn phím Sen Việt trên máy tính và điện thoại.">
+  <meta property="og:image" content="https://stevedat.github.io/VieLotus-IM/assets/app-icon-512x512.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <style>
+    :root {
+      --bg-canvas: #F4F7F6;
+      --bg-surface: #FCFDFD;
+      --bg-subtle: #E9F0EE;
+      --border-hairline: #D5E0DD;
+      --text-primary: #15241E;
+      --text-secondary: #4A5E56;
+      --text-muted: #6E827A;
+      --lotus-green: #1F5B3A;
+      --lotus-teal: #1E6B7B;
+      --font-display: 'Bricolage Grotesque', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+      --font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      font-family: var(--font-body);
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.65;
+    }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 0 max(16px, env(safe-area-inset-left));
+    }
+    a { color: var(--lotus-teal); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { width: 100%; max-width: 680px; margin: 0 auto; }
+    header {
+      padding: 18px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16.5px;
+      letter-spacing: -0.015em;
+      color: var(--text-primary);
+    }
+    .brand:hover { text-decoration: none; }
+    .brand img { width: 30px; height: 30px; border-radius: 7px; }
+    main { flex: 1; padding: 28px 0 44px; }
+    h1 { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .sub { font-size: 14.5px; color: var(--text-secondary); margin-bottom: 24px; }
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    h2 { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+    code, kbd { font-family: var(--font-mono); font-size: 0.9em; }
+    p, li { font-size: 14.5px; color: var(--text-secondary); }
+    ol, ul { padding-left: 18px; display: grid; gap: 6px; margin-top: 6px; }
+    footer {
+      padding: 20px 0 28px;
+      border-top: 1px solid var(--border-hairline);
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .footer-links { display: flex; gap: 16px; flex-wrap: wrap; }
+    .footer-links a { color: var(--text-muted); }
+    .footer-links a:hover { color: var(--text-primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="index.html" class="brand">
+        <img src="assets/app-icon-512x512.png" alt="Sen Việt">
+        <span>Sen Việt</span>
+      </a>
+      <a href="index.html">← Trang chủ</a>
+    </header>
+
+    <main>
+      <h1>Hướng dẫn & Hỗ trợ</h1>
+      <p class="sub">Các bước kích hoạt nhanh bàn phím Sen Việt trên thiết bị của bạn.</p>
+
+      <div class="card">
+        <h2>1. Trên macOS (macOS 13 trở lên)</h2>
+        <ol>
+          <li>Tải bộ cài tự động <a href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg">VieLotusIM.pkg</a> và mở để cài đặt, hoặc cài qua Homebrew: <code>brew install stevedat/tap/vielotus</code>.</li>
+          <li>Vào <strong>Cài đặt hệ thống (System Settings) → Bàn phím (Keyboard) → Nguồn đầu vào (Input Sources) → Sửa (Edit...)</strong>.</li>
+          <li>Nhấn dấu <strong>(+)</strong>, chọn <strong>Tiếng Việt</strong> → thêm <strong>Sen Việt</strong>.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>2. Trên Windows (Windows 10 &amp; 11 — x64 &amp; ARM64)</h2>
+        <ol>
+          <li>Tải bộ cài <a href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe">VieLotus-Setup-x64.exe</a> (Intel/AMD 64-bit) hoặc <a href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe">VieLotus-Setup-arm64.exe</a> (Snapdragon / Apple Silicon VM) và chạy trình cài đặt để tự động đăng ký và kích hoạt bộ gõ chuẩn Windows TSF.</li>
+          <li>Nhấn tổ hợp phím <kbd>Win</kbd> + <kbd>Space</kbd> trên thanh tác vụ để chuyển sang <strong>Sen Việt (VieLotus)</strong>, hoặc mở ứng dụng <strong>Sen Việt (VieLotus Settings)</strong> trong Start Menu để đổi kiểu gõ Telex / VNI.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>3. Trên Linux (Ubuntu, Debian, Mint, Pop!_OS — IBus &amp; Fcitx5)</h2>
+        <ol>
+          <li><strong>Cách 1 (Khuyên dùng — Cài &amp; tự động kích hoạt bằng 1 dòng lệnh):</strong><br>
+            <code>curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh</code>
+          </li>
+          <li><strong>Cách 2 (Tải gói <code>.deb</code> All-in-One):</strong> Tải <a href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_1.1.1_amd64.deb">vielotus_1.1.1_amd64.deb</a> (x64) hoặc <a href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_1.1.1_arm64.deb">vielotus_1.1.1_arm64.deb</a> (ARM64) rồi chạy: <code>sudo apt install ./vielotus_1.1.1_*.deb</code>.</li>
+          <li>Sau khi cài xong, bộ gõ <strong>Sen Việt</strong> sẽ tự động xuất hiện trên thanh ngôn ngữ hệ thống (<kbd>Super</kbd> + <kbd>Space</kbd>) và trong <strong>Menu ứng dụng</strong> (bấm phím <kbd>Super</kbd> gõ <strong>Sen Việt</strong> để mở bảng chọn Telex / VNI, hoặc gõ lệnh <code>vielotus --telex</code> / <code>vielotus --vni</code>).</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>4. Trên iPhone & iPad (iOS / iPadOS)</h2>
+        <ol>
+          <li>Tải <strong>Sen Việt</strong> trên <a href="https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799" target="_blank" rel="noopener noreferrer">App Store</a>.</li>
+          <li>Mở <strong>Cài đặt (Settings) → Cài đặt chung (General) → Bàn phím (Keyboard) → Các bàn phím (Keyboards)</strong>.</li>
+          <li>Chọn <strong>Thêm bàn phím mới...</strong> và bật <strong>Sen Việt</strong> (không cần bật Cho phép truy cập đầy đủ).</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>5. Trên Android</h2>
+        <ol>
+          <li>Tải <strong>Sen Việt</strong> trên <a href="https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard" target="_blank" rel="noopener noreferrer">Google Play</a>.</li>
+          <li>Mở ứng dụng <strong>Sen Việt</strong> và làm theo hướng dẫn trên màn hình để bật bàn phím ảo và bàn phím cứng trong phần Cài đặt hệ thống.</li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>6. Góp ý, Thảo luận & Tác giả</h2>
+        <p>
+          Nếu bạn gặp bất kỳ vấn đề nào trong quá trình sử dụng hoặc muốn trao đổi cùng cộng đồng, vui lòng tham gia <a href="https://zalo.me/g/6wwyvywyvhsb0n6rwkze" target="_blank" rel="noopener noreferrer">Kênh Thảo luận Cộng đồng (Zalo)</a>, gửi báo lỗi tại <a href="https://github.com/stevedat/VieLotus-IM/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>, hoặc kết nối với tác giả <a href="https://www.linkedin.com/in/stevedat/?isSelfProfile=true" target="_blank" rel="noopener noreferrer">Trần Phát Đạt trên LinkedIn</a>.
+        </p>
+      </div>
+    </main>
+
+    <footer>
+      <span>Sen Việt — Miễn phí cho cộng đồng người Việt.</span>
+      <div class="footer-links">
+        <a href="index.html">Trang chủ</a>
+        <a href="privacy.html">Quyền riêng tư</a>
+        <a href="terms.html">Điều khoản</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
