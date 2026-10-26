@@ -1,0 +1,183 @@
+name: Release (macOS, Windows & Linux)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.1.1)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build, Sign & Publish Desktop Release (macOS, Windows, Linux)
+    runs-on: macos-15
+    env:
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+      KEYCHAIN_PWD: ${{ secrets.KEYCHAIN_PWD || 'temp-build-keychain-pass' }}
+      DEVELOPER_ID_APP: ${{ secrets.DEVELOPER_ID_APP }}
+      DEVELOPER_ID_INSTALLER: ${{ secrets.DEVELOPER_ID_INSTALLER }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify prebuilt binary SHA-256 checksums
+        run: shasum -a 256 -c Binaries/checksums.sha256
+
+      - name: Extract release version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v${VERSION#v}"
+          else
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          fi
+          if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
+            VERSION="1.1.1"
+            TAG="v1.1.1"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Set up Apple Developer ID Certificate (if secrets provided)
+        if: env.MACOS_CERTIFICATE != ''
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+          security import "$CERT_PATH" -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed -e 's/"//g')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          rm -f "$CERT_PATH"
+
+      - name: Configure Apple Notarization credentials
+        id: notary
+        run: |
+          if [ -n "$ASC_PRIVATE_KEY" ] && [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ]; then
+            mkdir -p "$RUNNER_TEMP/private_keys"
+            KEY_FILE="$RUNNER_TEMP/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+            printf "%s\n" "$ASC_PRIVATE_KEY" > "$KEY_FILE"
+            chmod 600 "$KEY_FILE"
+            if xcrun notarytool store-credentials "notarytool-profile" \
+              --key "$KEY_FILE" \
+              --key-id "$ASC_KEY_ID" \
+              --issuer "$ASC_ISSUER_ID"; then
+              echo "enabled=1" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          if [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            if xcrun notarytool store-credentials "notarytool-profile" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID"; then
+              echo "enabled=1" >> $GITHUB_OUTPUT
+            else
+              echo "::warning::Apple Notarization credentials invalid or expired; proceeding with Developer ID signature."
+              echo "enabled=0" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "enabled=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and Sign universal App bundle
+        run: |
+          ./scripts/build_imk.sh "${{ steps.version.outputs.version }}"
+
+      - name: Archive VieLotusIM.app
+        run: |
+          cd .build/dist
+          zip -r -y VieLotusIM.app.zip VieLotusIM.app
+
+      - name: Notarize and Staple VieLotusIM.app.zip (if notarytool configured)
+        if: steps.notary.outputs.enabled == '1'
+        run: |
+          xcrun notarytool submit ".build/dist/VieLotusIM.app.zip" --keychain-profile "notarytool-profile" --wait
+          bash scripts/notarize_artifact.sh --staple-only ".build/dist/VieLotusIM.app"
+          cd .build/dist
+          rm -f VieLotusIM.app.zip
+          zip -r -y VieLotusIM.app.zip VieLotusIM.app
+
+      - name: Build, Sign, and Notarize PKG installer
+        env:
+          NOTARIZE: ${{ steps.notary.outputs.enabled }}
+          NOTARY_KEYCHAIN_PROFILE: "notarytool-profile"
+        run: |
+          ./scripts/build_pkg.sh "${{ steps.version.outputs.version }}"
+
+      - name: Stage Windows & Linux Release Installers and Generate Checksums
+        run: |
+          cp Binaries/windows/VieLotus-Setup-x64.exe .build/dist/
+          cp Binaries/windows/VieLotus-Setup-arm64.exe .build/dist/
+          cp Binaries/linux/*.deb .build/dist/
+          cd .build/dist
+          shasum -a 256 VieLotusIM.pkg VieLotusIM.app.zip VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe *.deb > checksums.sha256
+          cat checksums.sha256
+
+      - name: Prepare Release Notes Body
+        run: |
+          COMMIT_SHA=$(git rev-parse HEAD)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          cat > release_notes.md <<EOF
+          ### 🌸 Sen Việt (VieLotusIM) v${{ steps.version.outputs.version }} — Multi-Platform Desktop Release
+
+          - **Git Commit:** [\`${SHORT_SHA}\`](https://github.com/${{ github.repository }}/commit/${COMMIT_SHA})
+          - **Build Timestamp:** ${BUILD_DATE}
+          - **macOS:** \`VieLotusIM.pkg\` / \`VieLotusIM.app.zip\` (Universal Apple Silicon & Intel)
+          - **Windows (x64 & ARM64):** \`VieLotus-Setup-x64.exe\`, \`VieLotus-Setup-arm64.exe\` (Universal Native Windows Text Services Framework COM Installer)
+          - **Linux (Debian/Ubuntu All-in-One \`amd64\` & \`arm64\`):** \`vielotus_${{ steps.version.outputs.version }}_amd64.deb\`, \`vielotus_${{ steps.version.outputs.version }}_arm64.deb\` (IBus & Fcitx5 + Core Engine)
+
+          #### 📊 Chỉ số kiểm thử hồi quy chính thức (Benchmark Regression Matrix)
+          - **Overall Primary Suite:** **100.00% (9,091 / 9,091)**
+          - **Symmetric No-Context (\`vn_survives_collision\` / \`ambiguous_both_sides\`):** **97.33% (365 / 375)**
+          - **Single-Path Vietnamese Preservation (\`whitelist_safe = never\`):** **100.00% (182 / 182 — 0 critical losses)**
+
+          #### 🔐 Bảng mã băm SHA-256 đối chiếu (Integrity Checksums)
+          \`\`\`text
+          $(cat .build/dist/checksums.sha256)
+          \`\`\`
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          body_path: release_notes.md
+          files: |
+            .build/dist/VieLotusIM.pkg
+            .build/dist/VieLotusIM.app.zip
+            .build/dist/VieLotus-Setup-*.exe
+            .build/dist/*.deb
+            .build/dist/checksums.sha256
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+      - name: Clean up temporary keychain
+        if: always()
+        run: |
+          if [ -n "$RUNNER_TEMP" ] && [ -f "$RUNNER_TEMP/build.keychain" ]; then
+            security delete-keychain "$RUNNER_TEMP/build.keychain" || true
+          fi

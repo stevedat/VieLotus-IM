@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Báo cáo Nghiên cứu & Kiến trúc Kỹ thuật — Sen Việt (VieLotusIM)</title>
+  <meta name="description" content="Chuyên khảo kỹ thuật và kết quả thực nghiệm của bộ gõ Sen Việt (VieLotusIM): Kiến trúc Pure InputMethodKit không dùng CGEventTap, đối xứng song ngữ Anh–Việt trên 9.091 ca kiểm thử, và độ trễ đuôi p99 dưới 200 micro-giây.">
+
+  <!-- Canonical & OpenGraph -->
+  <link rel="canonical" href="https://stevedat.github.io/VieLotus-IM/research.html">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://stevedat.github.io/VieLotus-IM/research.html">
+  <meta property="og:title" content="Báo cáo Nghiên cứu & Kiến trúc Kỹ thuật — Sen Việt (VieLotusIM)">
+  <meta property="og:description" content="Phân tích giới hạn của kiến trúc CGEventTap truyền thống, giải pháp đồng bộ khung soạn thảo nguyên bản (InputMethodKit / TSF / IBus) và ma trận kiểm chứng đối xứng 9.091 ca.">
+  <meta property="og:image" content="https://stevedat.github.io/VieLotus-IM/assets/app-icon-512x512.png">
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+
+  <style>
+    :root {
+      --bg-canvas: #F4F7F6;
+      --bg-surface: #FCFDFD;
+      --bg-subtle: #E9F0EE;
+      --bg-code: #121E19;
+      --border-hairline: #D5E0DD;
+      --border-keycap: #B8C9C5;
+      --text-primary: #15241E;
+      --text-secondary: #4A5E56;
+      --text-muted: #6E827A;
+      --lotus-green: #1F5B3A;
+      --lotus-green-hover: #17472D;
+      --lotus-green-soft: #E3EFE8;
+      --lotus-teal: #1E6B7B;
+      --lotus-amber-bg: #FAF3E3;
+      --lotus-amber-border: #DFC793;
+      --lotus-amber-text: #6E4F12;
+      --lotus-danger-bg: #F9ECEE;
+      --lotus-danger-text: #8A2838;
+
+      --font-display: 'Bricolage Grotesque', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+      --font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      font-family: var(--font-body);
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.7;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+    }
+
+    a {
+      color: var(--lotus-teal);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 820px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      padding: 16px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16.5px;
+      letter-spacing: -0.015em;
+      color: var(--text-primary);
+      min-height: 44px;
+    }
+
+    .brand:hover {
+      text-decoration: none;
+    }
+
+    .brand img {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      flex-shrink: 0;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .lang-switch {
+      display: inline-flex;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-hairline);
+      border-radius: 8px;
+      padding: 2px;
+    }
+
+    .lang-btn {
+      border: 0;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 600;
+      min-height: 34px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .lang-btn.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      box-shadow: 0 1px 2px rgba(21, 36, 30, 0.06);
+    }
+
+    .header-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 4px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .header-link:hover {
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    /* Main Monograph Layout */
+    main {
+      flex: 1;
+      padding: 28px 0 56px;
+    }
+
+    .paper-header {
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border-hairline);
+      margin-bottom: 24px;
+    }
+
+    .paper-meta {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--lotus-green);
+      margin-bottom: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      text-wrap: balance;
+    }
+
+    .abstract {
+      font-size: 15px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      max-width: 72ch;
+    }
+
+    /* Pinned Top Empirical Summary Strip */
+    .summary-strip {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .metric-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 21px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--lotus-green);
+      line-height: 1.25;
+      margin-bottom: 4px;
+    }
+
+    .metric-label {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .metric-sub {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Table of Contents Bar */
+    .toc-nav {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-hairline);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 32px;
+    }
+
+    .toc-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .toc-list {
+      list-style: none;
+      display: grid;
+      gap: 6px;
+      font-size: 13.5px;
+    }
+
+    .toc-list a {
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .toc-list a:hover {
+      color: var(--lotus-green);
+      text-decoration: none;
+    }
+
+    .toc-sec {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--lotus-green);
+      font-weight: 600;
+    }
+
+    /* Sections */
+    .paper-section {
+      padding: 28px 0;
+      border-top: 1px solid var(--border-hairline);
+    }
+
+    .paper-section:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: -0.015em;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+
+    h3 {
+      font-family: var(--font-display);
+      font-size: 16.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 20px 0 8px;
+    }
+
+    p {
+      font-size: 14.75px;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+      max-width: 72ch;
+    }
+
+    p strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    /* Callout Note */
+    .finding-callout {
+      background: var(--lotus-amber-bg);
+      border: 1px solid var(--lotus-amber-border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin: 16px 0;
+      font-size: 13.75px;
+      color: var(--lotus-amber-text);
+      line-height: 1.6;
+    }
+
+    .finding-callout strong {
+      color: #493307;
+      font-weight: 600;
+    }
+
+    /* Data Tables */
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 10px;
+      margin: 16px 0 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      text-align: left;
+    }
+
+    th {
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      font-weight: 600;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-hairline);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-hairline);
+      color: var(--text-secondary);
+      vertical-align: top;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .num {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .badge-pass {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--lotus-green);
+      background: var(--lotus-green-soft);
+      padding: 2px 7px;
+      border-radius: 5px;
+    }
+
+    .badge-warn {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--lotus-danger-text);
+      background: var(--lotus-danger-bg);
+      padding: 2px 7px;
+      border-radius: 5px;
+    }
+
+    /* Interactive Centerpiece: Engine State & Collision Lab */
+    .lab-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-keycap);
+      border-radius: 12px;
+      padding: 18px;
+      margin: 20px 0;
+    }
+
+    .lab-header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .lab-title {
+      font-family: var(--font-display);
+      font-size: 16.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .lab-desc {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+    }
+
+    .case-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .case-pill {
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-canvas);
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 500;
+      min-height: 36px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .case-pill:hover {
+      border-color: var(--border-keycap);
+      color: var(--text-primary);
+    }
+
+    .case-pill.active {
+      background: var(--lotus-green);
+      border-color: var(--lotus-green);
+      color: #FFFFFF;
+    }
+
+    .lab-stage {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-hairline);
+      border-radius: 10px;
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .lab-input-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-hairline);
+      font-size: 13px;
+    }
+
+    .lab-keystrokes {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .lab-context-tag {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--lotus-teal);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      padding: 2px 8px;
+      border-radius: 5px;
+    }
+
+    .lab-comparison {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .lab-engine-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .lab-engine-card.highlight {
+      border-color: var(--lotus-green);
+      background: #F7FBF9;
+    }
+
+    .lab-engine-name {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .lab-engine-card.highlight .lab-engine-name {
+      color: var(--lotus-green);
+    }
+
+    .lab-engine-output {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .lab-engine-note {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Code Block */
+    .code-block {
+      background: var(--bg-code);
+      color: #E5F0EC;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.65;
+      overflow-x: auto;
+      margin: 12px 0 16px;
+    }
+
+    .code-comment {
+      color: #7FA395;
+    }
+
+    /* Footer */
+    footer {
+      padding: 22px 0 max(28px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border-hairline);
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .footer-links a:hover {
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    @media (min-width: 640px) {
+      body {
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+
+      header {
+        padding: 22px 0;
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      .summary-strip {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+
+      .toc-list {
+        grid-template-columns: repeat(2, 1fr);
+        column-gap: 20px;
+      }
+
+      .lab-comparison {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      footer {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+      }
+    }
+
+    @media (min-width: 820px) {
+      .summary-strip {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="index.html" class="brand">
+        <img src="assets/app-icon-512x512.png" alt="Sen Việt">
+        <span>Sen Việt</span>
+      </a>
+
+      <div class="header-actions">
+        <div class="lang-switch" role="group" aria-label="Ngôn ngữ">
+          <button id="btn-vi" class="lang-btn active" onclick="setLang('vi')">VI</button>
+          <button id="btn-en" class="lang-btn" onclick="setLang('en')">EN</button>
+        </div>
+        <a href="index.html" class="header-link" data-i18n="nav.home">Trang chủ</a>
+        <a href="support.html" class="header-link" data-i18n="nav.support">Hỗ trợ</a>
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="header-link">GitHub</a>
+      </div>
+    </header>
+
+    <main>
+      <article>
+        <div class="paper-header">
+          <div class="paper-meta">
+            <span data-i18n="meta.doc">Báo cáo Nghiên cứu & Thực nghiệm · v1.1</span>
+            <span>·</span>
+            <span data-i18n="meta.author">Tác giả: Trần Phát Đạt (Steve Dat)</span>
+            <span>·</span>
+            <span data-i18n="meta.target">Lõi: VieLotusCore (Pure Swift 6)</span>
+          </div>
+          <h1 data-i18n="paper.title">Kiến trúc bộ gõ tiếng Việt nguyên bản không dùng Event Tap và bài toán phân giải va chạm song ngữ đối xứng</h1>
+          <p class="abstract" data-i18n="paper.abstract">
+            Báo cáo này trình bày các nhận định kỹ thuật và kết quả đo kiểm thực nghiệm của dự án Sen Việt (VieLotusIM). Chúng tôi phân tích nguyên nhân gốc rễ khiến phương pháp chặn phím tầng thấp (CGEventTap / tiêm phím xóa giả lập) gây nuốt chữ trên trình duyệt hiện đại, đề xuất kiến trúc đồng bộ trạng thái nguyên bản qua InputMethodKit / TSF / IBus, và thiết lập chuẩn đánh giá đối xứng hai chiều cho bài toán gõ trộn tiếng Việt – tiếng Anh trên tập dữ liệu 9.091 ca kiểm thử.
+          </p>
+        </div>
+
+        <!-- Pinned Top Summary Metrics (Always quoting symmetric collision figures together) -->
+        <section class="summary-strip" aria-label="Chỉ số thực nghiệm cốt lõi">
+          <div class="metric-box">
+            <div class="metric-value">100.00%</div>
+            <div class="metric-label" data-i18n="m1.label">9.091 / 9.091 ca chính</div>
+            <div class="metric-sub" data-i18n="m1.sub">Độ chính xác tổng thể trên 5 nhóm kiểm thử có ngữ cảnh (Telex & VNI).</div>
+          </div>
+
+          <div class="metric-box">
+            <div class="metric-value">97.33%</div>
+            <div class="metric-label" data-i18n="m2.label">365 / 375 đối xứng hai chiều</div>
+            <div class="metric-sub" data-i18n="m2.sub">Chỉ số ambiguous_both_sides: Đúng tiếng Anh khi có ngữ cảnh VÀ giữ đúng âm tiết Việt khi gõ độc lập.</div>
+          </div>
+
+          <div class="metric-box">
+            <div class="metric-value">182 / 182</div>
+            <div class="metric-label" data-i18n="m3.label">100.00% đường gõ duy nhất</div>
+            <div class="metric-sub" data-i18n="m3.sub">Bảo toàn tuyệt đối (0 mất mát) các âm tiết tiếng Việt chỉ có một cách gõ phím (whitelist_safe = never).</div>
+          </div>
+
+          <div class="metric-box">
+            <div class="metric-value">&lt; 200 µs</div>
+            <div class="metric-label" data-i18n="m4.label">Độ trễ đuôi p99 (Telex)</div>
+            <div class="metric-sub" data-i18n="m4.sub">Thông lượng &gt; 40.000 phím/giây qua 250.000 phím liên tục, 0 rò rỉ bộ nhớ, 0 quyền Accessibility.</div>
+          </div>
+        </section>
+
+        <!-- Table of Contents -->
+        <nav class="toc-nav" aria-label="Mục lục báo cáo">
+          <div class="toc-title" data-i18n="toc.title">Cấu trúc chuyên khảo</div>
+          <ol class="toc-list">
+            <li><a href="#sec-1"><span class="toc-sec">§1</span> <span data-i18n="toc.s1">Giới hạn kiến trúc của CGEventTap & tiêm phím xóa giả lập</span></a></li>
+            <li><a href="#sec-2"><span class="toc-sec">§2</span> <span data-i18n="toc.s2">Mô phỏng tương tác: So sánh máy trạng thái theo từng phím</span></a></li>
+            <li><a href="#sec-3"><span class="toc-sec">§3</span> <span data-i18n="toc.s3">Bài toán va chạm song ngữ & nguyên lý công bố đối xứng</span></a></li>
+            <li><a href="#sec-4"><span class="toc-sec">§4</span> <span data-i18n="toc.s4">Cơ chế trình diễn thích ứng (AppKit, Chromium/React, Terminal)</span></a></li>
+            <li><a href="#sec-5"><span class="toc-sec">§5</span> <span data-i18n="toc.s5">Kiến trúc đa nền tảng (C-ABI) & giải quyết nạp DLL trên Windows 11 ARM64</span></a></li>
+            <li><a href="#sec-6"><span class="toc-sec">§6</span> <span data-i18n="toc.s6">Độ trễ đuôi p99 & quy trình tái lập kiểm thử hộp đen (Open-Core)</span></a></li>
+          </ol>
+        </nav>
+
+        <!-- Section 1 -->
+        <section id="sec-1" class="paper-section">
+          <h2 data-i18n="s1.heading">§1. Nhận định cốt lõi: Vì sao kiến trúc CGEventTap truyền thống gặp giới hạn trên hệ điều hành hiện đại?</h2>
+          <p data-i18n="s1.p1">
+            Trong suốt hai thập kỷ qua, phần lớn các bộ gõ tiếng Việt bên thứ ba trên macOS đều lựa chọn kiến trúc <strong>chặn sự kiện bàn phím tầng thấp (CGEventTap)</strong>. Khi người dùng gõ chữ <code>t-i-e-e</code>, chữ <code>tiê</code> chưa được tạo ra trong vùng đệm hệ thống; thay vào đó, chữ <code>tie</code> đã lọt vào ứng dụng, sau đó bộ gõ phát sinh một chuỗi sự kiện <code>Backspace</code> giả lập qua <code>CGEventSource</code> để xóa chữ cũ rồi bắn chuỗi Unicode <code>tiê</code> mới vào luồng sự kiện cửa sổ.
+          </p>
+          <p data-i18n="s1.p2">
+            Cách tiếp cận này từng hoạt động tốt trên các khung soạn thảo văn bản đồng bộ thế hệ cũ, nhưng bộc lộ <strong>4 xung đột cấu trúc không thể vá triệt để</strong> trên macOS hiện đại và các ứng dụng kiến trúc bất đồng bộ (Chromium, Electron, React Virtual DOM, IDE hiện đại):
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="s1.th1">Khía cạnh kỹ thuật</th>
+                  <th data-i18n="s1.th2">Bộ gõ dựa trên CGEventTap (Tiêm Backspace)</th>
+                  <th data-i18n="s1.th3">Sen Việt (Pure InputMethodKit / TSF / IBus)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong data-i18n="s1.r1.c1">Đồng bộ hóa giao diện bất đồng bộ (React / Electron / URL Bar)</strong></td>
+                  <td data-i18n="s1.r1.c2">Phím <code>Backspace</code> giả lập chạy đua (race condition) với vòng lặp đối chiếu Virtual DOM hoặc gợi ý tự động trên thanh địa chỉ, gây hiện tượng nhân đôi âm tiết (<code>t-ti-tiế-tiếng</code>) hoặc nhảy con trỏ.</td>
+                  <td data-i18n="s1.r1.c3">Thay thế nguyên tử qua <code>insertText:replacementRange:</code> (UTF-16) trên AppKit hoặc phát đúng vòng đời W3C <code>compositionstart</code> / <code>compositionupdate</code> trên trình duyệt.</td>
+                </tr>
+                <tr>
+                  <td><strong data-i18n="s1.r2.c1">Quyền hệ thống & lỗi câm TCC (csreq mismatch)</strong></td>
+                  <td data-i18n="s1.r2.c2">Bắt buộc đòi quyền <strong>Accessibility (Trợ năng)</strong> toàn hệ thống. Khi cập nhật phiên bản mới, chữ ký mã (Designated Requirement) thay đổi khiến macOS âm thầm chặn sự kiện dù nút bật trong Cài đặt vẫn sáng.</td>
+                  <td data-i18n="s1.r2.c3"><strong>0 quyền Accessibility, 0 quyền Input Monitoring.</strong> Vận hành đúng giao thức bàn phím chính thống của hệ điều hành.</td>
+                </tr>
+                <tr>
+                  <td><strong data-i18n="s1.r3.c1">Lịch sử hoàn tác (Undo Stack Cmd+Z)</strong></td>
+                  <td data-i18n="s1.r3.c2">Mỗi lần tiêm phím xóa và chèn lại chữ sẽ làm vỡ ngăn xếp hoàn tác của trình soạn thảo thành từng mảnh ký tự rời rạc.</td>
+                  <td data-i18n="s1.r3.c3">Bảo toàn nguyên vẹn ngăn xếp hoàn tác theo từng từ của ứng dụng đích.</td>
+                </tr>
+                <tr>
+                  <td><strong data-i18n="s1.r4.c1">Ô nhập mật khẩu (Secure Event Input)</strong></td>
+                  <td data-i18n="s1.r4.c2">Bị vô hiệu hóa đột ngột hoặc gây kẹt trạng thái khi trình duyệt/Terminal bật <code>EnableSecureEventInput()</code>.</td>
+                  <td data-i18n="s1.r4.c3">Kiểm tra chủ động <code>IsSecureEventInputEnabled()</code> và tự động chuyển sang passthrough an toàn, tuyệt đối không lưu vết phím.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Section 2: Interactive State & Collision Lab -->
+        <section id="sec-2" class="paper-section">
+          <h2 data-i18n="s2.heading">§2. Mô phỏng thực nghiệm: So sánh phản ứng máy trạng thái trên các ca gõ thực tế</h2>
+          <p data-i18n="s2.p1">
+            Chọn một trong 6 kịch bản kiểm thử thực tế dưới đây để quan sát sự khác biệt giữa cơ chế tiêm phím xóa truyền thống, bộ gõ mặc định Simple Telex, và máy trạng thái <code>InputSessionManager</code> + <code>SmartBilingualDetector</code> của Sen Việt:
+          </p>
+
+          <div class="lab-panel">
+            <div class="lab-header">
+              <div class="lab-title" data-i18n="lab.title">Bảng đối chiếu chuỗi phím & trạng thái đầu ra</div>
+              <div class="lab-desc" data-i18n="lab.desc">Nhấn vào từng chuỗi phím để xem cách phân giải âm vị, dấu thanh và ngữ cảnh song ngữ.</div>
+            </div>
+
+            <div class="case-pills" role="tablist">
+              <button type="button" class="case-pill active" onclick="selectCase(0)">truonwgfswo + Space</button>
+              <button type="button" class="case-pill" onclick="selectCase(1)">"run unit" + test + Space</button>
+              <button type="button" class="case-pill" onclick="selectCase(2)">"ăn Tết" → test + Space</button>
+              <button type="button" class="case-pill" onclick="selectCase(3)">roonjzz + Space</button>
+              <button type="button" class="case-pill" onclick="selectCase(4)">turn / last + Space</button>
+              <button type="button" class="case-pill" onclick="selectCase(5)">được + z (Sửa sau commit)</button>
+            </div>
+
+            <div class="lab-stage">
+              <div class="lab-input-row">
+                <div>
+                  <span data-i18n="lab.keystroke_label">Chuỗi phím đầu vào:</span>
+                  <span id="lab-keys" class="lab-keystrokes">t-r-u-o-n-w-g-f-s-w-o + Space</span>
+                </div>
+                <span id="lab-ctx" class="lab-context-tag">Ngữ cảnh: độc lập (SEN Flex)</span>
+              </div>
+
+              <div class="lab-comparison">
+                <div class="lab-engine-card">
+                  <div class="lab-engine-name" data-i18n="lab.col1">Bộ gõ CGEventTap cũ</div>
+                  <div id="lab-out-1" class="lab-engine-output">trườngwơ / lỗi dấu</div>
+                  <div id="lab-note-1" class="lab-engine-note">Bắn nhiều đợt Backspace giả lập; dễ rớt chữ trên thanh địa chỉ Chrome hoặc rò phím phụ âm cuối khi đổi dấu liên tiếp.</div>
+                </div>
+
+                <div class="lab-engine-card">
+                  <div class="lab-engine-name" data-i18n="lab.col2">Simple Telex mặc định</div>
+                  <div id="lab-out-2" class="lab-engine-output">truonwgfswo</div>
+                  <div id="lab-note-2" class="lab-engine-note">Yêu cầu gõ dấu ngay sau nguyên âm chuẩn; gõ tự do vượt qua phụ âm cuối hoặc đổi ý dấu thanh nhiều lần sẽ làm vỡ âm tiết.</div>
+                </div>
+
+                <div class="lab-engine-card highlight">
+                  <div class="lab-engine-name" data-i18n="lab.col3">Sen Việt (VieLotusCore)</div>
+                  <div id="lab-out-3" class="lab-engine-output">trưởng </div>
+                  <div id="lab-note-3" class="lab-engine-note">SEN Flex hợp nhất nguyên âm đôi ươ, cho phép ghi đè dấu huyền (f) sang sắc (s)/hỏi, loại bỏ phím thừa (No Ghost Keys) và thay thế nguyên tử UTF-16.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 3: Symmetric Bilingual Collision Matrix -->
+        <section id="sec-3" class="paper-section">
+          <h2 data-i18n="s3.heading">§3. Nghịch lý va chạm song ngữ Anh – Việt và nguyên lý công bố đối xứng</h2>
+          <p data-i18n="s3.p1">
+            Khi người Việt làm việc hàng ngày, hàng nghìn từ tiếng Anh phổ biến chứa các chữ cái trùng khớp với phím điều khiển Telex: <code>s</code> (dấu sắc), <code>f</code> (dấu huyền), <code>r</code> (dấu hỏi), <code>x</code> (dấu ngã), <code>j</code> (dấu nặng), <code>w</code> (ư/ơ/ă), và cặp nguyên âm <code>oo</code>, <code>ee</code>, <code>aa</code>. Ví dụ: gõ <code>test</code> bị biến thành <code>tết</code>, <code>toast</code> thành <code>toát</code>, <code>floor</code> thành <code>flô</code>, <code>restrict</code> bị biến dạng dấu hỏi/sắc.
+          </p>
+          <p data-i18n="s3.p2">
+            Tuy nhiên, một nhận định khoa học quan trọng của nghiên cứu này là: <strong>Mọi tuyên bố "đạt 100% khôi phục từ tiếng Anh" nếu chỉ đo một chiều đều là phóng đại năng lực của bộ gõ.</strong> Nếu một bộ gõ chỉ đơn giản nhét toàn bộ từ điển tiếng Anh vào danh sách trắng (whitelist) vô điều kiện, nó sẽ đạt 100% ở phía tiếng Anh nhưng lại <strong>phá hủy khả năng gõ các âm tiết tiếng Việt đồng hình</strong> (chẳng hạn người dùng không bao giờ gõ được chữ <em>tết</em> bằng <code>test</code>, chữ <em>đất</em> bằng <code>ddats</code>, hay chữ <em>lốt</em> bằng <code>loots</code> khi đứng đầu câu).
+          </p>
+
+          <div class="finding-callout" data-i18n="s3.callout">
+            <strong>Quy tắc công bố đối xứng bắt buộc của Sen Việt:</strong> Kết quả <strong>100.00% (9.091 / 9.091)</strong> trên bộ kiểm thử chính luôn phải được công bố đi kèm với phép thử ngược không ngữ cảnh: <strong>97.33% (365 / 375)</strong> ở chỉ số <code>ambiguous_both_sides</code> và <strong>100.00% (182 / 182 — 0 mất mát nghiêm trọng)</strong> ở nhóm âm tiết tiếng Việt chỉ có duy nhất một đường gõ (<code>whitelist_safe = never</code>).
+          </div>
+
+          <h3 data-i18n="s3.t1_title">Bảng 3.1 — Ma trận kiểm thử chính (9.091 ca, có cô lập ngữ cảnh từng dòng)</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="s3.t1.h1">Nhóm kiểm thử (Bucket)</th>
+                  <th data-i18n="s3.t1.h2">Mô tả điều kiện thực thi</th>
+                  <th class="num" data-i18n="s3.t1.h3">Đạt / Tổng</th>
+                  <th class="num" data-i18n="s3.t1.h4">Tỷ lệ</th>
+                  <th class="num" data-i18n="s3.t1.h5">Ngưỡng chốt (Ratchet)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>transform</code></td>
+                  <td data-i18n="s3.t1.r1">Biến đổi âm tiết tiếng Việt thuần túy (Telex & SEN Flex)</td>
+                  <td class="num">400 / 400</td>
+                  <td class="num"><span class="badge-pass">100.00%</span></td>
+                  <td class="num">100.00%</td>
+                </tr>
+                <tr>
+                  <td><code>keep_as_typed</code></td>
+                  <td data-i18n="s3.t1.r2">Từ vựng tiếng Anh không chứa chuỗi biến âm hợp lệ của tiếng Việt</td>
+                  <td class="num">362 / 362</td>
+                  <td class="num"><span class="badge-pass">100.00%</span></td>
+                  <td class="num">100.00%</td>
+                </tr>
+                <tr>
+                  <td><code>cancel_keep_composed</code></td>
+                  <td data-i18n="s3.t1.r3">Hủy dấu / thoát mũ ở cuối từ (<code>zz</code>, <code>ss</code>, lặp ba nguyên âm <code>aaa → aa</code>)</td>
+                  <td class="num">67 / 67</td>
+                  <td class="num"><span class="badge-pass">100.00%</span></td>
+                  <td class="num">100.00%</td>
+                </tr>
+                <tr>
+                  <td><code>restore_raw</code></td>
+                  <td data-i18n="s3.t1.r4">Khôi phục từ tiếng Anh bị biến dạng bởi phím dấu Telex (kiểm tra luật âm vị tắt <code>-c, -ch, -p, -t</code>, nguyên âm đôi bất khả và băm từ điển 64-bit)</td>
+                  <td class="num">7.213 / 7.213</td>
+                  <td class="num"><span class="badge-pass">100.00%</span></td>
+                  <td class="num">100.00%</td>
+                </tr>
+                <tr>
+                  <td><code>ambiguous_needs_context</code></td>
+                  <td data-i18n="s3.t1.r5">Từ lưỡng nghĩa (vừa là từ tiếng Anh hợp lệ, vừa tạo thành âm tiết tiếng Việt hợp lệ) khi được mồi ngữ cảnh tiếng Anh đi trước</td>
+                  <td class="num">1.049 / 1.049</td>
+                  <td class="num"><span class="badge-pass">100.00%</span></td>
+                  <td class="num">100.00%</td>
+                </tr>
+                <tr>
+                  <td><strong data-i18n="s3.t1.total">Tổng hợp bộ kiểm thử chính</strong></td>
+                  <td data-i18n="s3.t1.r6"><strong>0 xung đột thỏa mãn (Satisfiability) · 0 xung đột chính sách (Policy Coherence)</strong></td>
+                  <td class="num"><strong>9.091 / 9.091</strong></td>
+                  <td class="num"><span class="badge-pass">100.00%</span></td>
+                  <td class="num"><strong>100.00%</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3 data-i18n="s3.t2_title">Bảng 3.2 — Ma trận kiểm thử đối xứng không ngữ cảnh (Chạy lại các ca lưỡng nghĩa với context rỗng)</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="s3.t2.h1">Chỉ số đối xứng</th>
+                  <th data-i18n="s3.t2.h2">Ý nghĩa ngôn ngữ học & kiểm định</th>
+                  <th class="num" data-i18n="s3.t2.h3">Đạt / Tổng</th>
+                  <th class="num" data-i18n="s3.t2.h4">Tỷ lệ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>vn_survives_collision</code></td>
+                  <td data-i18n="s3.t2.r1">375 từ lưỡng nghĩa viết thường khi gõ độc lập không có ngữ cảnh tiếng Anh: âm tiết tiếng Việt phải được giữ lại</td>
+                  <td class="num">365 / 375</td>
+                  <td class="num"><span class="badge-pass">97.33%</span></td>
+                </tr>
+                <tr>
+                  <td>↳ <code>whitelist_safe = never</code></td>
+                  <td data-i18n="s3.t2.r2">Nhóm âm tiết tiếng Việt mà chuỗi phím đó là <strong>con đường duy nhất</strong> để gõ ra chữ Việt (không được phép mất dù chỉ 1 từ)</td>
+                  <td class="num">182 / 182</td>
+                  <td class="num"><span class="badge-pass">100.00% (0 lỗi)</span></td>
+                </tr>
+                <tr>
+                  <td>↳ <code>whitelist_safe = degrades_vn</code></td>
+                  <td data-i18n="s3.t2.r3">Nhóm âm tiết có nhiều cách gõ thay thế (ví dụ gõ kiểu Telex mở rộng)</td>
+                  <td class="num">183 / 193</td>
+                  <td class="num">94.82%</td>
+                </tr>
+                <tr>
+                  <td><code>ambiguous_both_sides</code></td>
+                  <td data-i18n="s3.t2.r4"><strong>Chỉ số chuẩn mực kép:</strong> Ra đúng tiếng Anh khi có ngữ cảnh tiếng Anh VÀ ra đúng tiếng Việt khi gõ độc lập</td>
+                  <td class="num"><strong>365 / 375</strong></td>
+                  <td class="num"><span class="badge-pass">97.33%</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Section 4: Adaptive Presentation & App Compatibility -->
+        <section id="sec-4" class="paper-section">
+          <h2 data-i18n="s4.heading">§4. Cơ chế trình diễn thích ứng theo đặc tính khung soạn thảo (ClientAdapter)</h2>
+          <p data-i18n="s4.p1">
+            Một nhận định thực tế khác của nhóm phát triển là: <strong>Không có một chế độ hiển thị đơn lẻ nào tối ưu cho mọi ứng dụng trên macOS nếu tuân thủ thuần túy InputMethodKit.</strong> Các ứng dụng Cocoa/AppKit truyền thống xử lý hoàn hảo phép thay thế phạm vi trực tiếp (<code>insertText:replacementRange:</code>) không cần gạch chân, trong khi các trình soạn thảo web dùng React, ProseMirror, Monaco hay thanh địa chỉ Chromium lại dựa vào sự kiện <code>compositionstart</code> / <code>compositionend</code> (tức chế độ <code>setMarkedText</code> có gạch chân tạm thời) để không nhân đôi ký tự khi đối chiếu DOM bất đồng bộ.
+          </p>
+          <p data-i18n="s4.p2">
+            Thay vì dùng <code>CGEventTap</code> để cưỡng bức màn hình, Sen Việt kết hợp bộ phân loại <code>ClientAdapter</code>, lớp bảo vệ biên độ <code>DirectReplacementGuard</code> (đảm bảo không bao giờ xóa lố ra ngoài phạm vi <code>[compositionStartLocation, virtualCursorLocation]</code>) và tập luật dữ liệu mở <code>typing-modes.yml</code>:
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="s4.th1">Nhóm ứng dụng</th>
+                  <th data-i18n="s4.th2">Ứng dụng đại diện</th>
+                  <th data-i18n="s4.th3">Chế độ trình diễn</th>
+                  <th data-i18n="s4.th4">Cơ chế đồng bộ kỹ thuật</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Standard AppKit / Cocoa</strong></td>
+                  <td>Notes, Pages, TextEdit, Mail, Safari, Xcode, Finder, MS Office</td>
+                  <td><code>Direct Replacement</code></td>
+                  <td data-i18n="s4.r1">Thay thế trực tiếp theo đơn vị mã UTF-16 qua <code>insertText:replacementRange:</code>, không gạch chân, giữ nguyên Undo stack.</td>
+                </tr>
+                <tr>
+                  <td><strong>Chromium, Electron &amp; CEF</strong></td>
+                  <td>Chrome, Arc, Edge, Brave, VS Code, Cursor, Slack, Notion, Obsidian, Zalo</td>
+                  <td><code>Marked Text (W3C)</code></td>
+                  <td data-i18n="s4.r2">Đồng bộ với vòng đời W3C IME composition để triệt tiêu hoàn toàn lỗi lặp chữ (<code>t-ti-tiế-tiếng</code>) và nhảy con trỏ trong React/Virtual DOM.</td>
+                </tr>
+                <tr>
+                  <td><strong>GPU &amp; POSIX Terminals</strong></td>
+                  <td>Ghostty, Alacritty, Kitty, WezTerm, iTerm2, Terminal.app</td>
+                  <td><code>Terminal Direct / Marked</code></td>
+                  <td data-i18n="s4.r3">Đồng bộ byte xóa PTY (<code>\u{7F}</code>) và độ dài UTF-16 code units, tương thích với các công cụ dòng lệnh như Claude Code, tmux, zsh.</td>
+                </tr>
+                <tr>
+                  <td><strong>Dynamic Fallback</strong></td>
+                  <td data-i18n="s4.r4_app">Ô nhập liệu tùy biến trả về <code>NSNotFound</code></td>
+                  <td><code>Auto Marked Fallback</code></td>
+                  <td data-i18n="s4.r4">Khi <code>DirectReplacementGuard</code> phát hiện ứng dụng đích bỏ qua <code>replacementRange</code>, hệ thống tự động chuyển sang <code>setMarkedText</code> ngay trong phiên gõ.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Section 5: Cross-Platform C-ABI & Windows 11 ARM64 TSF Case Study -->
+        <section id="sec-5" class="paper-section">
+          <h2 data-i18n="s5.heading">§5. Kiến trúc đa nền tảng (Pure Swift 6 Core) và bài toán nạp In-Process COM trên Windows 11 ARM64</h2>
+          <p data-i18n="s5.p1">
+            Để cùng một lõi ngôn ngữ học phục vụ đồng nhất cả 5 hệ điều hành (macOS, iOS/iPadOS, Windows, Linux, Android), toàn bộ thư viện <code>VieLotusCore</code> được viết bằng <strong>Swift 6 thuần túy</strong> không phụ thuộc giao diện đồ họa hệ thống, và xuất giao diện cầu nối C-ABI không sao chép bộ nhớ (<code>VieLotusCAPI</code>, 26 hàm trong <code>vielotus.h</code>) cho Windows TSF và Linux IBus / Fcitx5.
+          </p>
+          <p data-i18n="s5.p2">
+            <strong>Nghiên cứu tình huống kỹ thuật trên Windows 11 (x64 &amp; ARM64):</strong> Trên Windows, một bộ gõ chuẩn <em>Text Services Framework (TSF)</em> là một thư viện COM In-Process (<code>VieLotusTIP.dll</code>) được nạp trực tiếp vào không gian địa chỉ của từng tiến trình ứng dụng (<code>notepad.exe</code>, <code>explorer.exe</code>, trình duyệt) và được đăng ký qua <code>regsvr32.exe</code>. Nếu <code>VieLotusTIP.dll</code> liên kết tĩnh (Static PE Import) vào <code>VieLotusCAPI.dll</code>:
+          </p>
+          <p data-i18n="s5.p3">
+            1) Khi trình cài đặt gọi <code>regsvr32.exe</code> hoặc khi một ứng dụng có thư mục làm việc tại <code>C:\Windows\System32</code> khởi tạo COM đối tượng, trình nạp PE của Windows sẽ tìm <code>VieLotusCAPI.dll</code> cùng chuỗi thư viện Swift Runtime (<code>swiftCore.dll</code>, <code>swiftDispatch.dll</code>, <code>FoundationEssentials.dll</code>) trong <code>System32</code> thay vì thư mục cài đặt, gây ra lỗi <code>RegSvr32 exit code 0x3 (ERROR_MOD_NOT_FOUND)</code>.<br>
+            2) Để giải quyết triệt để ở cấp kiến trúc, <code>VieLotusTIP.dll</code> được biên dịch với <strong>Static MSVC Runtime (<code>/MT</code>)</strong> và chỉ phụ thuộc vào 4 DLL nhân Windows (<code>KERNEL32</code>, <code>USER32</code>, <code>OLE32</code>, <code>ADVAPI32</code>). Khi phiên gõ kích hoạt (<code>ActivateEx</code>), <code>VieLotusTIP.dll</code> tự xác định thư mục chứa chính nó qua <code>GetModuleFileNameW(g_hInst, ...)</code> và nạp động <code>VieLotusCAPI.dll</code> bằng cờ <code>LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS</code>, đảm bảo cô lập hoàn toàn đường dẫn DLL cho cả bản <code>x64</code> lẫn bản <code>ARM64</code> nguyên bản.
+          </p>
+        </section>
+
+        <!-- Section 6: Tail Latency & Independent Black-Box Verification -->
+        <section id="sec-6" class="paper-section">
+          <h2 data-i18n="s6.heading">§6. Hiệu năng độ trễ đuôi (p99 Tail Latency) & quy trình kiểm chứng độc lập (Open-Core)</h2>
+          <p data-i18n="s6.p1">
+            Trong trải nghiệm gõ phím thời gian thực, độ trễ trung bình (mean latency) thường che giấu các nhịp khựng vi mô khi bộ phân tích ngữ cảnh hoặc bộ thu gom rác bộ nhớ hoạt động. Do đó, Sen Việt kiểm soát chất lượng bằng <strong>độ trễ đuôi phân vị thứ 99 (p99 latency)</strong> trên bài kiểm thử chịu tải <strong>250.000 phím liên tục</strong> (<code>VieLotusCLI --stress</code>) chạy qua 3 luồng tải trộn lẫn:
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-i18n="s6.th1">Luồng tải kiểm thử (250.000 phím)</th>
+                  <th class="num" data-i18n="s6.th2">Ngưỡng trần cho phép (Gate)</th>
+                  <th class="num" data-i18n="s6.th3">Kết quả thực đo (Apple Silicon)</th>
+                  <th data-i18n="s6.th4">Trạng thái bộ nhớ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td data-i18n="s6.r1"><strong>Telex tiếng Việt thuần</strong> (Độ trễ p99)</td>
+                  <td class="num">&le; 500.00 &micro;s</td>
+                  <td class="num"><span class="badge-pass">150 – 220 &micro;s</span></td>
+                  <td data-i18n="s6.mem">Ổn định &lt; 30 MB RSS (0 rò rỉ)</td>
+                </tr>
+                <tr>
+                  <td data-i18n="s6.r2"><strong>VNI tiếng Việt thuần</strong> (Độ trễ p99)</td>
+                  <td class="num">&le; 300.00 &micro;s</td>
+                  <td class="num"><span class="badge-pass">60 – 110 &micro;s</span></td>
+                  <td data-i18n="s6.mem">Ổn định &lt; 30 MB RSS (0 rò rỉ)</td>
+                </tr>
+                <tr>
+                  <td data-i18n="s6.r3"><strong>Song ngữ Anh – Việt &amp; mã nguồn</strong> (Độ trễ p99)</td>
+                  <td class="num">&le; 700.00 &micro;s</td>
+                  <td class="num"><span class="badge-pass">250 – 380 &micro;s</span></td>
+                  <td data-i18n="s6.mem">Ổn định &lt; 30 MB RSS (0 rò rỉ)</td>
+                </tr>
+                <tr>
+                  <td data-i18n="s6.r4"><strong>Thông lượng xử lý duy trì</strong> (Sustained Throughput)</td>
+                  <td class="num">&ge; 25.000 phím/giây</td>
+                  <td class="num"><span class="badge-pass">&gt; 40.000 phím/giây</span></td>
+                  <td data-i18n="s6.r4_note">Chạy 3 tiến trình độc lập, lấy kết quả thấp nhất</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3 data-i18n="s6.repro_title">Tự tay kiểm chứng hộp đen trong 30 giây (Open-Core Verification)</h3>
+          <p data-i18n="s6.p2">
+            Sen Việt được phát hành theo mô hình <strong>Open-Core</strong>: toàn bộ mã nguồn phần vỏ hệ thống (<code>Sources/VieLotusIM</code>, <code>CrossPlatform/</code>) được mở công khai theo giấy phép MIT để bất kỳ kỹ sư bảo mật nào cũng xác minh được tính chất <em>Zero CGEventTap / Zero Keylogging</em>, đi kèm công cụ dòng lệnh đã biên dịch <code>VieLotusCLI</code> để kiểm chứng độc lập toàn bộ 9.091 ca kiểm thử và bài đo 250.000 phím:
+          </p>
+
+          <pre class="code-block"><code><span class="code-comment"># 1. Kiểm tra chữ ký băm SHA-256 của các binary phát hành</span>
+shasum -a 256 -c Binaries/checksums.sha256
+
+<span class="code-comment"># 2. Chạy toàn bộ 9.091 ca kiểm thử chính + 1.049 ca đối xứng không ngữ cảnh</span>
+./Binaries/VieLotusCLI --benchmark
+
+<span class="code-comment"># 3. Chạy cổng kiểm định 3 tiến trình độc lập + đo độ trễ đuôi p99 (250.000 phím)</span>
+./scripts/benchmark_ratchet.sh --with-latency
+
+<span class="code-comment"># 4. Xác minh mã nguồn vỏ không chứa bất kỳ lời gọi CGEventTap nào</span>
+grep -rn "CGEvent" Sources/VieLotusIM/</code></pre>
+        </section>
+      </article>
+    </main>
+
+    <footer>
+      <span data-i18n="footer.copy">Sen Việt — Báo cáo nghiên cứu &amp; kiểm định kỹ thuật mở cho cộng đồng.</span>
+      <div class="footer-links">
+        <a href="index.html" data-i18n="nav.home">Trang chủ</a>
+        <a href="support.html" data-i18n="nav.support">Hỗ trợ</a>
+        <a href="privacy.html" data-i18n="nav.privacy">Quyền riêng tư</a>
+        <a href="terms.html" data-i18n="nav.terms">Điều khoản</a>
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const labCases = [
+      {
+        keys: 't-r-u-o-n-w-g-f-s-w-o + Space',
+        ctx_vi: 'Ngữ cảnh: độc lập (SEN Flex)',
+        ctx_en: 'Context: standalone (SEN Flex)',
+        out1_vi: 'trườngwơ / lỗi dấu',
+        out1_en: 'trườngwơ / broken tone',
+        note1_vi: 'Bắn nhiều đợt Backspace giả lập; dễ rớt chữ trên thanh địa chỉ Chrome hoặc rò phím phụ âm khi đổi dấu liên tiếp.',
+        note1_en: 'Fires multiple synthetic Backspace bursts; prone to dropped chars in Chrome URL bar or leaked modifier keys.',
+        out2_vi: 'truonwgfswo',
+        out2_en: 'truonwgfswo',
+        note2_vi: 'Yêu cầu gõ dấu ngay sau nguyên âm chuẩn; gõ tự do vượt qua phụ âm cuối hoặc đổi dấu nhiều lần sẽ làm vỡ âm tiết.',
+        note2_en: 'Requires strict modifier order right after vowels; free-order modifiers after coda break syllable composition.',
+        out3_vi: 'trưởng ',
+        out3_en: 'trưởng ',
+        note3_vi: 'SEN Flex hợp nhất nguyên âm đôi ươ, cho phép đổi dấu huyền (f) sang sắc (s)/hỏi, lọc bỏ phím thừa và thay thế nguyên tử UTF-16.',
+        note3_en: 'SEN Flex unifies the ươ diphthong, allows overriding tones cleanly, purges no-op ghost keys, and swaps UTF-16 atomically.'
+      },
+      {
+        keys: '"run unit" → t-e-s-t + Space',
+        ctx_vi: 'Ngữ cảnh trước: "run unit" (Tiếng Anh)',
+        ctx_en: 'Preceding context: "run unit" (English)',
+        out1_vi: 'run unit tết ',
+        out1_en: 'run unit tết ',
+        note1_vi: 'Biến chữ "test" thành "tết" vì phím s bị hiểu cứng là dấu sắc và e-s-t tạo thành âm tiết có thực.',
+        note1_en: 'Mangles "test" into "tết" because "s" is unconditionally consumed as a rising tone.',
+        out2_vi: 'run unit tết ',
+        out2_en: 'run unit tết ',
+        note2_vi: 'Không có bộ phân giải va chạm theo ngữ cảnh câu; người dùng buộc phải xóa đi gõ lại hoặc bấm phím tắt đổi ngôn ngữ.',
+        note2_en: 'No context-aware bilingual arbiter; forces the user to backspace or toggle input language manually.',
+        out3_vi: 'run unit test ',
+        out3_en: 'run unit test ',
+        note3_vi: 'SmartBilingualDetector nhận diện ngữ cảnh tiếng Anh đứng trước ("run unit") và tự động khôi phục nguyên vẹn "test" khi nhấn Space.',
+        note3_en: 'SmartBilingualDetector scores the preceding English context ("run unit") and restores "test" cleanly on commit.'
+      },
+      {
+        keys: '(Đầu câu) → t-e-s-t + Space',
+        ctx_vi: 'Ngữ cảnh: Rỗng (Bảo toàn đối xứng tiếng Việt)',
+        ctx_en: 'Context: Empty (Symmetric Vietnamese survival)',
+        out1_vi: 'test (nếu bật whitelist cứng)',
+        out1_en: 'test (if hardcoded in English whitelist)',
+        note1_vi: 'Các bộ gõ dùng danh sách trắng tiếng Anh tĩnh sẽ ép "test" luôn ra tiếng Anh, làm mất khả năng gõ chữ "tết" theo lối gõ tự do.',
+        note1_en: 'IMEs with unconditional English whitelists force "test" to English even when typing standalone Vietnamese.',
+        out2_vi: 'tesst / tết',
+        out2_en: 'tesst / tết',
+        note2_vi: 'Chỉ gõ được "tết" nếu gõ đúng thứ tự t-e-e-s-t.',
+        note2_en: 'Only produces "tết" if typed in strict t-e-e-s-t order.',
+        out3_vi: 'tết (hoặc giữ âm tiết Việt)',
+        out3_en: 'tết (Vietnamese syllable preserved)',
+        note3_vi: 'Khi không có ngữ cảnh tiếng Anh đi trước, Sen Việt bảo toàn 97.33% âm tiết lưỡng nghĩa và 100% (182/182) đường gõ duy nhất cho tiếng Việt.',
+        note3_en: 'With no English context, Sen Việt preserves 97.33% of ambiguous Vietnamese syllables and 100% (182/182) of unique Vietnamese paths.'
+      },
+      {
+        keys: 'r-o-o-n-j-z-z + Space',
+        ctx_vi: 'Ngữ cảnh: Hủy dấu thanh ở cuối từ (Cancel)',
+        ctx_en: 'Context: Trailing tone cancellation (Cancel)',
+        out1_vi: 'rônoz / rộnzz',
+        out1_en: 'rônoz / rộnzz',
+        note1_vi: 'Thường để lọt chữ z thừa hoặc hủy luôn cả mũ ô.',
+        note1_en: 'Often leaks trailing "z" characters or strips the circumflex vowel.',
+        out2_vi: 'rônz',
+        out2_en: 'rônz',
+        note2_vi: 'Phím z đầu tiên xóa dấu nặng (rộn → rôn), phím z thứ hai xuất hiện thành ký tự rác ở cuối.',
+        note2_en: 'First z strips the dot tone (rộn → rôn), second z is appended literally.',
+        out3_vi: 'rônz (67/67 chuẩn cancel_keep_composed)',
+        out3_en: 'rônz (67/67 cancel_keep_composed pass)',
+        note3_vi: 'Khôi phục chính xác trạng thái âm tiết sau khi gỡ dấu thanh và nối ký tự thoát đúng quy ước chuẩn.',
+        note3_en: 'Restores the exact syllable snapshot after stripping the tone mark and appends the escaped character deterministically.'
+      },
+      {
+        keys: 't-u-r-n / l-a-s-t + Space',
+        ctx_vi: 'Ngữ cảnh: Độc lập (Điểm mù của bộ lọc ghép vần cơ học)',
+        ctx_en: 'Context: Standalone (Blind spot of naive phonotactic filters)',
+        out1_vi: 'tủn / lát',
+        out1_en: 'tủn / lát',
+        note1_vi: 'Chỉ kiểm tra khuôn phụ âm – nguyên âm nên biến "turn" thành âm vô nghĩa "tủn", và không phân biệt phím s đứng giữa từ trong l-a-s-t nên biến "last" thành "lát".',
+        note1_en: 'Checks only consonant-vowel templates, turning "turn" into the meaningless syllable "tủn" and failing to distinguish mid-word "s" in l-a-s-t ("last" → "lát").',
+        out2_vi: 'tủn / lát',
+        out2_en: 'tủn / lát',
+        note2_vi: 'Nuốt phím r và s làm dấu hỏi/sắc; người dùng phải xóa đi tắt tiếng Việt rồi gõ lại.',
+        note2_en: 'Consumes "r" and "s" as hook/acute tones, forcing the user to backspace and switch languages.',
+        out3_vi: 'turn / last   (gõ l-a-t-s → lát)',
+        out3_en: 'turn / last   (typing l-a-t-s → lát)',
+        note3_vi: 'Đối chiếu từ điển âm tiết thực tế ("tủn" vô nghĩa → trả về "turn") và nhận diện mẫu gõ tiếng Anh l-a-s-t → "last" ngay cả khi không có ngữ cảnh, trong khi gõ l-a-t-s vẫn ra "lát".',
+        note3_en: 'Validates against actual Vietnamese lexical entries ("tủn" is meaningless → restores "turn") and recognizes the mid-word modifier pattern l-a-s-t → "last" standalone, while l-a-t-s produces "lát".'
+      },
+      {
+        keys: 'đ-ư-ợ-c + Space → Backspace → z',
+        ctx_vi: 'Ngữ cảnh: Quay lại sửa dấu của từ đã commit',
+        ctx_en: 'Context: Post-commit word re-arming & tone edit',
+        out1_vi: 'được z (mất vùng đệm từ cũ)',
+        out1_en: 'được z (lost prior word buffer)',
+        note1_vi: 'Sau khi nhấn Space, nhiều bộ gõ xóa sạch bộ nhớ phiên nên khi xóa lùi lại không thể sửa dấu của từ vừa gõ.',
+        note1_en: 'After Space commits the word, session state is discarded so backspacing cannot edit the committed word\'s tone.',
+        out2_vi: 'đươcz',
+        out2_en: 'đươcz',
+        note2_vi: 'Gắn trực tiếp chữ z vào cuối từ đã hoàn tất thay vì gỡ dấu nặng.',
+        note2_en: 'Appends literal "z" to the committed word instead of stripping its dot-below tone.',
+        out3_vi: 'đươc ',
+        out3_en: 'đươc ',
+        note3_vi: 'Bộ đệm vòng 20 từ đã commit (Post-Commit Ring Buffer) nạp lại cặp (raw, rendered), cho phép gỡ dấu nặng (được → đươc) mượt mà.',
+        note3_en: '20-entry Post-Commit Ring Buffer re-arms the (raw, rendered) pair, stripping the tone mark (được → đươc) seamlessly.'
+      }
+    ];
+
+    let activeCaseIndex = 0;
+    let currentLang = 'vi';
+
+    function renderLabCase() {
+      const c = labCases[activeCaseIndex];
+      const isEn = currentLang === 'en';
+      document.getElementById('lab-keys').textContent = c.keys;
+      document.getElementById('lab-ctx').textContent = isEn ? c.ctx_en : c.ctx_vi;
+      document.getElementById('lab-out-1').textContent = isEn ? c.out1_en : c.out1_vi;
+      document.getElementById('lab-note-1').textContent = isEn ? c.note1_en : c.note1_vi;
+      document.getElementById('lab-out-2').textContent = isEn ? c.out2_en : c.out2_vi;
+      document.getElementById('lab-note-2').textContent = isEn ? c.note2_en : c.note2_vi;
+      document.getElementById('lab-out-3').textContent = isEn ? c.out3_en : c.out3_vi;
+      document.getElementById('lab-note-3').textContent = isEn ? c.note3_en : c.note3_vi;
+    }
+
+    function selectCase(idx) {
+      activeCaseIndex = idx;
+      document.querySelectorAll('.case-pill').forEach((btn, i) => {
+        btn.classList.toggle('active', i === idx);
+      });
+      renderLabCase();
+    }
+
+    const i18n = {
+      vi: {
+        'nav.home': 'Trang chủ',
+        'nav.support': 'Hỗ trợ',
+        'nav.privacy': 'Quyền riêng tư',
+        'nav.terms': 'Điều khoản',
+        'meta.doc': 'Báo cáo Nghiên cứu & Thực nghiệm · v1.1',
+        'meta.author': 'Tác giả: Trần Phát Đạt (Steve Dat)',
+        'meta.target': 'Lõi: VieLotusCore (Pure Swift 6)',
+        'paper.title': 'Kiến trúc bộ gõ tiếng Việt nguyên bản không dùng Event Tap và bài toán phân giải va chạm song ngữ đối xứng',
+        'paper.abstract': 'Báo cáo này trình bày các nhận định kỹ thuật và kết quả đo kiểm thực nghiệm của dự án Sen Việt (VieLotusIM). Chúng tôi phân tích nguyên nhân gốc rễ khiến phương pháp chặn phím tầng thấp (CGEventTap / tiêm phím xóa giả lập) gây nuốt chữ trên trình duyệt hiện đại, đề xuất kiến trúc đồng bộ trạng thái nguyên bản qua InputMethodKit / TSF / IBus, và thiết lập chuẩn đánh giá đối xứng hai chiều cho bài toán gõ trộn tiếng Việt – tiếng Anh trên tập dữ liệu 9.091 ca kiểm thử.',
+        'm1.label': '9.091 / 9.091 ca chính',
+        'm1.sub': 'Độ chính xác tổng thể trên 5 nhóm kiểm thử có ngữ cảnh (Telex & VNI).',
+        'm2.label': '365 / 375 đối xứng hai chiều',
+        'm2.sub': 'Chỉ số ambiguous_both_sides: Đúng tiếng Anh khi có ngữ cảnh VÀ giữ đúng âm tiết Việt khi gõ độc lập.',
+        'm3.label': '100.00% đường gõ duy nhất',
+        'm3.sub': 'Bảo toàn tuyệt đối (0 mất mát) các âm tiết tiếng Việt chỉ có một cách gõ phím (whitelist_safe = never).',
+        'm4.label': 'Độ trễ đuôi p99 (Telex)',
+        'm4.sub': 'Thông lượng > 40.000 phím/giây qua 250.000 phím liên tục, 0 rò rỉ bộ nhớ, 0 quyền Accessibility.',
+        'toc.title': 'Cấu trúc chuyên khảo',
+        'toc.s1': 'Giới hạn kiến trúc của CGEventTap & tiêm phím xóa giả lập',
+        'toc.s2': 'Mô phỏng tương tác: So sánh máy trạng thái theo từng phím',
+        'toc.s3': 'Bài toán va chạm song ngữ & nguyên lý công bố đối xứng',
+        'toc.s4': 'Cơ chế trình diễn thích ứng (AppKit, Chromium/React, Terminal)',
+        'toc.s5': 'Kiến trúc đa nền tảng (C-ABI) & giải quyết nạp DLL trên Windows 11 ARM64',
+        'toc.s6': 'Độ trễ đuôi p99 & quy trình tái lập kiểm thử hộp đen (Open-Core)',
+        's1.heading': '§1. Nhận định cốt lõi: Vì sao kiến trúc CGEventTap truyền thống gặp giới hạn trên hệ điều hành hiện đại?',
+        's1.p1': 'Trong suốt hai thập kỷ qua, phần lớn các bộ gõ tiếng Việt bên thứ ba trên macOS đều lựa chọn kiến trúc chặn sự kiện bàn phím tầng thấp (CGEventTap). Khi người dùng gõ chữ t-i-e-e, chữ tiê chưa được tạo ra trong vùng đệm hệ thống; thay vào đó, chữ tie đã lọt vào ứng dụng, sau đó bộ gõ phát sinh một chuỗi sự kiện Backspace giả lập qua CGEventSource để xóa chữ cũ rồi bắn chuỗi Unicode tiê mới vào luồng sự kiện cửa sổ.',
+        's1.p2': 'Cách tiếp cận này từng hoạt động tốt trên các khung soạn thảo văn bản đồng bộ thế hệ cũ, nhưng bộc lộ 4 xung đột cấu trúc không thể vá triệt để trên macOS hiện đại và các ứng dụng kiến trúc bất đồng bộ (Chromium, Electron, React Virtual DOM, IDE hiện đại):',
+        's1.th1': 'Khía cạnh kỹ thuật',
+        's1.th2': 'Bộ gõ dựa trên CGEventTap (Tiêm Backspace)',
+        's1.th3': 'Sen Việt (Pure InputMethodKit / TSF / IBus)',
+        's1.r1.c1': 'Đồng bộ hóa giao diện bất đồng bộ (React / Electron / URL Bar)',
+        's1.r1.c2': 'Phím Backspace giả lập chạy đua (race condition) với vòng lặp đối chiếu Virtual DOM hoặc gợi ý tự động trên thanh địa chỉ, gây hiện tượng nhân đôi âm tiết (t-ti-tiế-tiếng) hoặc nhảy con trỏ.',
+        's1.r1.c3': 'Thay thế nguyên tử qua insertText:replacementRange: (UTF-16) trên AppKit hoặc phát đúng vòng đời W3C compositionstart / compositionupdate trên trình duyệt.',
+        's1.r2.c1': 'Quyền hệ thống & lỗi câm TCC (csreq mismatch)',
+        's1.r2.c2': 'Bắt buộc đòi quyền Accessibility (Trợ năng) toàn hệ thống. Khi cập nhật phiên bản mới, chữ ký mã (Designated Requirement) thay đổi khiến macOS âm thầm chặn sự kiện dù nút bật trong Cài đặt vẫn sáng.',
+        's1.r2.c3': '0 quyền Accessibility, 0 quyền Input Monitoring. Vận hành đúng giao thức bàn phím chính thống của hệ điều hành.',
+        's1.r3.c1': 'Lịch sử hoàn tác (Undo Stack Cmd+Z)',
+        's1.r3.c2': 'Mỗi lần tiêm phím xóa và chèn lại chữ sẽ làm vỡ ngăn xếp hoàn tác của trình soạn thảo thành từng mảnh ký tự rời rạc.',
+        's1.r3.c3': 'Bảo toàn nguyên vẹn ngăn xếp hoàn tác theo từng từ của ứng dụng đích.',
+        's1.r4.c1': 'Ô nhập mật khẩu (Secure Event Input)',
+        's1.r4.c2': 'Bị vô hiệu hóa đột ngột hoặc gây kẹt trạng thái khi trình duyệt/Terminal bật EnableSecureEventInput().',
+        's1.r4.c3': 'Kiểm tra chủ động IsSecureEventInputEnabled() và tự động chuyển sang passthrough an toàn, tuyệt đối không lưu vết phím.',
+        's2.heading': '§2. Mô phỏng thực nghiệm: So sánh phản ứng máy trạng thái trên các ca gõ thực tế',
+        's2.p1': 'Chọn một trong 6 kịch bản kiểm thử thực tế dưới đây để quan sát sự khác biệt giữa cơ chế tiêm phím xóa truyền thống, bộ gõ mặc định Simple Telex, và máy trạng thái InputSessionManager + SmartBilingualDetector của Sen Việt:',
+        'lab.title': 'Bảng đối chiếu chuỗi phím & trạng thái đầu ra',
+        'lab.desc': 'Nhấn vào từng chuỗi phím để xem cách phân giải âm vị, dấu thanh và ngữ cảnh song ngữ.',
+        'lab.keystroke_label': 'Chuỗi phím đầu vào:',
+        'lab.col1': 'Bộ gõ CGEventTap cũ',
+        'lab.col2': 'Simple Telex mặc định',
+        'lab.col3': 'Sen Việt (VieLotusCore)',
+        's3.heading': '§3. Nghịch lý va chạm song ngữ Anh – Việt và nguyên lý công bố đối xứng',
+        's3.p1': 'Khi người Việt làm việc hàng ngày, hàng nghìn từ tiếng Anh phổ biến chứa các chữ cái trùng khớp với phím điều khiển Telex: s (dấu sắc), f (dấu huyền), r (dấu hỏi), x (dấu ngã), j (dấu nặng), w (ư/ơ/ă), và cặp nguyên âm oo, ee, aa. Ví dụ: gõ test bị biến thành tết, toast thành toát, floor thành flô, restrict bị biến dạng dấu hỏi/sắc.',
+        's3.p2': 'Tuy nhiên, một nhận định khoa học quan trọng của nghiên cứu này là: Mọi tuyên bố "đạt 100% khôi phục từ tiếng Anh" nếu chỉ đo một chiều đều là phóng đại năng lực của bộ gõ. Nếu một bộ gõ chỉ đơn giản nhét toàn bộ từ điển tiếng Anh vào danh sách trắng (whitelist) vô điều kiện, nó sẽ đạt 100% ở phía tiếng Anh nhưng lại phá hủy khả năng gõ các âm tiết tiếng Việt đồng hình (chẳng hạn người dùng không bao giờ gõ được chữ tết bằng test, chữ đất bằng ddats, hay chữ lốt bằng loots khi đứng đầu câu).',
+        's3.callout': 'Quy tắc công bố đối xứng bắt buộc của Sen Việt: Kết quả 100.00% (9.091 / 9.091) trên bộ kiểm thử chính luôn phải được công bố đi kèm với phép thử ngược không ngữ cảnh: 97.33% (365 / 375) ở chỉ số ambiguous_both_sides và 100.00% (182 / 182 — 0 mất mát nghiêm trọng) ở nhóm âm tiết tiếng Việt chỉ có duy nhất một đường gõ (whitelist_safe = never).',
+        's3.t1_title': 'Bảng 3.1 — Ma trận kiểm thử chính (9.091 ca, có cô lập ngữ cảnh từng dòng)',
+        's3.t1.h1': 'Nhóm kiểm thử (Bucket)',
+        's3.t1.h2': 'Mô tả điều kiện thực thi',
+        's3.t1.h3': 'Đạt / Tổng',
+        's3.t1.h4': 'Tỷ lệ',
+        's3.t1.h5': 'Ngưỡng chốt (Ratchet)',
+        's3.t1.r1': 'Biến đổi âm tiết tiếng Việt thuần túy (Telex & SEN Flex)',
+        's3.t1.r2': 'Từ vựng tiếng Anh không chứa chuỗi biến âm hợp lệ của tiếng Việt',
+        's3.t1.r3': 'Hủy dấu / thoát mũ ở cuối từ (zz, ss, lặp ba nguyên âm aaa → aa)',
+        's3.t1.r4': 'Khôi phục từ tiếng Anh bị biến dạng bởi phím dấu Telex (kiểm tra luật âm vị tắt -c, -ch, -p, -t, nguyên âm đôi bất khả và băm từ điển 64-bit)',
+        's3.t1.r5': 'Từ lưỡng nghĩa (vừa là từ tiếng Anh hợp lệ, vừa tạo thành âm tiết tiếng Việt hợp lệ) khi được mồi ngữ cảnh tiếng Anh đi trước',
+        's3.t1.total': 'Tổng hợp bộ kiểm thử chính',
+        's3.t1.r6': '0 xung đột thỏa mãn (Satisfiability) · 0 xung đột chính sách (Policy Coherence)',
+        's3.t2_title': 'Bảng 3.2 — Ma trận kiểm thử đối xứng không ngữ cảnh (Chạy lại các ca lưỡng nghĩa với context rỗng)',
+        's3.t2.h1': 'Chỉ số đối xứng',
+        's3.t2.h2': 'Ý nghĩa ngôn ngữ học & kiểm định',
+        's3.t2.h3': 'Đạt / Tổng',
+        's3.t2.h4': 'Tỷ lệ',
+        's3.t2.r1': '375 từ lưỡng nghĩa viết thường khi gõ độc lập không có ngữ cảnh tiếng Anh: âm tiết tiếng Việt phải được giữ lại',
+        's3.t2.r2': 'Nhóm âm tiết tiếng Việt mà chuỗi phím đó là con đường duy nhất để gõ ra chữ Việt (không được phép mất dù chỉ 1 từ)',
+        's3.t2.r3': 'Nhóm âm tiết có nhiều cách gõ thay thế (ví dụ gõ kiểu Telex mở rộng)',
+        's3.t2.r4': 'Chỉ số chuẩn mực kép: Ra đúng tiếng Anh khi có ngữ cảnh tiếng Anh VÀ ra đúng tiếng Việt khi gõ độc lập',
+        's4.heading': '§4. Cơ chế trình diễn thích ứng theo đặc tính khung soạn thảo (ClientAdapter)',
+        's4.p1': 'Một nhận định thực tế khác của nhóm phát triển là: Không có một chế độ hiển thị đơn lẻ nào tối ưu cho mọi ứng dụng trên macOS nếu tuân thủ thuần túy InputMethodKit. Các ứng dụng Cocoa/AppKit truyền thống xử lý hoàn hảo phép thay thế phạm vi trực tiếp (insertText:replacementRange:) không cần gạch chân, trong khi các trình soạn thảo web dùng React, ProseMirror, Monaco hay thanh địa chỉ Chromium lại dựa vào sự kiện compositionstart / compositionend (tức chế độ setMarkedText có gạch chân tạm thời) để không nhân đôi ký tự khi đối chiếu DOM bất đồng bộ.',
+        's4.p2': 'Thay vì dùng CGEventTap để cưỡng bức màn hình, Sen Việt kết hợp bộ phân loại ClientAdapter, lớp bảo vệ biên độ DirectReplacementGuard (đảm bảo không bao giờ xóa lố ra ngoài phạm vi [compositionStartLocation, virtualCursorLocation]) và tập luật dữ liệu mở typing-modes.yml:',
+        's4.th1': 'Nhóm ứng dụng',
+        's4.th2': 'Ứng dụng đại diện',
+        's4.th3': 'Chế độ trình diễn',
+        's4.th4': 'Cơ chế đồng bộ kỹ thuật',
+        's4.r1': 'Thay thế trực tiếp theo đơn vị mã UTF-16 qua insertText:replacementRange:, không gạch chân, giữ nguyên Undo stack.',
+        's4.r2': 'Đồng bộ với vòng đời W3C IME composition để triệt tiêu hoàn toàn lỗi lặp chữ (t-ti-tiế-tiếng) và nhảy con trỏ trong React/Virtual DOM.',
+        's4.r3': 'Đồng bộ byte xóa PTY (\\u{7F}) và độ dài UTF-16 code units, tương thích với các công cụ dòng lệnh như Claude Code, tmux, zsh.',
+        's4.r4_app': 'Ô nhập liệu tùy biến trả về NSNotFound',
+        's4.r4': 'Khi DirectReplacementGuard phát hiện ứng dụng đích bỏ qua replacementRange, hệ thống tự động chuyển sang setMarkedText ngay trong phiên gõ.',
+        's5.heading': '§5. Kiến trúc đa nền tảng (Pure Swift 6 Core) và bài toán nạp In-Process COM trên Windows 11 ARM64',
+        's5.p1': 'Để cùng một lõi ngôn ngữ học phục vụ đồng nhất cả 5 hệ điều hành (macOS, iOS/iPadOS, Windows, Linux, Android), toàn bộ thư viện VieLotusCore được viết bằng Swift 6 thuần túy không phụ thuộc giao diện đồ họa hệ thống, và xuất giao diện cầu nối C-ABI không sao chép bộ nhớ (VieLotusCAPI, 26 hàm trong vielotus.h) cho Windows TSF và Linux IBus / Fcitx5.',
+        's5.p2': 'Nghiên cứu tình huống kỹ thuật trên Windows 11 (x64 & ARM64): Trên Windows, một bộ gõ chuẩn Text Services Framework (TSF) là một thư viện COM In-Process (VieLotusTIP.dll) được nạp trực tiếp vào không gian địa chỉ của từng tiến trình ứng dụng (notepad.exe, explorer.exe, trình duyệt) và được đăng ký qua regsvr32.exe. Nếu VieLotusTIP.dll liên kết tĩnh (Static PE Import) vào VieLotusCAPI.dll:',
+        's5.p3': '1) Khi trình cài đặt gọi regsvr32.exe hoặc khi một ứng dụng có thư mục làm việc tại C:\\Windows\\System32 khởi tạo COM đối tượng, trình nạp PE của Windows sẽ tìm VieLotusCAPI.dll cùng chuỗi thư viện Swift Runtime (swiftCore.dll, swiftDispatch.dll, FoundationEssentials.dll) trong System32 thay vì thư mục cài đặt, gây ra lỗi RegSvr32 exit code 0x3 (ERROR_MOD_NOT_FOUND). 2) Để giải quyết triệt để, VieLotusTIP.dll được biên dịch với Static MSVC Runtime (/MT) và chỉ phụ thuộc vào 4 DLL nhân Windows. Khi phiên gõ kích hoạt (ActivateEx), VieLotusTIP.dll tự xác định thư mục cài đặt qua GetModuleFileNameW(g_hInst, ...) và nạp động VieLotusCAPI.dll bằng cờ LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, đảm bảo cô lập hoàn toàn đường dẫn DLL cho cả bản x64 lẫn ARM64 nguyên bản.',
+        's6.heading': '§6. Hiệu năng độ trễ đuôi (p99 Tail Latency) & quy trình kiểm chứng độc lập (Open-Core)',
+        's6.p1': 'Trong trải nghiệm gõ phím thời gian thực, độ trễ trung bình (mean latency) thường che giấu các nhịp khựng vi mô khi bộ phân tích ngữ cảnh hoặc bộ thu gom rác bộ nhớ hoạt động. Do đó, Sen Việt kiểm soát chất lượng bằng độ trễ đuôi phân vị thứ 99 (p99 latency) trên bài kiểm thử chịu tải 250.000 phím liên tục (VieLotusCLI --stress) chạy qua 3 luồng tải trộn lẫn:',
+        's6.th1': 'Luồng tải kiểm thử (250.000 phím)',
+        's6.th2': 'Ngưỡng trần cho phép (Gate)',
+        's6.th3': 'Kết quả thực đo (Apple Silicon)',
+        's6.th4': 'Trạng thái bộ nhớ',
+        's6.r1': 'Telex tiếng Việt thuần (Độ trễ p99)',
+        's6.r2': 'VNI tiếng Việt thuần (Độ trễ p99)',
+        's6.r3': 'Song ngữ Anh – Việt & mã nguồn (Độ trễ p99)',
+        's6.r4': 'Thông lượng xử lý duy trì (Sustained Throughput)',
+        's6.mem': 'Ổn định < 30 MB RSS (0 rò rỉ)',
+        's6.r4_note': 'Chạy 3 tiến trình độc lập, lấy kết quả thấp nhất',
+        's6.repro_title': 'Tự tay kiểm chứng hộp đen trong 30 giây (Open-Core Verification)',
+        's6.p2': 'Sen Việt được phát hành theo mô hình Open-Core: toàn bộ mã nguồn phần vỏ hệ thống (Sources/VieLotusIM, CrossPlatform/) được mở công khai theo giấy phép MIT để bất kỳ kỹ sư bảo mật nào cũng xác minh được tính chất Zero CGEventTap / Zero Keylogging, đi kèm công cụ dòng lệnh đã biên dịch VieLotusCLI để kiểm chứng độc lập toàn bộ 9.091 ca kiểm thử và bài đo 250.000 phím:',
+        'footer.copy': 'Sen Việt — Báo cáo nghiên cứu & kiểm định kỹ thuật mở cho cộng đồng.'
+      },
+      en: {
+        'nav.home': 'Home',
+        'nav.support': 'Support',
+        'nav.privacy': 'Privacy',
+        'nav.terms': 'Terms',
+        'meta.doc': 'Technical Monograph & Empirical Report · v1.1',
+        'meta.author': 'Author: Tran Phat Dat (Steve Dat)',
+        'meta.target': 'Engine: VieLotusCore (Pure Swift 6)',
+        'paper.title': 'Event-Tap-Free Native Vietnamese Input Architecture and Symmetric Bilingual Collision Disambiguation',
+        'paper.abstract': 'This monograph presents the architectural findings and empirical evaluation of Sen Việt (VieLotusIM). We analyze why legacy CGEventTap synthetic-backspace injection causes dropped characters and race conditions in modern asynchronous UI frameworks, introduce a pure OS-native state synchronization architecture across InputMethodKit, Windows TSF, and Linux IBus/Fcitx5, and establish a symmetric two-sided evaluation protocol across a 9,091-case regression suite.',
+        'm1.label': '9,091 / 9,091 primary suite',
+        'm1.sub': 'Overall accuracy across all 5 context-isolated primary regression buckets (Telex & VNI).',
+        'm2.label': '365 / 375 symmetric both-sides',
+        'm2.sub': 'ambiguous_both_sides: Restores English with context AND preserves standalone Vietnamese without context.',
+        'm3.label': '100.00% unique Vietnamese paths',
+        'm3.sub': 'Zero critical losses on Vietnamese syllables with only a single keystroke path (whitelist_safe = never).',
+        'm4.label': 'Telex p99 tail latency',
+        'm4.sub': 'Sustained throughput > 40,000 KPS across 250,000 continuous keystrokes, zero memory leaks, zero Accessibility hooks.',
+        'toc.title': 'Monograph contents',
+        'toc.s1': 'Architectural limits of CGEventTap & synthetic backspace injection',
+        'toc.s2': 'Interactive simulation: Keystroke-by-keystroke state machine comparison',
+        'toc.s3': 'Bilingual collision paradox & mandatory symmetric disclosure',
+        'toc.s4': 'Adaptive client presentation (AppKit, Chromium/React, Terminals)',
+        'toc.s5': 'Cross-platform C-ABI & in-process COM loading on Windows 11 ARM64',
+        'toc.s6': 'p99 tail latency & reproducible black-box verification (Open-Core)',
+        's1.heading': '§1. Core thesis: Why legacy CGEventTap architectures fail in modern asynchronous operating systems',
+        's1.p1': 'For two decades, most third-party Vietnamese input methods on macOS have relied on low-level event interception (CGEventTap). When a user types t-i-e-e, the composed syllable tiê is not negotiated through the OS input session; instead, raw ASCII characters leak into the target app, and the IME injects synthetic Backspace keystrokes via CGEventSource followed by replacement Unicode characters.',
+        's1.p2': 'While effective in legacy synchronous text views, synthetic backspace injection exhibits 4 structural failure modes in modern macOS and asynchronous UI runtimes (Chromium, Electron, React Virtual DOM, modern IDEs):',
+        's1.th1': 'Technical dimension',
+        's1.th2': 'Legacy CGEventTap IME (Synthetic Backspace)',
+        's1.th3': 'Sen Việt (Pure InputMethodKit / TSF / IBus)',
+        's1.r1.c1': 'Asynchronous UI synchronization (React / Electron / URL bars)',
+        's1.r1.c2': 'Synthetic Backspace events race against Virtual DOM reconciliation and URL bar autocomplete, causing syllable duplication (t-ti-tiế-tiếng) and caret jumps.',
+        's1.r1.c3': 'Atomic UTF-16 replacement via insertText:replacementRange: on AppKit, or standards-compliant W3C compositionstart / compositionupdate in browsers.',
+        's1.r2.c1': 'System permissions & silent TCC failure (csreq mismatch)',
+        's1.r2.c2': 'Requires global Accessibility privileges. Updating the app binary invalidates the TCC Designated Requirement (csreq), causing the kernel to silently drop injected events while System Settings still shows the toggle enabled.',
+        's1.r2.c3': '0 Accessibility permissions, 0 Input Monitoring permissions. Operates strictly within the OS-sanctioned input method contract.',
+        's1.r3.c1': 'Editor Undo Stack integrity (Cmd+Z)',
+        's1.r3.c2': 'Synthetic backspaces and re-insertions fragment the host editor\'s undo history into broken per-character steps.',
+        's1.r3.c3': 'Preserves clean word-level Cmd+Z undo history in the host application.',
+        's1.r4.c1': 'Password fields (Secure Event Input)',
+        's1.r4.c2': 'Breaks or gets stuck in inconsistent state when a browser or terminal activates EnableSecureEventInput().',
+        's1.r4.c3': 'Actively checks IsSecureEventInputEnabled() and transitions cleanly to zero-logging passthrough.',
+        's2.heading': '§2. Interactive simulation: Comparing state machine responses on real edge cases',
+        's2.p1': 'Select any of the 6 empirical typing scenarios below to inspect how legacy synthetic-backspace IMEs, Apple built-in Simple Telex, and Sen Việt\'s InputSessionManager + SmartBilingualDetector resolve phonology, tones, and bilingual context:',
+        'lab.title': 'Keystroke sequence & state output comparator',
+        'lab.desc': 'Click a keystroke sequence to inspect phonological parsing, tone overriding, and bilingual disambiguation.',
+        'lab.keystroke_label': 'Input keystrokes:',
+        'lab.col1': 'Legacy CGEventTap IME',
+        'lab.col2': 'Built-in Simple Telex',
+        'lab.col3': 'Sen Việt (VieLotusCore)',
+        's3.heading': '§3. The bilingual collision paradox and mandatory symmetric disclosure',
+        's3.p1': 'In everyday bilingual work, thousands of common English words contain characters that collide with Telex modifier keys: s (rising tone), f (falling tone), r (hook above), x (tilde), j (dot below), w (horn/breve), and vowel pairs oo, ee, aa. For example, typing test turns into tết, toast into toát, floor into flô, and restrict into garbled diacritics.',
+        's3.p2': 'A foundational finding of our research is that any one-sided claim of "100% English word restoration" overstates engine capability. If an IME simply places an English dictionary into an unconditional whitelist, it achieves 100% on English words by destroying the user\'s ability to type homographic Vietnamese syllables standalone (e.g., never being able to type tết via test or đất via ddats at the start of a sentence).',
+        's3.callout': 'Mandatory Symmetric Disclosure Rule: Sen Việt\'s 100.00% (9,091 / 9,091) primary suite accuracy must always be quoted alongside its no-context replay counterpart: 97.33% (365 / 375) on ambiguous_both_sides and 100.00% (182 / 182 — 0 critical losses) on unique Vietnamese keystroke paths (whitelist_safe = never).',
+        's3.t1_title': 'Table 3.1 — Primary regression matrix (9,091 cases, per-row context isolation)',
+        's3.t1.h1': 'Regression bucket',
+        's3.t1.h2': 'Drive condition & linguistic scope',
+        's3.t1.h3': 'Pass / Total',
+        's3.t1.h4': 'Pass rate',
+        's3.t1.h5': 'Ratchet floor',
+        's3.t1.r1': 'Pure Vietnamese syllable transformation (Telex & SEN Flex free-order)',
+        's3.t1.r2': 'Untouched English vocabulary with no valid Vietnamese transformation path',
+        's3.t1.r3': 'Trailing modifier cancellation (zz, ss, triple-vowel escape aaa → aa)',
+        's3.t1.r4': 'Restoring English words mangled by Telex keys (stop-coda -c, -ch, -p, -t rules, impossible diphthongs & 64-bit LexiconDigest)',
+        's3.t1.r5': 'Ambiguous collisions (valid English word AND valid Vietnamese syllable) driven with preceding English context primed',
+        's3.t1.total': 'Overall Primary Regression Suite',
+        's3.t1.r6': '0 Satisfiability conflicts · 0 Policy Coherence conflicts',
+        's3.t2_title': 'Table 3.2 — Symmetric no-context replay matrix (ambiguous rows re-driven with empty context)',
+        's3.t2.h1': 'Symmetric metric',
+        's3.t2.h2': 'Linguistic & evaluation meaning',
+        's3.t2.h3': 'Pass / Total',
+        's3.t2.h4': 'Rate',
+        's3.t2.r1': '375 lowercase ambiguous rows driven with NO context: the Vietnamese syllable must survive',
+        's3.t2.r2': 'Vietnamese syllables where that keystroke sequence is the ONLY path to the syllable (zero losses permitted)',
+        's3.t2.r3': 'Syllables with multiple alternative keystroke paths',
+        's3.t2.r4': 'Dual standard: Correct as English with English context AND correct as Vietnamese without context',
+        's4.heading': '§4. Adaptive presentation engine across host editor architectures (ClientAdapter)',
+        's4.p1': 'No single presentation mode is optimal for every macOS application when operating strictly within InputMethodKit. Native Cocoa/AppKit views support underline-free atomic replacement (insertText:replacementRange:), whereas Chromium, Electron, and React editors rely on W3C compositionstart / compositionend events (setMarkedText) to coordinate asynchronous Virtual DOM reconciliation.',
+        's4.p2': 'Rather than forcing the screen with CGEventTap, Sen Việt combines ClientAdapter classification, DirectReplacementGuard range-ownership verification (never replacing outside [compositionStartLocation, virtualCursorLocation]), and user-editable data rules in typing-modes.yml:',
+        's4.th1': 'Application category',
+        's4.th2': 'Representative hosts',
+        's4.th3': 'Presentation mode',
+        's4.th4': 'Technical synchronization mechanism',
+        's4.r1': 'Atomic UTF-16 replacement via insertText:replacementRange:, zero composition underline, intact Cmd+Z undo stack.',
+        's4.r2': 'Synchronizes with W3C IME composition lifecycle to eliminate character duplication (t-ti-tiế-tiếng) and caret jumps in React/Virtual DOM.',
+        's4.r3': 'Synchronizes PTY DEL bytes (\\u{7F}) and UTF-16 code unit counts for modern CLI tools (Claude Code, tmux, zsh).',
+        's4.r4_app': 'Custom controls returning NSNotFound',
+        's4.r4': 'When DirectReplacementGuard detects a host ignoring replacementRange, the session dynamically switches to setMarkedText.',
+        's5.heading': '§5. Cross-platform Pure Swift 6 Core and in-process COM loading on Windows 11 ARM64',
+        's5.p1': 'To power all 5 operating systems (macOS, iOS/iPadOS, Windows, Linux, Android) from a single linguistic state machine, VieLotusCore is written in pure Swift 6 with zero UI dependencies and exposes a zero-copy C-ABI bridge (VieLotusCAPI, 26 functions in vielotus.h) for Windows TSF and Linux IBus / Fcitx5.',
+        's5.p2': 'Engineering Case Study on Windows 11 (x64 & ARM64): A Windows Text Services Framework (TSF) input method is an in-process COM server (VieLotusTIP.dll) loaded directly into the address space of arbitrary host processes (notepad.exe, explorer.exe, browsers) and registered via regsvr32.exe. If VieLotusTIP.dll uses a static PE import to VieLotusCAPI.dll:',
+        's5.p3': '1) When regsvr32.exe runs or when a host process with working directory C:\\Windows\\System32 instantiates the COM object, the Windows PE loader searches System32 rather than the installation folder for VieLotusCAPI.dll and its transitive Swift Runtime DLLs (swiftCore.dll, swiftDispatch.dll), failing with RegSvr32 exit code 0x3 (ERROR_MOD_NOT_FOUND). 2) To solve this architecturally, VieLotusTIP.dll is compiled with the static MSVC runtime (/MT) and imports only 4 Windows OS DLLs. Upon ActivateEx, VieLotusTIP.dll resolves its own directory via GetModuleFileNameW(g_hInst, ...) and dynamically loads VieLotusCAPI.dll with LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS across both x64 and native ARM64 builds.',
+        's6.heading': '§6. p99 tail latency & reproducible black-box verification (Open-Core)',
+        's6.p1': 'In real-time typing, mean latency masks micro-stutters caused by language detection or memory allocation spikes. Sen Việt gates every build on 99th-percentile tail latency (p99) across a 250,000-keystroke endurance benchmark (VieLotusCLI --stress) spanning three interleaved workloads:',
+        's6.th1': 'Stress workload (250,000 keystrokes)',
+        's6.th2': 'Ratchet ceiling / floor gate',
+        's6.th3': 'Measured (Apple Silicon)',
+        's6.th4': 'Memory profile',
+        's6.r1': 'Pure Telex Vietnamese (p99 latency)',
+        's6.r2': 'Pure VNI Vietnamese (p99 latency)',
+        's6.r3': 'Mixed Bilingual Prose & Code (p99 latency)',
+        's6.r4': 'Sustained processing throughput',
+        's6.mem': 'Steady < 30 MB RSS (0 leaks)',
+        's6.r4_note': 'Worst-of-3 separate OS processes',
+        's6.repro_title': '30-second independent black-box verification (Open-Core)',
+        's6.p2': 'Sen Việt uses an Open-Core model: the full platform shell source code (Sources/VieLotusIM, CrossPlatform/) is MIT-licensed so security auditors can verify Zero CGEventTap / Zero Keylogging, paired with the prebuilt VieLotusCLI binary so anyone can independently reproduce the 9,091-case regression matrix and 250,000-keystroke stress benchmark:',
+        'footer.copy': 'Sen Việt — Open technical research & empirical verification report.'
+      }
+    };
+
+    function setLang(lang) {
+      currentLang = lang;
+      document.documentElement.lang = lang;
+      localStorage.setItem('vielotus_lang', lang);
+
+      document.getElementById('btn-vi').classList.toggle('active', lang === 'vi');
+      document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (i18n[lang] && i18n[lang][key]) {
+          el.textContent = i18n[lang][key];
+        }
+      });
+
+      renderLabCase();
+    }
+
+    (function init() {
+      const saved = localStorage.getItem('vielotus_lang');
+      if (saved === 'en' || saved === 'vi') {
+        setLang(saved);
+      } else {
+        renderLabCase();
+      }
+    })();
+  </script>
+</body>
+</html>
