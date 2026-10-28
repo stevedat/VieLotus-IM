@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+if command -v ldconfig >/dev/null 2>&1; then
+    ldconfig >/dev/null 2>&1 || true
+fi
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q /usr/share/applications >/dev/null 2>&1 || true
+fi
+if command -v ibus >/dev/null 2>&1; then
+    ibus write-cache --system >/dev/null 2>&1 || true
+fi
+if [ "${1:-}" = "remove" ] || [ "${1:-}" = "purge" ]; then
+    PKG_DEPENDS="/usr/share/language-selector/data/pkg_depends"
+    if [ -f "${PKG_DEPENDS}" ]; then
+        sed -i '/# Sen Việt (VieLotusIM)/d;/vielotus/d' "${PKG_DEPENDS}" 2>/dev/null || true
+    fi
+fi
+exit 0

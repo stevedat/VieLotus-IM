@@ -32,11 +32,6 @@ if(EXISTS "${PREBUILT_ENGINE_OBJ}")
     list(APPEND SOURCES "${PREBUILT_ENGINE_OBJ}")
     add_compile_definitions(VIELOTUS_EMBEDDED_ENGINE=1)
 endif()
-    if(EXISTS "${PREBUILT_ENGINE_OBJ}")
-        list(APPEND SOURCES "${PREBUILT_ENGINE_OBJ}")
-        add_compile_definitions(VIELOTUS_EMBEDDED_ENGINE=1)
-    endif()
-endif()
 
 add_library(VieLotusTIP SHARED
     ${SOURCES}

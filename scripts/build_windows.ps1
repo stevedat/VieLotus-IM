@@ -107,6 +107,13 @@ foreach ($targetArch in $archesToBuild) {
         Write-Error "❌ Lỗi: Không tìm thấy VieLotusTIP.dll ($targetArch) sau khi build."
         exit 1
     }
+
+    $builtSettingsExe = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusSettings.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($builtSettingsExe) {
+        Copy-Item $builtSettingsExe.FullName -Destination "$binStagingDir\$targetArch\VieLotusSettings.exe" -Force
+        Copy-Item $builtSettingsExe.FullName -Destination "$binStagingDir\VieLotusSettings.exe" -Force
+        Write-Host "   ✅ Đã copy: $($builtSettingsExe.FullName) -> $binStagingDir\$targetArch\VieLotusSettings.exe"
+    }
 }
 
 # Also try building the opposite architecture so the Inno Setup installer is always Universal (x64 + ARM64)
@@ -122,6 +129,10 @@ foreach ($extraArch in @("x64", "arm64")) {
                 Copy-Item $builtExtra.FullName -Destination "$binStagingDir\$extraArch\VieLotusTIP.dll" -Force
                 Copy-Item $builtExtra.FullName -Destination "$distWindowsDir\VieLotusTIP-$extraArch.dll" -Force
                 Write-Host "   ✅ Đã bổ sung kiến trúc $extraArch vào bộ cài Universal: $($builtExtra.FullName)"
+            }
+            $builtExtraSettings = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusSettings.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($builtExtraSettings) {
+                Copy-Item $builtExtraSettings.FullName -Destination "$binStagingDir\$extraArch\VieLotusSettings.exe" -Force
             }
         }
     }
@@ -150,4 +161,114 @@ if ($iscc -and (Test-Path "$binStagingDir\VieLotusTIP.dll")) {
     }
 } else {
     Write-Host "ℹ️  Cấu trúc staging đã sẵn sàng tại: $binStagingDir" -ForegroundColor Yellow
+}
+
+# 5. Package Microsoft Store MSIX & MSIXBundle (Partner Center: NidoHoldings.SenVitVieLotusIM)
+$makeappxCmd = Get-Command makeappx.exe -ErrorAction SilentlyContinue
+if (-not $makeappxCmd) {
+    $sdkMakeAppx = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter "makeappx.exe" -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match "x64" } |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
+    if ($sdkMakeAppx) {
+        $makeappx = $sdkMakeAppx.FullName
+    } else {
+        $makeappx = $null
+    }
+} else {
+    $makeappx = $makeappxCmd.Source
+}
+
+if ($makeappx) {
+    $msixDistDir = "$distWindowsDir\msix"
+    $msixStageBase = "$rootDir\build-msix"
+    New-Item -ItemType Directory -Force -Path $msixDistDir | Out-Null
+    if (Test-Path $msixStageBase) {
+        Remove-Item $msixStageBase -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $bundleInputDir = "$msixStageBase\bundle-in"
+    New-Item -ItemType Directory -Force -Path $bundleInputDir | Out-Null
+
+    foreach ($msixArch in @("x64", "arm64")) {
+        if ((Test-Path "$binStagingDir\$msixArch\VieLotusTIP.dll") -and (Test-Path "$binStagingDir\$msixArch\VieLotusSettings.exe")) {
+            Write-Host "📦 Bước 5 ($msixArch): Đóng gói Microsoft Store MSIX (VieLotus-$msixArch.msix)..." -ForegroundColor Green
+            $stageDir = "$msixStageBase\$msixArch"
+            New-Item -ItemType Directory -Force -Path "$stageDir\Assets" | Out-Null
+            Copy-Item "$binStagingDir\$msixArch\VieLotusTIP.dll" -Destination "$stageDir\VieLotusTIP.dll" -Force
+            Copy-Item "$binStagingDir\$msixArch\VieLotusSettings.exe" -Destination "$stageDir\VieLotusSettings.exe" -Force
+            Copy-Item "$windowsDir\assets\VieLotusIM.ico" -Destination "$stageDir\VieLotusIM.ico" -Force
+            Copy-Item "$windowsDir\assets\*.png" -Destination "$stageDir\Assets\" -Force
+
+            $manifestXml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap desktop">
+
+  <Identity
+    Name="NidoHoldings.SenVitVieLotusIM"
+    Publisher="CN=BC3DBCFE-AB40-468F-8F2B-36C55BB3374C"
+    Version="$Version.0"
+    ProcessorArchitecture="$msixArch" />
+
+  <Properties>
+    <DisplayName>Sen Việt (VieLotusIM)</DisplayName>
+    <PublisherDisplayName>Nido Holdings</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Bộ gõ Tiếng Việt thế hệ mới chuẩn Native TSF cho Windows 10/11 (Telex, VNI, Smart Bilingual 100% Offline).</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="vi-VN" />
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="VieLotusIM" Executable="VieLotusSettings.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Sen Việt (VieLotusIM)"
+        Description="Cài đặt &amp; Quản lý Bộ gõ Tiếng Việt Sen Việt (VieLotusIM)"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <desktop:Extension Category="windows.startupTask" Executable="VieLotusSettings.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="VieLotusStartupActivate" Enabled="true" DisplayName="Sen Việt (VieLotusIM)" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
+"@
+            Set-Content -Path "$stageDir\AppxManifest.xml" -Value $manifestXml -Encoding UTF8
+            $outMsix = "$msixDistDir\VieLotus-$msixArch.msix"
+            if (Test-Path $outMsix) { Remove-Item $outMsix -Force }
+            & $makeappx pack /d $stageDir /p $outMsix /o | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Copy-Item $outMsix -Destination "$bundleInputDir\VieLotus-$msixArch.msix" -Force
+                Write-Host "   ✅ Đã tạo: $outMsix"
+            }
+        }
+    }
+
+    $outBundle = "$msixDistDir\VieLotus_$Version.0_x64_arm64.msixbundle"
+    if (Test-Path $outBundle) { Remove-Item $outBundle -Force }
+    & $makeappx bundle /d $bundleInputDir /p $outBundle /o | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "✅ Đã tạo gói Microsoft Store MSIXBundle tại: $outBundle" -ForegroundColor Cyan
+    }
+    Remove-Item $msixStageBase -Recurse -Force -ErrorAction SilentlyContinue
 }

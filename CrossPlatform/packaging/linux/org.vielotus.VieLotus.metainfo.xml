@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.vielotus.VieLotus</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Sen Việt (VieLotusIM)</name>
+  <summary>Bộ gõ tiếng Việt thế hệ mới cho Linux (IBus &amp; Fcitx5)</summary>
+  <description>
+    <p>Sen Việt (VieLotusIM) là bộ gõ tiếng Việt thuần khiết với lõi xử lý song ngữ thông minh Anh–Việt (Smart Bilingual) và gõ dấu tự do Telex / VNI, hỗ trợ đồng thời cả IBus và Fcitx5 trên Ubuntu, Debian, Linux Mint và Pop!_OS.</p>
+  </description>
+  <launchable type="desktop-id">vielotus.desktop</launchable>
+  <url type="homepage">https://stevedat.github.io/VieLotus-IM/</url>
+  <developer_name>Trần Phát Đạt (Steve Dat)</developer_name>
+  <provides>
+    <binary>vielotus</binary>
+    <binary>vielotus-settings</binary>
+  </provides>
+</component>

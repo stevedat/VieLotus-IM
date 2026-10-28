@@ -3,13 +3,14 @@ set -euo pipefail
 
 # ==============================================================================
 # Sen Việt (VieLotusIM) - All-in-One Debian / Ubuntu (.deb) Packaging Script
-# Generates a single self-contained installer:
-#   vielotus_${VERSION}_${ARCH}.deb
+# Generates self-contained installers:
+#   vielotus_${VERSION}_amd64.deb
+#   vielotus_${VERSION}_arm64.deb
 # containing:
 #   1. Shared C-ABI Engine Library (libVieLotusCAPI.so + Swift Linux Runtime)
-#   2. Fcitx5 Input Method Addon (vielotus.so + vielotus.conf)
+#   2. Fcitx5 Input Method Addon (vielotus.so + addon/vielotus.conf + inputmethod/*.conf)
 #   3. IBus Input Method Engine (ibus-engine-vielotus + vielotus.xml)
-#   4. Freedesktop Icons & typing-modes.yml
+#   4. Desktop Settings Utility (vielotus-settings), Freedesktop Icons & typing-modes.yml
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,6 +21,7 @@ ARCH="${2:-amd64}"
 
 DIST_LINUX="${ROOT_DIR}/dist/linux"
 DEB_BASE="${ROOT_DIR}/dist/deb"
+PACKAGING_LINUX="${ROOT_DIR}/CrossPlatform/packaging/linux"
 
 echo "🌸 === Đóng gói Sen Việt (VieLotusIM) All-in-One v${VERSION} (.deb) cho kiến trúc ${ARCH} ==="
 
@@ -38,383 +40,278 @@ build_deb() {
     local output_file="$2"
     if command -v dpkg-deb >/dev/null 2>&1; then
         dpkg-deb -Zxz --build --root-owner-group "${pkg_dir}" "${output_file}"
-    elif command -v docker >/dev/null 2>&1; then
-        local rel_pkg_dir="${pkg_dir#"${ROOT_DIR}/"}"
-        local rel_out="${output_file#"${ROOT_DIR}/"}"
-        docker run --rm \
-            -v "${ROOT_DIR}:/workspace" \
-            -w /workspace \
-            vielotus-linux-builder:latest \
-            dpkg-deb -Zxz --build --root-owner-group "${rel_pkg_dir}" "${rel_out}"
+    elif command -v python3 >/dev/null 2>&1; then
+        python3 - "${pkg_dir}" "${output_file}" <<'PYEOF'
+import io, lzma, os, stat, sys, tarfile, time
+
+pkg_dir = os.path.abspath(sys.argv[1])
+output_file = os.path.abspath(sys.argv[2])
+control_dir = os.path.join(pkg_dir, "DEBIAN")
+mtime = int(time.time())
+
+def reset_root(ti):
+    ti.uid = 0
+    ti.gid = 0
+    ti.uname = "root"
+    ti.gname = "root"
+    ti.mtime = mtime
+    return ti
+
+def build_tar_xz(root_dir, is_control=False):
+    raw_buf = io.BytesIO()
+    with tarfile.open(fileobj=raw_buf, mode="w", format=tarfile.GNU_FORMAT) as tf:
+        root_ti = tarfile.TarInfo(name=".")
+        root_ti.type = tarfile.DIRTYPE
+        root_ti.mode = 0o755
+        tf.addfile(reset_root(root_ti))
+
+        for dirpath, dirnames, filenames in os.walk(root_dir):
+            dirnames.sort()
+            filenames.sort()
+            rel_dir = os.path.relpath(dirpath, root_dir)
+            if is_control and rel_dir != ".":
+                continue
+            if not is_control and (rel_dir == "DEBIAN" or rel_dir.startswith("DEBIAN" + os.sep)):
+                dirnames[:] = []
+                continue
+
+            if rel_dir != ".":
+                arc_dir = "./" + rel_dir.replace(os.sep, "/")
+                ti = tf.gettarinfo(dirpath, arcname=arc_dir)
+                ti.mode = 0o755
+                tf.addfile(reset_root(ti))
+
+            for fname in filenames:
+                fpath = os.path.join(dirpath, fname)
+                arc_name = "./" + fname if rel_dir == "." else "./" + os.path.join(rel_dir, fname).replace(os.sep, "/")
+                st = os.lstat(fpath)
+                ti = tf.gettarinfo(fpath, arcname=arc_name)
+                if stat.S_ISLNK(st.st_mode):
+                    ti.mode = 0o777
+                    tf.addfile(reset_root(ti))
+                else:
+                    if is_control and fname in ("postinst", "postrm", "preinst", "prerm"):
+                        ti.mode = 0o755
+                    elif st.st_mode & stat.S_IXUSR:
+                        ti.mode = 0o755
+                    else:
+                        ti.mode = 0o644
+                    with open(fpath, "rb") as fobj:
+                        tf.addfile(reset_root(ti), fileobj=fobj)
+
+    return lzma.compress(raw_buf.getvalue(), preset=6)
+
+def ar_member(name, data):
+    hdr = f"{name:<16}{mtime:<12}{0:<6}{0:<6}{0o100644:<8o}{len(data):<10}`\n".encode("ascii")
+    pad = b"\n" if (len(data) % 2 == 1) else b""
+    return hdr + data + pad
+
+control_xz = build_tar_xz(control_dir, is_control=True)
+data_xz = build_tar_xz(pkg_dir, is_control=False)
+
+os.makedirs(os.path.dirname(output_file), exist_ok=True)
+with open(output_file, "wb") as out:
+    out.write(b"!<arch>\n")
+    out.write(ar_member("debian-binary", b"2.0\n"))
+    out.write(ar_member("control.tar.xz", control_xz))
+    out.write(ar_member("data.tar.xz", data_xz))
+PYEOF
+    else
+        echo "❌ Không tìm thấy dpkg-deb hoặc python3 để đóng gói .deb."
+        exit 1
     fi
 }
 
-PKG_NAME="vielotus"
-PKG_DIR="${DEB_BASE}/${PKG_NAME}_${VERSION}_${ARCH}"
-echo "📦 Đóng gói All-in-One ${PKG_NAME}_${VERSION}_${ARCH}.deb..."
+verify_elf_arch() {
+    local target_arch="$1"
+    shift
+    python3 - "${target_arch}" "$@" <<'PYEOF'
+import struct, sys
 
-mkdir -p "${PKG_DIR}/DEBIAN"
-mkdir -p "${PKG_DIR}/usr/lib"
-mkdir -p "${PKG_DIR}/usr/lib/vielotus"
-mkdir -p "${PKG_DIR}/etc/ld.so.conf.d"
-mkdir -p "${PKG_DIR}/usr/include"
-mkdir -p "${PKG_DIR}/usr/lib/fcitx5"
-mkdir -p "${PKG_DIR}/usr/share/fcitx5/addon"
-mkdir -p "${PKG_DIR}/usr/lib/ibus"
-mkdir -p "${PKG_DIR}/usr/share/ibus/component"
-mkdir -p "${PKG_DIR}/usr/share/doc/${PKG_NAME}"
+target_arch = sys.argv[1]
+expected_machine = {"amd64": 62, "arm64": 183}.get(target_arch)
+if expected_machine is None:
+    sys.exit(0)
 
-# 1. Core C-ABI Library & Header
-cp "${DIST_LINUX}/libVieLotusCAPI.so" "${PKG_DIR}/usr/lib/"
-python3 - "${ROOT_DIR}/Sources/VieLotusCAPI/include/vielotus.h" "${PKG_DIR}/usr/include/vielotus.h" << 'PYEOF'
-import re, sys
-with open(sys.argv[1], "r", encoding="utf-8") as f:
-    h = f.read()
-h = re.sub(r"// =+\n// Context-Aware Word Suggestion Engine\n// =+\n.*?(?=// =+\n// Version & Metadata)", "", h, flags=re.S)
-h = re.sub(r"\n*// =+\n// EDU-TYPE Local Loopback Bridge.*?(?=\n#ifdef __cplusplus)", "\n", h, flags=re.S)
-with open(sys.argv[2], "w", encoding="utf-8") as f:
-    f.write(h)
+for path in sys.argv[2:]:
+    with open(path, "rb") as f:
+        hdr = f.read(20)
+    if len(hdr) < 20 or hdr[:4] != b"\x7fELF":
+        raise SystemExit(f"❌ Tệp không phải ELF hợp lệ: {path}")
+    e_machine = struct.unpack("<H", hdr[18:20])[0]
+    if e_machine != expected_machine:
+        raise SystemExit(
+            f"❌ Sai kiến trúc ELF cho {path}: e_machine={e_machine} (kỳ vọng {expected_machine} cho {target_arch})"
+        )
 PYEOF
+}
 
-# Bundle Swift Linux runtime libraries so end-user machines do not need the Swift toolchain installed
-if [ -d "${DIST_LINUX}/swift-runtime" ]; then
-    cp -a "${DIST_LINUX}/swift-runtime/"*.so* "${PKG_DIR}/usr/lib/vielotus/" 2>/dev/null || true
-elif [ -d "/usr/lib/swift/linux" ]; then
-    for lib in \
-        libswiftCore.so \
-        libswift_Concurrency.so \
-        libswift_StringProcessing.so \
-        libswift_RegexParser.so \
-        libswiftGlibc.so \
-        libswiftSynchronization.so \
-        libBlocksRuntime.so \
-        libdispatch.so \
-        libswiftDispatch.so \
-        libFoundation.so \
-        libFoundationEssentials.so \
-        libFoundationInternationalization.so \
-        lib_FoundationICU.so; do
-        if [ -f "/usr/lib/swift/linux/${lib}" ]; then
-            cp -L "/usr/lib/swift/linux/${lib}" "${PKG_DIR}/usr/lib/vielotus/"
-        fi
-    done
-fi
-echo "/usr/lib/vielotus" > "${PKG_DIR}/etc/ld.so.conf.d/vielotus.conf"
-
-# 2. Fcitx5 Addon
-cp "${DIST_LINUX}/vielotus.so" "${PKG_DIR}/usr/lib/fcitx5/"
-if [ "${ARCH}" = "amd64" ]; then
-    mkdir -p "${PKG_DIR}/usr/lib/x86_64-linux-gnu/fcitx5"
-    ln -sf ../../fcitx5/vielotus.so "${PKG_DIR}/usr/lib/x86_64-linux-gnu/fcitx5/vielotus.so"
-elif [ "${ARCH}" = "arm64" ]; then
-    mkdir -p "${PKG_DIR}/usr/lib/aarch64-linux-gnu/fcitx5"
-    ln -sf ../../fcitx5/vielotus.so "${PKG_DIR}/usr/lib/aarch64-linux-gnu/fcitx5/vielotus.so"
-fi
-cp "${DIST_LINUX}/vielotus.conf" "${PKG_DIR}/usr/share/fcitx5/addon/"
-cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/README.md" "${PKG_DIR}/usr/share/doc/${PKG_NAME}/"
-
-# 3. IBus Engine
-cp "${DIST_LINUX}/ibus-engine-vielotus" "${PKG_DIR}/usr/lib/ibus/"
-cp "${DIST_LINUX}/vielotus.xml" "${PKG_DIR}/usr/share/ibus/component/"
-
-# 4. Freedesktop hicolor icons (16x16 -> 512x512) & status indicators
-for size in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
-    ICON_SRC="${ROOT_DIR}/CrossPlatform/linux-icons/hicolor_${size}_apps/vielotus.png"
-    if [ -f "${ICON_SRC}" ]; then
-        mkdir -p "${PKG_DIR}/usr/share/icons/hicolor/${size}/apps"
-        cp "${ICON_SRC}" "${PKG_DIR}/usr/share/icons/hicolor/${size}/apps/vielotus.png"
-    fi
-done
-
-if [ -d "${ROOT_DIR}/CrossPlatform/linux-icons/status_indicators" ]; then
-    mkdir -p "${PKG_DIR}/usr/share/vielotus/icons"
-    cp "${ROOT_DIR}/CrossPlatform/linux-icons/status_indicators/"*.png "${PKG_DIR}/usr/share/vielotus/icons/"
-fi
-
-# 5. Desktop resource files (typing-modes.yml only)
-if [ -f "${ROOT_DIR}/Resources/typing-modes.yml" ]; then
-    mkdir -p "${PKG_DIR}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
-    cp "${ROOT_DIR}/Resources/typing-modes.yml" "${PKG_DIR}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/"
-elif [ -f "${ROOT_DIR}/Sources/VieLotusCore/Resources/typing-modes.yml" ]; then
-    mkdir -p "${PKG_DIR}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
-    cp "${ROOT_DIR}/Sources/VieLotusCore/Resources/typing-modes.yml" "${PKG_DIR}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/"
-fi
-
-# 6. Desktop Application Launcher, GUI/CLI Settings Utility & AppStream Metadata
 install_desktop_integration() {
     local target_root="$1"
     mkdir -p "${target_root}/usr/bin"
     mkdir -p "${target_root}/usr/share/applications"
     mkdir -p "${target_root}/usr/share/metainfo"
 
-    cat <<'SETTINGS_EOF' > "${target_root}/usr/bin/vielotus-settings"
-#!/bin/sh
-# ==============================================================================
-# Sen Việt (VieLotusIM) — Linux Desktop Settings & Auto-Activation Utility
-# ==============================================================================
-set -e
-
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/vielotus"
-CONFIG_FILE="${CONFIG_DIR}/config.env"
-mkdir -p "${CONFIG_DIR}"
-
-INPUT_METHOD="telex"
-if [ -f "${CONFIG_FILE}" ]; then
-    . "${CONFIG_FILE}" 2>/dev/null || true
-fi
-
-save_and_apply() {
-    MODE="$1"
-    printf 'INPUT_METHOD="%s"\n' "${MODE}" > "${CONFIG_FILE}"
-    ENGINE_ID="vielotus"
-    if [ "${MODE}" = "vni" ]; then
-        ENGINE_ID="vielotus-vni"
-    fi
-
-    # 1. Refresh IBus cache & switch active engine
-    if command -v ibus >/dev/null 2>&1; then
-        ibus write-cache >/dev/null 2>&1 || true
-        ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true
-    fi
-
-    # 2. Register into GNOME / Ubuntu Input Sources (org.gnome.desktop.input-sources)
-    if command -v gsettings >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
-        python3 - "${ENGINE_ID}" <<'PYEOF' 2>/dev/null || true
-import subprocess, sys, ast
-engine_id = sys.argv[1]
-try:
-    raw = subprocess.check_output(
-        ["gsettings", "get", "org.gnome.desktop.input-sources", "sources"],
-        stderr=subprocess.DEVNULL
-    ).decode().strip()
-    if raw.startswith("@a(ss) "):
-        raw = raw[len("@a(ss) "):]
-    sources = list(ast.literal_eval(raw)) if raw else []
-except Exception:
-    sources = []
-
-if not sources:
-    sources = [("xkb", "us")]
-
-# Replace any existing vielotus entry or append
-sources = [s for s in sources if not (s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni"))]
-sources.append(("ibus", engine_id))
-formatted = "[" + ", ".join(f"('{k}', '{v}')" for k, v in sources) + "]"
-subprocess.call(["gsettings", "set", "org.gnome.desktop.input-sources", "sources", formatted],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-PYEOF
-    fi
-}
-
-case "${1:-}" in
-    --activate)
-        save_and_apply "${INPUT_METHOD}"
-        echo "✅ Đã kích hoạt bộ gõ Sen Việt (${INPUT_METHOD})."
-        exit 0
-        ;;
-    --telex)
-        save_and_apply "telex"
-        echo "✅ Đã chuyển Sen Việt sang kiểu gõ Telex."
-        exit 0
-        ;;
-    --vni)
-        save_and_apply "vni"
-        echo "✅ Đã chuyển Sen Việt sang kiểu gõ VNI."
-        exit 0
-        ;;
-esac
-
-# Always ensure the input source is registered when the user opens the app
-save_and_apply "${INPUT_METHOD}"
-
-if command -v zenity >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
-    TELEX_TRUE="TRUE"
-    VNI_TRUE="FALSE"
-    if [ "${INPUT_METHOD}" = "vni" ]; then
-        TELEX_TRUE="FALSE"
-        VNI_TRUE="TRUE"
-    fi
-    CHOICE=$(zenity --list --radiolist \
-        --title="Sen Việt (VieLotusIM) — Cài đặt bộ gõ" \
-        --text="Bộ gõ tiếng Việt Sen Việt đã được kích hoạt trên thanh ngôn ngữ hệ thống (Super + Space).\nChọn kiểu gõ mặc định:" \
-        --width=460 --height=260 \
-        --column="Chọn" --column="Mã" --column="Kiểu gõ tiếng Việt" \
-        "${TELEX_TRUE}" "telex" "Telex (Gõ dấu tự do SEN Flex & Song ngữ thông minh)" \
-        "${VNI_TRUE}" "vni" "VNI (Gõ dấu bằng phím số 1–9)" \
-        --hide-column=2 2>/dev/null || true)
-    if [ -n "${CHOICE}" ]; then
-        save_and_apply "${CHOICE}"
-        zenity --notification --text="Sen Việt: Đã kích hoạt kiểu gõ $(echo "${CHOICE}" | tr 'a-z' 'A-Z')" 2>/dev/null || true
-    fi
-    exit 0
-fi
-
-echo "🌸 === Sen Việt (VieLotusIM) cho Linux ==="
-echo "Trạng thái: Đã kích hoạt (${INPUT_METHOD})"
-echo "  • Chuyển sang Telex : vielotus --telex"
-echo "  • Chuyển sang VNI   : vielotus --vni"
-echo "  • Phím tắt đổi bộ gõ: Super + Space"
-SETTINGS_EOF
+    cp "${PACKAGING_LINUX}/vielotus-settings" "${target_root}/usr/bin/vielotus-settings"
     chmod 755 "${target_root}/usr/bin/vielotus-settings"
     ln -sf vielotus-settings "${target_root}/usr/bin/vielotus"
 
-    cat <<'DESKTOP_EOF' > "${target_root}/usr/share/applications/vielotus.desktop"
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=Sen Việt (VieLotus)
-Name[vi]=Sen Việt (Bộ gõ tiếng Việt)
-GenericName=Vietnamese Input Method
-GenericName[vi]=Bộ gõ tiếng Việt
-Comment=Configure and activate Sen Việt Vietnamese Input Method (Telex & VNI)
-Comment[vi]=Cài đặt và kích hoạt bộ gõ tiếng Việt Sen Việt (Telex & VNI)
-Exec=/usr/bin/vielotus-settings
-Icon=vielotus
-Terminal=false
-Categories=Utility;Settings;DesktopSettings;
-Keywords=Vietnamese;Telex;VNI;Input Method;IBus;Fcitx5;Sen Viet;VieLotus;Bo go tieng Viet;
-StartupNotify=true
-DESKTOP_EOF
-
-    cat <<'META_EOF' > "${target_root}/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml"
-<?xml version="1.0" encoding="UTF-8"?>
-<component type="desktop-application">
-  <id>org.vielotus.VieLotus</id>
-  <metadata_license>MIT</metadata_license>
-  <project_license>MIT</project_license>
-  <name>Sen Việt (VieLotusIM)</name>
-  <summary>Bộ gõ tiếng Việt thế hệ mới cho Linux (IBus &amp; Fcitx5)</summary>
-  <description>
-    <p>Sen Việt (VieLotusIM) là bộ gõ tiếng Việt thuần khiết với lõi xử lý song ngữ thông minh Anh–Việt (Smart Bilingual) và gõ dấu tự do Telex / VNI, hỗ trợ đồng thời cả IBus và Fcitx5 trên Ubuntu, Debian, Linux Mint và Pop!_OS.</p>
-  </description>
-  <launchable type="desktop-id">vielotus.desktop</launchable>
-  <url type="homepage">https://stevedat.github.io/VieLotus-IM/</url>
-  <developer_name>Trần Phát Đạt (Steve Dat)</developer_name>
-  <provides>
-    <binary>vielotus</binary>
-    <binary>vielotus-settings</binary>
-  </provides>
-</component>
-META_EOF
+    cp "${PACKAGING_LINUX}/vielotus.desktop" "${target_root}/usr/share/applications/vielotus.desktop"
+    cp "${PACKAGING_LINUX}/org.vielotus.VieLotus.metainfo.xml" \
+       "${target_root}/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml"
 }
 
 write_maintainer_scripts() {
     local target_root="$1"
-    cat <<'EOF' > "${target_root}/DEBIAN/postinst"
-#!/bin/sh
-set -e
-if command -v ldconfig >/dev/null 2>&1; then
-    ldconfig >/dev/null 2>&1 || true
-fi
-if command -v update-desktop-database >/dev/null 2>&1; then
-    update-desktop-database -q /usr/share/applications >/dev/null 2>&1 || true
-fi
-if command -v gtk-update-icon-cache >/dev/null 2>&1; then
-    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor >/dev/null 2>&1 || true
-fi
-if command -v ibus >/dev/null 2>&1; then
-    ibus write-cache --system >/dev/null 2>&1 || true
-fi
-
-# Auto-register Sen Việt into the active desktop user's GNOME/IBus session
-TARGET_USER="${SUDO_USER:-}"
-if [ -z "${TARGET_USER}" ] && [ -n "${PKEXEC_UID:-}" ]; then
-    TARGET_USER=$(id -nu "${PKEXEC_UID}" 2>/dev/null || true)
-fi
-if [ -z "${TARGET_USER}" ]; then
-    TARGET_USER=$(who 2>/dev/null | awk '{print $1; exit}' || true)
-fi
-if [ -n "${TARGET_USER}" ] && [ "${TARGET_USER}" != "root" ] && [ -x /usr/bin/vielotus-settings ]; then
-    TARGET_UID=$(id -u "${TARGET_USER}" 2>/dev/null || true)
-    if [ -n "${TARGET_UID}" ] && [ -S "/run/user/${TARGET_UID}/bus" ]; then
-        su - "${TARGET_USER}" -c "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${TARGET_UID}/bus /usr/bin/vielotus-settings --activate" >/dev/null 2>&1 || true
-    fi
-fi
-exit 0
-EOF
+    cp "${PACKAGING_LINUX}/postinst" "${target_root}/DEBIAN/postinst"
     chmod 755 "${target_root}/DEBIAN/postinst"
 
-    cat <<'EOF' > "${target_root}/DEBIAN/postrm"
-#!/bin/sh
-set -e
-if command -v ldconfig >/dev/null 2>&1; then
-    ldconfig >/dev/null 2>&1 || true
-fi
-if command -v update-desktop-database >/dev/null 2>&1; then
-    update-desktop-database -q /usr/share/applications >/dev/null 2>&1 || true
-fi
-if command -v ibus >/dev/null 2>&1; then
-    ibus write-cache --system >/dev/null 2>&1 || true
-fi
-exit 0
-EOF
+    cp "${PACKAGING_LINUX}/postrm" "${target_root}/DEBIAN/postrm"
     chmod 755 "${target_root}/DEBIAN/postrm"
 }
 
-install_desktop_integration "${PKG_DIR}"
-
-INSTALLED_SIZE=$(du -sk "${PKG_DIR}" | awk '{print $1}')
-
-cat <<EOF > "${PKG_DIR}/DEBIAN/control"
-Package: ${PKG_NAME}
-Version: ${VERSION}
-Section: utils
-Priority: optional
-Architecture: ${ARCH}
-Installed-Size: ${INSTALLED_SIZE}
-Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
-Homepage: https://github.com/stevedat/VieLotus-IM
-Depends: libc6
-Suggests: ibus, fcitx5, zenity
-Description: Sen Việt (VieLotusIM) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
- All-in-one installer containing the Pure Swift 6 Vietnamese engine core
- (libVieLotusCAPI.so + bundled Swift runtime) alongside both native IBus
- and Fcitx5 input method plugins for Ubuntu, Debian, Mint, and Pop!_OS.
-EOF
-
-if command -v md5sum >/dev/null 2>&1; then
-    (cd "${PKG_DIR}" && find usr etc -type f -exec md5sum {} + > DEBIAN/md5sums)
-fi
-
-write_maintainer_scripts "${PKG_DIR}"
-
-build_deb "${PKG_DIR}" "${DIST_LINUX}/${PKG_NAME}_${VERSION}_${ARCH}.deb"
-rm -rf "${DEB_BASE}"
-
-if [ "${ARCH}" = "amd64" ] && [ -f "${ROOT_DIR}/Binaries/linux/${PKG_NAME}_${VERSION}_arm64.deb" ] && command -v dpkg-deb >/dev/null 2>&1; then
-    echo "📦 Đồng bộ gói ${PKG_NAME}_${VERSION}_arm64.deb..."
-    rm -rf /tmp/deb-arm64
-    dpkg-deb -R "${ROOT_DIR}/Binaries/linux/${PKG_NAME}_${VERSION}_arm64.deb" /tmp/deb-arm64
-    cp "${DIST_LINUX}/vielotus.xml" /tmp/deb-arm64/usr/share/ibus/component/vielotus.xml
-    install_desktop_integration /tmp/deb-arm64
-    rm -rf /tmp/deb-arm64/DEBIAN
-    mkdir -p /tmp/deb-arm64/DEBIAN
-    ARM64_SIZE=$(du -sk /tmp/deb-arm64 | awk '{print $1}')
-    cat <<EOF > /tmp/deb-arm64/DEBIAN/control
-Package: ${PKG_NAME}
-Version: ${VERSION}
-Section: utils
-Priority: optional
-Architecture: arm64
-Installed-Size: ${ARM64_SIZE}
-Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
-Homepage: https://github.com/stevedat/VieLotus-IM
-Depends: libc6
-Suggests: ibus, fcitx5, zenity
-Description: Sen Việt (VieLotusIM) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
- All-in-one installer containing the Pure Swift 6 Vietnamese engine core
- (libVieLotusCAPI.so + bundled Swift runtime) alongside both native IBus
- and Fcitx5 input method plugins for Ubuntu, Debian, Mint, and Pop!_OS.
-EOF
-    if command -v md5sum >/dev/null 2>&1; then
-        (cd /tmp/deb-arm64 && find usr etc -type f -exec md5sum {} + > DEBIAN/md5sums)
+resolve_arch_bin_dir() {
+    local target_arch="$1"
+    local candidate="${DIST_LINUX}/${target_arch}"
+    if [ -d "${candidate}" ] && [ -f "${candidate}/vielotus.so" ] && [ -f "${candidate}/ibus-engine-vielotus" ] && [ -f "${candidate}/libVieLotusCAPI.so" ]; then
+        if verify_elf_arch "${target_arch}" "${candidate}/libVieLotusCAPI.so" "${candidate}/vielotus.so" "${candidate}/ibus-engine-vielotus" 2>/dev/null; then
+            # Prefer top-level DIST_LINUX if its binaries are newer AND match target_arch
+            if [ -f "${DIST_LINUX}/vielotus.so" ] && [ "${DIST_LINUX}/vielotus.so" -nt "${candidate}/vielotus.so" ]; then
+                if verify_elf_arch "${target_arch}" "${DIST_LINUX}/libVieLotusCAPI.so" "${DIST_LINUX}/vielotus.so" "${DIST_LINUX}/ibus-engine-vielotus" 2>/dev/null; then
+                    echo "${DIST_LINUX}"
+                    return 0
+                fi
+            fi
+            echo "${candidate}"
+            return 0
+        fi
     fi
-    write_maintainer_scripts /tmp/deb-arm64
-    dpkg-deb -Zxz --build --root-owner-group /tmp/deb-arm64 "${DIST_LINUX}/${PKG_NAME}_${VERSION}_arm64.deb"
-    rm -rf /tmp/deb-arm64
+    echo "${DIST_LINUX}"
+}
+
+package_single_arch() {
+    local target_arch="$1"
+    local arch_bin_dir
+    arch_bin_dir="$(resolve_arch_bin_dir "${target_arch}")"
+
+    verify_elf_arch "${target_arch}" \
+        "${arch_bin_dir}/libVieLotusCAPI.so" \
+        "${arch_bin_dir}/vielotus.so" \
+        "${arch_bin_dir}/ibus-engine-vielotus"
+
+    local pkg_name="vielotus"
+    local pkg_dir="${DEB_BASE}/${pkg_name}_${VERSION}_${target_arch}"
+    echo "📦 Đóng gói All-in-One ${pkg_name}_${VERSION}_${target_arch}.deb (từ ${arch_bin_dir#"${ROOT_DIR}/"})..."
+
+    rm -rf "${pkg_dir}"
+    mkdir -p "${pkg_dir}/DEBIAN"
+    mkdir -p "${pkg_dir}/usr/lib"
+    mkdir -p "${pkg_dir}/usr/lib/vielotus"
+    mkdir -p "${pkg_dir}/etc/ld.so.conf.d"
+    mkdir -p "${pkg_dir}/usr/include"
+    mkdir -p "${pkg_dir}/usr/lib/fcitx5"
+    mkdir -p "${pkg_dir}/usr/share/fcitx5/addon"
+    mkdir -p "${pkg_dir}/usr/share/fcitx5/inputmethod"
+    mkdir -p "${pkg_dir}/usr/lib/ibus"
+    mkdir -p "${pkg_dir}/usr/share/ibus/component"
+    mkdir -p "${pkg_dir}/usr/share/doc/${pkg_name}"
+
+    # 1. Core C-ABI Library & Header
+    cp "${arch_bin_dir}/libVieLotusCAPI.so" "${pkg_dir}/usr/lib/"
+    cp "${ROOT_DIR}/Sources/VieLotusCAPI/include/vielotus.h" "${pkg_dir}/usr/include/vielotus.h"
+
+    if [ -d "${arch_bin_dir}/swift-runtime" ]; then
+        cp -a "${arch_bin_dir}/swift-runtime/"*.so* "${pkg_dir}/usr/lib/vielotus/" 2>/dev/null || true
+    elif [ -d "${DIST_LINUX}/swift-runtime" ]; then
+        cp -a "${DIST_LINUX}/swift-runtime/"*.so* "${pkg_dir}/usr/lib/vielotus/" 2>/dev/null || true
+    fi
+    echo "/usr/lib/vielotus" > "${pkg_dir}/etc/ld.so.conf.d/vielotus.conf"
+
+    # 2. Fcitx5 Addon & InputMethod definitions
+    cp "${arch_bin_dir}/vielotus.so" "${pkg_dir}/usr/lib/fcitx5/"
+    if [ "${target_arch}" = "amd64" ]; then
+        mkdir -p "${pkg_dir}/usr/lib/x86_64-linux-gnu/fcitx5"
+        ln -sf ../../fcitx5/vielotus.so "${pkg_dir}/usr/lib/x86_64-linux-gnu/fcitx5/vielotus.so"
+    elif [ "${target_arch}" = "arm64" ]; then
+        mkdir -p "${pkg_dir}/usr/lib/aarch64-linux-gnu/fcitx5"
+        ln -sf ../../fcitx5/vielotus.so "${pkg_dir}/usr/lib/aarch64-linux-gnu/fcitx5/vielotus.so"
+    fi
+    cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus.conf.in" "${pkg_dir}/usr/share/fcitx5/addon/vielotus.conf"
+    cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus-telex.conf" "${pkg_dir}/usr/share/fcitx5/inputmethod/vielotus-telex.conf"
+    cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus-vni.conf" "${pkg_dir}/usr/share/fcitx5/inputmethod/vielotus-vni.conf"
+    cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/README.md" "${pkg_dir}/usr/share/doc/${pkg_name}/"
+
+    # 3. IBus Engine
+    cp "${arch_bin_dir}/ibus-engine-vielotus" "${pkg_dir}/usr/lib/ibus/"
+    cp "${DIST_LINUX}/vielotus.xml" "${pkg_dir}/usr/share/ibus/component/"
+
+    # 4. Freedesktop hicolor icons (16x16 -> 512x512) & status indicators
+    for size in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
+        ICON_SRC="${ROOT_DIR}/CrossPlatform/linux-icons/hicolor_${size}_apps/vielotus.png"
+        if [ -f "${ICON_SRC}" ]; then
+            mkdir -p "${pkg_dir}/usr/share/icons/hicolor/${size}/apps"
+            cp "${ICON_SRC}" "${pkg_dir}/usr/share/icons/hicolor/${size}/apps/vielotus.png"
+        fi
+    done
+
+    if [ -d "${ROOT_DIR}/CrossPlatform/linux-icons/status_indicators" ]; then
+        mkdir -p "${pkg_dir}/usr/share/vielotus/icons"
+        cp "${ROOT_DIR}/CrossPlatform/linux-icons/status_indicators/"*.png "${pkg_dir}/usr/share/vielotus/icons/"
+    fi
+
+    # 5. Desktop resource files (typing-modes.yml only)
+    if [ -f "${ROOT_DIR}/Resources/typing-modes.yml" ]; then
+        mkdir -p "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
+        cp "${ROOT_DIR}/Resources/typing-modes.yml" "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/"
+    elif [ -f "${ROOT_DIR}/Sources/VieLotusCore/Resources/typing-modes.yml" ]; then
+        mkdir -p "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
+        cp "${ROOT_DIR}/Sources/VieLotusCore/Resources/typing-modes.yml" "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/"
+    fi
+
+    # 6. Desktop Application Launcher, GUI/CLI Settings Utility & AppStream Metadata
+    install_desktop_integration "${pkg_dir}"
+
+    local installed_size
+    installed_size=$(du -sk "${pkg_dir}" | awk '{print $1}')
+
+    cat <<EOF > "${pkg_dir}/DEBIAN/control"
+Package: ${pkg_name}
+Version: ${VERSION}
+Section: utils
+Priority: optional
+Architecture: ${target_arch}
+Installed-Size: ${installed_size}
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3
+Recommends: ibus | fcitx5, im-config, python3-gi, gir1.2-gtk-3.0
+Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
+Provides: fcitx5-vielotus, ibus-vielotus
+Enhances: fcitx5, ibus, language-selector-common
+Description: Sen Việt (VieLotusIM) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
+ All-in-one installer containing the Pure Swift 6 Vietnamese engine core
+ (libVieLotusCAPI.so + bundled Swift runtime) alongside both native IBus
+ and Fcitx5 input method plugins for Ubuntu, Debian, Mint, and Pop!_OS.
+EOF
+
+    if command -v md5sum >/dev/null 2>&1; then
+        (cd "${pkg_dir}" && find usr etc -type f -exec md5sum {} + > DEBIAN/md5sums)
+    fi
+
+    write_maintainer_scripts "${pkg_dir}"
+
+    build_deb "${pkg_dir}" "${DIST_LINUX}/${pkg_name}_${VERSION}_${target_arch}.deb"
+}
+
+package_single_arch "${ARCH}"
+
+if [ "${ARCH}" = "amd64" ] && [ -d "${DIST_LINUX}/arm64" ] && [ -f "${DIST_LINUX}/arm64/vielotus.so" ]; then
+    package_single_arch "arm64"
 fi
+
+rm -rf "${DEB_BASE}"
 
 echo "======================================================="
 echo "🎉 Gói All-in-One Debian/Ubuntu (.deb) đã sẵn sàng tại:"
-ls -lh "${DIST_LINUX}/${PKG_NAME}_${VERSION}_${ARCH}.deb"
+ls -lh "${DIST_LINUX}/vielotus_${VERSION}"_*.deb
 echo "======================================================="

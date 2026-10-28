@@ -1,0 +1,33 @@
+Source: vielotus
+Section: utils
+Priority: optional
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Build-Depends:
+ debhelper-compat (= 13),
+ cmake (>= 3.16),
+ extra-cmake-modules,
+ ninja-build,
+ pkg-config,
+ fcitx5-modules-dev,
+ libfcitx5config-dev,
+ libfcitx5core-dev,
+ libfcitx5utils-dev,
+ libibus-1.0-dev,
+ libglib2.0-dev
+Standards-Version: 4.6.2
+Homepage: https://github.com/stevedat/VieLotus-IM
+Vcs-Git: https://github.com/stevedat/VieLotus-IM.git
+Vcs-Browser: https://github.com/stevedat/VieLotus-IM
+Rules-Requires-Root: no
+
+Package: vielotus
+Architecture: amd64 arm64
+Depends: ${shlibs:Depends}, ${misc:Depends}, libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3
+Recommends: ibus | fcitx5, im-config, python3-gi, gir1.2-gtk-3.0
+Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
+Provides: fcitx5-vielotus, ibus-vielotus
+Enhances: fcitx5, ibus, language-selector-common
+Description: Sen Việt (VieLotusIM) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
+ Sen Việt (VieLotusIM) is a Pure Swift 6 Vietnamese input method engine with
+ Smart Bilingual (English-Vietnamese) restoration and free-tone SEN Flex
+ (Telex & VNI) support for both Fcitx5 and IBus on Ubuntu and Debian.

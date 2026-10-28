@@ -104,19 +104,15 @@ jobs:
         run: |
           ./scripts/build_imk.sh "${{ steps.version.outputs.version }}"
 
-      - name: Archive VieLotusIM.app
-        run: |
-          cd .build/dist
-          zip -r -y VieLotusIM.app.zip VieLotusIM.app
-
-      - name: Notarize and Staple VieLotusIM.app.zip (if notarytool configured)
+      - name: Notarize and Staple VieLotusIM.app (if notarytool configured)
         if: steps.notary.outputs.enabled == '1'
         run: |
+          cd .build/dist
+          zip -r -y VieLotusIM.app.zip VieLotusIM.app
+          cd ../..
           xcrun notarytool submit ".build/dist/VieLotusIM.app.zip" --keychain-profile "notarytool-profile" --wait
           bash scripts/notarize_artifact.sh --staple-only ".build/dist/VieLotusIM.app"
-          cd .build/dist
-          rm -f VieLotusIM.app.zip
-          zip -r -y VieLotusIM.app.zip VieLotusIM.app
+          rm -f ".build/dist/VieLotusIM.app.zip"
 
       - name: Build, Sign, and Notarize PKG installer
         env:
@@ -131,7 +127,7 @@ jobs:
           cp Binaries/windows/VieLotus-Setup-arm64.exe .build/dist/
           cp Binaries/linux/*.deb .build/dist/
           cd .build/dist
-          shasum -a 256 VieLotusIM.pkg VieLotusIM.app.zip VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe *.deb > checksums.sha256
+          shasum -a 256 VieLotusIM.pkg VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe *.deb > checksums.sha256
           cat checksums.sha256
 
       - name: Prepare Release Notes Body
@@ -145,7 +141,7 @@ jobs:
 
           - **Git Commit:** [\`${SHORT_SHA}\`](https://github.com/${{ github.repository }}/commit/${COMMIT_SHA})
           - **Build Timestamp:** ${BUILD_DATE}
-          - **macOS:** \`VieLotusIM.pkg\` / \`VieLotusIM.app.zip\` (Universal Apple Silicon & Intel)
+          - **macOS:** \`VieLotusIM.pkg\` (Universal Apple Silicon & Intel)
           - **Windows (x64 & ARM64):** \`VieLotus-Setup-x64.exe\`, \`VieLotus-Setup-arm64.exe\` (Universal Native Windows Text Services Framework COM Installer)
           - **Linux (Debian/Ubuntu All-in-One \`amd64\` & \`arm64\`):** \`vielotus_${{ steps.version.outputs.version }}_amd64.deb\`, \`vielotus_${{ steps.version.outputs.version }}_arm64.deb\` (IBus & Fcitx5 + Core Engine)
 
@@ -167,7 +163,6 @@ jobs:
           body_path: release_notes.md
           files: |
             .build/dist/VieLotusIM.pkg
-            .build/dist/VieLotusIM.app.zip
             .build/dist/VieLotus-Setup-*.exe
             .build/dist/*.deb
             .build/dist/checksums.sha256

@@ -1,7 +1,7 @@
 ; ============================================================================
 ; Sen Việt (VieLotusIM) - Windows Official Native Installer Script (Inno Setup)
 ; Produces: VieLotus-Setup-x64.exe & VieLotus-Setup-arm64.exe
-; Universal x64 + ARM64 Native Windows Text Services Framework (TSF) TIP
+; Native Windows Text Services Framework (TSF) TIP (Architecture-Specific + Universal Fallback)
 ; Microsoft Store Win32 / WinGet Silent Installer Compliant
 ; ============================================================================
 
@@ -21,7 +21,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 VersionInfoVersion={#MyAppVersion}.0
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription={#MyAppName} Setup
+VersionInfoDescription={#MyAppName} Setup ({#MyAppArch})
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}.0
 VersionInfoCopyright=Copyright (C) 2026 {#MyAppPublisher}. All rights reserved.
@@ -38,8 +38,13 @@ SetupIconFile=assets\VieLotusIM.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+#if MyAppArch == "arm64"
+ArchitecturesAllowed=arm64
+ArchitecturesInstallIn64BitMode=arm64
+#else
 ArchitecturesAllowed=x64compatible arm64
 ArchitecturesInstallIn64BitMode=x64compatible arm64
+#endif
 PrivilegesRequired=admin
 CloseApplications=no
 RestartApplications=no
@@ -50,15 +55,19 @@ UninstallDisplayIcon={app}\VieLotusSettings.exe
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-; Native Windows Text Services Framework (TSF) In-process COM TIP DLL (Universal x64 + ARM64)
-#if FileExists("bin\x64\VieLotusTIP.dll") && FileExists("bin\arm64\VieLotusTIP.dll")
+; Native Windows Text Services Framework (TSF) In-process COM TIP DLL
+#if MyAppArch == "arm64" && FileExists("bin\arm64\VieLotusTIP.dll")
+Source: "bin\arm64\VieLotusTIP.dll"; DestDir: "{app}"; DestName: "VieLotusTIP.dll"; Flags: ignoreversion regserver 64bit restartreplace uninsrestartdelete
+#elif FileExists("bin\x64\VieLotusTIP.dll") && FileExists("bin\arm64\VieLotusTIP.dll")
 Source: "bin\x64\VieLotusTIP.dll"; DestDir: "{app}"; DestName: "VieLotusTIP.dll"; Check: not IsArm64; Flags: ignoreversion regserver 64bit restartreplace uninsrestartdelete
 Source: "bin\arm64\VieLotusTIP.dll"; DestDir: "{app}"; DestName: "VieLotusTIP.dll"; Check: IsArm64; Flags: ignoreversion regserver 64bit restartreplace uninsrestartdelete
 #else
 Source: "bin\VieLotusTIP.dll"; DestDir: "{app}"; Flags: ignoreversion regserver 64bit restartreplace uninsrestartdelete
 #endif
 ; Native Win32 Settings & IME Launcher Executable
-#if FileExists("bin\x64\VieLotusSettings.exe") && FileExists("bin\arm64\VieLotusSettings.exe")
+#if MyAppArch == "arm64" && FileExists("bin\arm64\VieLotusSettings.exe")
+Source: "bin\arm64\VieLotusSettings.exe"; DestDir: "{app}"; DestName: "VieLotusSettings.exe"; Flags: ignoreversion 64bit
+#elif FileExists("bin\x64\VieLotusSettings.exe") && FileExists("bin\arm64\VieLotusSettings.exe")
 Source: "bin\x64\VieLotusSettings.exe"; DestDir: "{app}"; DestName: "VieLotusSettings.exe"; Check: not IsArm64; Flags: ignoreversion 64bit
 Source: "bin\arm64\VieLotusSettings.exe"; DestDir: "{app}"; DestName: "VieLotusSettings.exe"; Check: IsArm64; Flags: ignoreversion 64bit
 #else

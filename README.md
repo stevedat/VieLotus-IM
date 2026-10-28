@@ -1,131 +1,83 @@
 # VieLotusIM (Sen Việt)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platforms](https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-1F5B3A.svg)](#platform-ecosystem)
+[![English](https://img.shields.io/badge/Language-English-1F5B3A.svg)](README.md)
+[![Tiếng Việt](https://img.shields.io/badge/Ngôn_ngữ-Tiếng_Việt-2d3748.svg)](README.vi.md)
+[![macOS](https://img.shields.io/badge/macOS-Installer_(.pkg)-000000.svg?logo=apple&logoColor=white)](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg)
+[![Windows Store](https://img.shields.io/badge/Microsoft_Store-Sen_Việt-0067B8.svg?logo=windows&logoColor=white)](https://github.com/stevedat/VieLotus-IM/releases/latest)
+[![Linux](https://img.shields.io/badge/Linux-Snap_%2F_.deb-E95420.svg?logo=ubuntu&logoColor=white)](https://snapcraft.io/vielotus)
 [![App Store](https://img.shields.io/badge/App_Store-Sen_Việt-000000.svg?logo=apple&logoColor=white)](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799)
 [![Google Play](https://img.shields.io/badge/Google_Play-Sen_Việt-1F5B3A.svg?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard)
-[![Language](https://img.shields.io/badge/Swift-6.0-orange.svg)](#platform-ecosystem)
-[![Accuracy](https://img.shields.io/badge/Regression-100.00%25%20(9%2C091%2F9%2C091)-emerald.svg)](#benchmark-matrix)
-[![Website](https://img.shields.io/badge/Website-stevedat.github.io%2FVieLotus--IM-1E6B7B.svg)](https://stevedat.github.io/VieLotus-IM/)
 
-A lightweight, memory-safe Vietnamese input method powered by a unified **Pure Swift 6** core across **macOS**, **Windows**, **Linux**, **iOS & iPadOS**, and **Android**. Designed to deliver natural bilingual typing with zero invasive system hooks and 100% offline privacy.
+A lightweight, memory-safe Vietnamese input method powered by a unified **Pure Swift 6** core across **macOS**, **Windows**, **Linux**, **iOS & iPadOS**, and **Android** — built on official OS input frameworks with **zero Accessibility hooks** and **100% offline privacy**.
 
----
-
-## Platform Ecosystem
-
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                              Host Platform Adapters                              │
-│  macOS (InputMethodKit)  │  Windows (TSF)  │  Linux (IBus/Fcitx5)  │ iOS/Android │
-└─────────────▲────────────────────▲────────────────────▲───────────────────▲──────┘
-              │                    │                    │                   │
-┌─────────────┴────────────────────┴────────────────────┴───────────────────┴──────┐
-│                     VieLotusCore & VieLotusCAPI (Pure Swift 6)                   │
-│  ┌────────────────────────┐  ┌────────────────────────────────────────────────┐  │
-│  │  InputSessionManager   │  │             SmartBilingualDetector             │  │
-│  │  - Composing state     │  │  - Vietnamese phonotactic & stop-coda rules    │  │
-│  │  - Caret stepping      │  │  - Context-aware bilingual collision arbiter   │  │
-│  │  - Telex / VNI engines │  │  - Pluggable SpellCheckerProvider              │  │
-│  └────────────────────────┘  └────────────────────────────────────────────────┘  │
-│  ┌────────────────────────┐  ┌────────────────────────────────────────────────┐  │
-│  │     ClientAdapter      │  │               PresentationRules                │  │
-│  │  - App categorization  │  │  - typing-modes.yml (zero-dependency parser)   │  │
-│  │  - UTF-16 cursor sync  │  │  - Per-app & global presentation overrides     │  │
-│  └────────────────────────┘  └────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────────────────────┘
-```
-
-- **Unified Core (`VieLotusCore` & `VieLotusCAPI`)**: Pure Swift 6 state machine (`InputSessionManager`, `VietnameseEngine`, `SmartBilingualDetector`) shared across Apple platforms and exposed via a zero-copy C-ABI bridge for Windows and Linux.
-- **macOS (`VieLotusIM`)**: Built strictly on Apple's `InputMethodKit` (`IMKInputController`, `IMKServer`, `IMKTextInput`) requiring zero Accessibility permissions.
-- **Windows (`windows-tsf`)**: Native Text Services Framework (TSF) Text Input Processor (`ITfTextInputProcessorEx`) communicating with `VieLotusCAPI`.
-- **Linux (`ibus-vielotus` & `fcitx5-vielotus`)**: Native IBus and Fcitx5 engines backed by `libVieLotusCAPI.so`.
-- **iOS, iPadOS & Android**: Native mobile keyboard extensions powered by the same syllable and bilingual arbitration core.
+📄 **[Technical Report & Live Demo](https://stevedat.github.io/VieLotus-IM/)** · 📐 **[Architecture & Benchmark Spec](https://stevedat.github.io/VieLotus-IM/research.html)**
 
 ---
 
-## Key Capabilities
+## Core Highlights
 
-### 1. Zero Dropped Letters in Web, Electron & Modern Editors
-- **Problem**: Legacy input methods rely on synthetic backspace injection (`CGEventTap` or key-up hooks) to erase raw characters and type composed syllables. In modern virtual-DOM editors (Google Docs, Notion, Slack, VS Code, Electron), synthetic backspaces race with user keystrokes, causing dropped letters or duplicated words.
-- **Approach**: Uses native system composition (`setMarkedText` / atomic `insertText:replacementRange:`) and UTF-16 code unit synchronization for GPU terminals (Ghostty, Alacritty, Kitty, iTerm2).
-
-### 2. Context-Aware Bilingual Typing (Telex & VNI)
-- **Problem**: Everyday English words and code identifiers (`test`, `restrict`, `toast`, `blood`, `floor`, `door`, `git`, `commit`, `const`) collide with Telex modifier keys (`s`, `f`, `r`, `x`, `j`, `w`, `aa`, `ee`, `oo`).
-- **Approach**: `SmartBilingualDetector` validates Vietnamese phonotactic rules (such as stop-coda `-c, -ch, -p, -t` tone constraints) alongside lexical context so users can write Vietnamese and English seamlessly without toggling modes.
-
-### 3. Native Undo Integrity & 100% On-Device Privacy
-- **Undo Preservation**: Atomic text replacement keeps the host application's `Cmd + Z` / `Ctrl + Z` undo history intact.
-- **Zero-Logging Privacy**: Operates 100% offline with zero network sockets, zero telemetry, and zero keystroke logging.
+- **Zero System Hooks (`0 Accessibility`)**: Uses native OS input contracts (`InputMethodKit`, `Win32 TSF`, `IBus / Fcitx5`, `UIKit`, `InputMethodService`) rather than global keystroke taps (`CGEventTap`). Immune to TCC permission breakage after updates and operates 100% offline.
+- **Lexical & Context-Aware Bilingual Typing (Telex & VNI)**: Rejects non-existent Vietnamese syllables (`turn` stays `turn`, never `"tủn"`) and mid-word English `-s-t` patterns (`last`, `best`, `cost`), while resolving true single-path collisions (`rest`/`rét`, `if`/`ì`, `as`/`á`) via preceding context.
+- **Adaptive Per-App Presentation (`< 0.2 ms` p99)**: Dynamically switches between `Direct Replacement` (AppKit, Safari, Office) and standards-compliant `Marked Text` (Chromium, Electron, React/ProseMirror, GPU terminals) with UTF-16 cursor synchronization and a 20-word backspace ring buffer.
 
 ---
 
-## Benchmark Matrix
+## Verified Hardware, OS & Environment Matrix
 
-Measured against the bundled 9,091-case regression suite:
+| Platform & OS | Verified Hardware & CPU | Native Framework | Verified Applications & Environments |
+| :--- | :--- | :--- | :--- |
+| **macOS**<br>13 Ventura, 14 Sonoma, 15 Sequoia | **Apple Silicon** (`M1 / M2 / M3 / M4` — MacBook Air/Pro, Mac mini, iMac, Mac Studio)<br>**Intel** (`x86_64`) | `InputMethodKit` (`IMKServer`) | **Native**: Safari, Notes, Pages, Mail, Xcode, Spotlight<br>**Web/Electron**: Chrome, Arc, Edge, VS Code, Cursor, Slack, Discord, Notion, Zalo, Teams<br>**Terminals**: Terminal.app, iTerm2, Ghostty, Kitty, Alacritty, Warp<br>**Office**: Word, Excel, PowerPoint |
+| **Windows**<br>Windows 10 (21H2+) & Windows 11 (22H2–24H2) | **Intel / AMD** (`x64`)<br>**ARM64** (Snapdragon X Elite/Plus, Surface Pro ARM, Parallels on Apple Silicon) | `Win32 TSF` (`ITfTextInputProcessorEx`) | **WinUI 3 / UWP**: Windows 11 Notepad, Windows Terminal, Windows Search, Edge<br>**Win32 / Desktop**: Office 365, Chrome, VS Code, File Explorer, Zalo PC |
+| **Linux**<br>Ubuntu 22.04/24.04 LTS, Debian 12, Mint, Pop!_OS, Fedora, Arch | **x86_64** (`amd64` PC/Laptop)<br>**ARM64** (`aarch64` — Raspberry Pi 4/5, ARM workstations) | `IBus` & `Fcitx5` (`libVieLotusCAPI.so`) | **Display**: X11 & Wayland (GNOME, KDE Plasma)<br>**Apps**: Firefox, Chromium, VS Code, LibreOffice, GNOME Terminal, Konsole, Ghostty |
+| **iOS & iPadOS**<br>iOS / iPadOS 16, 17, 18 | **iPhone** (XS → 16 Pro Max)<br>**iPad** (Air, mini, Pro M1–M4) | `UIKit` (`UIInputViewController`) | On-screen touch keyboard (60/120Hz) & physical Magic Keyboard / Bluetooth keyboards (Zero Full Access) |
+| **Android**<br>Android 8.0 (API 26) – Android 15 | **ARM64 / ARMv7 / x86_64** (Samsung Galaxy Phone/Tab/DeX, Pixel, Xiaomi, OPPO) | `InputMethodService` (JNI C-ABI) | On-screen touch keyboard & physical USB / Bluetooth keyboards across mobile and tablet/DeX modes |
 
-| Test Bucket | Test Condition | Passing Rate |
+---
+
+## Benchmark Summary (9,091-Case Suite)
+
+| Metric Bucket | Drive Condition | Result |
 | :--- | :--- | :--- |
-| **Pure Vietnamese Transform** | Vietnamese syllables only | **400 / 400 (100.00%)** |
-| **English Vocabulary Preservation** | Untouched English dictionary | **362 / 362 (100.00%)** |
-| **Tone Cancellation** | Trailing cancel keys | **67 / 67 (100.00%)** |
-| **Telex Raw Word Restoration** | Restoring mangled English words | **7,213 / 7,213 (100.00%)** |
-| **Ambiguous Spellings (With Context)** | Primed with English context | **1,049 / 1,049 (100.00%)** |
-| **Overall Suite** | Complete 9,091-case regression suite | **9,091 / 9,091 (100.00%)** |
-
-> [!IMPORTANT]
-> **Symmetric Collision Disclosure:**
-> High English restoration accuracy must always be reported alongside its symmetric no-context counterpart. When the 375 lowercase ambiguous collision words are driven **without** English context priming:
-> - **`vn_survives_collision` / `ambiguous_both_sides`**: **365 / 375 (97.33%)** survival (correct as English *with* context and as Vietnamese *without* context).
-> - **Unique Vietnamese keystroke paths (`whitelist_safe = never`)**: **182 / 182 (100.00% — 0 critical losses)**.
+| **Primary Regression Suite** | Transform (400), English Keep (362), Cancel (67), Restore Raw (7,213), Ambiguous w/ Context (1,049) | **9,091 / 9,091 (100.00%)** |
+| **Symmetric Collision (`ambiguous_both_sides`)** | 375 lowercase collision words replayed *with* English context AND *without* context (`vn_survives_collision`) | **365 / 375 (97.33%)** |
+| **Unique Vietnamese Paths (`whitelist_safe = never`)** | Syllables with only one Telex/VNI keystroke path | **182 / 182 (100.00% — 0 critical losses)** |
 
 ---
 
-## Installation
+## Quick Installation
 
-### macOS (macOS 13+)
+### 1. macOS (macOS 13+)
+- **Homebrew**:
+  ```bash
+  brew install stevedat/tap/vielotus
+  ```
+- **Direct Installer (`.pkg`)**: Download [`VieLotusIM.pkg`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg), run the installer, then open **System Settings → Keyboard → Input Sources → Edit... → (+) → Vietnamese → Sen Việt**.
 
-#### Option 1: Homebrew (Recommended)
-```bash
-brew install stevedat/tap/vielotus
-```
+### 2. Windows (Windows 10 / 11 — `x64` & `ARM64`)
+- Download [`VieLotus-Setup-x64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe) or [`VieLotus-Setup-arm64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe) from [Releases](https://github.com/stevedat/VieLotus-IM/releases/latest) (or install via **Microsoft Store**).
+- Run the installer and press **`Win + Space`** to select **Sen Việt**.
 
-#### Option 2: Installer Package (`.pkg`)
-1. Download `VieLotusIM.pkg` from the [Latest Release](https://github.com/stevedat/VieLotus-IM/releases/latest) (or `Binaries/VieLotusIM.pkg`).
-2. Open the installer to automatically register **Sen Việt**.
-3. Open **System Settings** → **Keyboard** → **Text Input** → **Edit...** and add **Vietnamese** → **Sen Việt**.
+### 3. Linux (Ubuntu / Debian / Snap — `amd64` & `arm64`)
+- **One-line installer (Ubuntu / Debian `.deb`)**:
+  ```bash
+  curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh
+  ```
+- **Snap Store**:
+  ```bash
+  sudo snap install vielotus
+  ```
+- **Manual `.deb` install via `apt`**:
+  ```bash
+  sudo apt update && sudo apt install ./vielotus_1.1.1_amd64.deb   # or ./vielotus_1.1.1_arm64.deb
+  ```
+- **Quick CLI controls**: `vielotus-settings` (GTK3 GUI) · `vielotus --telex` · `vielotus --vni` · `vielotus --status`.
 
-### Windows (Windows 10 / 11 x64)
-
-1. Download `VieLotus-Setup-x64.exe` from the [Latest Release](https://github.com/stevedat/VieLotus-IM/releases/latest) (or `Binaries/windows/VieLotus-Setup-x64.exe`).
-2. Run the installer to automatically register the **Sen Việt (VieLotus)** Text Services Framework (TSF) input method.
-3. Press **`Win + Space`** to switch to **Sen Việt**.
-
-### Linux (Ubuntu / Debian — `amd64` & `arm64`)
-
-Install the all-in-one `.deb` package (includes Core Engine + both IBus & Fcitx5 plugins) from the [Latest Release](https://github.com/stevedat/VieLotus-IM/releases/latest) (or `Binaries/linux/`):
-```bash
-# For x86_64 (amd64):
-sudo apt install ./Binaries/linux/vielotus_1.1.1_amd64.deb
-
-# For ARM64 (aarch64):
-sudo apt install ./Binaries/linux/vielotus_1.1.1_arm64.deb
-```
-
-### iOS & iPadOS (iPhone & iPad)
-
-1. Install **Sen Việt** from the [Apple App Store](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799).
-2. Open **Settings** → **General** → **Keyboard** → **Keyboards** → **Add New Keyboard...** and select **Sen Việt**.
-3. Switch to **Sen Việt** in any app using the **Globe (🌐)** key (100% offline, no Full Access required).
-
-### Android
-
-1. Install **Sen Việt** from [Google Play](https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard).
-2. Open the **Sen Việt** app and follow the quick setup steps to enable the virtual and physical keyboard in Android **Settings** → **System** → **Keyboard**.
+### 4. iOS / iPadOS & Android
+- **iOS & iPadOS**: Install from the [App Store](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799) → **Settings → General → Keyboard → Keyboards → Add New Keyboard... → Sen Việt**.
+- **Android**: Install from [Google Play](https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard) and enable **Sen Việt** in **Settings → System → Keyboard**.
 
 ---
 
 ## License
 
-VieLotusIM is licensed under the [MIT License](LICENSE).
-Created and maintained by **Steve Dat** ([@stevedat](https://github.com/stevedat)).
+Licensed under the [MIT License](LICENSE). Maintained by **Steve Dat** ([@stevedat](https://github.com/stevedat)).

@@ -3,205 +3,54 @@
 <head>
   <meta charset="utf-8">
   <style>
-    :root {
-      color-scheme: light dark;
-      --bg: #ffffff;
-      --text: #1d1d1f;
-      --secondary: #6e6e73;
-      --card-bg: #f5f5f7;
-      --border: #d2d2d7;
-      --accent: #0071e3;
-      --success: #34c759;
-      --warning-bg: rgba(255, 159, 10, 0.12);
-      --warning-border: rgba(255, 159, 10, 0.35);
-      --warning-text: #b25000;
-      --kbd-bg: #ffffff;
-      --kbd-border: #c8c8cc;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #1e1e1e;
-        --text: #f5f5f7;
-        --secondary: #a1a1a6;
-        --card-bg: #2d2d2d;
-        --border: #424245;
-        --accent: #2997ff;
-        --success: #30d158;
-        --warning-bg: rgba(255, 159, 10, 0.18);
-        --warning-border: rgba(255, 159, 10, 0.4);
-        --warning-text: #ffb340;
-        --kbd-bg: #3a3a3c;
-        --kbd-border: #545458;
-      }
-    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Helvetica, Arial, sans-serif;
       font-size: 13px;
-      line-height: 1.5;
-      color: var(--text);
-      background-color: var(--bg);
+      line-height: 1.45;
       margin: 0;
-      padding: 16px 20px;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 14px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border);
-    }
-    .success-badge {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #34c759, #10b981);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #ffffff;
-      font-size: 24px;
-      font-weight: 700;
-      box-shadow: 0 4px 10px rgba(52, 199, 89, 0.3);
-      flex-shrink: 0;
+      padding: 6px 4px;
     }
     h1 {
-      font-size: 17px;
+      font-size: 18px;
       font-weight: 700;
       margin: 0 0 2px 0;
     }
-    .subtitle {
-      font-size: 12px;
-      color: var(--secondary);
-      margin: 0;
-    }
-    .warning-box {
-      background: var(--warning-bg);
-      border: 1px solid var(--warning-border);
-      border-radius: 8px;
-      padding: 9px 12px;
-      margin-bottom: 14px;
-      font-size: 12px;
-      color: var(--warning-text);
-      font-weight: 500;
-      line-height: 1.45;
-    }
-    .steps {
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-      margin-bottom: 14px;
-    }
-    .step-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 9px 12px;
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-    }
-    .step-num {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #ffffff;
-      font-weight: 700;
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-    .step-content {
-      flex: 1;
-    }
-    .step-title {
-      font-weight: 600;
+    p.subtitle {
       font-size: 12.5px;
-      margin-bottom: 2px;
+      margin: 0 0 10px 0;
+      opacity: 0.78;
     }
-    .step-desc {
-      font-size: 11.5px;
-      color: var(--secondary);
-      margin: 0;
+    p.note {
+      margin: 0 0 10px 0;
+      font-size: 12.5px;
     }
-    kbd {
-      display: inline-block;
-      padding: 1px 5px;
-      font-size: 11px;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-      font-weight: 600;
-      line-height: 1.3;
-      color: var(--text);
-      background-color: var(--kbd-bg);
-      border: 1px solid var(--kbd-border);
-      border-radius: 4px;
-      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    p.step {
+      margin: 0 0 8px 0;
     }
-    .footer-links {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-      font-size: 11.5px;
+    p.footer {
+      margin: 12px 0 0 0;
+      font-size: 12px;
+      opacity: 0.85;
     }
     a {
-      color: var(--accent);
+      color: #0071e3;
       text-decoration: none;
-      font-weight: 500;
-    }
-    a:hover {
-      text-decoration: underline;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="success-badge">✓</div>
-    <div>
-      <h1>Cài đặt Sen Việt hoàn tất!</h1>
-      <p class="subtitle">Thực hiện 3 bước đơn giản dưới đây để kích hoạt bộ gõ</p>
-    </div>
-  </div>
+  <h1>✅ Cài đặt Sen Việt hoàn tất!</h1>
+  <p class="subtitle">Thực hiện 3 bước ngắn dưới đây trong cửa sổ Cài đặt Bàn phím vừa mở:</p>
 
-  <div class="warning-box">
-    ⚠️ <strong>Lưu ý quan trọng:</strong> Hệ điều hành macOS bảo mật không cho phép tự động bật bộ gõ bên thứ ba. Cửa sổ <em>Cài đặt Bàn phím</em> đã được mở sẵn cho bạn.
-  </div>
+  <p class="step"><b>1. Mở Nguồn đầu vào (Input Sources):</b><br>
+  Trong mục <b>Bàn phím (Keyboard)</b> → <i>Nguồn đầu vào</i>, nhấn nút <b>Sửa… (Edit…)</b>.</p>
 
-  <div class="steps">
-    <div class="step-card">
-      <div class="step-num">1</div>
-      <div class="step-content">
-        <div class="step-title">Mở mục Nguồn đầu vào (Input Sources)</div>
-        <p class="step-desc">Trong cửa sổ <strong>Bàn phím (Keyboard)</strong> vừa mở, cuộn xuống mục <em>Nguồn đầu vào</em> và nhấn nút <strong>Sửa... (Edit...)</strong>.</p>
-      </div>
-    </div>
+  <p class="step"><b>2. Thêm bộ gõ Sen Việt:</b><br>
+  Nhấn dấu <b>[ + ]</b> ở góc dưới bên trái → chọn <b>Tiếng Việt</b> → chọn <b>Sen Việt</b> → nhấn <b>Thêm (Add)</b>.</p>
 
-    <div class="step-card">
-      <div class="step-num">2</div>
-      <div class="step-content">
-        <div class="step-title">Thêm bộ gõ Sen Việt</div>
-        <p class="step-desc">Bấm dấu <kbd>+</kbd> ở góc dưới bên trái → chọn <strong>Tiếng Việt</strong> trong danh sách bên trái → chọn <strong>Sen Việt</strong> bên phải → bấm <strong>Thêm (Add)</strong>.</p>
-      </div>
-    </div>
+  <p class="step"><b>3. Xoá bộ gõ Tiếng Việt cũ của Apple (Khuyến nghị):</b><br>
+  Chọn <i>Tiếng Việt - Telex / VNI</i> mặc định và nhấn <b>[ − ]</b> để tránh xung đột phím tắt.</p>
 
-    <div class="step-card">
-      <div class="step-num">3</div>
-      <div class="step-content">
-        <div class="step-title">Xoá bỏ bộ gõ Tiếng Việt cũ của Apple (Khuyến nghị)</div>
-        <p class="step-desc">Chọn bộ gõ tiếng Việt cũ của Apple (<em>Tiếng Việt - Telex</em> hoặc <em>VNI</em>) và nhấn dấu <kbd>−</kbd> để xoá. Điều này giúp loại bỏ triệt để xung đột phím và lỗi nuốt chữ của hệ thống.</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="footer-links">
-    <div>🌐 Trang chủ: <a href="https://stevedat.github.io/VieLotus-IM/" target="_blank">stevedat.github.io/VieLotus-IM</a></div>
-    <div>💬 Hỗ trợ & Góp ý: <a href="https://github.com/stevedat/VieLotus-IM/issues" target="_blank">GitHub Issues</a></div>
-  </div>
+  <p class="footer">🌐 Trang chủ: <a href="https://stevedat.github.io/VieLotus-IM/">stevedat.github.io/VieLotus-IM</a> &nbsp;·&nbsp; 💬 Hỗ trợ: <a href="https://github.com/stevedat/VieLotus-IM/issues">GitHub Issues</a></p>
 </body>
 </html>

@@ -1,0 +1,27 @@
+From: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Subject: [PATCH] data/pkg_depends: Register Sen Việt (vielotus) for Vietnamese (vi)
+
+Registers `vielotus` (`ibus-vielotus` and `fcitx5-vielotus`) in Ubuntu's
+`language-selector-common` dependency table (`data/pkg_depends`) so selecting
+Vietnamese (`vi`) in Ubuntu Language Support automatically installs Sen Việt
+for both IBus and Fcitx5 desktops.
+---
+ data/pkg_depends | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/data/pkg_depends b/data/pkg_depends
+index 8a91e42..f30b19c 100644
+--- a/data/pkg_depends
++++ b/data/pkg_depends
+@@ -143,6 +143,9 @@ im:th::gtk-im-libthai
+ im:th::gtk3-im-libthai
+ 
+ im:vi::ibus-unikey
++im:vi::vielotus
++im:vi:fcitx5:fcitx5-vielotus
++im:vi:ibus:ibus-vielotus
+ 
+ im:zh-hans::fcitx5-frontend-gtk2
+ im:zh-hans::fcitx5-frontend-gtk3
+-- 
+2.43.0
