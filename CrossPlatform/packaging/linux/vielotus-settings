@@ -1,0 +1,523 @@
+#!/bin/sh
+# ==============================================================================
+# Sen Việt (VieLotusIM) — Linux Desktop Settings & Auto-Activation Utility
+# Supports both Fcitx5 (fcitx5-configtool) and IBus (GNOME Input Sources)
+# ==============================================================================
+set -e
+
+CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
+DATA_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}"
+CONFIG_DIR="${CONFIG_ROOT}/vielotus"
+CONFIG_FILE="${CONFIG_DIR}/config.env"
+mkdir -p "${CONFIG_DIR}"
+
+INPUT_METHOD="telex"
+GRAMMAR_PROFILE="sen_flex"
+SMART_BILINGUAL="true"
+MODERN_ORTHOGRAPHY="true"
+QUICK_TELEX="false"
+
+load_config() {
+    if [ ! -f "${CONFIG_FILE}" ]; then
+        return 0
+    fi
+    while IFS='=' read -r raw_key raw_val || [ -n "${raw_key}" ]; do
+        key=$(printf '%s' "${raw_key}" | tr -d '[:space:]')
+        case "${key}" in
+            ''|\#*) continue ;;
+        esac
+        val=$(printf '%s' "${raw_val}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+        case "${key}" in
+            INPUT_METHOD)
+                case "${val}" in
+                    vni|VNI) INPUT_METHOD="vni" ;;
+                    *) INPUT_METHOD="telex" ;;
+                esac
+                ;;
+            GRAMMAR_PROFILE)
+                case "${val}" in
+                    classic|Classic|CLASSIC) GRAMMAR_PROFILE="classic" ;;
+                    *) GRAMMAR_PROFILE="sen_flex" ;;
+                esac
+                ;;
+            SMART_BILINGUAL)
+                case "${val}" in
+                    false|False|FALSE|0) SMART_BILINGUAL="false" ;;
+                    *) SMART_BILINGUAL="true" ;;
+                esac
+                ;;
+            MODERN_ORTHOGRAPHY)
+                case "${val}" in
+                    false|False|FALSE|0) MODERN_ORTHOGRAPHY="false" ;;
+                    *) MODERN_ORTHOGRAPHY="true" ;;
+                esac
+                ;;
+            QUICK_TELEX)
+                case "${val}" in
+                    true|True|TRUE|1) QUICK_TELEX="true" ;;
+                    *) QUICK_TELEX="false" ;;
+                esac
+                ;;
+        esac
+    done < "${CONFIG_FILE}"
+}
+
+load_config
+
+sync_fcitx5_metadata() {
+    USER_FCITX_DIR="${DATA_ROOT}/fcitx5"
+    # If system-wide Fcitx5 metadata is installed via .deb, remove any redundant user copies
+    if [ -f /usr/share/fcitx5/addon/vielotus.conf ] && [ -f /usr/share/fcitx5/inputmethod/vielotus-telex.conf ]; then
+        rm -f "${USER_FCITX_DIR}/addon/vielotus.conf" \
+              "${USER_FCITX_DIR}/inputmethod/vielotus-telex.conf" \
+              "${USER_FCITX_DIR}/inputmethod/vielotus-vni.conf" 2>/dev/null || true
+        return 0
+    fi
+
+    mkdir -p "${USER_FCITX_DIR}/addon" "${USER_FCITX_DIR}/inputmethod"
+    cat <<'ADDON_EOF' > "${USER_FCITX_DIR}/addon/vielotus.conf"
+[Addon]
+Name[vi]=Bộ gõ tiếng Việt Sen Việt (VieLotus)
+Name=Sen Việt (VieLotus)
+Comment=Next-Gen Pure Vietnamese Input Engine for Fcitx5
+Category=InputMethod
+Version=1.1.1
+Enabled=True
+Library=vielotus
+Type=SharedLibrary
+OnDemand=True
+Configurable=True
+
+[Dependencies]
+0=core:5.0.0
+ADDON_EOF
+
+    cat <<'TELEX_EOF' > "${USER_FCITX_DIR}/inputmethod/vielotus-telex.conf"
+[InputMethod]
+Name=Sen Việt (Telex)
+Icon=vielotus
+Label=VN
+LangCode=vi
+Addon=vielotus
+Configurable=True
+TELEX_EOF
+
+    cat <<'VNI_EOF' > "${USER_FCITX_DIR}/inputmethod/vielotus-vni.conf"
+[InputMethod]
+Name=Sen Việt (VNI)
+Icon=vielotus
+Label=VNI
+LangCode=vi
+Addon=vielotus
+Configurable=True
+VNI_EOF
+}
+
+configure_fcitx5_profile() {
+    FCITX_IM="$1"
+    FCITX_PROFILE_DIR="${CONFIG_ROOT}/fcitx5"
+    FCITX_PROFILE="${FCITX_PROFILE_DIR}/profile"
+    mkdir -p "${FCITX_PROFILE_DIR}/conf"
+
+    FCITX_GRAMMAR="SenFlex"
+    if [ "${GRAMMAR_PROFILE}" = "classic" ]; then
+        FCITX_GRAMMAR="Classic"
+    fi
+    FCITX_SB="True"
+    [ "${SMART_BILINGUAL}" = "false" ] && FCITX_SB="False"
+    FCITX_MOD="True"
+    [ "${MODERN_ORTHOGRAPHY}" = "false" ] && FCITX_MOD="False"
+    FCITX_QT="False"
+    [ "${QUICK_TELEX}" = "true" ] && FCITX_QT="True"
+
+    cat <<FCITX_CONF_EOF > "${FCITX_PROFILE_DIR}/conf/vielotus.conf"
+# Chế độ đặt dấu (Grammar Profile)
+GrammarProfile=${FCITX_GRAMMAR}
+# Song ngữ thông minh Anh-Việt (Smart Bilingual)
+SmartBilingual=${FCITX_SB}
+# Chính tả hiện đại: oà, uý (thay vì òa, úy)
+ModernOrthography=${FCITX_MOD}
+# Gõ tắt phụ âm (Quick Telex: cc=ch, gg=gi, kk=kh...)
+QuickTelex=${FCITX_QT}
+FCITX_CONF_EOF
+
+    if [ ! -f "${FCITX_PROFILE}" ]; then
+        cat <<PROFILE_EOF > "${FCITX_PROFILE}"
+[Groups/0]
+Name=Default
+Default Layout=us
+DefaultIM=${FCITX_IM}
+
+[Groups/0/Items/0]
+Name=keyboard-us
+Layout=
+
+[Groups/0/Items/1]
+Name=${FCITX_IM}
+Layout=
+
+[GroupOrder]
+0=Default
+PROFILE_EOF
+    elif command -v python3 >/dev/null 2>&1; then
+        python3 - "${FCITX_PROFILE}" "${FCITX_IM}" <<'PYEOF' 2>/dev/null || true
+import re, sys
+
+profile_path, im_name = sys.argv[1], sys.argv[2]
+with open(profile_path, "r", encoding="utf-8", errors="ignore") as f:
+    text = f.read()
+
+if "DefaultIM=" in text:
+    text = re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", text, count=1, flags=re.M)
+
+if re.search(r"^Name=vielotus-(telex|vni)$", text, flags=re.M):
+    text = re.sub(r"^Name=vielotus-(telex|vni)$", f"Name={im_name}", text, count=1, flags=re.M)
+elif f"Name={im_name}" not in text:
+    indices = [int(m) for m in re.findall(r"^\[Groups/0/Items/(\d+)\]", text, flags=re.M)]
+    next_idx = (max(indices) + 1) if indices else 1
+    new_item = f"\n[Groups/0/Items/{next_idx}]\nName={im_name}\nLayout=\n"
+    if "[GroupOrder]" in text:
+        text = text.replace("[GroupOrder]", new_item.lstrip("\n") + "\n[GroupOrder]", 1)
+    else:
+        text = text.rstrip() + "\n" + new_item
+
+with open(profile_path, "w", encoding="utf-8") as f:
+    f.write(text)
+PYEOF
+    fi
+}
+
+save_and_apply() {
+    MODE="${1:-$INPUT_METHOD}"
+    case "${MODE}" in
+        vni|VNI) INPUT_METHOD="vni" ;;
+        *) INPUT_METHOD="telex" ;;
+    esac
+
+    cat <<ENV_EOF > "${CONFIG_FILE}"
+INPUT_METHOD="${INPUT_METHOD}"
+GRAMMAR_PROFILE="${GRAMMAR_PROFILE}"
+SMART_BILINGUAL="${SMART_BILINGUAL}"
+MODERN_ORTHOGRAPHY="${MODERN_ORTHOGRAPHY}"
+QUICK_TELEX="${QUICK_TELEX}"
+ENV_EOF
+
+    ENGINE_ID="vielotus"
+    FCITX_IM_ID="vielotus-telex"
+    if [ "${INPUT_METHOD}" = "vni" ]; then
+        ENGINE_ID="vielotus-vni"
+        FCITX_IM_ID="vielotus-vni"
+    fi
+
+    # 1. Sync Fcitx5 metadata & update Fcitx5 profile
+    sync_fcitx5_metadata || true
+    configure_fcitx5_profile "${FCITX_IM_ID}" || true
+
+    # Reload/switch Fcitx5 if running
+    if command -v fcitx5 >/dev/null 2>&1; then
+        if pgrep -x fcitx5 >/dev/null 2>&1 || [ "${XMODIFIERS:-}" = "@im=fcitx" ] || [ "${GTK_IM_MODULE:-}" = "fcitx" ]; then
+            if command -v fcitx5-remote >/dev/null 2>&1; then
+                fcitx5-remote -r >/dev/null 2>&1 || fcitx5 -r -d >/dev/null 2>&1 || true
+                fcitx5-remote -s "${FCITX_IM_ID}" >/dev/null 2>&1 || true
+            else
+                fcitx5 -r -d >/dev/null 2>&1 || true
+            fi
+        fi
+    fi
+
+    # 2. Refresh IBus cache & switch active engine if IBus daemon is reachable
+    if command -v ibus >/dev/null 2>&1; then
+        ibus write-cache >/dev/null 2>&1 || true
+        if pgrep -x ibus-daemon >/dev/null 2>&1; then
+            ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true
+        fi
+    fi
+
+    # 3. Register into GNOME / Ubuntu Input Sources (org.gnome.desktop.input-sources)
+    if command -v gsettings >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+        python3 - "${ENGINE_ID}" <<'PYEOF' 2>/dev/null || true
+import ast, subprocess, sys
+engine_id = sys.argv[1]
+try:
+    raw = subprocess.check_output(
+        ["gsettings", "get", "org.gnome.desktop.input-sources", "sources"],
+        stderr=subprocess.DEVNULL
+    ).decode().strip()
+    if raw.startswith("@a(ss) "):
+        raw = raw[len("@a(ss) "):]
+    sources = list(ast.literal_eval(raw)) if raw else []
+except Exception:
+    sources = []
+
+if not sources:
+    sources = [("xkb", "us")]
+
+sources = [s for s in sources if not (s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni"))]
+sources.append(("ibus", engine_id))
+formatted = "[" + ", ".join(f"('{k}', '{v}')" for k, v in sources) + "]"
+subprocess.call(
+    ["gsettings", "set", "org.gnome.desktop.input-sources", "sources", formatted],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+PYEOF
+    fi
+}
+
+run_gtk_settings() {
+    SMOKE_MODE="${1:-0}"
+    python3 - "${CONFIG_FILE}" "${SMOKE_MODE}" <<'GTK_PYEOF'
+import os, subprocess, sys
+
+try:
+    import gi
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gtk, GLib
+except Exception:
+    sys.exit(2)
+
+ok, _ = Gtk.init_check(sys.argv[:1])
+if not ok:
+    sys.exit(2)
+
+config_path = sys.argv[1]
+smoke_mode = len(sys.argv) > 2 and sys.argv[2] == "1"
+
+cfg = {
+    "INPUT_METHOD": "telex",
+    "GRAMMAR_PROFILE": "sen_flex",
+    "SMART_BILINGUAL": "true",
+    "MODERN_ORTHOGRAPHY": "true",
+    "QUICK_TELEX": "false",
+}
+if os.path.exists(config_path):
+    with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            if "=" in line and not line.lstrip().startswith("#"):
+                k, v = line.strip().split("=", 1)
+                cfg[k.strip()] = v.strip().strip('"').strip("'")
+
+win = Gtk.Window(title="Sen Việt (VieLotusIM) — Cài đặt bộ gõ")
+win.set_default_size(500, 460)
+win.set_position(Gtk.WindowPosition.CENTER)
+win.set_border_width(18)
+try:
+    win.set_icon_name("vielotus")
+except Exception:
+    pass
+
+vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+win.add(vbox)
+
+# Header
+header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+title_lbl = Gtk.Label()
+title_lbl.set_markup("<span size='x-large' weight='bold'>🌸 Sen Việt (VieLotusIM) v1.1.1</span>")
+title_lbl.set_xalign(0)
+sub_lbl = Gtk.Label(label="Bộ gõ tiếng Việt thế hệ mới · Hỗ trợ đồng thời IBus & Fcitx5")
+sub_lbl.set_xalign(0)
+header_box.pack_start(title_lbl, False, False, 0)
+header_box.pack_start(sub_lbl, False, False, 0)
+vbox.pack_start(header_box, False, False, 4)
+
+vbox.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 2)
+
+# Grid for Input Method & Grammar Profile
+grid = Gtk.Grid()
+grid.set_column_spacing(16)
+grid.set_row_spacing(10)
+
+im_lbl = Gtk.Label()
+im_lbl.set_markup("<b>Kiểu gõ tiếng Việt:</b>")
+im_lbl.set_xalign(0)
+im_combo = Gtk.ComboBoxText()
+im_combo.append("telex", "Telex (Gõ dấu tự do — Khuyên dùng)")
+im_combo.append("vni", "VNI (Gõ dấu bằng phím số 1–9)")
+im_combo.set_active_id("vni" if cfg["INPUT_METHOD"] == "vni" else "telex")
+im_combo.set_hexpand(True)
+
+gr_lbl = Gtk.Label()
+gr_lbl.set_markup("<b>Chế độ đặt dấu:</b>")
+gr_lbl.set_xalign(0)
+gr_combo = Gtk.ComboBoxText()
+gr_combo.append("sen_flex", "SEN Flex (Gõ dấu tự do ở mọi vị trí)")
+gr_combo.append("classic", "Classic (Chuẩn truyền thống)")
+gr_combo.set_active_id("classic" if cfg["GRAMMAR_PROFILE"] == "classic" else "sen_flex")
+gr_combo.set_hexpand(True)
+
+grid.attach(im_lbl, 0, 0, 1, 1)
+grid.attach(im_combo, 1, 0, 1, 1)
+grid.attach(gr_lbl, 0, 1, 1, 1)
+grid.attach(gr_combo, 1, 1, 1, 1)
+vbox.pack_start(grid, False, False, 4)
+
+# Checkboxes
+opt_frame = Gtk.Frame(label=" Trí tuệ ngôn ngữ & Tùy chọn gõ ")
+opt_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+opt_box.set_border_width(12)
+opt_frame.add(opt_box)
+
+chk_sb = Gtk.CheckButton(label="Song ngữ thông minh Anh–Việt (Smart Bilingual — tự khôi phục từ tiếng Anh)")
+chk_sb.set_active(cfg["SMART_BILINGUAL"] != "false")
+
+chk_mod = Gtk.CheckButton(label="Chính tả hiện đại: oà, uý (thay vì òa, úy)")
+chk_mod.set_active(cfg["MODERN_ORTHOGRAPHY"] != "false")
+
+chk_qt = Gtk.CheckButton(label="Gõ tắt phụ âm (Quick Telex: cc=ch, gg=gi, kk=kh, nn=ng, qq=qu, tt=th)")
+chk_qt.set_active(cfg["QUICK_TELEX"] == "true")
+
+opt_box.pack_start(chk_sb, False, False, 0)
+opt_box.pack_start(chk_mod, False, False, 0)
+opt_box.pack_start(chk_qt, False, False, 0)
+vbox.pack_start(opt_frame, False, False, 4)
+
+# Live Test Entry
+test_frame = Gtk.Frame(label=" Ô gõ thử trực tiếp (Live Test) ")
+test_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+test_box.set_border_width(10)
+test_entry = Gtk.Entry()
+test_entry.set_placeholder_text("Gõ thử tiếng Việt tại đây (ví dụ: vieetj nam -> việt nam)...")
+test_box.pack_start(test_entry, False, False, 0)
+test_frame.add(test_box)
+vbox.pack_start(test_frame, False, False, 4)
+
+status_lbl = Gtk.Label(label="")
+status_lbl.set_xalign(0)
+vbox.pack_start(status_lbl, False, False, 0)
+
+# Buttons
+btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+btn_fcitx = Gtk.Button(label="Mở Fcitx5 Config")
+def on_fcitx_clicked(_btn):
+    for cmd in ("fcitx5-configtool", "fcitx5-config-qt"):
+        try:
+            subprocess.Popen([cmd])
+            return
+        except Exception:
+            pass
+btn_fcitx.connect("clicked", on_fcitx_clicked)
+
+btn_close = Gtk.Button(label="Đóng")
+btn_close.connect("clicked", lambda *_: Gtk.main_quit())
+
+btn_apply = Gtk.Button(label="Lưu & Áp dụng ngay")
+btn_apply.get_style_context().add_class("suggested-action")
+
+def apply_changes(*_):
+    im_val = im_combo.get_active_id() or "telex"
+    gr_val = gr_combo.get_active_id() or "sen_flex"
+    sb_val = "true" if chk_sb.get_active() else "false"
+    mod_val = "true" if chk_mod.get_active() else "false"
+    qt_val = "true" if chk_qt.get_active() else "false"
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, "w", encoding="utf-8") as f:
+        f.write(f'INPUT_METHOD="{im_val}"\n')
+        f.write(f'GRAMMAR_PROFILE="{gr_val}"\n')
+        f.write(f'SMART_BILINGUAL="{sb_val}"\n')
+        f.write(f'MODERN_ORTHOGRAPHY="{mod_val}"\n')
+        f.write(f'QUICK_TELEX="{qt_val}"\n')
+    settings_bin = "/usr/bin/vielotus-settings"
+    if not os.path.exists(settings_bin):
+        settings_bin = os.path.abspath(sys.argv[0])
+    subprocess.call([settings_bin, f"--{im_val}"])
+    status_lbl.set_markup(
+        f"<span foreground='#10b981' weight='bold'>✓ Đã lưu và kích hoạt kiểu gõ {im_val.upper()} ({gr_val})!</span>"
+    )
+
+btn_apply.connect("clicked", apply_changes)
+
+btn_box.pack_start(btn_fcitx, False, False, 0)
+btn_box.pack_end(btn_apply, False, False, 0)
+btn_box.pack_end(btn_close, False, False, 0)
+vbox.pack_end(btn_box, False, False, 0)
+
+win.connect("destroy", Gtk.main_quit)
+win.show_all()
+
+if smoke_mode:
+    def _smoke_step():
+        apply_changes()
+        Gtk.main_quit()
+        return False
+    GLib.timeout_add(150, _smoke_step)
+
+Gtk.main()
+GTK_PYEOF
+}
+
+case "${1:-}" in
+    --activate)
+        load_config
+        save_and_apply "${INPUT_METHOD}"
+        echo "✅ Đã kích hoạt bộ gõ Sen Việt (${INPUT_METHOD}) cho cả Fcitx5 và IBus."
+        exit 0
+        ;;
+    --telex)
+        load_config
+        save_and_apply "telex"
+        echo "✅ Đã chuyển Sen Việt sang kiểu gõ Telex (Fcitx5 & IBus)."
+        exit 0
+        ;;
+    --vni)
+        load_config
+        save_and_apply "vni"
+        echo "✅ Đã chuyển Sen Việt sang kiểu gõ VNI (Fcitx5 & IBus)."
+        exit 0
+        ;;
+    --status)
+        load_config
+        echo "INPUT_METHOD=${INPUT_METHOD}"
+        echo "GRAMMAR_PROFILE=${GRAMMAR_PROFILE}"
+        echo "SMART_BILINGUAL=${SMART_BILINGUAL}"
+        echo "MODERN_ORTHOGRAPHY=${MODERN_ORTHOGRAPHY}"
+        echo "QUICK_TELEX=${QUICK_TELEX}"
+        exit 0
+        ;;
+    --smoke-test-gui)
+        load_config
+        save_and_apply "${INPUT_METHOD}"
+        run_gtk_settings "1"
+        echo "✅ GTK3 Settings GUI smoke test PASSED."
+        exit 0
+        ;;
+esac
+
+# Ensure the input source is registered when the user opens the settings utility
+load_config
+save_and_apply "${INPUT_METHOD}"
+
+# Launch Native GTK3 Desktop Settings Window if graphical session is available
+if command -v python3 >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+    if run_gtk_settings "0" 2>/dev/null; then
+        exit 0
+    fi
+fi
+
+if command -v zenity >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+    TELEX_TRUE="TRUE"
+    VNI_TRUE="FALSE"
+    if [ "${INPUT_METHOD}" = "vni" ]; then
+        TELEX_TRUE="FALSE"
+        VNI_TRUE="TRUE"
+    fi
+    CHOICE=$(zenity --list --radiolist \
+        --title="Sen Việt (VieLotusIM) — Cài đặt bộ gõ" \
+        --text="Bộ gõ tiếng Việt Sen Việt đã được kích hoạt cho Fcitx5 & IBus.\nChọn kiểu gõ mặc định:" \
+        --width=460 --height=260 \
+        --column="Chọn" --column="Mã" --column="Kiểu gõ tiếng Việt" \
+        "${TELEX_TRUE}" "telex" "Telex (Gõ dấu tự do SEN Flex & Song ngữ thông minh)" \
+        "${VNI_TRUE}" "vni" "VNI (Gõ dấu bằng phím số 1–9)" \
+        --hide-column=2 2>/dev/null || true)
+    if [ -n "${CHOICE}" ]; then
+        save_and_apply "${CHOICE}"
+        zenity --notification --text="Sen Việt: Đã kích hoạt kiểu gõ $(echo "${CHOICE}" | tr 'a-z' 'A-Z')" 2>/dev/null || true
+    fi
+    exit 0
+fi
+
+echo "🌸 === Sen Việt (VieLotusIM) cho Linux (Fcitx5 & IBus) ==="
+echo "Trạng thái: Đã kích hoạt (${INPUT_METHOD})"
+echo "  • Chuyển sang Telex : vielotus --telex"
+echo "  • Chuyển sang VNI   : vielotus --vni"
+echo "  • Kiểm tra cấu hình : vielotus --status"
+echo "  • Khởi động lại Fcitx5: fcitx5 -r -d"

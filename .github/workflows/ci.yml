@@ -36,7 +36,6 @@ jobs:
         with:
           name: VieLotus-macOS
           path: |
-            .build/dist/VieLotusIM.app
             .build/dist/VieLotusIM.pkg
 
   linux-build:
@@ -122,13 +121,12 @@ jobs:
             Write-Host "Verified $($item.Name) ($($item.Length) bytes)"
           }
 
-      - name: Build Windows TSF COM Shell (x64 & ARM64) via CMake & MSVC
+      - name: Build Windows TSF COM Shell, Inno Setup Installers & Microsoft Store MSIX (x64 & ARM64)
         shell: pwsh
         run: |
-          cmake -B build-tsf-x64 -S CrossPlatform/windows-tsf -A x64 -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-tsf-x64 --config Release
-          cmake -B build-tsf-arm64 -S CrossPlatform/windows-tsf -A ARM64 -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-tsf-arm64 --config Release
+          ./scripts/build_windows.ps1 -Version 1.1.1 -Arch all -SkipTests
+          Copy-Item dist/windows/VieLotus-Setup-x64.exe Binaries/windows/VieLotus-Setup-x64.exe -Force
+          Copy-Item dist/windows/VieLotus-Setup-arm64.exe Binaries/windows/VieLotus-Setup-arm64.exe -Force
 
       - name: Upload Windows build artifacts (x64 & ARM64)
         uses: actions/upload-artifact@v4
@@ -137,5 +135,4 @@ jobs:
           path: |
             Binaries/windows/VieLotus-Setup-x64.exe
             Binaries/windows/VieLotus-Setup-arm64.exe
-            build-tsf-x64/Release/VieLotusTIP.dll
-            build-tsf-arm64/Release/VieLotusTIP.dll
+            dist/windows/msix/*

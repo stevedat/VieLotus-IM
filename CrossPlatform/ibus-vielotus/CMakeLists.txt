@@ -29,6 +29,15 @@ if(NOT DEFINED VIELOTUS_LIB_PATH)
     endif()
 endif()
 
+get_filename_component(VIELOTUS_LIB_DIR "${VIELOTUS_LIB_PATH}" DIRECTORY)
+set(VIELOTUS_RPATH_LINK_FLAGS "-Wl,-rpath-link,${VIELOTUS_LIB_DIR}")
+if(EXISTS "${VIELOTUS_LIB_DIR}/swift-runtime")
+    list(APPEND VIELOTUS_RPATH_LINK_FLAGS "-Wl,-rpath-link,${VIELOTUS_LIB_DIR}/swift-runtime")
+endif()
+if(EXISTS "/usr/lib/swift/linux")
+    list(APPEND VIELOTUS_RPATH_LINK_FLAGS "-Wl,-rpath-link,/usr/lib/swift/linux")
+endif()
+
 include_directories(
     ${IBUS_INCLUDE_DIRS}
     ${GLIB_INCLUDE_DIRS}
@@ -41,6 +50,8 @@ target_link_libraries(ibus-engine-vielotus
     ${IBUS_LIBRARIES}
     ${GLIB_LIBRARIES}
     "${VIELOTUS_LIB_PATH}"
+    ${VIELOTUS_RPATH_LINK_FLAGS}
+    "-Wl,--no-undefined"
 )
 
 target_compile_options(ibus-engine-vielotus PRIVATE

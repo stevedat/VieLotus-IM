@@ -1,0 +1,112 @@
+name: vielotus
+base: core24
+version: '1.1.1'
+title: Sen Việt (VieLotusIM)
+summary: Sen Việt (VieLotusIM) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
+description: |
+  Sen Việt (VieLotusIM) là bộ gõ tiếng Việt thế hệ mới với lõi xử lý Pure Swift 6
+  và trí tuệ song ngữ thông minh Anh–Việt (Smart Bilingual), đạt độ chính xác
+  100.00% (9.091/9.091) trên bộ kiểm thử hồi quy chính thức (cùng 97.33% [365/375]
+  ở vế đối xứng không ngữ cảnh ambiguous_both_sides và 100.00% [182/182] ở nhóm
+  đường gõ duy nhất never).
+
+  Tính năng nổi bật:
+  - Gõ dấu tự do SEN Flex (Telex & VNI) tự nhiên, chuẩn xác.
+  - Tự động nhận diện và khôi phục từ tiếng Anh / thuật ngữ lập trình khi gõ song ngữ.
+  - Hỗ trợ đồng thời cả hai chuẩn bộ gõ phổ biến nhất trên Linux: IBus và Fcitx5.
+  - Tương thích hoàn hảo với Ubuntu, Debian, Linux Mint, Pop!_OS, Fedora và Arch Linux.
+
+grade: stable
+confinement: strict
+license: MIT
+icon: CrossPlatform/linux-icons/hicolor_512x512_apps/vielotus.png
+
+contact:
+  - https://github.com/stevedat/VieLotus-IM/issues
+issues:
+  - https://github.com/stevedat/VieLotus-IM/issues
+source-code:
+  - https://github.com/stevedat/VieLotus-IM
+website:
+  - https://stevedat.github.io/VieLotus-IM/
+
+platforms:
+  amd64:
+    build-on: [amd64]
+    build-for: [amd64]
+  arm64:
+    build-on: [arm64]
+    build-for: [arm64]
+
+apps:
+  vielotus:
+    command: usr/bin/vielotus-snap-runner
+    common-id: org.vielotus.VieLotus
+    desktop: usr/share/applications/vielotus.desktop
+    plugs:
+      - desktop
+      - desktop-legacy
+      - gsettings
+      - home
+      - wayland
+      - x11
+    environment:
+      LD_LIBRARY_PATH: $SNAP/usr/lib:$SNAP/usr/lib/vielotus:$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/usr/lib/aarch64-linux-gnu
+      VIELOTUS_RESOURCE_PATH: $SNAP/usr/share/vielotus/VietLotusIM_VieLotusCore.resources
+
+  ibus-engine:
+    command: usr/bin/ibus-engine-vielotus-runner
+    plugs:
+      - desktop
+      - desktop-legacy
+      - gsettings
+      - home
+      - wayland
+      - x11
+    environment:
+      LD_LIBRARY_PATH: $SNAP/usr/lib:$SNAP/usr/lib/vielotus:$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/usr/lib/aarch64-linux-gnu
+      VIELOTUS_RESOURCE_PATH: $SNAP/usr/share/vielotus/VietLotusIM_VieLotusCore.resources
+
+parts:
+  vielotus:
+    plugin: dump
+    source: .
+    stage-packages:
+      - libibus-1.0-5t64
+      - libglib2.0-0t64
+      - zenity
+    override-build: |
+      DEB_FILE="$CRAFT_PART_SRC/dist/linux/vielotus_${CRAFT_PROJECT_VERSION}_${CRAFT_ARCH_BUILD_FOR}.deb"
+      if [ -f "$DEB_FILE" ]; then
+        ar p "$DEB_FILE" data.tar.xz | tar -xJf - -C "$CRAFT_PART_INSTALL"
+      else
+        echo "Missing prebuilt deb: $DEB_FILE"
+        exit 1
+      fi
+      cat << 'EOF' > "$CRAFT_PART_INSTALL/usr/bin/vielotus-snap-runner"
+      #!/bin/sh
+      set -e
+      export LD_LIBRARY_PATH="${SNAP}/usr/lib:${SNAP}/usr/lib/vielotus:${SNAP}/usr/lib/x86_64-linux-gnu:${SNAP}/usr/lib/aarch64-linux-gnu:${LD_LIBRARY_PATH:-}"
+      export VIELOTUS_RESOURCE_PATH="${SNAP}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
+      USER_LIB_BASE="${HOME}/.local/lib/vielotus"
+      mkdir -p "${USER_LIB_BASE}/fcitx5" "${USER_LIB_BASE}/lib"
+      cp -f "${SNAP}/usr/lib/fcitx5/vielotus.so" "${USER_LIB_BASE}/fcitx5/vielotus.so" 2>/dev/null || true
+      cp -f "${SNAP}/usr/lib/libVieLotusCAPI.so" "${USER_LIB_BASE}/lib/libVieLotusCAPI.so" 2>/dev/null || true
+      cp -f "${SNAP}/usr/lib/vielotus/"*.so* "${USER_LIB_BASE}/lib/" 2>/dev/null || true
+      ENV_D_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d"
+      mkdir -p "${ENV_D_DIR}"
+      cat <<ENV_EOF > "${ENV_D_DIR}/90-vielotus.conf"
+      FCITX_ADDON_DIRS=${USER_LIB_BASE}/fcitx5:/usr/lib/aarch64-linux-gnu/fcitx5:/usr/lib/x86_64-linux-gnu/fcitx5:/usr/lib/fcitx5
+      LD_LIBRARY_PATH=${USER_LIB_BASE}/lib:/usr/lib:/usr/lib/vielotus
+      ENV_EOF
+      export FCITX_ADDON_DIRS="${USER_LIB_BASE}/fcitx5:/usr/lib/aarch64-linux-gnu/fcitx5:/usr/lib/x86_64-linux-gnu/fcitx5:/usr/lib/fcitx5"
+      export LD_LIBRARY_PATH="${USER_LIB_BASE}/lib:${LD_LIBRARY_PATH}"
+      exec "${SNAP}/usr/bin/vielotus-settings" "$@"
+      EOF
+      chmod 755 "$CRAFT_PART_INSTALL/usr/bin/vielotus-snap-runner"
+      cat << 'EOF' > "$CRAFT_PART_INSTALL/usr/bin/ibus-engine-vielotus-runner"
+      #!/bin/sh
+      export LD_LIBRARY_PATH="${SNAP}/usr/lib:${SNAP}/usr/lib/vielotus:${SNAP}/usr/lib/x86_64-linux-gnu:${SNAP}/usr/lib/aarch64-linux-gnu:${LD_LIBRARY_PATH:-}"
+      exec "${SNAP}/usr/lib/ibus/ibus-engine-vielotus" "$@"
+      EOF
+      chmod 755 "$CRAFT_PART_INSTALL/usr/bin/ibus-engine-vielotus-runner"

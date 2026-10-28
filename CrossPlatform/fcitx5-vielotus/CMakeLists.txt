@@ -10,6 +10,7 @@ find_package(ECM 1.0.0 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 find_package(Fcitx5Core 5.0.0 REQUIRED)
+find_package(Fcitx5Config 5.0.0 REQUIRED)
 find_package(Fcitx5Module REQUIRED COMPONENTS QuickPhrase)
 
 include(GNUInstallDirs)
@@ -40,6 +41,14 @@ if(NOT DEFINED VIELOTUS_LIB_PATH)
 endif()
 
 message(STATUS "Using VieLotus library: ${VIELOTUS_LIB_PATH}")
+get_filename_component(VIELOTUS_LIB_DIR "${VIELOTUS_LIB_PATH}" DIRECTORY)
+set(VIELOTUS_RPATH_LINK_FLAGS "-Wl,-rpath-link,${VIELOTUS_LIB_DIR}")
+if(EXISTS "${VIELOTUS_LIB_DIR}/swift-runtime")
+    list(APPEND VIELOTUS_RPATH_LINK_FLAGS "-Wl,-rpath-link,${VIELOTUS_LIB_DIR}/swift-runtime")
+endif()
+if(EXISTS "/usr/lib/swift/linux")
+    list(APPEND VIELOTUS_RPATH_LINK_FLAGS "-Wl,-rpath-link,/usr/lib/swift/linux")
+endif()
 
 include_directories(
     ${VIELOTUS_INCLUDE_DIR}
@@ -52,7 +61,10 @@ add_library(vielotus-addon MODULE
 
 target_link_libraries(vielotus-addon PRIVATE
     Fcitx5::Core
+    Fcitx5::Config
     "${VIELOTUS_LIB_PATH}"
+    ${VIELOTUS_RPATH_LINK_FLAGS}
+    "-Wl,--no-undefined"
 )
 
 set_target_properties(vielotus-addon PROPERTIES
@@ -60,7 +72,12 @@ set_target_properties(vielotus-addon PROPERTIES
     OUTPUT_NAME "vielotus"
 )
 
-# Install addon configuration metadata
+# Install addon & inputmethod configuration metadata
 configure_file(vielotus.conf.in vielotus.conf @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/vielotus.conf" DESTINATION "${FCITX_INSTALL_PKGDATADIR}/addon")
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/vielotus-telex.conf"
+    "${CMAKE_CURRENT_SOURCE_DIR}/vielotus-vni.conf"
+    DESTINATION "${FCITX_INSTALL_PKGDATADIR}/inputmethod"
+)
 install(TARGETS vielotus-addon DESTINATION "${FCITX_INSTALL_LIBDIR}/fcitx5")

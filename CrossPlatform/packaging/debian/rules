@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	swift build -c release --product VieLotusCAPI
+	cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+	cmake --build build-fcitx5
+	cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+	cmake --build build-ibus
+
+override_dh_auto_install:
+	DESTDIR=$(CURDIR)/debian/vielotus cmake --install build-fcitx5
+	DESTDIR=$(CURDIR)/debian/vielotus cmake --install build-ibus
+	install -Dm755 .build/release/libVieLotusCAPI.so $(CURDIR)/debian/vielotus/usr/lib/libVieLotusCAPI.so
+	install -Dm644 Sources/VieLotusCAPI/include/vielotus.h $(CURDIR)/debian/vielotus/usr/include/vielotus.h
+	install -Dm644 Resources/typing-modes.yml $(CURDIR)/debian/vielotus/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml

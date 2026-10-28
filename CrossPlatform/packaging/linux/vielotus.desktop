@@ -1,0 +1,15 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Sen Việt (VieLotus)
+Name[vi]=Sen Việt (Bộ gõ tiếng Việt)
+GenericName=Vietnamese Input Method
+GenericName[vi]=Bộ gõ tiếng Việt
+Comment=Configure and activate Sen Việt Vietnamese Input Method (Telex & VNI)
+Comment[vi]=Cài đặt và kích hoạt bộ gõ tiếng Việt Sen Việt (Telex & VNI)
+Exec=/usr/bin/vielotus-settings
+Icon=vielotus
+Terminal=false
+Categories=Utility;Settings;DesktopSettings;
+Keywords=Vietnamese;Telex;VNI;Input Method;IBus;Fcitx5;Sen Viet;VieLotus;Bo go tieng Viet;
+StartupNotify=true
