@@ -110,6 +110,8 @@ private:
 
     Instance* instance_;
     VieLotusConfig config_;
+    int32_t envInputMethod_{VIELOTUS_INPUT_TELEX};
+    bool hasEnvInputMethod_{false};
     FactoryFor<VieLotusState> factory_;
     std::unique_ptr<SimpleAction> settingsAction_;
     std::vector<ScopedConnection> connections_;

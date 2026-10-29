@@ -44,6 +44,10 @@ static const WCHAR c_szPrefsInputMethodVal[] = L"InputMethod";
 static const WCHAR c_szPrefsVnEnabledVal[] = L"VietnameseEnabled";
 static const WCHAR c_szPrefsSmartBilingualVal[] = L"SmartBilingual";
 static const WCHAR c_szPrefsModernOrthoVal[] = L"ModernOrthography";
+static const WCHAR c_szPrefsMacroEnabledVal[] = L"MacroEnabled";
+static const WCHAR c_szPrefsDeveloperModeVal[] = L"DeveloperMode";
+static const WCHAR c_szPrefsQuickTelexVal[] = L"QuickTelex";
+static const WCHAR c_szPrefsRelaxedCodaVal[] = L"RelaxedCoda";
 
 // LayoutOrTip strings for input.dll!InstallLayoutOrTip
 static const WCHAR c_szTipTelexLayoutString[] =
@@ -125,6 +129,18 @@ void LoadVieLotusPrefs(VieLotusWindowsPrefs &outPrefs) {
     if (ReadRegDword(hKey, c_szPrefsModernOrthoVal, dwVal)) {
         outPrefs.modernOrthography = (dwVal != 0);
     }
+    if (ReadRegDword(hKey, c_szPrefsMacroEnabledVal, dwVal)) {
+        outPrefs.macroEnabled = (dwVal != 0);
+    }
+    if (ReadRegDword(hKey, c_szPrefsDeveloperModeVal, dwVal)) {
+        outPrefs.developerMode = (dwVal != 0);
+    }
+    if (ReadRegDword(hKey, c_szPrefsQuickTelexVal, dwVal)) {
+        outPrefs.quickTelex = (dwVal != 0);
+    }
+    if (ReadRegDword(hKey, c_szPrefsRelaxedCodaVal, dwVal)) {
+        outPrefs.relaxedCoda = (dwVal != 0);
+    }
     RegCloseKey(hKey);
 }
 
@@ -135,6 +151,10 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs) {
         WriteRegDword(hKey, c_szPrefsVnEnabledVal, prefs.vietnameseEnabled ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsSmartBilingualVal, prefs.smartBilingual ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsModernOrthoVal, prefs.modernOrthography ? 1u : 0u);
+        WriteRegDword(hKey, c_szPrefsMacroEnabledVal, prefs.macroEnabled ? 1u : 0u);
+        WriteRegDword(hKey, c_szPrefsDeveloperModeVal, prefs.developerMode ? 1u : 0u);
+        WriteRegDword(hKey, c_szPrefsQuickTelexVal, prefs.quickTelex ? 1u : 0u);
+        WriteRegDword(hKey, c_szPrefsRelaxedCodaVal, prefs.relaxedCoda ? 1u : 0u);
         RegCloseKey(hKey);
     }
 }
@@ -383,15 +403,19 @@ enum class HitRegion : int {
     TabAbout,
     CardTelex,
     CardVni,
-    TileVnEnabled,
-    TileSmartBi,
-    TileModernOrtho,
+    TileMacroToggle,
+    BtnMacroManage,
+    TileDevMode,
+    ChipQuickTelex,
+    ChipRelaxedCoda,
     TileWinTypingSettings,
     BtnCopyBankStk,
+    BtnNidoOfficeExplore,
     BtnYouPersonaExplore,
     RowZalo,
     RowLinkedIn,
     RowGitHub,
+    FooterNidoOffice,
     FooterYouPersona,
     FooterZalo,
     FooterGitHub
@@ -482,26 +506,39 @@ static HitRegion HitTestBentoUI(const BentoSettingsState *st, float xDip, float 
     if (PtInDipRect(xDip, yDip, 384.0f, 16.0f, 96.0f, 32.0f)) return HitRegion::TabAbout;
 
     // Footer Links
+    if (PtInDipRect(xDip, yDip, 268.0f, 452.0f, 62.0f, 24.0f)) return HitRegion::FooterNidoOffice;
     if (PtInDipRect(xDip, yDip, 336.0f, 452.0f, 82.0f, 24.0f)) return HitRegion::FooterYouPersona;
     if (PtInDipRect(xDip, yDip, 424.0f, 452.0f, 28.0f, 24.0f)) return HitRegion::FooterZalo;
     if (PtInDipRect(xDip, yDip, 456.0f, 452.0f, 36.0f, 24.0f)) return HitRegion::FooterGitHub;
 
     if (st->selectedTab == 0) {
-        // Tab 0: Cài đặt
+        // Tab 0: Cài đặt (macOS Bento 2x2 Parity)
         if (PtInDipRect(xDip, yDip, 18.0f, 98.0f, 226.0f, 76.0f)) return HitRegion::CardTelex;
         if (PtInDipRect(xDip, yDip, 256.0f, 98.0f, 226.0f, 76.0f)) return HitRegion::CardVni;
 
-        if (PtInDipRect(xDip, yDip, 18.0f, 210.0f, 226.0f, 82.0f)) return HitRegion::TileVnEnabled;
-        if (PtInDipRect(xDip, yDip, 256.0f, 210.0f, 226.0f, 82.0f)) return HitRegion::TileSmartBi;
-        if (PtInDipRect(xDip, yDip, 18.0f, 302.0f, 226.0f, 82.0f)) return HitRegion::TileModernOrtho;
+        // Tile 1: Bảng gõ tắt (Toggle + Quản lý button)
+        if (PtInDipRect(xDip, yDip, 160.0f, 220.0f, 76.0f, 24.0f)) return HitRegion::BtnMacroManage;
+        if (PtInDipRect(xDip, yDip, 18.0f, 210.0f, 226.0f, 82.0f)) return HitRegion::TileMacroToggle;
+
+        // Tile 2: Chế độ Code & Dev
+        if (PtInDipRect(xDip, yDip, 256.0f, 210.0f, 226.0f, 82.0f)) return HitRegion::TileDevMode;
+
+        // Tile 3: Tốc gõ phụ âm (2 chips: Đầu cc/gg/qq & Cuối -g/-h/-k)
+        if (PtInDipRect(xDip, yDip, 28.0f, 348.0f, 100.0f, 26.0f)) return HitRegion::ChipQuickTelex;
+        if (PtInDipRect(xDip, yDip, 134.0f, 348.0f, 100.0f, 26.0f)) return HitRegion::ChipRelaxedCoda;
+        if (PtInDipRect(xDip, yDip, 18.0f, 302.0f, 113.0f, 82.0f)) return HitRegion::ChipQuickTelex;
+        if (PtInDipRect(xDip, yDip, 131.0f, 302.0f, 113.0f, 82.0f)) return HitRegion::ChipRelaxedCoda;
+
+        // Tile 4: Phím tắt Đổi bộ gõ
         if (PtInDipRect(xDip, yDip, 256.0f, 302.0f, 226.0f, 82.0f)) return HitRegion::TileWinTypingSettings;
     } else {
-        // Tab 1: Về ứng dụng
-        if (PtInDipRect(xDip, yDip, 372.0f, 206.0f, 96.0f, 24.0f)) return HitRegion::BtnCopyBankStk;
-        if (PtInDipRect(xDip, yDip, 18.0f, 276.0f, 464.0f, 72.0f)) return HitRegion::BtnYouPersonaExplore;
-        if (PtInDipRect(xDip, yDip, 18.0f, 358.0f, 464.0f, 26.0f)) return HitRegion::RowZalo;
-        if (PtInDipRect(xDip, yDip, 18.0f, 384.0f, 464.0f, 26.0f)) return HitRegion::RowLinkedIn;
-        if (PtInDipRect(xDip, yDip, 18.0f, 410.0f, 464.0f, 26.0f)) return HitRegion::RowGitHub;
+        // Tab 1: Về ứng dụng (Matches macOS aboutTabView + NidoOffice & YouPersona.com)
+        if (PtInDipRect(xDip, yDip, 372.0f, 192.0f, 96.0f, 22.0f)) return HitRegion::BtnCopyBankStk;
+        if (PtInDipRect(xDip, yDip, 18.0f, 246.0f, 464.0f, 52.0f)) return HitRegion::BtnNidoOfficeExplore;
+        if (PtInDipRect(xDip, yDip, 18.0f, 299.0f, 464.0f, 52.0f)) return HitRegion::BtnYouPersonaExplore;
+        if (PtInDipRect(xDip, yDip, 18.0f, 360.0f, 464.0f, 26.0f)) return HitRegion::RowZalo;
+        if (PtInDipRect(xDip, yDip, 18.0f, 386.0f, 464.0f, 26.0f)) return HitRegion::RowLinkedIn;
+        if (PtInDipRect(xDip, yDip, 18.0f, 412.0f, 464.0f, 26.0f)) return HitRegion::RowGitHub;
     }
 
     return HitRegion::None;
@@ -775,49 +812,75 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 -1, &fSecHdr, RectF(18.0f * s, 188.0f * s, 320.0f * s, 18.0f * s), &sfLeft, &secondaryBrush
             );
 
-            // 2x2 Bento Grid
+            // 2x2 Bento Grid (100% Parity with macOS SettingsView.swift)
+            // Tile 1: Bảng gõ tắt (Toggle + Quản lý button)
             DrawBentoFeatureTile(
                 g, s, 18.0f, 210.0f, 226.0f, 82.0f,
-                st->prefs.vietnameseEnabled,
-                st->hoveredRegion == HitRegion::TileVnEnabled,
+                st->prefs.macroEnabled,
+                st->hoveredRegion == HitRegion::TileMacroToggle || st->hoveredRegion == HitRegion::BtnMacroManage,
                 Color(255, 88, 86, 214), // Indigo
-                L"VN",
-                L"Ch\u1EBF \u0111\u1ED9 Ti\u1EBFng Vi\u1EC7t",
-                st->prefs.vietnameseEnabled
-                    ? L"\u0110ang b\u1EADt \u2022 Ctrl+Space \u0111\u1ED5i nhanh"
-                    : L"\u0110ang t\u1EAFt \u2022 G\u00F5 ti\u1EBFng Anh thu\u1EA7n",
-                st->prefs.vietnameseEnabled ? L"\u0110ANG B\u1EACT" : L"T\u1EAET",
+                L"GT",
+                L"B\u1EA3ng g\u00F5 t\u1EAFt",
+                st->prefs.macroEnabled
+                    ? L"\u0110ang b\u1EADt \u2022 38 c\u1EE5m t\u1EEB"
+                    : L"\u0110ang t\u1EAFt g\u00F5 t\u1EAFt",
+                L"Qu\u1EA3n l\u00FD (38)",
                 fTileTitle, fSub, fPill, sfLeft, sfCenter
             );
 
+            // Tile 2: Chế độ Code & Dev
             DrawBentoFeatureTile(
                 g, s, 256.0f, 210.0f, 226.0f, 82.0f,
-                st->prefs.smartBilingual,
-                st->hoveredRegion == HitRegion::TileSmartBi,
+                st->prefs.developerMode,
+                st->hoveredRegion == HitRegion::TileDevMode,
                 Color(255, 13, 148, 136), // Teal
-                L"AI",
-                L"Song ng\u1EEF th\u00F4ng minh",
-                st->prefs.smartBilingual
-                    ? L"T\u1EF1 gi\u1EEF t\u1EEB Anh: turn, form, code"
-                    : L"\u0110ang t\u1EAFt kh\u00F4i ph\u1EE5c ti\u1EBFng Anh",
-                st->prefs.smartBilingual ? L"\u0110ANG B\u1EACT" : L"T\u1EAET",
+                L"<>",
+                L"Ch\u1EBF \u0111\u1ED9 Code & Dev",
+                st->prefs.developerMode
+                    ? L"T\u1EF1 ng\u1EAFt d\u1EA5u trong `code`"
+                    : L"G\u00F5 ti\u1EBFng Vi\u1EC7t b\u00ECnh th\u01B0\u1EDDng",
+                st->prefs.developerMode ? L"\u0110ANG B\u1EACT" : L"T\u1EAET",
                 fTileTitle, fSub, fPill, sfLeft, sfCenter
             );
 
-            DrawBentoFeatureTile(
-                g, s, 18.0f, 302.0f, 226.0f, 82.0f,
-                st->prefs.modernOrthography,
-                st->hoveredRegion == HitRegion::TileModernOrtho,
-                Color(255, 234, 88, 12), // Orange
-                L"A\u00C1",
-                L"Ch\u00EDnh t\u1EA3 chu\u1EA9n m\u1EDBi",
-                st->prefs.modernOrthography
-                    ? L"Chu\u1EA9n o\u00E0, o\u00E8, u\u00FD thay v\u00EC \u00F2a, \u00FAy"
-                    : L"Chu\u1EA9n c\u0169 \u00F2a, \u00F2e, \u00FAy",
-                st->prefs.modernOrthography ? L"CHU\u1EA8N M\u1EDAI" : L"CHU\u1EA8N C\u0168",
-                fTileTitle, fSub, fPill, sfLeft, sfCenter
-            );
+            // Tile 3: Tốc gõ phụ âm (2 interactive chips: Đầu cc/gg/qq & Cuối -g/-h/-k)
+            {
+                bool anyChipActive = st->prefs.quickTelex || st->prefs.relaxedCoda;
+                bool tileHovered = (st->hoveredRegion == HitRegion::ChipQuickTelex || st->hoveredRegion == HitRegion::ChipRelaxedCoda);
+                Color orangeAcc(255, 234, 88, 12);
+                Color tileFill = tileHovered ? Color(255, 250, 250, 253) : Color(255, 255, 255, 255);
+                Color tileBorder = anyChipActive
+                    ? Color(130, orangeAcc.GetR(), orangeAcc.GetG(), orangeAcc.GetB())
+                    : Color(255, 226, 226, 232);
+                DrawCard(g, RectF(18.0f * s, 302.0f * s, 226.0f * s, 82.0f * s), 12.0f * s, tileFill, tileBorder, 1.1f * s);
 
+                RectF iconBox(29.0f * s, 313.0f * s, 26.0f * s, 26.0f * s);
+                FillRoundRect(g, iconBox, 7.0f * s, anyChipActive ? Color(38, 234, 88, 12) : Color(255, 238, 238, 243));
+                SolidBrush iconBr(anyChipActive ? orangeAcc : Color(255, 120, 120, 128));
+                g.DrawString(L"\u26A1", -1, &fPill, iconBox, &sfCenter, &iconBr);
+
+                g.DrawString(
+                    L"T\u1ED1c g\u00F5 ph\u1EE5 \u00E2m",
+                    -1, &fTileTitle, RectF(61.0f * s, 316.0f * s, 175.0f * s, 20.0f * s), &sfLeft, &primaryBrush
+                );
+
+                auto drawConsonantChip = [&](float cx, const WCHAR *label, bool active, bool hovered) {
+                    RectF chipRect(cx * s, 348.0f * s, 100.0f * s, 25.0f * s);
+                    Color cFill = active
+                        ? Color(38, 234, 88, 12)
+                        : (hovered ? Color(255, 234, 234, 240) : Color(255, 242, 242, 247));
+                    Color cBorder = active ? Color(180, 234, 88, 12) : Color(255, 222, 222, 228);
+                    FillRoundRect(g, chipRect, 7.0f * s, cFill);
+                    DrawRoundRect(g, chipRect, 7.0f * s, cBorder, 1.0f * s);
+                    SolidBrush cText(active ? orangeAcc : Color(255, 105, 105, 112));
+                    g.DrawString(label, -1, &fPill, chipRect, &sfCenter, &cText);
+                };
+
+                drawConsonantChip(28.0f, L"\u0110\u1EA7u (cc/gg/qq)", st->prefs.quickTelex, st->hoveredRegion == HitRegion::ChipQuickTelex);
+                drawConsonantChip(134.0f, L"Cu\u1ED1i (-g/-h/-k)", st->prefs.relaxedCoda, st->hoveredRegion == HitRegion::ChipRelaxedCoda);
+            }
+
+            // Tile 4: Phím tắt Đổi bộ gõ
             DrawBentoFeatureTile(
                 g, s, 256.0f, 302.0f, 226.0f, 82.0f,
                 true,
@@ -846,29 +909,30 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             );
         } else {
             // =================================================================
-            // TAB 1: VỀ ỨNG DỤNG (Matches macOS aboutTabView)
+            // TAB 1: VỀ ỨNG DỤNG (Matches macOS aboutTabView + NidoOffice)
             // =================================================================
             SolidBrush indigoBrush(Color(255, 88, 86, 214));
             SolidBrush tealBrush(Color(255, 13, 148, 136));
             SolidBrush orangeBrush(Color(255, 234, 88, 12));
+            SolidBrush whiteTextBrush(Color(255, 255, 255, 255));
 
-            // Card 1: SỨ MỆNH TỐI THƯỢNG
-            DrawCard(g, RectF(18.0f * s, 74.0f * s, 464.0f * s, 72.0f * s), 10.0f * s, Color(255, 255, 255, 255), Color(255, 226, 226, 232));
+            // Card 1: SỨ MỆNH TỐI THƯỢNG (y=72, h=64)
+            DrawCard(g, RectF(18.0f * s, 72.0f * s, 464.0f * s, 64.0f * s), 10.0f * s, Color(255, 255, 255, 255), Color(255, 226, 226, 232));
             g.DrawString(
                 L"\u2726 S\u1EE8 M\u1EC6NH T\u1ED0I TH\u01AF\u1EE2NG",
-                -1, &fSecHdr, RectF(30.0f * s, 82.0f * s, 250.0f * s, 16.0f * s), &sfLeft, &indigoBrush
+                -1, &fSecHdr, RectF(30.0f * s, 78.0f * s, 250.0f * s, 16.0f * s), &sfLeft, &indigoBrush
             );
             g.DrawString(
                 L"Sen Vi\u1EC7t \u0111\u01B0\u1EE3c ph\u00E1t tri\u1EC3n theo kim ch\u1EC9 nam \"H\u00E3y \u0111\u1EC3 vi\u1EC7c g\u00F5 l\u00E0 g\u00F5, d\u00F9 b\u1EA1n g\u00F5 ti\u1EBFng Vi\u1EC7t hay ti\u1EBFng Anh; nhanh hay ch\u1EADm; g\u00F5 l\u00E0 Sen Vi\u1EC7t\".",
-                -1, &fBody, RectF(30.0f * s, 102.0f * s, 440.0f * s, 38.0f * s), &sfWrap, &primaryBrush
+                -1, &fSub, RectF(30.0f * s, 96.0f * s, 440.0f * s, 34.0f * s), &sfWrap, &primaryBrush
             );
 
-            // Card 2: Mời tác giả ly cà phê nhỏ (VietQR)
-            DrawCard(g, RectF(18.0f * s, 154.0f * s, 464.0f * s, 110.0f * s), 10.0f * s, Color(255, 255, 255, 255), Color(255, 226, 226, 232));
-            RectF qrBox(30.0f * s, 165.0f * s, 88.0f * s, 88.0f * s);
+            // Card 2: Mời tác giả ly cà phê nhỏ (VietQR) (y=142, h=96)
+            DrawCard(g, RectF(18.0f * s, 142.0f * s, 464.0f * s, 96.0f * s), 10.0f * s, Color(255, 255, 255, 255), Color(255, 226, 226, 232));
+            RectF qrBox(30.0f * s, 150.0f * s, 80.0f * s, 80.0f * s);
             DrawRoundRect(g, qrBox, 8.0f * s, Color(255, 226, 226, 232), 1.0f * s);
             if (st->pVietQr && st->pVietQr->GetLastStatus() == Ok) {
-                RectF qrInner(34.0f * s, 169.0f * s, 80.0f * s, 80.0f * s);
+                RectF qrInner(34.0f * s, 154.0f * s, 72.0f * s, 72.0f * s);
                 g.DrawImage(st->pVietQr, qrInner);
             } else {
                 g.DrawString(L"VietQR\r\nMB Bank", -1, &fPill, qrBox, &sfCenter, &orangeBrush);
@@ -876,19 +940,19 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
             g.DrawString(
                 L"\u2615 M\u1EDDi t\u00E1c gi\u1EA3 ly c\u00E0 ph\u00EA nh\u1ECF (VietQR)",
-                -1, &fTileTitle, RectF(130.0f * s, 164.0f * s, 338.0f * s, 20.0f * s), &sfLeft, &primaryBrush
+                -1, &fTileTitle, RectF(122.0f * s, 150.0f * s, 346.0f * s, 18.0f * s), &sfLeft, &primaryBrush
             );
             g.DrawString(
                 L"Sen Vi\u1EC7t ho\u00E0n to\u00E0n mi\u1EC5n ph\u00ED. N\u1EBFu h\u1EEFu \u00EDch, b\u1EA1n c\u00F3 th\u1EC3 \u1EE7ng h\u1ED9 nh\u1EB9 qua VietQR:",
-                -1, &fSub, RectF(130.0f * s, 184.0f * s, 340.0f * s, 18.0f * s), &sfLeft, &secondaryBrush
+                -1, &fSub, RectF(122.0f * s, 170.0f * s, 346.0f * s, 16.0f * s), &sfLeft, &secondaryBrush
             );
             g.DrawString(
                 L"MB Bank \u2022 STK: 0979266045",
-                -1, &fBodyBold, RectF(130.0f * s, 206.0f * s, 235.0f * s, 24.0f * s), &sfLeft, &indigoBrush
+                -1, &fBodyBold, RectF(122.0f * s, 190.0f * s, 235.0f * s, 22.0f * s), &sfLeft, &indigoBrush
             );
 
-            // Copy STK Button
-            RectF copyBtn(372.0f * s, 206.0f * s, 96.0f * s, 24.0f * s);
+            // Copy STK Button (matches HitTestBentoUI: 372, 192, 96, 22)
+            RectF copyBtn(372.0f * s, 192.0f * s, 96.0f * s, 22.0f * s);
             FillRoundRect(
                 g, copyBtn, 6.0f * s,
                 st->copiedStk ? Color(36, 13, 148, 136) : (st->hoveredRegion == HitRegion::BtnCopyBankStk ? Color(48, 88, 86, 214) : Color(28, 88, 86, 214))
@@ -901,32 +965,54 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
             g.DrawString(
                 L"Ch\u1EE7 TK: Tr\u1EA7n Ph\u00E1t \u0110\u1EA1t \u2022 N\u1ED9i dung: Ung ho Sen Viet",
-                -1, &fSub, RectF(130.0f * s, 234.0f * s, 340.0f * s, 18.0f * s), &sfLeft, &secondaryBrush
+                -1, &fSub, RectF(122.0f * s, 214.0f * s, 346.0f * s, 16.0f * s), &sfLeft, &secondaryBrush
             );
 
-            // Card 3: YouPersona.com (SẢN PHẨM KHÁC CỦA TÁC GIẢ)
-            Color ypFill = (st->hoveredRegion == HitRegion::BtnYouPersonaExplore) ? Color(255, 246, 253, 252) : Color(255, 255, 255, 255);
-            DrawCard(g, RectF(18.0f * s, 274.0f * s, 464.0f * s, 72.0f * s), 10.0f * s, ypFill, Color(120, 13, 148, 136), 1.1f * s);
+            // Card 3: Ecosystem Showcase — NidoOffice (Educenter.app) & YouPersona.com (y=244, h=108)
+            DrawCard(g, RectF(18.0f * s, 244.0f * s, 464.0f * s, 108.0f * s), 10.0f * s, Color(255, 255, 255, 255), Color(120, 88, 86, 214), 1.1f * s);
+
+            // Row 3A: NidoOffice (https://educenter.app) — y=246..298
+            if (st->hoveredRegion == HitRegion::BtnNidoOfficeExplore) {
+                FillRoundRect(g, RectF(22.0f * s, 246.0f * s, 456.0f * s, 50.0f * s), 8.0f * s, Color(255, 242, 243, 254));
+            }
+            g.DrawString(
+                L"NidoOffice",
+                -1, &fTileTitle, RectF(30.0f * s, 250.0f * s, 85.0f * s, 18.0f * s), &sfLeft, &primaryBrush
+            );
+            RectF nidoBadge(116.0f * s, 251.0f * s, 162.0f * s, 16.0f * s);
+            FillRoundRect(g, nidoBadge, 8.0f * s, Color(36, 88, 86, 214));
+            g.DrawString(L"B\u1ED8 OFFICE AI \u2022 EDUCENTER.APP", -1, &fPill, nidoBadge, &sfCenter, &indigoBrush);
+            g.DrawString(
+                L"So\u1EA1n th\u1EA3o v\u0103n b\u1EA3n, b\u1EA3ng t\u00EDnh, thuy\u1EBFt tr\u00ECnh & h\u1ECDc li\u1EC7u AI th\u1EBF h\u1EC7 m\u1EDBi.",
+                -1, &fSub, RectF(30.0f * s, 271.0f * s, 344.0f * s, 20.0f * s), &sfLeft, &secondaryBrush
+            );
+            RectF nidoCta(382.0f * s, 259.0f * s, 86.0f * s, 24.0f * s);
+            FillRoundRect(g, nidoCta, 12.0f * s, Color(255, 88, 86, 214));
+            g.DrawString(L"Kh\u00E1m ph\u00E1 \u2197", -1, &fPill, nidoCta, &sfCenter, &whiteTextBrush);
+
+            g.DrawLine(&divPen, 30.0f * s, 298.0f * s, 470.0f * s, 298.0f * s);
+
+            // Row 3B: YouPersona.com — y=299..350
+            if (st->hoveredRegion == HitRegion::BtnYouPersonaExplore) {
+                FillRoundRect(g, RectF(22.0f * s, 300.0f * s, 456.0f * s, 50.0f * s), 8.0f * s, Color(255, 243, 252, 251));
+            }
             g.DrawString(
                 L"YouPersona.com",
-                -1, &fTileTitle, RectF(30.0f * s, 282.0f * s, 115.0f * s, 20.0f * s), &sfLeft, &primaryBrush
+                -1, &fTileTitle, RectF(30.0f * s, 304.0f * s, 115.0f * s, 18.0f * s), &sfLeft, &primaryBrush
             );
-            RectF ypBadge(144.0f * s, 284.0f * s, 164.0f * s, 16.0f * s);
+            RectF ypBadge(144.0f * s, 305.0f * s, 146.0f * s, 16.0f * s);
             FillRoundRect(g, ypBadge, 8.0f * s, Color(36, 13, 148, 136));
-            g.DrawString(L"S\u1EA2N PH\u1EA8M KH\u00C1C C\u1EE6A T\u00C1C GI\u1EA2", -1, &fPill, ypBadge, &sfCenter, &tealBrush);
-
+            g.DrawString(L"QU\u1EA2N L\u00DD THU CHI AI", -1, &fPill, ypBadge, &sfCenter, &tealBrush);
             g.DrawString(
-                L"Tr\u1EE3 l\u00FD Qu\u1EA3n l\u00FD Thu Chi & T\u00E0i ch\u00EDnh C\u00E1 nh\u00E2n AI \u2014 ghi ch\u00E9p gi\u1ECDng n\u00F3i, qu\u00E9t ho\u00E1 \u0111\u01A1n & 6 chi\u1EBFc l\u1ECD.",
-                -1, &fSub, RectF(30.0f * s, 304.0f * s, 344.0f * s, 34.0f * s), &sfWrap, &secondaryBrush
+                L"Tr\u1EE3 l\u00FD T\u00E0i ch\u00EDnh C\u00E1 nh\u00E2n AI \u2014 ghi ch\u00E9p gi\u1ECDng n\u00F3i, qu\u00E9t ho\u00E1 \u0111\u01A1n & 6 chi\u1EBFc l\u1ECD.",
+                -1, &fSub, RectF(30.0f * s, 325.0f * s, 344.0f * s, 20.0f * s), &sfLeft, &secondaryBrush
             );
+            RectF ypCta(382.0f * s, 313.0f * s, 86.0f * s, 24.0f * s);
+            FillRoundRect(g, ypCta, 12.0f * s, Color(255, 13, 148, 136));
+            g.DrawString(L"Kh\u00E1m ph\u00E1 \u2197", -1, &fPill, ypCta, &sfCenter, &whiteTextBrush);
 
-            RectF ctaRect(382.0f * s, 296.0f * s, 86.0f * s, 28.0f * s);
-            FillRoundRect(g, ctaRect, 14.0f * s, Color(255, 13, 148, 136));
-            SolidBrush whiteTextBrush(Color(255, 255, 255, 255));
-            g.DrawString(L"Kh\u00E1m ph\u00E1 \u2197", -1, &fPill, ctaRect, &sfCenter, &whiteTextBrush);
-
-            // Card 4: Cộng đồng & Tác giả (3 clickable rows)
-            DrawCard(g, RectF(18.0f * s, 356.0f * s, 464.0f * s, 80.0f * s), 10.0f * s, Color(255, 255, 255, 255), Color(255, 226, 226, 232));
+            // Card 4: Cộng đồng & Tác giả (3 clickable rows at 360, 386, 412)
+            DrawCard(g, RectF(18.0f * s, 358.0f * s, 464.0f * s, 80.0f * s), 10.0f * s, Color(255, 255, 255, 255), Color(255, 226, 226, 232));
 
             auto drawLinkRow = [&](float ry, const WCHAR *label, bool hovered, bool drawBottomDiv) {
                 if (hovered) {
@@ -939,9 +1025,9 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 }
             };
 
-            drawLinkRow(358.0f, L"K\u00EAnh Th\u1EA3o lu\u1EADn C\u1ED9ng \u0111\u1ED3ng (Zalo)", st->hoveredRegion == HitRegion::RowZalo, true);
-            drawLinkRow(384.0f, L"T\u00E1c gi\u1EA3: Tr\u1EA7n Ph\u00E1t \u0110\u1EA1t (LinkedIn)", st->hoveredRegion == HitRegion::RowLinkedIn, true);
-            drawLinkRow(410.0f, L"M\u00E3 ngu\u1ED3n M\u1EDF & B\u00E1o l\u1ED7i (GitHub)", st->hoveredRegion == HitRegion::RowGitHub, false);
+            drawLinkRow(360.0f, L"K\u00EAnh Th\u1EA3o lu\u1EADn C\u1ED9ng \u0111\u1ED3ng (Zalo)", st->hoveredRegion == HitRegion::RowZalo, true);
+            drawLinkRow(386.0f, L"T\u00E1c gi\u1EA3: Tr\u1EA7n Ph\u00E1t \u0110\u1EA1t (LinkedIn)", st->hoveredRegion == HitRegion::RowLinkedIn, true);
+            drawLinkRow(412.0f, L"M\u00E3 ngu\u1ED3n M\u1EDF & B\u00E1o l\u1ED7i (GitHub)", st->hoveredRegion == HitRegion::RowGitHub, false);
         }
 
         // 3. Bottom Footer Bar (446..484)
@@ -949,12 +1035,15 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         g.DrawLine(&divPen, 0.0f, 446.0f * s, static_cast<float>(width), 446.0f * s);
 
         SolidBrush greenDotBrush(Color(255, 34, 197, 94));
+        SolidBrush indigoFooterBrush(Color(255, 88, 86, 214));
         g.FillEllipse(&greenDotBrush, RectF(18.0f * s, 462.0f * s, 6.5f * s, 6.5f * s));
         g.DrawString(
-            L"Song ng\u1EEF \u2022 Chu\u1EA9n m\u1EDBi \u2022 T\u1EF1 \u0111\u1ED9ng l\u01B0u & \u00E1p d\u1EE5ng t\u1EE9c th\u00EC",
-            -1, &fFooter, RectF(30.0f * s, 446.0f * s, 300.0f * s, 38.0f * s), &sfLeft, &secondaryBrush
+            L"Song ng\u1EEF \u2022 Chu\u1EA9n m\u1EDBi \u2022 T\u1EF1 \u0111\u1ED9ng l\u01B0u",
+            -1, &fFooter, RectF(30.0f * s, 446.0f * s, 232.0f * s, 38.0f * s), &sfLeft, &secondaryBrush
         );
 
+        g.DrawString(L"NidoOffice", -1, &fFooterBold, RectF(268.0f * s, 446.0f * s, 62.0f * s, 38.0f * s), &sfCenter, &indigoFooterBrush);
+        g.DrawString(L"\u2022", -1, &fFooter, RectF(330.0f * s, 446.0f * s, 6.0f * s, 38.0f * s), &sfCenter, &secondaryBrush);
         g.DrawString(L"YouPersona.com", -1, &fFooterBold, RectF(336.0f * s, 446.0f * s, 82.0f * s, 38.0f * s), &sfCenter, &blueBrush);
         g.DrawString(L"\u2022", -1, &fFooter, RectF(418.0f * s, 446.0f * s, 6.0f * s, 38.0f * s), &sfCenter, &secondaryBrush);
         g.DrawString(L"Zalo", -1, &fFooter, RectF(424.0f * s, 446.0f * s, 28.0f * s, 38.0f * s), &sfCenter, &secondaryBrush);
@@ -1074,18 +1163,41 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
             break;
-        case HitRegion::TileVnEnabled:
-            st->prefs.vietnameseEnabled = !st->prefs.vietnameseEnabled;
+        case HitRegion::TileMacroToggle:
+            st->prefs.macroEnabled = !st->prefs.macroEnabled;
             SaveVieLotusPrefs(st->prefs);
             InvalidateRect(hwnd, nullptr, FALSE);
             break;
-        case HitRegion::TileSmartBi:
-            st->prefs.smartBilingual = !st->prefs.smartBilingual;
+        case HitRegion::BtnMacroManage: {
+            WCHAR appData[MAX_PATH] = {};
+            if (ExpandEnvironmentStringsW(L"%APPDATA%\\VieLotusIM", appData, MAX_PATH) > 0) {
+                CreateDirectoryW(appData, nullptr);
+                std::wstring macroPath = std::wstring(appData) + L"\\macros.json";
+                if (GetFileAttributesW(macroPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+                    HANDLE hFile = CreateFileW(macroPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+                    if (hFile != INVALID_HANDLE_VALUE) {
+                        const char *defaultJson = "{\r\n  \"ks\": \"Kh\xC3\xA1" "ch s\xE1\xBA\xA1n\",\r\n  \"vn\": \"Vi\xE1\xBB\x87t Nam\",\r\n  \"tphcm\": \"TP. H\xE1\xBB\x93 Ch\xC3\xAD Minh\",\r\n  \"ko\": \"kh\xC3\xB4ng\",\r\n  \"dc\": \"\xC4\x91\xC6\xB0\xE1\xBB\xA3" "c\"\r\n}\r\n";
+                        DWORD written = 0;
+                        WriteFile(hFile, defaultJson, static_cast<DWORD>(strlen(defaultJson)), &written, nullptr);
+                        CloseHandle(hFile);
+                    }
+                }
+                ShellExecuteW(hwnd, L"open", L"notepad.exe", macroPath.c_str(), nullptr, SW_SHOWNORMAL);
+            }
+            break;
+        }
+        case HitRegion::TileDevMode:
+            st->prefs.developerMode = !st->prefs.developerMode;
             SaveVieLotusPrefs(st->prefs);
             InvalidateRect(hwnd, nullptr, FALSE);
             break;
-        case HitRegion::TileModernOrtho:
-            st->prefs.modernOrthography = !st->prefs.modernOrthography;
+        case HitRegion::ChipQuickTelex:
+            st->prefs.quickTelex = !st->prefs.quickTelex;
+            SaveVieLotusPrefs(st->prefs);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            break;
+        case HitRegion::ChipRelaxedCoda:
+            st->prefs.relaxedCoda = !st->prefs.relaxedCoda;
             SaveVieLotusPrefs(st->prefs);
             InvalidateRect(hwnd, nullptr, FALSE);
             break;
@@ -1097,6 +1209,10 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             st->copiedStk = true;
             SetTimer(hwnd, 1, 1800, nullptr);
             InvalidateRect(hwnd, nullptr, FALSE);
+            break;
+        case HitRegion::BtnNidoOfficeExplore:
+        case HitRegion::FooterNidoOffice:
+            ShellExecuteW(hwnd, L"open", L"https://educenter.app", nullptr, nullptr, SW_SHOWNORMAL);
             break;
         case HitRegion::BtnYouPersonaExplore:
         case HitRegion::FooterYouPersona:

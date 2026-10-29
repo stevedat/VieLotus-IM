@@ -8,15 +8,15 @@
 [![App Store](https://img.shields.io/badge/App_Store-Sen_Việt-000000.svg?logo=apple&logoColor=white)](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799)
 [![Google Play](https://img.shields.io/badge/Google_Play-Sen_Việt-1F5B3A.svg?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard)
 
-A lightweight, memory-safe Vietnamese input method powered by a unified **Pure Swift 6** core across **macOS**, **Windows**, **Linux**, **iOS & iPadOS**, and **Android** — built on official OS input frameworks with **zero Accessibility hooks** and **100% offline privacy**.
+A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosystem (macOS, iOS, iPadOS)** as its primary **Pure Swift 6** reference architecture, and compiled natively across **Windows**, **Linux**, and **Android** — operating strictly through official OS input protocols with **zero global keystroke hooks** and **100% offline privacy**.
 
-📄 **[Technical Report & Live Demo](https://stevedat.github.io/VieLotus-IM/)** · 📐 **[Architecture & Benchmark Spec](https://stevedat.github.io/VieLotus-IM/research.html)**
+📄 **[Technical Dossier & Interactive Specimen](https://stevedat.github.io/VieLotus-IM/)** · 📐 **[Architecture & Benchmark Monograph](https://stevedat.github.io/VieLotus-IM/research.html)**
 
 ---
 
 ## Core Highlights
 
-- **Zero System Hooks (`0 Accessibility`)**: Uses native OS input contracts (`InputMethodKit`, `Win32 TSF`, `IBus / Fcitx5`, `UIKit`, `InputMethodService`) rather than global keystroke taps (`CGEventTap`). Immune to TCC permission breakage after updates and operates 100% offline.
+- **Zero Global Hooks (`0 Accessibility / 0 Full Access / 0 Keyboard Hook`)**: Uses official OS input contracts (`InputMethodKit` on macOS, `UIInputViewController` on iOS/iPadOS, `Win32 TSF` on Windows, `IBus / Fcitx5` on Linux, `InputMethodService` on Android) rather than global event taps. Immune to macOS TCC permission breakage, Linux Wayland isolation issues, and operates 100% offline.
 - **Lexical & Context-Aware Bilingual Typing (Telex & VNI)**: Rejects non-existent Vietnamese syllables (`turn` stays `turn`, never `"tủn"`) and mid-word English `-s-t` patterns (`last`, `best`, `cost`), while resolving true single-path collisions (`rest`/`rét`, `if`/`ì`, `as`/`á`) via preceding context.
 - **Adaptive Per-App Presentation (`< 0.2 ms` p99)**: Dynamically switches between `Direct Replacement` (AppKit, Safari, Office) and standards-compliant `Marked Text` (Chromium, Electron, React/ProseMirror, GPU terminals) with UTF-16 cursor synchronization and a 20-word backspace ring buffer.
 
