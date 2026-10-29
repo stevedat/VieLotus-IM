@@ -48,6 +48,7 @@ static const WCHAR c_szPrefsMacroEnabledVal[] = L"MacroEnabled";
 static const WCHAR c_szPrefsDeveloperModeVal[] = L"DeveloperMode";
 static const WCHAR c_szPrefsQuickTelexVal[] = L"QuickTelex";
 static const WCHAR c_szPrefsRelaxedCodaVal[] = L"RelaxedCoda";
+static const WCHAR c_szPrefsUpdatedBySettingsVal[] = L"PrefsUpdatedBySettings";
 
 // LayoutOrTip strings for input.dll!InstallLayoutOrTip
 static const WCHAR c_szTipTelexLayoutString[] =
@@ -110,6 +111,24 @@ void SavePersistedVniPreference(bool isVni) {
     }
 }
 
+bool ConsumeSettingsVniOverride(bool &outIsVni) {
+    HKEY hKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, c_szPrefsSubKey, 0, KEY_READ | KEY_WRITE, &hKey) != ERROR_SUCCESS) {
+        return false;
+    }
+    DWORD updated = 0;
+    bool hasOverride = ReadRegDword(hKey, c_szPrefsUpdatedBySettingsVal, updated) && (updated != 0);
+    if (hasOverride) {
+        WriteRegDword(hKey, c_szPrefsUpdatedBySettingsVal, 0u);
+        DWORD dwVal = 0;
+        if (ReadRegDword(hKey, c_szPrefsInputMethodVal, dwVal)) {
+            outIsVni = (dwVal == 1);
+        }
+    }
+    RegCloseKey(hKey);
+    return hasOverride;
+}
+
 void LoadVieLotusPrefs(VieLotusWindowsPrefs &outPrefs) {
     outPrefs = VieLotusWindowsPrefs{};
     HKEY hKey = nullptr;
@@ -155,6 +174,7 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs) {
         WriteRegDword(hKey, c_szPrefsDeveloperModeVal, prefs.developerMode ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsQuickTelexVal, prefs.quickTelex ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsRelaxedCodaVal, prefs.relaxedCoda ? 1u : 0u);
+        WriteRegDword(hKey, c_szPrefsUpdatedBySettingsVal, 1u);
         RegCloseKey(hKey);
     }
 }
@@ -325,7 +345,15 @@ HRESULT ActivateUserProfiles() {
                 CLSID_VieLotusTIP,
                 preferredGuid,
                 nullptr,
-                TF_IPPMF_FORPROCESS | TF_IPPMF_FORSESSION | TF_IPPMF_ENABLEPROFILE
+                TF_IPPMF_FORSESSION | TF_IPPMF_ENABLEPROFILE
+            );
+            pProfileMgr->ActivateProfile(
+                TF_PROFILETYPE_INPUTPROCESSOR,
+                VI_LANGID,
+                CLSID_VieLotusTIP,
+                preferredGuid,
+                nullptr,
+                TF_IPPMF_FORPROCESS | TF_IPPMF_ENABLEPROFILE
             );
             pProfileMgr->Release();
         }
@@ -1134,6 +1162,19 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             SetTextColor(hdcEdit, RGB(28, 28, 30));
             SetBkColor(hdcEdit, RGB(255, 255, 255));
             return reinterpret_cast<LRESULT>(st->hEditBgBrush);
+        }
+        break;
+    }
+
+    case WM_ACTIVATE:
+    case WM_INPUTLANGCHANGE:
+    case WM_SETTINGCHANGE: {
+        if (st) {
+            bool oldVni = st->prefs.isVni;
+            LoadVieLotusPrefs(st->prefs);
+            if (st->prefs.isVni != oldVni) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
         }
         break;
     }
