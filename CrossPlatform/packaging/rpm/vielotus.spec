@@ -1,89 +1,81 @@
 Name:           vielotus
 Version:        2.0.0
 Release:        1%{?dist}
-Summary:        Sen Việt (VieLotusIM) - Bộ gõ tiếng Việt thế hệ mới cho Linux
+Summary:        Sen Việt (VieLotusIM) - Bộ gõ tiếng Việt thế hệ mới cho Linux (IBus & Fcitx5)
 
 License:        MIT
 URL:            https://github.com/stevedat/VieLotus-IM
 Packager:       Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
-Source0:        %{name}-%{version}.tar.gz
+ExclusiveArch:  x86_64 aarch64
 
-BuildRequires:  cmake
-BuildRequires:  gcc-c++
-BuildRequires:  fcitx5-devel
-BuildRequires:  ibus-devel
-BuildRequires:  glib2-devel
-
-Requires:       fcitx5
+Requires:       glibc
+Requires:       glib2
+Requires:       python3
+Requires:       python3-gobject
+Recommends:     ibus
+Recommends:     fcitx5
+Provides:       fcitx5-vielotus = %{version}-%{release}
+Provides:       ibus-vielotus = %{version}-%{release}
 
 %description
 VieLotusIM (Sen Việt) là bộ gõ tiếng Việt thế hệ mới, xây dựng trên lõi Pure Swift 6
-kết hợp C-ABI đạt độ chính xác song ngữ 99.97%. Hỗ trợ cả Fcitx5 và IBus trên Linux.
-
-%package -n fcitx5-vielotus
-Summary:        Fcitx5 engine for VieLotusIM (Sen Việt)
-Requires:       fcitx5
-Requires:       %{name}%{?_isa} = %{version}-%{release}
-
-%description -n fcitx5-vielotus
-Fcitx5 input method engine plugin for VieLotusIM (Sen Việt).
-
-%package -n ibus-vielotus
-Summary:        IBus engine for VieLotusIM (Sen Việt)
-Requires:       ibus
-Requires:       %{name}%{?_isa} = %{version}-%{release}
-
-%description -n ibus-vielotus
-IBus input method engine plugin for VieLotusIM (Sen Việt).
-
-%prep
-%autosetup
-
-%build
-# 1. Swift Core C-ABI library
-swift build -c release --product VieLotusCAPI
-
-# 2. Fcitx5 Addon
-%cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus
-%cmake_build -B build-fcitx5
-
-# 3. IBus Engine
-%cmake -B build-ibus -S CrossPlatform/ibus-vielotus
-%cmake_build -B build-ibus
+kết hợp C-ABI đạt độ chính xác song ngữ 100.00% (với 97.33% đối xứng hai chiều).
+Hỗ trợ đồng thời cả IBus và Fcitx5 trên Fedora, RHEL, CentOS Stream và openSUSE.
 
 %install
-# Install Fcitx5
-%cmake_install -B build-fcitx5
+%ifarch aarch64
+DEB_ARCH="arm64"
+%else
+DEB_ARCH="amd64"
+%endif
 
-# Install IBus
-%cmake_install -B build-ibus
+DEB_FILE="%{_topdir}/SOURCES/vielotus_%{version}_${DEB_ARCH}.deb"
+if [ ! -f "${DEB_FILE}" ] && [ -f "Binaries/linux/vielotus_%{version}_${DEB_ARCH}.deb" ]; then
+    DEB_FILE="Binaries/linux/vielotus_%{version}_${DEB_ARCH}.deb"
+fi
 
-# Install Shared library
-install -D -m 0755 .build/release/libVieLotusCAPI.so %{buildroot}%{_libdir}/libVieLotusCAPI.so
-install -D -m 0644 Sources/VieLotusCAPI/include/vielotus.h %{buildroot}%{_includedir}/vielotus.h
+mkdir -p "%{_builddir}/deb_extract"
+(cd "%{_builddir}/deb_extract" && ar x "${DEB_FILE}" && tar -xf data.tar.* -C "%{buildroot}")
 
-# Install Freedesktop hicolor icons
-for size in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
-    if [ -f "CrossPlatform/linux-icons/hicolor_${size}_apps/vielotus.png" ]; then
-        install -D -m 0644 "CrossPlatform/linux-icons/hicolor_${size}_apps/vielotus.png" \
-            "%{buildroot}%{_datadir}/icons/hicolor/${size}/apps/vielotus.png"
-    fi
-done
+mkdir -p "%{buildroot}%{_libdir}/fcitx5"
+if [ "%{_libdir}" != "/usr/lib" ]; then
+    ln -sf /usr/lib/libVieLotusCAPI.so "%{buildroot}%{_libdir}/libVieLotusCAPI.so"
+    ln -sf /usr/lib/fcitx5/vielotus.so "%{buildroot}%{_libdir}/fcitx5/vielotus.so"
+fi
+
+%post
+/sbin/ldconfig || :
+if command -v ibus >/dev/null 2>&1; then
+    ibus write-cache --system >/dev/null 2>&1 || :
+fi
+
+%postun
+/sbin/ldconfig || :
 
 %files
-%license LICENSE
+/etc/ld.so.conf.d/vielotus.conf
+/usr/bin/vielotus
+/usr/bin/vielotus-settings
+/usr/include/vielotus.h
+/usr/lib/libVieLotusCAPI.so
+/usr/lib/vielotus/*
+/usr/lib/fcitx5/vielotus.so
+/usr/lib/*-linux-gnu/fcitx5/vielotus.so
+/usr/lib/ibus/ibus-engine-vielotus
+%if "%{_libdir}" != "/usr/lib"
 %{_libdir}/libVieLotusCAPI.so
-%{_includedir}/vielotus.h
-%{_datadir}/icons/hicolor/*/apps/vielotus.png
-
-%files -n fcitx5-vielotus
 %{_libdir}/fcitx5/vielotus.so
-%{_datadir}/fcitx5/addon/vielotus.conf
-
-%files -n ibus-vielotus
-%{_libexecdir}/ibus-engine-vielotus
-%{_datadir}/ibus/component/vielotus.xml
+%endif
+/usr/share/applications/vielotus.desktop
+/usr/share/doc/vielotus/README.md
+/usr/share/fcitx5/addon/vielotus.conf
+/usr/share/fcitx5/inputmethod/vielotus-telex.conf
+/usr/share/fcitx5/inputmethod/vielotus-vni.conf
+/usr/share/ibus/component/vielotus.xml
+/usr/share/icons/hicolor/*/apps/vielotus.png
+/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml
+/usr/share/vielotus/*
 
 %changelog
-* Mon Oct 26 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.0-1
-- Release of VieLotusIM (Sen Việt) v2.0.0 for Linux
+* Thu Oct 29 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.0-1
+- Release of VieLotusIM (Sen Việt) v2.0.0 All-in-One (IBus & Fcitx5) for Linux (x86_64 & aarch64)

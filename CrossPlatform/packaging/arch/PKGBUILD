@@ -1,60 +1,24 @@
 # Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
-pkgname=fcitx5-vielotus
+pkgname=vielotus-bin
+_pkgname=vielotus
 pkgver=2.0.0
 pkgrel=1
-pkgdesc="Bộ gõ tiếng Việt Sen Việt thế hệ mới cho Fcitx5 (Pure Swift 6 Core & C-ABI)"
+pkgdesc="Bộ gõ tiếng Việt Sen Việt (VieLotusIM) thế hệ mới cho Linux (IBus & Fcitx5, Pure Swift 6 Core)"
 arch=('x86_64' 'aarch64')
 url="https://github.com/stevedat/VieLotus-IM"
 license=('MIT')
-depends=('fcitx5' 'glibc')
-makedepends=('cmake' 'extra-cmake-modules' 'ninja' 'swift-bin')
-source=("$pkgname-$pkgver.tar.gz")
-sha256sums=('SKIP')
-
-build() {
-    cd "$srcdir/vielotus"
-    
-    # 1. Build Swift Core C-ABI
-    swift build -c release --product VieLotusCAPI
-    
-    # 2. Build Fcitx5 Addon
-    cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/usr
-    cmake --build build-fcitx5
-    
-    # 3. Build IBus Engine (if libibus available)
-    if pacman -Qi ibus &>/dev/null; then
-        cmake -B build-ibus -S CrossPlatform/ibus-vielotus \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr
-        cmake --build build-ibus
-    fi
-}
+depends=('glibc' 'gcc-libs' 'glib2' 'python' 'python-gobject' 'gtk3')
+optdepends=(
+    'fcitx5: Fcitx5 input method framework support'
+    'ibus: IBus input method framework support'
+)
+provides=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
+conflicts=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
+source_x86_64=("${_pkgname}_${pkgver}_amd64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_amd64.deb")
+source_aarch64=("${_pkgname}_${pkgver}_arm64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_arm64.deb")
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
 
 package() {
-    cd "$srcdir/vielotus"
-    
-    # Install Fcitx5 Addon
-    DESTDIR="$pkgdir" cmake --install build-fcitx5
-    
-    # Install Shared C-ABI library
-    install -Dm755 .build/release/libVieLotusCAPI.so "$pkgdir/usr/lib/libVieLotusCAPI.so"
-    install -Dm644 Sources/VieLotusCAPI/include/vielotus.h "$pkgdir/usr/include/vielotus.h"
-    
-    # Install IBus if built
-    if [ -d build-ibus ]; then
-        DESTDIR="$pkgdir" cmake --install build-ibus
-    fi
-
-    # Install Freedesktop hicolor icons
-    for size in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
-        if [ -f "CrossPlatform/linux-icons/hicolor_${size}_apps/vielotus.png" ]; then
-            install -Dm644 "CrossPlatform/linux-icons/hicolor_${size}_apps/vielotus.png" \
-                "$pkgdir/usr/share/icons/hicolor/${size}/apps/vielotus.png"
-        fi
-    done
-
-    # License
-    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    bsdtar -xf "${srcdir}/data.tar.xz" -C "${pkgdir}/"
 }

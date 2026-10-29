@@ -57,8 +57,8 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
 - Tải [`VieLotus-Setup-x64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe) hoặc [`VieLotus-Setup-arm64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe) tại [Releases](https://github.com/stevedat/VieLotus-IM/releases/latest) (hoặc cài qua **Microsoft Store**).
 - Chạy bộ cài và nhấn **`Win + Space`** để chuyển sang **Sen Việt**.
 
-### 3. Linux (Ubuntu / Debian / Snap — `amd64` & `arm64`)
-- **Cài đặt tự động 1 dòng lệnh (Ubuntu / Debian `.deb`)**:
+### 3. Linux (Ubuntu / Debian / Mint / Fedora / Arch / openSUSE — `amd64` & `arm64`)
+- **Cài đặt tự động 1 dòng lệnh (Tự nhận diện `apt`, `dnf`, `pacman`, `zypper` & `x86_64` / `aarch64`)**:
   ```bash
   curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh
   ```
@@ -66,10 +66,11 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
   ```bash
   sudo snap install vielotus
   ```
-- **Cài gói `.deb` thủ công qua `apt`**:
+- **Cài gói `.deb` thủ công qua `apt` (Ubuntu / Debian / Mint / Pop!_OS)**:
   ```bash
   sudo apt update && sudo apt install ./vielotus_2.0.0_amd64.deb   # hoặc ./vielotus_2.0.0_arm64.deb
   ```
+- **Arch Linux / Manjaro (`PKGBUILD`)**: `cd CrossPlatform/packaging/arch && makepkg -si`
 - **Lệnh điều khiển nhanh**: `vielotus-settings` (cửa sổ cài đặt GTK3) · `vielotus --telex` · `vielotus --vni` · `vielotus --status`.
 
 ### 4. iOS / iPadOS & Android
