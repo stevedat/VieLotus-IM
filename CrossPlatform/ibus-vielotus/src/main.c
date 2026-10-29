@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include "vielotus.h"
 
 #define IBUS_TYPE_VIELOTUS_ENGINE (ibus_vielotus_engine_get_type())
@@ -22,6 +23,7 @@ struct _IBusVieLotusEngine {
     gboolean sen_flex;
     gboolean modern_orthography;
     gboolean quick_telex;
+    time_t config_mtime;
     IBusPropList *prop_list;
 };
 
@@ -32,12 +34,32 @@ struct _IBusVieLotusEngineClass {
 GType ibus_vielotus_engine_get_type(void);
 G_DEFINE_TYPE(IBusVieLotusEngine, ibus_vielotus_engine, IBUS_TYPE_ENGINE)
 
-static void ibus_vielotus_load_user_config(IBusVieLotusEngine *vl_engine) {
+static gchar *ibus_vielotus_get_config_dir(void) {
+    const char *snap_real_home = getenv("SNAP_REAL_HOME");
+    if (snap_real_home && snap_real_home[0] != '\0') {
+        return g_build_filename(snap_real_home, ".config", "vielotus", NULL);
+    }
     const gchar *cfg_root = g_get_user_config_dir();
-    if (!cfg_root || !vl_engine->session) {
+    if (!cfg_root) {
+        return NULL;
+    }
+    return g_build_filename(cfg_root, "vielotus", NULL);
+}
+
+static void ibus_vielotus_load_user_config(IBusVieLotusEngine *vl_engine) {
+    if (!vl_engine->session) {
         return;
     }
-    gchar *path = g_build_filename(cfg_root, "vielotus", "config.env", NULL);
+    gchar *dir_path = ibus_vielotus_get_config_dir();
+    if (!dir_path) {
+        return;
+    }
+    gchar *path = g_build_filename(dir_path, "config.env", NULL);
+    g_free(dir_path);
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        vl_engine->config_mtime = st.st_mtime;
+    }
     FILE *fp = fopen(path, "r");
     g_free(path);
     if (!fp) {
@@ -82,18 +104,17 @@ static void ibus_vielotus_load_user_config(IBusVieLotusEngine *vl_engine) {
 }
 
 static void ibus_vielotus_save_user_config(IBusVieLotusEngine *vl_engine) {
-    const gchar *cfg_root = g_get_user_config_dir();
-    if (!cfg_root) {
+    gchar *dir_path = ibus_vielotus_get_config_dir();
+    if (!dir_path) {
         return;
     }
-    gchar *dir_path = g_build_filename(cfg_root, "vielotus", NULL);
     g_mkdir_with_parents(dir_path, 0755);
     gchar *path = g_build_filename(dir_path, "config.env", NULL);
     g_free(dir_path);
 
     FILE *fp = fopen(path, "w");
-    g_free(path);
     if (!fp) {
+        g_free(path);
         return;
     }
     fprintf(fp, "INPUT_METHOD=\"%s\"\n", vl_engine->is_vni ? "vni" : "telex");
@@ -102,6 +123,11 @@ static void ibus_vielotus_save_user_config(IBusVieLotusEngine *vl_engine) {
     fprintf(fp, "MODERN_ORTHOGRAPHY=\"%s\"\n", vl_engine->modern_orthography ? "true" : "false");
     fprintf(fp, "QUICK_TELEX=\"%s\"\n", vl_engine->quick_telex ? "true" : "false");
     fclose(fp);
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        vl_engine->config_mtime = st.st_mtime;
+    }
+    g_free(path);
 }
 
 static void ibus_vielotus_build_prop_list(IBusVieLotusEngine *vl_engine) {
@@ -191,12 +217,12 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
         }
     }
 
-    ibus_vielotus_engine_reset_internal(vl_engine);
-
     if (buf[0] != '\0') {
         IBusText *commit_text = ibus_text_new_from_string(buf);
         ibus_engine_commit_text(engine, commit_text);
     }
+
+    ibus_vielotus_engine_reset_internal(vl_engine);
 }
 
 static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
@@ -331,6 +357,27 @@ static void ibus_vielotus_engine_property_activate(
     ibus_engine_register_properties(engine, vl_engine->prop_list);
 }
 
+static void ibus_vielotus_reload_config_if_changed(IBusVieLotusEngine *vl_engine) {
+    if (!vl_engine->session) {
+        return;
+    }
+    gchar *dir_path = ibus_vielotus_get_config_dir();
+    if (!dir_path) {
+        return;
+    }
+    gchar *path = g_build_filename(dir_path, "config.env", NULL);
+    g_free(dir_path);
+    struct stat st;
+    if (stat(path, &st) == 0 && st.st_mtime != vl_engine->config_mtime) {
+        g_free(path);
+        ibus_vielotus_load_user_config(vl_engine);
+        ibus_vielotus_build_prop_list(vl_engine);
+        ibus_engine_register_properties((IBusEngine *)vl_engine, vl_engine->prop_list);
+        return;
+    }
+    g_free(path);
+}
+
 static gboolean ibus_vielotus_engine_process_key_event(
     IBusEngine *engine,
     guint keyval,
@@ -343,6 +390,10 @@ static gboolean ibus_vielotus_engine_process_key_event(
     // Ignore key release events
     if (state & IBUS_RELEASE_MASK) {
         return FALSE;
+    }
+
+    if (!vielotus_is_composing(vl_engine->session)) {
+        ibus_vielotus_reload_config_if_changed(vl_engine);
     }
 
     // Ignore pure modifier presses (Shift, CapsLock) so uppercase letters work mid-word
@@ -388,9 +439,9 @@ static gboolean ibus_vielotus_engine_process_key_event(
                     const char *committed = vielotus_get_last_text(vl_engine->session);
                     char buf[1024];
                     snprintf(buf, sizeof(buf), "%s%c", committed ? committed : "", (char)keyval);
-                    ibus_vielotus_engine_reset_internal(vl_engine);
                     IBusText *commit_text = ibus_text_new_from_string(buf);
                     ibus_engine_commit_text(engine, commit_text);
+                    ibus_vielotus_engine_reset_internal(vl_engine);
                     return TRUE;
                 }
                 char trail[2] = { (char)keyval, '\0' };
@@ -407,11 +458,11 @@ static gboolean ibus_vielotus_engine_process_key_event(
             const char *committed = vielotus_get_last_text(vl_engine->session);
             char buf[1024];
             snprintf(buf, sizeof(buf), "%s", committed ? committed : "");
-            ibus_vielotus_engine_reset_internal(vl_engine);
             if (buf[0] != '\0') {
                 IBusText *commit_text = ibus_text_new_from_string(buf);
                 ibus_engine_commit_text(engine, commit_text);
             }
+            ibus_vielotus_engine_reset_internal(vl_engine);
             return TRUE;
         } else if (vielotus_is_composing(vl_engine->session) ||
                    action == VIELOTUS_ACTION_REPLACE ||
@@ -480,7 +531,14 @@ int main(int argc, char **argv) {
     if (ibus) {
         ibus_bus_request_name(bus, "org.freedesktop.IBus.VieLotus", 0);
     } else {
-        IBusComponent *component = ibus_component_new_from_file("/usr/share/ibus/component/vielotus.xml");
+        const char *snap_dir = getenv("SNAP");
+        char comp_path[512];
+        if (snap_dir && snap_dir[0] != '\0') {
+            snprintf(comp_path, sizeof(comp_path), "%s/usr/share/ibus/component/vielotus.xml", snap_dir);
+        } else {
+            snprintf(comp_path, sizeof(comp_path), "/usr/share/ibus/component/vielotus.xml");
+        }
+        IBusComponent *component = ibus_component_new_from_file(comp_path);
         if (component) {
             ibus_bus_register_component(bus, component);
         }

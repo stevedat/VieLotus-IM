@@ -249,21 +249,20 @@ ENV_EOF
         fi
     fi
 
-    # 2. Refresh IBus cache, restart old engine worker & switch active engine if IBus daemon is reachable
-    if command -v pkill >/dev/null 2>&1; then
-        pkill -f ibus-engine-vielotus >/dev/null 2>&1 || true
-    fi
+    # 2. Refresh IBus cache & switch active engine non-blockingly if IBus daemon is reachable
     if command -v ibus >/dev/null 2>&1; then
-        ibus write-cache >/dev/null 2>&1 || true
+        (ibus write-cache >/dev/null 2>&1 || true) &
         if pgrep -x ibus-daemon >/dev/null 2>&1; then
-            ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true
+            (ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true) &
         fi
     fi
 
-    # Refresh user & Snap Store fontconfig cache if present so Vietnamese glyphs (ệ, ộ, ử...) render cleanly
+    # Refresh user & Snap Store fontconfig cache once so Vietnamese glyphs (ệ, ộ, ử...) render cleanly
     FONTCONF_DIR="${CONFIG_ROOT}/fontconfig/conf.d"
-    mkdir -p "${FONTCONF_DIR}" 2>/dev/null || true
-    cat <<'FC_EOF' > "${FONTCONF_DIR}/99-vielotus-vietnamese.conf" 2>/dev/null || true
+    FONTCONF_FILE="${FONTCONF_DIR}/99-vielotus-vietnamese.conf"
+    if [ ! -f "${FONTCONF_FILE}" ]; then
+        mkdir -p "${FONTCONF_DIR}" 2>/dev/null || true
+        cat <<'FC_EOF' > "${FONTCONF_FILE}" 2>/dev/null || true
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <fontconfig>
@@ -293,37 +292,59 @@ ENV_EOF
   </alias>
 </fontconfig>
 FC_EOF
-    if [ -d "${HOME}/snap/snap-store/common/.cache/fontconfig" ]; then
-        rm -rf "${HOME}/snap/snap-store/common/.cache/fontconfig" 2>/dev/null || true
-    fi
-    if command -v fc-cache >/dev/null 2>&1; then
-        fc-cache -f >/dev/null 2>&1 || true
+        if [ -d "${HOME}/snap/snap-store/common/.cache/fontconfig" ]; then
+            rm -rf "${HOME}/snap/snap-store/common/.cache/fontconfig" 2>/dev/null || true
+        fi
+        if command -v fc-cache >/dev/null 2>&1; then
+            (fc-cache -f >/dev/null 2>&1 || true) &
+        fi
     fi
 
-    # 3. Register into GNOME / Ubuntu Input Sources (org.gnome.desktop.input-sources)
+    # 3. Register and activate in GNOME / Ubuntu Input Sources (org.gnome.desktop.input-sources)
     if command -v gsettings >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
         python3 - "${ENGINE_ID}" <<'PYEOF' 2>/dev/null || true
 import ast, subprocess, sys
 engine_id = sys.argv[1]
-try:
-    raw = subprocess.check_output(
-        ["gsettings", "get", "org.gnome.desktop.input-sources", "sources"],
-        stderr=subprocess.DEVNULL
-    ).decode().strip()
-    if raw.startswith("@a(ss) "):
-        raw = raw[len("@a(ss) "):]
-    sources = list(ast.literal_eval(raw)) if raw else []
-except Exception:
-    sources = []
 
+def get_sources_list(key):
+    try:
+        raw = subprocess.check_output(
+            ["gsettings", "get", "org.gnome.desktop.input-sources", key],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        if raw.startswith("@a(ss) "):
+            raw = raw[len("@a(ss) "):]
+        return list(ast.literal_eval(raw)) if raw else []
+    except Exception:
+        return []
+
+sources = get_sources_list("sources")
 if not sources:
     sources = [("xkb", "us")]
 
 sources = [s for s in sources if not (s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni"))]
-sources.append(("ibus", engine_id))
-formatted = "[" + ", ".join(f"('{k}', '{v}')" for k, v in sources) + "]"
+sources.insert(0, ("ibus", engine_id))
+formatted_sources = "[" + ", ".join(f"('{k}', '{v}')" for k, v in sources) + "]"
 subprocess.call(
-    ["gsettings", "set", "org.gnome.desktop.input-sources", "sources", formatted],
+    ["gsettings", "set", "org.gnome.desktop.input-sources", "sources", formatted_sources],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+
+mru = get_sources_list("mru-sources")
+mru = [s for s in mru if not (s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni"))]
+mru.insert(0, ("ibus", engine_id))
+for s in sources:
+    if s not in mru:
+        mru.append(s)
+formatted_mru = "[" + ", ".join(f"('{k}', '{v}')" for k, v in mru) + "]"
+subprocess.call(
+    ["gsettings", "set", "org.gnome.desktop.input-sources", "mru-sources", formatted_mru],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+subprocess.call(
+    ["gsettings", "set", "org.gnome.desktop.input-sources", "current", "0"],
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
 )
@@ -449,7 +470,14 @@ def save_current_config(*_):
     if not os.path.exists(settings_bin):
         settings_bin = os.path.abspath(sys.argv[0])
     im_flag = "--vni" if cfg["INPUT_METHOD"] == "vni" else "--telex"
-    subprocess.call([settings_bin, im_flag])
+    if smoke_mode:
+        subprocess.call([settings_bin, im_flag])
+    else:
+        subprocess.Popen(
+            [settings_bin, im_flag],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
 # ==============================================================================
 # TAB 1: CÀI ĐẶT (Matches macOS 2-Card Hero + 2x2 Bento Grid + Smart Strip)
@@ -863,13 +891,91 @@ case "${1:-}" in
         ;;
 esac
 
-# Ensure the input source is registered when the user opens the settings utility
+# Ensure graphical session variables are discovered if launched from a minimal desktop/terminal context
+UID_CUR="$(id -u 2>/dev/null || echo 1000)"
+if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/${UID_CUR}" ]; then
+    export XDG_RUNTIME_DIR="/run/user/${UID_CUR}"
+fi
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/${UID_CUR}/bus" ]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${UID_CUR}/bus"
+fi
+if [ -z "${WAYLAND_DISPLAY:-}" ] && [ -S "/run/user/${UID_CUR}/wayland-0" ]; then
+    export WAYLAND_DISPLAY="wayland-0"
+fi
+if [ -z "${DISPLAY:-}" ] && [ -S "/tmp/.X11-unix/X0" ]; then
+    export DISPLAY=":0"
+fi
+
+# Ensure the input source is registered in background so GUI opens immediately
 load_config
-save_and_apply "${INPUT_METHOD}"
+(save_and_apply "${INPUT_METHOD}" >/dev/null 2>&1 || true) &
 
 # Launch Native GTK3 Desktop Settings Window if graphical session is available
 if command -v python3 >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
-    if run_gtk_settings "0" 2>/dev/null; then
+    if run_gtk_settings "0" 2>/tmp/vielotus-settings.log; then
+        exit 0
+    fi
+    # Fallback to Python Tkinter GUI if python3-gi is not installed
+    if python3 - "${CONFIG_FILE}" <<'TK_PYEOF' 2>>/tmp/vielotus-settings.log; then
+import os, subprocess, sys
+import tkinter as tk
+from tkinter import ttk
+
+config_path = sys.argv[1]
+cfg = {
+    "INPUT_METHOD": "telex",
+    "GRAMMAR_PROFILE": "sen_flex",
+    "SMART_BILINGUAL": "true",
+    "MODERN_ORTHOGRAPHY": "true",
+    "QUICK_TELEX": "false",
+    "RELAXED_CODA": "false",
+    "MACRO_ENABLED": "true",
+    "DEVELOPER_MODE": "false",
+}
+if os.path.exists(config_path):
+    with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            if "=" in line and not line.lstrip().startswith("#"):
+                k, v = line.strip().split("=", 1)
+                cfg[k.strip()] = v.strip().strip('"').strip("'")
+
+root = tk.Tk()
+root.title("Sen Việt (VieLotusIM v2.0.0) — Cài đặt")
+root.geometry("460x320")
+root.resizable(False, False)
+
+im_var = tk.StringVar(value=cfg.get("INPUT_METHOD", "telex"))
+qt_var = tk.BooleanVar(value=cfg.get("QUICK_TELEX", "false") == "true")
+rc_var = tk.BooleanVar(value=cfg.get("RELAXED_CODA", "false") == "true")
+mc_var = tk.BooleanVar(value=cfg.get("MACRO_ENABLED", "true") == "true")
+dv_var = tk.BooleanVar(value=cfg.get("DEVELOPER_MODE", "false") == "true")
+
+def apply_changes(*_):
+    cfg["INPUT_METHOD"] = im_var.get()
+    cfg["QUICK_TELEX"] = "true" if qt_var.get() else "false"
+    cfg["RELAXED_CODA"] = "true" if rc_var.get() else "false"
+    cfg["MACRO_ENABLED"] = "true" if mc_var.get() else "false"
+    cfg["DEVELOPER_MODE"] = "true" if dv_var.get() else "false"
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, "w", encoding="utf-8") as f:
+        for k, v in cfg.items():
+            f.write(f'{k}="{v}"\n')
+    im_flag = "--vni" if cfg["INPUT_METHOD"] == "vni" else "--telex"
+    subprocess.Popen(["/usr/bin/vielotus-settings", im_flag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+frm = ttk.Frame(root, padding=16)
+frm.pack(fill="both", expand=True)
+ttk.Label(frm, text="🌸 Sen Việt (VieLotusIM v2.0.0)", font=("Sans", 13, "bold")).pack(anchor="w")
+ttk.Label(frm, text="Kiểu gõ Tiếng Việt (tự động lưu & áp dụng):").pack(anchor="w", pady=(10, 4))
+ttk.Radiobutton(frm, text="Telex Tự Do (s f r x j w — vieetj → việt)", variable=im_var, value="telex", command=apply_changes).pack(anchor="w")
+ttk.Radiobutton(frm, text="VNI Chuẩn (phím số 1–9 — vie65t → việt)", variable=im_var, value="vni", command=apply_changes).pack(anchor="w")
+ttk.Separator(frm, orient="horizontal").pack(fill="x", pady=10)
+ttk.Checkbutton(frm, text="Gõ tắt phụ âm (Quick Telex: cc=ch, gg=gi, kk=kh)", variable=qt_var, command=apply_changes).pack(anchor="w")
+ttk.Checkbutton(frm, text="Phụ âm cuối mở rộng (f, j, w, z)", variable=rc_var, command=apply_changes).pack(anchor="w")
+ttk.Checkbutton(frm, text="Gõ tắt thông minh (vn → Việt Nam)", variable=mc_var, command=apply_changes).pack(anchor="w")
+ttk.Checkbutton(frm, text="Bảo vệ Code & Terminal (IDE / CLI)", variable=dv_var, command=apply_changes).pack(anchor="w")
+root.mainloop()
+TK_PYEOF
         exit 0
     fi
 fi

@@ -65,19 +65,34 @@ RUNNER_EOF
 #!/bin/sh
 set -e
 
-export LD_LIBRARY_PATH="${SNAP}/usr/lib:${SNAP}/usr/lib/vielotus:${SNAP}/usr/lib/x86_64-linux-gnu:${SNAP}/usr/lib/aarch64-linux-gnu:${LD_LIBRARY_PATH:-}"
+if [ -n "${SNAP_REAL_HOME:-}" ] && [ -d "${SNAP_REAL_HOME}" ]; then
+    export HOME="${SNAP_REAL_HOME}"
+    export XDG_CONFIG_HOME="${SNAP_REAL_HOME}/.config"
+fi
+
+GNOME_PLATFORM="${SNAP}/gnome-platform"
+if [ -d "${GNOME_PLATFORM}/usr" ]; then
+    export PATH="${GNOME_PLATFORM}/usr/bin:${SNAP}/usr/sbin:${SNAP}/usr/bin:${PATH}"
+    export LD_LIBRARY_PATH="${SNAP}/usr/lib:${SNAP}/usr/lib/vielotus:${SNAP}/usr/lib/x86_64-linux-gnu:${SNAP}/usr/lib/aarch64-linux-gnu:${GNOME_PLATFORM}/usr/lib/x86_64-linux-gnu:${GNOME_PLATFORM}/usr/lib/aarch64-linux-gnu:${GNOME_PLATFORM}/usr/lib:${LD_LIBRARY_PATH:-}"
+    export GI_TYPELIB_PATH="${GNOME_PLATFORM}/usr/lib/x86_64-linux-gnu/girepository-1.0:${GNOME_PLATFORM}/usr/lib/aarch64-linux-gnu/girepository-1.0:${GNOME_PLATFORM}/usr/lib/girepository-1.0"
+    export PYTHONPATH="${GNOME_PLATFORM}/usr/lib/python3/dist-packages:${PYTHONPATH:-}"
+    export XDG_DATA_DIRS="${SNAP}/usr/share:${GNOME_PLATFORM}/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+    export GTK_PATH="${GNOME_PLATFORM}/usr/lib/x86_64-linux-gnu/gtk-3.0:${GNOME_PLATFORM}/usr/lib/aarch64-linux-gnu/gtk-3.0"
+else
+    export LD_LIBRARY_PATH="${SNAP}/usr/lib:${SNAP}/usr/lib/vielotus:${SNAP}/usr/lib/x86_64-linux-gnu:${SNAP}/usr/lib/aarch64-linux-gnu:${LD_LIBRARY_PATH:-}"
+fi
 export VIELOTUS_RESOURCE_PATH="${SNAP}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
 
 # Export Fcitx5 addon, IBus engine & runtime libraries into ~/.local/lib/vielotus so host fcitx5/ibus can load them
 USER_LIB_BASE="${HOME}/.local/lib/vielotus"
-mkdir -p "${USER_LIB_BASE}/fcitx5" "${USER_LIB_BASE}/ibus" "${USER_LIB_BASE}/lib"
+mkdir -p "${USER_LIB_BASE}/fcitx5" "${USER_LIB_BASE}/ibus" "${USER_LIB_BASE}/lib" 2>/dev/null || true
 cp -f "${SNAP}/usr/lib/fcitx5/vielotus.so" "${USER_LIB_BASE}/fcitx5/vielotus.so" 2>/dev/null || true
 cp -f "${SNAP}/usr/lib/ibus/ibus-engine-vielotus" "${USER_LIB_BASE}/ibus/ibus-engine-vielotus" 2>/dev/null || true
 chmod 755 "${USER_LIB_BASE}/ibus/ibus-engine-vielotus" 2>/dev/null || true
 cp -f "${SNAP}/usr/lib/libVieLotusCAPI.so" "${USER_LIB_BASE}/lib/libVieLotusCAPI.so" 2>/dev/null || true
 cp -f "${SNAP}/usr/lib/vielotus/"*.so* "${USER_LIB_BASE}/lib/" 2>/dev/null || true
 
-cat <<IBUS_WRAP_EOF > "${USER_LIB_BASE}/ibus/ibus-engine-vielotus-runner"
+cat <<IBUS_WRAP_EOF > "${USER_LIB_BASE}/ibus/ibus-engine-vielotus-runner" 2>/dev/null || true
 #!/bin/sh
 export LD_LIBRARY_PATH="${USER_LIB_BASE}/lib:/usr/lib:/usr/lib/vielotus:\${LD_LIBRARY_PATH:-}"
 exec "${USER_LIB_BASE}/ibus/ibus-engine-vielotus" "\$@"
@@ -85,13 +100,12 @@ IBUS_WRAP_EOF
 chmod 755 "${USER_LIB_BASE}/ibus/ibus-engine-vielotus-runner" 2>/dev/null || true
 
 if [ ! -x /usr/lib/ibus/ibus-engine-vielotus ] && pgrep -x ibus-daemon >/dev/null 2>&1; then
-    pkill -f ibus-engine-vielotus >/dev/null 2>&1 || true
-    nohup "${USER_LIB_BASE}/ibus/ibus-engine-vielotus-runner" --ibus >/dev/null 2>&1 &
+    nohup "${USER_LIB_BASE}/ibus/ibus-engine-vielotus-runner" >/dev/null 2>&1 &
 fi
 
 ENV_D_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d"
-mkdir -p "${ENV_D_DIR}"
-cat <<ENV_EOF > "${ENV_D_DIR}/90-vielotus.conf"
+mkdir -p "${ENV_D_DIR}" 2>/dev/null || true
+cat <<ENV_EOF > "${ENV_D_DIR}/90-vielotus.conf" 2>/dev/null || true
 FCITX_ADDON_DIRS=${USER_LIB_BASE}/fcitx5:/usr/lib/aarch64-linux-gnu/fcitx5:/usr/lib/x86_64-linux-gnu/fcitx5:/usr/lib/fcitx5
 LD_LIBRARY_PATH=${USER_LIB_BASE}/lib:/usr/lib:/usr/lib/vielotus
 ENV_EOF
@@ -102,6 +116,7 @@ export LD_LIBRARY_PATH="${USER_LIB_BASE}/lib:${LD_LIBRARY_PATH}"
 exec "${SNAP}/usr/bin/vielotus-settings" "$@"
 SNAP_SETTINGS_EOF
     chmod 755 "${prime_dir}/usr/bin/vielotus-snap-runner"
+    mkdir -p "${prime_dir}/gnome-platform" "${prime_dir}/data-dir/themes" "${prime_dir}/data-dir/icons" "${prime_dir}/data-dir/sounds"
 
     # 3. Populate meta/gui/icon.png and meta/gui/vielotus.desktop
     if [ -f "${ROOT_DIR}/CrossPlatform/linux-icons/hicolor_512x512_apps/vielotus.png" ]; then
@@ -161,6 +176,23 @@ links:
     - https://github.com/stevedat/VieLotus-IM
   website:
     - https://stevedat.github.io/VieLotus-IM/
+plugs:
+  gnome-46-2404:
+    interface: content
+    target: \$SNAP/gnome-platform
+    default-provider: gnome-46-2404
+  gtk-3-themes:
+    interface: content
+    target: \$SNAP/data-dir/themes
+    default-provider: gtk-common-themes
+  icon-themes:
+    interface: content
+    target: \$SNAP/data-dir/icons
+    default-provider: gtk-common-themes
+  sound-themes:
+    interface: content
+    target: \$SNAP/data-dir/sounds
+    default-provider: gtk-common-themes
 apps:
   vielotus:
     command: usr/bin/vielotus-snap-runner
