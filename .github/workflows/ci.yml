@@ -26,10 +26,10 @@ jobs:
         run: swift build --configuration release
 
       - name: Build universal App bundle (VieLotusIM.app)
-        run: ./scripts/build_imk.sh 1.1.1
+        run: ./scripts/build_imk.sh 2.0.0
 
       - name: Build installer package (VieLotusIM.pkg)
-        run: ./scripts/build_pkg.sh 1.1.1
+        run: ./scripts/build_pkg.sh 2.0.0
 
       - name: Upload macOS build artifacts
         uses: actions/upload-artifact@v4
@@ -67,7 +67,7 @@ jobs:
 
       - name: Extract libVieLotusCAPI.so from prebuilt vielotus .deb
         run: |
-          dpkg-deb -x Binaries/linux/vielotus_1.1.1_amd64.deb /tmp/vielotus-core
+          dpkg-deb -x Binaries/linux/vielotus_2.0.0_amd64.deb /tmp/vielotus-core
           cp /tmp/vielotus-core/usr/lib/libVieLotusCAPI.so Binaries/linux/libVieLotusCAPI.so
 
       - name: Build Fcitx5 Plugin (vielotus.so) against prebuilt libVieLotusCAPI.so
@@ -92,7 +92,7 @@ jobs:
           cp CrossPlatform/fcitx5-vielotus/build/vielotus.conf dist/linux/
           cp CrossPlatform/ibus-vielotus/build/ibus-engine-vielotus dist/linux/
           cp CrossPlatform/ibus-vielotus/build/vielotus.xml dist/linux/
-          ./scripts/build_deb.sh 1.1.1 amd64
+          ./scripts/build_deb.sh 2.0.0 amd64
 
       - name: Upload Linux build artifacts
         uses: actions/upload-artifact@v4
@@ -124,7 +124,7 @@ jobs:
       - name: Build Windows TSF COM Shell, Inno Setup Installers & Microsoft Store MSIX (x64 & ARM64)
         shell: pwsh
         run: |
-          ./scripts/build_windows.ps1 -Version 1.1.1 -Arch all -SkipTests
+          ./scripts/build_windows.ps1 -Version 2.0.0 -Arch all -SkipTests
           Copy-Item dist/windows/VieLotus-Setup-x64.exe Binaries/windows/VieLotus-Setup-x64.exe -Force
           Copy-Item dist/windows/VieLotus-Setup-arm64.exe Binaries/windows/VieLotus-Setup-arm64.exe -Force
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ibus-vielotus VERSION 1.1.1 LANGUAGES C)
+project(ibus-vielotus VERSION 2.0.0 LANGUAGES C)
 
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(CMAKE_INSTALL_RPATH "/usr/lib:/usr/lib/vielotus")

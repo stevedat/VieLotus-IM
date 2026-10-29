@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 1.1.1)'
+        description: 'Release version (e.g. 2.0.0)'
         required: false
         default: ''
 
@@ -15,8 +15,44 @@ permissions:
   contents: write
 
 jobs:
+  windows-build:
+    name: Build Windows Installers (x64 & ARM64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract release version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          fi
+          if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
+            VERSION="2.0.0"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Build Windows TSF COM Shell & Inno Setup Installers (x64 & ARM64)
+        shell: pwsh
+        run: |
+          ./scripts/build_windows.ps1 -Version "${{ steps.version.outputs.version }}" -Arch all -SkipTests
+
+      - name: Upload Windows release installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: VieLotus-Windows-Installers
+          path: |
+            dist/windows/VieLotus-Setup-x64.exe
+            dist/windows/VieLotus-Setup-arm64.exe
+
   build-and-release:
     name: Build, Sign & Publish Desktop Release (macOS, Windows, Linux)
+    needs: [windows-build]
     runs-on: macos-15
     env:
       MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
@@ -49,8 +85,8 @@ jobs:
             VERSION="${TAG#v}"
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
-            VERSION="1.1.1"
-            TAG="v1.1.1"
+            VERSION="2.0.0"
+            TAG="v2.0.0"
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
@@ -121,10 +157,18 @@ jobs:
         run: |
           ./scripts/build_pkg.sh "${{ steps.version.outputs.version }}"
 
+      - name: Download freshly built Windows Release Installers
+        uses: actions/download-artifact@v4
+        with:
+          name: VieLotus-Windows-Installers
+          path: .build/dist/
+
       - name: Stage Windows & Linux Release Installers and Generate Checksums
         run: |
-          cp Binaries/windows/VieLotus-Setup-x64.exe .build/dist/
-          cp Binaries/windows/VieLotus-Setup-arm64.exe .build/dist/
+          if [ ! -f .build/dist/VieLotus-Setup-x64.exe ]; then
+            cp Binaries/windows/VieLotus-Setup-x64.exe .build/dist/
+            cp Binaries/windows/VieLotus-Setup-arm64.exe .build/dist/
+          fi
           cp Binaries/linux/*.deb .build/dist/
           cd .build/dist
           shasum -a 256 VieLotusIM.pkg VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe *.deb > checksums.sha256

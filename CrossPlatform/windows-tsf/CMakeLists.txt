@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(VieLotusTIP VERSION 1.1.1 LANGUAGES CXX)
+project(VieLotusTIP VERSION 2.0.0 LANGUAGES CXX)
 
 # Use static MSVC runtime (/MT) so VieLotusTIP.dll has zero external VC++ Redistributable dependencies
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

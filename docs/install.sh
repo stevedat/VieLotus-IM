@@ -6,7 +6,7 @@
 # ==============================================================================
 set -e
 
-VERSION="${VIELOTUS_VERSION:-1.1.1}"
+VERSION="${VIELOTUS_VERSION:-2.0.0}"
 ARCH_RAW="$(uname -m)"
 
 case "${ARCH_RAW}" in
