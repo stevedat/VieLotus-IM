@@ -284,7 +284,7 @@ Installed-Size: ${installed_size}
 Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
 Homepage: https://github.com/stevedat/VieLotus-IM
 Depends: libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3
-Recommends: ibus | fcitx5, im-config, python3-gi, gir1.2-gtk-3.0
+Recommends: ibus | fcitx5, im-config, python3-gi, gir1.2-gtk-3.0, fonts-noto-core | fonts-dejavu-core, fonts-ubuntu-classic
 Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
 Provides: fcitx5-vielotus, ibus-vielotus
 Enhances: fcitx5, ibus, language-selector-common

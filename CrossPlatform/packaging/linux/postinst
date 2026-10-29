@@ -9,8 +9,15 @@ fi
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor >/dev/null 2>&1 || true
 fi
+if command -v fc-cache >/dev/null 2>&1; then
+    fc-cache -f >/dev/null 2>&1 || true
+fi
 if command -v ibus >/dev/null 2>&1; then
     ibus write-cache --system >/dev/null 2>&1 || true
+fi
+# Stop any older running ibus-engine-vielotus daemon so IBus respawns the updated v2.0.0 binary immediately
+if command -v pkill >/dev/null 2>&1; then
+    pkill -f ibus-engine-vielotus >/dev/null 2>&1 || true
 fi
 
 # Register Sen Việt (vielotus) into Ubuntu Language Support (language-selector-common)

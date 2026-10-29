@@ -249,12 +249,55 @@ ENV_EOF
         fi
     fi
 
-    # 2. Refresh IBus cache & switch active engine if IBus daemon is reachable
+    # 2. Refresh IBus cache, restart old engine worker & switch active engine if IBus daemon is reachable
+    if command -v pkill >/dev/null 2>&1; then
+        pkill -f ibus-engine-vielotus >/dev/null 2>&1 || true
+    fi
     if command -v ibus >/dev/null 2>&1; then
         ibus write-cache >/dev/null 2>&1 || true
         if pgrep -x ibus-daemon >/dev/null 2>&1; then
             ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true
         fi
+    fi
+
+    # Refresh user & Snap Store fontconfig cache if present so Vietnamese glyphs (ệ, ộ, ử...) render cleanly
+    FONTCONF_DIR="${CONFIG_ROOT}/fontconfig/conf.d"
+    mkdir -p "${FONTCONF_DIR}" 2>/dev/null || true
+    cat <<'FC_EOF' > "${FONTCONF_DIR}/99-vielotus-vietnamese.conf" 2>/dev/null || true
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <alias>
+    <family>Ubuntu</family>
+    <prefer>
+      <family>Ubuntu</family>
+      <family>Noto Sans</family>
+      <family>DejaVu Sans</family>
+    </prefer>
+  </alias>
+  <alias>
+    <family>Ubuntu Sans</family>
+    <prefer>
+      <family>Ubuntu Sans</family>
+      <family>Noto Sans</family>
+      <family>DejaVu Sans</family>
+    </prefer>
+  </alias>
+  <alias>
+    <family>sans-serif</family>
+    <prefer>
+      <family>Noto Sans</family>
+      <family>DejaVu Sans</family>
+      <family>Ubuntu</family>
+    </prefer>
+  </alias>
+</fontconfig>
+FC_EOF
+    if [ -d "${HOME}/snap/snap-store/common/.cache/fontconfig" ]; then
+        rm -rf "${HOME}/snap/snap-store/common/.cache/fontconfig" 2>/dev/null || true
+    fi
+    if command -v fc-cache >/dev/null 2>&1; then
+        fc-cache -f >/dev/null 2>&1 || true
     fi
 
     # 3. Register into GNOME / Ubuntu Input Sources (org.gnome.desktop.input-sources)
@@ -329,6 +372,7 @@ cfg["SMART_BILINGUAL"] = "true"
 cfg["MODERN_ORTHOGRAPHY"] = "true"
 
 css = b"""
+* { font-family: "Noto Sans", "DejaVu Sans", "Liberation Sans", "Ubuntu", sans-serif; }
 .bento-win { background-color: #f5f5f7; }
 .bento-header { background-color: #ffffff; border-bottom: 1px solid #e5e5ea; padding: 10px 16px; }
 .bento-footer { background-color: #ffffff; border-top: 1px solid #e5e5ea; padding: 8px 16px; }

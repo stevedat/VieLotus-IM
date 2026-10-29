@@ -148,11 +148,23 @@ static void ibus_vielotus_build_prop_list(IBusVieLotusEngine *vl_engine) {
     ibus_prop_list_append(vl_engine->prop_list, prop);
 }
 
+static void ibus_vielotus_clear_preedit(IBusEngine *engine) {
+    IBusText *empty = ibus_text_new_from_static_string("");
+    ibus_engine_update_preedit_text_with_mode(
+        engine,
+        empty,
+        0,
+        FALSE,
+        IBUS_ENGINE_PREEDIT_CLEAR
+    );
+    ibus_engine_hide_preedit_text(engine);
+}
+
 static void ibus_vielotus_engine_reset_internal(IBusVieLotusEngine *vl_engine) {
     if (vl_engine->session) {
         vielotus_reset_session(vl_engine->session);
     }
-    ibus_engine_hide_preedit_text((IBusEngine *)vl_engine);
+    ibus_vielotus_clear_preedit((IBusEngine *)vl_engine);
 }
 
 static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const char *trailing_ascii) {
@@ -161,7 +173,12 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
     buf[0] = '\0';
 
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
-        vielotus_commit_word(vl_engine->session);
+        if (trailing_ascii && trailing_ascii[0] != '\0' && trailing_ascii[1] == '\0') {
+            uint32_t cp = (uint32_t)(unsigned char)trailing_ascii[0];
+            vielotus_feed_char(vl_engine->session, cp);
+        } else {
+            vielotus_commit_word(vl_engine->session);
+        }
         const char *committed = vielotus_get_last_text(vl_engine->session);
         if (committed && committed[0] != '\0') {
             snprintf(buf, sizeof(buf), "%s", committed);
@@ -188,18 +205,19 @@ static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
         const char *composing = vielotus_get_composing_text(vl_engine->session);
         if (composing && composing[0] != '\0') {
             IBusText *text = ibus_text_new_from_string(composing);
-            ibus_text_append_attribute(text, IBUS_ATTR_TYPE_UNDERLINE, IBUS_ATTR_UNDERLINE_SINGLE, 0, -1);
+            guint char_len = ibus_text_get_length(text);
+            ibus_text_append_attribute(text, IBUS_ATTR_TYPE_UNDERLINE, IBUS_ATTR_UNDERLINE_SINGLE, 0, (gint)char_len);
             ibus_engine_update_preedit_text_with_mode(
                 engine,
                 text,
-                ibus_text_get_length(text),
+                char_len,
                 TRUE,
                 IBUS_ENGINE_PREEDIT_COMMIT
             );
             return;
         }
     }
-    ibus_engine_hide_preedit_text(engine);
+    ibus_vielotus_clear_preedit(engine);
 }
 
 static void ibus_vielotus_engine_init(IBusVieLotusEngine *vl_engine) {
@@ -271,7 +289,11 @@ static void ibus_vielotus_engine_focus_in(IBusEngine *engine) {
 
 static void ibus_vielotus_engine_focus_out(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
-    ibus_vielotus_engine_reset_internal(vl_engine);
+    if (vielotus_is_composing(vl_engine->session)) {
+        ibus_vielotus_commit_composing(vl_engine, NULL);
+    } else {
+        ibus_vielotus_engine_reset_internal(vl_engine);
+    }
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->focus_out(engine);
 }
 
@@ -282,7 +304,11 @@ static void ibus_vielotus_engine_property_activate(
 ) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
     if (g_strcmp0(prop_name, "more-settings") == 0) {
-        g_spawn_command_line_async("/usr/bin/vielotus-settings", NULL);
+        if (g_file_test("/usr/bin/vielotus-settings", G_FILE_TEST_IS_EXECUTABLE)) {
+            g_spawn_command_line_async("/usr/bin/vielotus-settings", NULL);
+        } else {
+            g_spawn_command_line_async("vielotus", NULL);
+        }
         return;
     } else if (g_strcmp0(prop_name, "smart-bilingual") == 0) {
         vl_engine->smart_bilingual = (prop_state == PROP_STATE_CHECKED);
