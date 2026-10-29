@@ -1264,9 +1264,10 @@
                 </td>
                 <td>
                   <div class="channel-pills">
-                    <a id="link-win-exe" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe" class="channel-pill">Setup x64 (.exe)</a>
-                    <a id="link-win-arm64" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe" class="channel-pill">Setup ARM64 (.exe)</a>
-                    <a href="https://github.com/stevedat/VieLotus-IM/releases/latest" target="_blank" rel="noopener noreferrer" class="channel-pill secondary">Microsoft Store / MSIX</a>
+                    <a id="link-win-store-exe" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Store-Setup.exe" class="channel-pill">VieLotus-Store-Setup.exe (Signed)</a>
+                    <a id="link-win-exe" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe" class="channel-pill secondary">Setup x64 (.exe)</a>
+                    <a id="link-win-arm64" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe" class="channel-pill secondary">Setup ARM64 (.exe)</a>
+                    <a href="https://apps.microsoft.com/detail/9PF5K64GXXSH" target="_blank" rel="noopener noreferrer" class="channel-pill secondary">Microsoft Store</a>
                   </div>
                 </td>
               </tr>
@@ -2211,6 +2212,9 @@
             } else if (asset.name === 'VieLotusIM.app.zip') {
               const rowZip = document.getElementById('link-mac-zip');
               if (rowZip) rowZip.href = asset.browser_download_url;
+            } else if (asset.name === 'VieLotus-Store-Setup.exe') {
+              const rowWinStoreExe = document.getElementById('link-win-store-exe');
+              if (rowWinStoreExe) rowWinStoreExe.href = asset.browser_download_url;
             } else if (asset.name === 'VieLotus-Setup-x64.exe') {
               const rowExe = document.getElementById('link-win-exe');
               if (rowExe) rowExe.href = asset.browser_download_url;

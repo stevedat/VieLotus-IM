@@ -68,12 +68,26 @@ set -e
 export LD_LIBRARY_PATH="${SNAP}/usr/lib:${SNAP}/usr/lib/vielotus:${SNAP}/usr/lib/x86_64-linux-gnu:${SNAP}/usr/lib/aarch64-linux-gnu:${LD_LIBRARY_PATH:-}"
 export VIELOTUS_RESOURCE_PATH="${SNAP}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
 
-# Export Fcitx5 addon & runtime libraries into ~/.local/lib/vielotus so host fcitx5 can load them
+# Export Fcitx5 addon, IBus engine & runtime libraries into ~/.local/lib/vielotus so host fcitx5/ibus can load them
 USER_LIB_BASE="${HOME}/.local/lib/vielotus"
-mkdir -p "${USER_LIB_BASE}/fcitx5" "${USER_LIB_BASE}/lib"
+mkdir -p "${USER_LIB_BASE}/fcitx5" "${USER_LIB_BASE}/ibus" "${USER_LIB_BASE}/lib"
 cp -f "${SNAP}/usr/lib/fcitx5/vielotus.so" "${USER_LIB_BASE}/fcitx5/vielotus.so" 2>/dev/null || true
+cp -f "${SNAP}/usr/lib/ibus/ibus-engine-vielotus" "${USER_LIB_BASE}/ibus/ibus-engine-vielotus" 2>/dev/null || true
+chmod 755 "${USER_LIB_BASE}/ibus/ibus-engine-vielotus" 2>/dev/null || true
 cp -f "${SNAP}/usr/lib/libVieLotusCAPI.so" "${USER_LIB_BASE}/lib/libVieLotusCAPI.so" 2>/dev/null || true
 cp -f "${SNAP}/usr/lib/vielotus/"*.so* "${USER_LIB_BASE}/lib/" 2>/dev/null || true
+
+cat <<IBUS_WRAP_EOF > "${USER_LIB_BASE}/ibus/ibus-engine-vielotus-runner"
+#!/bin/sh
+export LD_LIBRARY_PATH="${USER_LIB_BASE}/lib:/usr/lib:/usr/lib/vielotus:\${LD_LIBRARY_PATH:-}"
+exec "${USER_LIB_BASE}/ibus/ibus-engine-vielotus" "\$@"
+IBUS_WRAP_EOF
+chmod 755 "${USER_LIB_BASE}/ibus/ibus-engine-vielotus-runner" 2>/dev/null || true
+
+if [ ! -x /usr/lib/ibus/ibus-engine-vielotus ] && pgrep -x ibus-daemon >/dev/null 2>&1; then
+    pkill -f ibus-engine-vielotus >/dev/null 2>&1 || true
+    nohup "${USER_LIB_BASE}/ibus/ibus-engine-vielotus-runner" --ibus >/dev/null 2>&1 &
+fi
 
 ENV_D_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d"
 mkdir -p "${ENV_D_DIR}"

@@ -90,7 +90,12 @@ void VieLotusState::updatePreedit() {
 void VieLotusState::commitComposing(const char* trailingAscii) {
     std::string out;
     if (session_ && vielotus_is_composing(session_)) {
-        vielotus_commit_word(session_);
+        if (trailingAscii && trailingAscii[0] != '\0' && trailingAscii[1] == '\0') {
+            uint32_t cp = static_cast<uint32_t>(static_cast<unsigned char>(trailingAscii[0]));
+            vielotus_feed_char(session_, cp);
+        } else {
+            vielotus_commit_word(session_);
+        }
         const char* committed = vielotus_get_last_text(session_);
         if (committed && committed[0] != '\0') {
             out.append(committed);

@@ -178,6 +178,10 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
     fi
     ${SUDO} apt-get update -qq || true
     ${SUDO} apt-get install -y "${TMP_DEB}" || (${SUDO} dpkg -i "${TMP_DEB}" && ${SUDO} apt-get install -f -y)
+    ${SUDO} apt-get install -y --no-install-recommends fonts-noto-core fonts-dejavu-core 2>/dev/null || true
+    if command -v fc-cache >/dev/null 2>&1; then
+        ${SUDO} fc-cache -f >/dev/null 2>&1 || true
+    fi
 elif command -v pacman >/dev/null 2>&1; then
     echo "📦 Phát hiện hệ sinh thái Arch Linux / Manjaro (pacman)..."
     ${SUDO} pacman -S --needed --noconfirm python-gobject gtk3 2>/dev/null || true

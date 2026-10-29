@@ -3,7 +3,7 @@
 [![English](https://img.shields.io/badge/Language-English-1F5B3A.svg)](README.md)
 [![Tiếng Việt](https://img.shields.io/badge/Ngôn_ngữ-Tiếng_Việt-2d3748.svg)](README.vi.md)
 [![macOS](https://img.shields.io/badge/macOS-Installer_(.pkg)-000000.svg?logo=apple&logoColor=white)](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg)
-[![Windows Store](https://img.shields.io/badge/Microsoft_Store-Sen_Việt-0067B8.svg?logo=windows&logoColor=white)](https://github.com/stevedat/VieLotus-IM/releases/latest)
+[![Windows Store](https://img.shields.io/badge/Microsoft_Store-Sen_Việt-0067B8.svg?logo=windows&logoColor=white)](https://apps.microsoft.com/detail/9PF5K64GXXSH)
 [![Linux](https://img.shields.io/badge/Linux-Snap_%2F_.deb-E95420.svg?logo=ubuntu&logoColor=white)](https://snapcraft.io/vielotus)
 [![App Store](https://img.shields.io/badge/App_Store-Sen_Việt-000000.svg?logo=apple&logoColor=white)](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799)
 [![Google Play](https://img.shields.io/badge/Google_Play-Sen_Việt-1F5B3A.svg?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard)
@@ -54,7 +54,8 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
 - **Direct Installer (`.pkg`)**: Download [`VieLotusIM.pkg`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg), run the installer, then open **System Settings → Keyboard → Input Sources → Edit... → (+) → Vietnamese → Sen Việt**.
 
 ### 2. Windows (Windows 10 / 11 — `x64` & `ARM64`)
-- Download [`VieLotus-Setup-x64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe) or [`VieLotus-Setup-arm64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe) from [Releases](https://github.com/stevedat/VieLotus-IM/releases/latest) (or install via **Microsoft Store**).
+- **Microsoft Corporation Signed Web Installer (Recommended — Zero SmartScreen warning)**: Download [`VieLotus-Store-Setup.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Store-Setup.exe) or install directly from the [**Microsoft Store**](https://apps.microsoft.com/detail/9PF5K64GXXSH).
+- **Standalone Offline Installers**: Download [`VieLotus-Setup-x64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe) (`x64`) or [`VieLotus-Setup-arm64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe) (`ARM64`) from [Releases](https://github.com/stevedat/VieLotus-IM/releases/latest).
 - Run the installer and press **`Win + Space`** to select **Sen Việt**.
 
 ### 3. Linux (Ubuntu / Debian / Mint / Fedora / Arch / openSUSE — `amd64` & `arm64`)

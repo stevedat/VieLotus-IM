@@ -169,9 +169,12 @@ jobs:
             cp Binaries/windows/VieLotus-Setup-x64.exe .build/dist/
             cp Binaries/windows/VieLotus-Setup-arm64.exe .build/dist/
           fi
+          if [ -f Binaries/windows/VieLotus-Store-Setup.exe ]; then
+            cp Binaries/windows/VieLotus-Store-Setup.exe .build/dist/
+          fi
           cp Binaries/linux/*.deb .build/dist/
           cd .build/dist
-          shasum -a 256 VieLotusIM.pkg VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe *.deb > checksums.sha256
+          shasum -a 256 VieLotusIM.pkg VieLotus-Store-Setup.exe VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe *.deb > checksums.sha256
           cat checksums.sha256
 
       - name: Prepare Release Notes Body
@@ -186,7 +189,7 @@ jobs:
           - **Git Commit:** [\`${SHORT_SHA}\`](https://github.com/${{ github.repository }}/commit/${COMMIT_SHA})
           - **Build Timestamp:** ${BUILD_DATE}
           - **macOS:** \`VieLotusIM.pkg\` (Universal Apple Silicon & Intel)
-          - **Windows (x64 & ARM64):** \`VieLotus-Setup-x64.exe\`, \`VieLotus-Setup-arm64.exe\` (Universal Native Windows Text Services Framework COM Installer)
+          - **Windows (Microsoft Store Signed & Offline Installers — x64 & ARM64):** \`VieLotus-Store-Setup.exe\` (Signed by Microsoft Corporation), \`VieLotus-Setup-x64.exe\`, \`VieLotus-Setup-arm64.exe\` (Universal Native Windows Text Services Framework COM Installer)
           - **Linux (Debian/Ubuntu All-in-One \`amd64\` & \`arm64\`):** \`vielotus_${{ steps.version.outputs.version }}_amd64.deb\`, \`vielotus_${{ steps.version.outputs.version }}_arm64.deb\` (IBus & Fcitx5 + Core Engine)
 
           #### 📊 Chỉ số kiểm thử hồi quy chính thức (Benchmark Regression Matrix)
@@ -207,6 +210,7 @@ jobs:
           body_path: release_notes.md
           files: |
             .build/dist/VieLotusIM.pkg
+            .build/dist/VieLotus-Store-Setup.exe
             .build/dist/VieLotus-Setup-*.exe
             .build/dist/*.deb
             .build/dist/checksums.sha256

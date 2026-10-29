@@ -3,7 +3,7 @@
 [![English](https://img.shields.io/badge/Language-English-2d3748.svg)](README.md)
 [![Tiếng Việt](https://img.shields.io/badge/Ngôn_ngữ-Tiếng_Việt-1F5B3A.svg)](README.vi.md)
 [![macOS](https://img.shields.io/badge/macOS-Bộ_cài_(.pkg)-000000.svg?logo=apple&logoColor=white)](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg)
-[![Windows Store](https://img.shields.io/badge/Microsoft_Store-Sen_Việt-0067B8.svg?logo=windows&logoColor=white)](https://github.com/stevedat/VieLotus-IM/releases/latest)
+[![Windows Store](https://img.shields.io/badge/Microsoft_Store-Sen_Việt-0067B8.svg?logo=windows&logoColor=white)](https://apps.microsoft.com/detail/9PF5K64GXXSH)
 [![Linux](https://img.shields.io/badge/Linux-Snap_%2F_.deb-E95420.svg?logo=ubuntu&logoColor=white)](https://snapcraft.io/vielotus)
 [![App Store](https://img.shields.io/badge/App_Store-Sen_Việt-000000.svg?logo=apple&logoColor=white)](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799)
 [![Google Play](https://img.shields.io/badge/Google_Play-Sen_Việt-1F5B3A.svg?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard)
@@ -54,7 +54,8 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
 - **Bộ cài trực tiếp (`.pkg`)**: Tải [`VieLotusIM.pkg`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg), mở để cài đặt tự động, sau đó vào **System Settings → Keyboard → Input Sources → Edit... → (+) → Tiếng Việt → Sen Việt**.
 
 ### 2. Windows (Windows 10 / 11 — `x64` & `ARM64`)
-- Tải [`VieLotus-Setup-x64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe) hoặc [`VieLotus-Setup-arm64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe) tại [Releases](https://github.com/stevedat/VieLotus-IM/releases/latest) (hoặc cài qua **Microsoft Store**).
+- **Bộ cài ký số bởi Microsoft Corporation (Khuyên dùng — 0 cảnh báo SmartScreen)**: Tải [`VieLotus-Store-Setup.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Store-Setup.exe) hoặc cài trực tiếp trên [**Microsoft Store**](https://apps.microsoft.com/detail/9PF5K64GXXSH).
+- **Bộ cài Offline độc lập**: Tải [`VieLotus-Setup-x64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe) (`x64`) hoặc [`VieLotus-Setup-arm64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe) (`ARM64`) tại [Releases](https://github.com/stevedat/VieLotus-IM/releases/latest).
 - Chạy bộ cài và nhấn **`Win + Space`** để chuyển sang **Sen Việt**.
 
 ### 3. Linux (Ubuntu / Debian / Mint / Fedora / Arch / openSUSE — `amd64` & `arm64`)
