@@ -105,16 +105,16 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
         out.append(trailingAscii);
     }
 
+    if (!out.empty()) {
+        ic_->commitString(out);
+    }
+
     if (session_) {
         vielotus_reset_session(session_);
     }
     ic_->inputPanel().reset();
     ic_->updatePreedit();
     ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
-
-    if (!out.empty()) {
-        ic_->commitString(out);
-    }
 }
 
 void VieLotusState::reset() {
@@ -198,8 +198,8 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                     const char* committed = vielotus_get_last_text(session_);
                     std::string out = committed ? committed : "";
                     out.push_back(static_cast<char>(sym));
-                    reset();
                     ic_->commitString(out);
+                    reset();
                     keyEvent.filterAndAccept();
                     return;
                 }
@@ -219,10 +219,10 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         if (action == VIELOTUS_ACTION_COMMIT) {
             const char* committed = vielotus_get_last_text(session_);
             std::string out = committed ? committed : "";
-            reset();
             if (!out.empty()) {
                 ic_->commitString(out);
             }
+            reset();
             keyEvent.filterAndAccept();
             return;
         } else if (vielotus_is_composing(session_) ||

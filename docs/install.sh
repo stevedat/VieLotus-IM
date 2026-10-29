@@ -170,6 +170,11 @@ finalize_linux_integration() {
 # ------------------------------------------------------------------------------
 if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
     echo "📦 Phát hiện hệ sinh thái Debian / Ubuntu (apt)..."
+    # Remove any sandboxed Snap installation so native /usr/bin/vielotus & system IBus/Fcitx5 take precedence
+    if command -v snap >/dev/null 2>&1 && snap list vielotus >/dev/null 2>&1; then
+        echo "🧹 Đang gỡ bản Snap cũ để đồng bộ sang gói hệ thống (.deb) chuẩn..."
+        ${SUDO} snap remove vielotus >/dev/null 2>&1 || true
+    fi
     PKG_DEPENDS="/usr/share/language-selector/data/pkg_depends"
     if [ -f "${PKG_DEPENDS}" ]; then
         if ! grep -q "im:vi::vielotus" "${PKG_DEPENDS}" 2>/dev/null; then
@@ -177,8 +182,8 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
         fi
     fi
     ${SUDO} apt-get update -qq || true
+    ${SUDO} apt-get install -y --no-install-recommends python3-gi gir1.2-gtk-3.0 zenity fonts-noto-core fonts-dejavu-core 2>/dev/null || true
     ${SUDO} apt-get install -y "${TMP_DEB}" || (${SUDO} dpkg -i "${TMP_DEB}" && ${SUDO} apt-get install -f -y)
-    ${SUDO} apt-get install -y --no-install-recommends fonts-noto-core fonts-dejavu-core 2>/dev/null || true
     if command -v fc-cache >/dev/null 2>&1; then
         ${SUDO} fc-cache -f >/dev/null 2>&1 || true
     fi
