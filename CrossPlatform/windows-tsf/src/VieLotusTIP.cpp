@@ -5,6 +5,19 @@
 
 #define VI_LANGID 0x042A
 
+#ifndef TF_PROFILETYPE_INPUTPROCESSOR
+#define TF_PROFILETYPE_INPUTPROCESSOR 1
+#endif
+#ifndef TF_IPPMF_FORPROCESS
+#define TF_IPPMF_FORPROCESS 0x10000000
+#endif
+#ifndef TF_IPPMF_FORSESSION
+#define TF_IPPMF_FORSESSION 0x20000000
+#endif
+#ifndef TF_IPPMF_ENABLEPROFILE
+#define TF_IPPMF_ENABLEPROFILE 0x00000002
+#endif
+
 namespace {
 
 struct VieLotusCApi {
@@ -112,6 +125,8 @@ STDMETHODIMP CVieLotusTIP::QueryInterface(REFIID riid, void **ppvObj) {
         *ppvObj = static_cast<ITfKeyEventSink *>(this);
     } else if (IsEqualIID(riid, IID_ITfThreadMgrEventSink)) {
         *ppvObj = static_cast<ITfThreadMgrEventSink *>(this);
+    } else if (IsEqualIID(riid, IID_ITfActiveLanguageProfileNotifySink)) {
+        *ppvObj = static_cast<ITfActiveLanguageProfileNotifySink *>(this);
     } else if (IsEqualIID(riid, IID_ITfCompositionSink)) {
         *ppvObj = static_cast<ITfCompositionSink *>(this);
     }
@@ -133,6 +148,29 @@ STDMETHODIMP_(ULONG) CVieLotusTIP::Release() {
         delete this;
     }
     return cRef;
+}
+
+void CVieLotusTIP::ApplyVniMode(bool isVni, bool persistToRegistry) {
+    bool changed = (m_isVniMode != isVni);
+    m_isVniMode = isVni;
+    if (persistToRegistry) {
+        SavePersistedVniPreference(m_isVniMode);
+    }
+
+#if defined(VIELOTUS_EMBEDDED_ENGINE)
+    m_nativeEngine.setInputMethod(m_isVniMode ? vielotus_win::InputMethod::VNI : vielotus_win::InputMethod::Telex);
+    if (changed) {
+        m_nativeEngine.reset();
+    }
+#endif
+
+    const auto &api = GetCApi();
+    if (api.isValid && m_session) {
+        api.set_input_method(m_session, m_isVniMode ? VIELOTUS_INPUT_VNI : VIELOTUS_INPUT_TELEX);
+        if (changed) {
+            api.reset_session(m_session);
+        }
+    }
 }
 
 void CVieLotusTIP::ReloadUserPreferences() {
@@ -174,35 +212,76 @@ void CVieLotusTIP::InitSession() {
 }
 
 void CVieLotusTIP::SyncActiveLanguageProfile() {
+    ITfInputProcessorProfiles *pProfiles = nullptr;
+    if (FAILED(CoCreateInstance(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER, IID_ITfInputProcessorProfiles, reinterpret_cast<void **>(&pProfiles))) || !pProfiles) {
+        return;
+    }
+
     ITfInputProcessorProfileMgr *pProfileMgr = nullptr;
-    if (m_pThreadMgr && SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfInputProcessorProfileMgr, reinterpret_cast<void **>(&pProfileMgr)))) {
+    pProfiles->QueryInterface(IID_ITfInputProcessorProfileMgr, reinterpret_cast<void **>(&pProfileMgr));
+
+    // 1. If the user explicitly clicked Telex/VNI inside VieLotusSettings, apply it and sync TSF profile
+    bool settingsVni = false;
+    if (ConsumeSettingsVniOverride(settingsVni)) {
+        const GUID &targetGuid = settingsVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
+        ApplyVniMode(settingsVni, true);
+        pProfiles->SetDefaultLanguageProfile(VI_LANGID, CLSID_VieLotusTIP, targetGuid);
+        pProfiles->ActivateLanguageProfile(CLSID_VieLotusTIP, VI_LANGID, targetGuid);
+        if (pProfileMgr) {
+            pProfileMgr->ActivateProfile(
+                TF_PROFILETYPE_INPUTPROCESSOR,
+                VI_LANGID,
+                CLSID_VieLotusTIP,
+                targetGuid,
+                nullptr,
+                TF_IPPMF_FORPROCESS | TF_IPPMF_ENABLEPROFILE
+            );
+            pProfileMgr->Release();
+        }
+        pProfiles->Release();
+        return;
+    }
+
+    // 2. Otherwise, query the active TSF profile selected via Windows Taskbar / Win+Space
+    bool resolved = false;
+    bool isVni = m_isVniMode;
+
+    if (pProfileMgr) {
         TF_INPUTPROCESSORPROFILE activeProfile{};
         if (SUCCEEDED(pProfileMgr->GetActiveProfile(GUID_TFCAT_TIP_KEYBOARD, &activeProfile)) &&
             IsEqualCLSID(activeProfile.clsid, CLSID_VieLotusTIP)) {
-            bool isVni = IsEqualGUID(activeProfile.guidProfile, GUID_VieLotusProfileVNI) != FALSE;
-            if (m_isVniMode != isVni) {
-                m_isVniMode = isVni;
-                SavePersistedVniPreference(m_isVniMode);
-
-                // Persist as Windows default profile for Vietnamese so reboot/restart keeps VNI/Telex
-                ITfInputProcessorProfiles *pProfiles = nullptr;
-                if (SUCCEEDED(CoCreateInstance(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER, IID_ITfInputProcessorProfiles, (void **)&pProfiles)) && pProfiles) {
-                    pProfiles->SetDefaultLanguageProfile(VI_LANGID, CLSID_VieLotusTIP, activeProfile.guidProfile);
-                    pProfiles->Release();
-                }
-
-#if defined(VIELOTUS_EMBEDDED_ENGINE)
-                m_nativeEngine.setInputMethod(m_isVniMode ? vielotus_win::InputMethod::VNI : vielotus_win::InputMethod::Telex);
-#endif
-                const auto &api = GetCApi();
-                if (api.isValid && m_session) {
-                    api.set_input_method(m_session, m_isVniMode ? VIELOTUS_INPUT_VNI : VIELOTUS_INPUT_TELEX);
-                    api.reset_session(m_session);
-                }
+            if (IsEqualGUID(activeProfile.guidProfile, GUID_VieLotusProfileVNI)) {
+                isVni = true;
+                resolved = true;
+            } else if (IsEqualGUID(activeProfile.guidProfile, GUID_VieLotusProfile)) {
+                isVni = false;
+                resolved = true;
             }
         }
         pProfileMgr->Release();
     }
+
+    if (!resolved) {
+        LANGID langId = VI_LANGID;
+        GUID guidProfile{};
+        if (SUCCEEDED(pProfiles->GetActiveLanguageProfile(CLSID_VieLotusTIP, &langId, &guidProfile))) {
+            if (IsEqualGUID(guidProfile, GUID_VieLotusProfileVNI)) {
+                isVni = true;
+                resolved = true;
+            } else if (IsEqualGUID(guidProfile, GUID_VieLotusProfile)) {
+                isVni = false;
+                resolved = true;
+            }
+        }
+    }
+
+    if (resolved && m_isVniMode != isVni) {
+        const GUID &activeGuid = isVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
+        pProfiles->SetDefaultLanguageProfile(VI_LANGID, CLSID_VieLotusTIP, activeGuid);
+        ApplyVniMode(isVni, true);
+    }
+
+    pProfiles->Release();
 }
 
 void CVieLotusTIP::ResetComposingSession() {
@@ -332,10 +411,11 @@ STDMETHODIMP CVieLotusTIP::ActivateEx(ITfThreadMgr *ptim, TfClientId tid, DWORD 
         pKeystrokeMgr->Release();
     }
 
-    // 2. Advise ThreadMgrEventSink
+    // 2. Advise ThreadMgrEventSink & ActiveLanguageProfileNotifySink
     ITfSource *pSource = nullptr;
     if (SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfSource, reinterpret_cast<void **>(&pSource)))) {
         pSource->AdviseSink(IID_ITfThreadMgrEventSink, static_cast<ITfThreadMgrEventSink *>(this), &m_dwThreadMgrEventSinkCookie);
+        pSource->AdviseSink(IID_ITfActiveLanguageProfileNotifySink, static_cast<ITfActiveLanguageProfileNotifySink *>(this), &m_dwProfileNotifySinkCookie);
         pSource->Release();
     }
 
@@ -352,14 +432,18 @@ STDMETHODIMP CVieLotusTIP::Deactivate() {
         pKeystrokeMgr->Release();
     }
 
-    // 2. Unadvise ThreadMgrEventSink
-    if (m_dwThreadMgrEventSinkCookie != TF_INVALID_COOKIE) {
-        ITfSource *pSource = nullptr;
-        if (SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfSource, reinterpret_cast<void **>(&pSource)))) {
+    // 2. Unadvise ThreadMgrEventSink & ActiveLanguageProfileNotifySink
+    ITfSource *pSource = nullptr;
+    if (SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfSource, reinterpret_cast<void **>(&pSource)))) {
+        if (m_dwThreadMgrEventSinkCookie != TF_INVALID_COOKIE) {
             pSource->UnadviseSink(m_dwThreadMgrEventSinkCookie);
-            pSource->Release();
+            m_dwThreadMgrEventSinkCookie = TF_INVALID_COOKIE;
         }
-        m_dwThreadMgrEventSinkCookie = TF_INVALID_COOKIE;
+        if (m_dwProfileNotifySinkCookie != TF_INVALID_COOKIE) {
+            pSource->UnadviseSink(m_dwProfileNotifySinkCookie);
+            m_dwProfileNotifySinkCookie = TF_INVALID_COOKIE;
+        }
+        pSource->Release();
     }
 
     CleanSession();
@@ -414,6 +498,9 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
 
     // Eat candidate alphabetic typing keys
     if (wParam >= 'A' && wParam <= 'Z') {
+        if (!isComposing) {
+            SyncActiveLanguageProfile();
+        }
         *pfEaten = TRUE;
         return S_OK;
     }
@@ -591,6 +678,17 @@ STDMETHODIMP CVieLotusTIP::OnPushContext(ITfContext *pic) {
 
 STDMETHODIMP CVieLotusTIP::OnPopContext(ITfContext *pic) {
     (void)pic;
+    return S_OK;
+}
+
+STDMETHODIMP CVieLotusTIP::OnActivated(REFCLSID clsid, REFGUID guidProfile, BOOL fActivated) {
+    if (fActivated && IsEqualCLSID(clsid, CLSID_VieLotusTIP)) {
+        if (IsEqualGUID(guidProfile, GUID_VieLotusProfileVNI)) {
+            ApplyVniMode(true, true);
+        } else if (IsEqualGUID(guidProfile, GUID_VieLotusProfile)) {
+            ApplyVniMode(false, true);
+        }
+    }
     return S_OK;
 }
 

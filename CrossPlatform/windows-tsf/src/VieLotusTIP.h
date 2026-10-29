@@ -9,6 +9,7 @@
 class CVieLotusTIP : public ITfTextInputProcessorEx,
                      public ITfKeyEventSink,
                      public ITfThreadMgrEventSink,
+                     public ITfActiveLanguageProfileNotifySink,
                      public ITfCompositionSink {
 public:
     CVieLotusTIP();
@@ -41,6 +42,9 @@ public:
     STDMETHODIMP OnPushContext(ITfContext *pic) override;
     STDMETHODIMP OnPopContext(ITfContext *pic) override;
 
+    // ITfActiveLanguageProfileNotifySink
+    STDMETHODIMP OnActivated(REFCLSID clsid, REFGUID guidProfile, BOOL fActivated) override;
+
     // ITfCompositionSink
     STDMETHODIMP OnCompositionTerminated(TfEditCookie ecWrite, ITfComposition *pComposition) override;
 
@@ -49,6 +53,7 @@ private:
     ITfThreadMgr *m_pThreadMgr{nullptr};
     TfClientId m_tfClientId{TF_CLIENTID_NULL};
     DWORD m_dwThreadMgrEventSinkCookie{TF_INVALID_COOKIE};
+    DWORD m_dwProfileNotifySinkCookie{TF_INVALID_COOKIE};
 
     vielotus_session_t m_session{nullptr};
 #if defined(VIELOTUS_EMBEDDED_ENGINE)
@@ -61,6 +66,7 @@ private:
 
     void InitSession();
     void CleanSession();
+    void ApplyVniMode(bool isVni, bool persistToRegistry);
     void ReloadUserPreferences();
     void SyncActiveLanguageProfile();
     void ResetComposingSession();

@@ -25,6 +25,7 @@ HRESULT DeactivateUserProfiles();
 // Persisted user preferences in HKCU\Software\VieLotusIM
 bool LoadPersistedVniPreference(bool &outIsVni);
 void SavePersistedVniPreference(bool isVni);
+bool ConsumeSettingsVniOverride(bool &outIsVni);
 void LoadVieLotusPrefs(VieLotusWindowsPrefs &outPrefs);
 void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs);
 
