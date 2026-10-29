@@ -57,8 +57,8 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
 - Download [`VieLotus-Setup-x64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe) or [`VieLotus-Setup-arm64.exe`](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe) from [Releases](https://github.com/stevedat/VieLotus-IM/releases/latest) (or install via **Microsoft Store**).
 - Run the installer and press **`Win + Space`** to select **Sen Việt**.
 
-### 3. Linux (Ubuntu / Debian / Snap — `amd64` & `arm64`)
-- **One-line installer (Ubuntu / Debian `.deb`)**:
+### 3. Linux (Ubuntu / Debian / Mint / Fedora / Arch / openSUSE — `amd64` & `arm64`)
+- **Universal one-line installer (Auto-detects `apt`, `dnf`, `pacman`, `zypper` & `x86_64` / `aarch64`)**:
   ```bash
   curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh
   ```
@@ -66,10 +66,11 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
   ```bash
   sudo snap install vielotus
   ```
-- **Manual `.deb` install via `apt`**:
+- **Manual `.deb` install via `apt` (Ubuntu / Debian / Mint / Pop!_OS)**:
   ```bash
   sudo apt update && sudo apt install ./vielotus_2.0.0_amd64.deb   # or ./vielotus_2.0.0_arm64.deb
   ```
+- **Arch Linux / Manjaro (`PKGBUILD`)**: `cd CrossPlatform/packaging/arch && makepkg -si`
 - **Quick CLI controls**: `vielotus-settings` (GTK3 GUI) · `vielotus --telex` · `vielotus --vni` · `vielotus --status`.
 
 ### 4. iOS / iPadOS & Android
