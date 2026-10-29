@@ -431,6 +431,9 @@ struct BentoSettingsState {
     Image *pVietQr{nullptr};
     HICON hWndIconBig{nullptr};
     HICON hWndIconSmall{nullptr};
+    HWND hTestEdit{nullptr};
+    HFONT hEditFont{nullptr};
+    HBRUSH hEditBgBrush{nullptr};
 };
 
 static std::wstring GetDllDirPath() {
@@ -893,20 +896,21 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 fTileTitle, fSub, fPill, sfLeft, sfCenter
             );
 
-            // Section 3: Compact Smart Engine Status Strip
+            // Section 3: Built-in Live Typing Lab Strip ("Thử gõ nhanh")
             RectF stripRect(18.0f * s, 396.0f * s, 464.0f * s, 38.0f * s);
-            FillRoundRect(g, stripRect, 10.0f * s, Color(255, 237, 238, 253));
-            DrawRoundRect(g, stripRect, 10.0f * s, Color(255, 198, 202, 248), 1.0f * s);
+            DrawCard(g, stripRect, 10.0f * s, Color(255, 255, 255, 255), Color(255, 198, 202, 248), 1.1f * s);
 
             SolidBrush indigoBrush(Color(255, 88, 86, 214));
             g.DrawString(
-                L"\u2726 Tr\u00ED tu\u1EC7 Sen Vi\u1EC7t t\u1EF1 \u0111\u1ED9ng:",
-                -1, &fBodyBold, RectF(30.0f * s, 396.0f * s, 155.0f * s, 38.0f * s), &sfLeft, &indigoBrush
+                L"\u2726 Th\u1EED g\u00F5:",
+                -1, &fBodyBold, RectF(28.0f * s, 396.0f * s, 68.0f * s, 38.0f * s), &sfLeft, &indigoBrush
             );
-            g.DrawString(
-                L"Song ng\u1EEF \u2022 Chu\u1EA9n m\u1EDBi \u2022 Hu\u1EF7 d\u1EA5u w/a/e/o \u2022 TSF Native",
-                -1, &fSub, RectF(182.0f * s, 396.0f * s, 290.0f * s, 38.0f * s), &sfLeft, &secondaryBrush
-            );
+            if (!st->hTestEdit) {
+                g.DrawString(
+                    L"t\u00F4i s\u1EBD \u0111i \u2022 phim sex \u2022 l\u00F9n t\u1EE7n \u2022 turn on",
+                    -1, &fSub, RectF(98.0f * s, 396.0f * s, 370.0f * s, 38.0f * s), &sfLeft, &secondaryBrush
+                );
+            }
         } else {
             // =================================================================
             // TAB 1: VỀ ỨNG DỤNG (Matches macOS aboutTabView + NidoOffice)
@@ -1094,7 +1098,44 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         // Enable Windows 11 rounded window corners via DWM
         DWORD cornerPref = 2; // DWMWCP_ROUND
         DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
+
+        float s = st->dpiScale;
+        st->hEditBgBrush = CreateSolidBrush(RGB(255, 255, 255));
+        st->hEditFont = CreateFontW(
+            -static_cast<int>(12.5f * s + 0.5f), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_SWISS, L"Segoe UI"
+        );
+        st->hTestEdit = CreateWindowExW(
+            0, L"EDIT", L"",
+            WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            static_cast<int>(98.0f * s),
+            static_cast<int>(406.0f * s),
+            static_cast<int>(372.0f * s),
+            static_cast<int>(20.0f * s),
+            hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(1001)), g_hInst, nullptr
+        );
+        if (st->hTestEdit) {
+            if (st->hEditFont) {
+                SendMessageW(st->hTestEdit, WM_SETFONT, reinterpret_cast<WPARAM>(st->hEditFont), TRUE);
+            }
+            // EM_SETCUEBANNER = 0x1501
+            SendMessageW(
+                st->hTestEdit, 0x1501, TRUE,
+                reinterpret_cast<LPARAM>(L"G\u00F5 th\u1EED: t\u00F4i s\u1EBD \u0111i \u2022 phim sex \u2022 l\u00F9n t\u1EE7n \u2022 turn on...")
+            );
+        }
         return 0;
+    }
+
+    case WM_CTLCOLOREDIT: {
+        if (st && st->hEditBgBrush && reinterpret_cast<HWND>(lParam) == st->hTestEdit) {
+            HDC hdcEdit = reinterpret_cast<HDC>(wParam);
+            SetTextColor(hdcEdit, RGB(28, 28, 30));
+            SetBkColor(hdcEdit, RGB(255, 255, 255));
+            return reinterpret_cast<LRESULT>(st->hEditBgBrush);
+        }
+        break;
     }
 
     case WM_ERASEBKGND:
@@ -1138,12 +1179,14 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         case HitRegion::TabSettings:
             if (st->selectedTab != 0) {
                 st->selectedTab = 0;
+                if (st->hTestEdit) ShowWindow(st->hTestEdit, SW_SHOW);
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
             break;
         case HitRegion::TabAbout:
             if (st->selectedTab != 1) {
                 st->selectedTab = 1;
+                if (st->hTestEdit) ShowWindow(st->hTestEdit, SW_HIDE);
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
             break;
@@ -1260,6 +1303,8 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             delete st->pVietQr;
             if (st->hWndIconBig) DestroyIcon(st->hWndIconBig);
             if (st->hWndIconSmall) DestroyIcon(st->hWndIconSmall);
+            if (st->hEditFont) DeleteObject(st->hEditFont);
+            if (st->hEditBgBrush) DeleteObject(st->hEditBgBrush);
             delete st;
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
         }
@@ -1305,7 +1350,7 @@ void ShowVieLotusSettingsDialog(HWND hwndParent) {
     int clientW = MulDiv(500, dpiY, 96);
     int clientH = MulDiv(484, dpiY, 96);
 
-    DWORD dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE;
+    DWORD dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN | WS_VISIBLE;
     DWORD dwExStyle = WS_EX_APPWINDOW;
     RECT rcWnd = { 0, 0, clientW, clientH };
     AdjustWindowRectEx(&rcWnd, dwStyle, FALSE, dwExStyle);
