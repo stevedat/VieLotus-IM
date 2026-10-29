@@ -6,6 +6,7 @@
 param (
     [string]$Configuration = "Release",
     [string]$Version = "2.0.0",
+    [string]$MsixVersion = "2.0.1.0",
     [ValidateSet("x64", "arm64", "all")]
     [string]$Arch = "all",
     [switch]$SkipTests = $false
@@ -211,7 +212,7 @@ if ($makeappx) {
   <Identity
     Name="NidoHoldings.SenVitVieLotusIM"
     Publisher="CN=BC3DBCFE-AB40-468F-8F2B-36C55BB3374C"
-    Version="$Version.0"
+    Version="$MsixVersion"
     ProcessorArchitecture="$msixArch" />
 
   <Properties>
@@ -264,9 +265,9 @@ if ($makeappx) {
         }
     }
 
-    $outBundle = "$msixDistDir\VieLotus_$Version.0_x64_arm64.msixbundle"
+    $outBundle = "$msixDistDir\VieLotus_${MsixVersion}_x64_arm64.msixbundle"
     if (Test-Path $outBundle) { Remove-Item $outBundle -Force }
-    & $makeappx bundle /d $bundleInputDir /p $outBundle /bv "$Version.0" /o | Out-Null
+    & $makeappx bundle /d $bundleInputDir /p $outBundle /bv "$MsixVersion" /o | Out-Null
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✅ Đã tạo gói Microsoft Store MSIXBundle tại: $outBundle" -ForegroundColor Cyan
     }
