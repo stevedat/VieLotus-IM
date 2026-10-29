@@ -6,7 +6,7 @@ export COPYFILE_DISABLE=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
-VERSION="${1:-$(git describe --tags --always 2>/dev/null || echo '1.1.1')}"
+VERSION="${1:-$(git describe --tags --always 2>/dev/null || echo '2.0.0')}"
 VERSION="${VERSION#v}" # Strip leading 'v'
 
 echo "=== Packaging VieLotusIM v${VERSION} ==="

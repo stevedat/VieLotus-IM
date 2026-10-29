@@ -102,7 +102,7 @@ Name[vi]=Bộ gõ tiếng Việt Sen Việt (VieLotus)
 Name=Sen Việt (VieLotus)
 Comment=Next-Gen Pure Vietnamese Input Engine for Fcitx5
 Category=InputMethod
-Version=1.1.1
+Version=2.0.0
 Enabled=True
 Library=vielotus
 Type=SharedLibrary
@@ -368,7 +368,7 @@ brand_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
 title_lbl = Gtk.Label()
 title_lbl.set_markup(
     "<span size='large' weight='bold' foreground='#1c1c1e'>🌸 Sen Việt</span> "
-    "<span size='small' weight='bold' foreground='#007aff'>v1.1.1</span>"
+    "<span size='small' weight='bold' foreground='#007aff'>v2.0.0</span>"
 )
 title_lbl.set_xalign(0)
 sub_lbl = Gtk.Label()

@@ -1,4 +1,4 @@
-vielotus (1.1.1-1) noble; urgency=medium
+vielotus (2.0.0-1) noble; urgency=medium
 
   * Official multi-architecture (amd64 & arm64) release of Sen Việt (VieLotusIM).
   * Native Fcitx5 addon (vielotus-telex, vielotus-vni) and IBus engine integration.

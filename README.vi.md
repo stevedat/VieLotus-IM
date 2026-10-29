@@ -68,7 +68,7 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
   ```
 - **Cài gói `.deb` thủ công qua `apt`**:
   ```bash
-  sudo apt update && sudo apt install ./vielotus_1.1.1_amd64.deb   # hoặc ./vielotus_1.1.1_arm64.deb
+  sudo apt update && sudo apt install ./vielotus_2.0.0_amd64.deb   # hoặc ./vielotus_2.0.0_arm64.deb
   ```
 - **Lệnh điều khiển nhanh**: `vielotus-settings` (cửa sổ cài đặt GTK3) · `vielotus --telex` · `vielotus --vni` · `vielotus --status`.
 

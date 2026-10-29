@@ -68,7 +68,7 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
   ```
 - **Manual `.deb` install via `apt`**:
   ```bash
-  sudo apt update && sudo apt install ./vielotus_1.1.1_amd64.deb   # or ./vielotus_1.1.1_arm64.deb
+  sudo apt update && sudo apt install ./vielotus_2.0.0_amd64.deb   # or ./vielotus_2.0.0_arm64.deb
   ```
 - **Quick CLI controls**: `vielotus-settings` (GTK3 GUI) · `vielotus --telex` · `vielotus --vni` · `vielotus --status`.
 

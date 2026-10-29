@@ -1,6 +1,6 @@
 # Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
 pkgname=fcitx5-vielotus
-pkgver=1.1.1
+pkgver=2.0.0
 pkgrel=1
 pkgdesc="Bộ gõ tiếng Việt Sen Việt thế hệ mới cho Fcitx5 (Pure Swift 6 Core & C-ABI)"
 arch=('x86_64' 'aarch64')

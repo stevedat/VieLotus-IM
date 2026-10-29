@@ -1,5 +1,5 @@
 Name:           vielotus
-Version:        1.1.1
+Version:        2.0.0
 Release:        1%{?dist}
 Summary:        Sen Việt (VieLotusIM) - Bộ gõ tiếng Việt thế hệ mới cho Linux
 
@@ -85,5 +85,5 @@ done
 %{_datadir}/ibus/component/vielotus.xml
 
 %changelog
-* Mon Oct 26 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 1.1.1-1
-- Release of VieLotusIM (Sen Việt) v1.1.1 for Linux
+* Mon Oct 26 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.0-1
+- Release of VieLotusIM (Sen Việt) v2.0.0 for Linux

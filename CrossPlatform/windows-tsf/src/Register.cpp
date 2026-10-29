@@ -740,7 +740,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             g.DrawString(L"SV", -1, &fBrand, iconRect, &sfCenter, &wBr);
         }
 
-        // Brand Title "Sen Việt" + version pill "v1.1.1"
+        // Brand Title "Sen Việt" + version pill "v2.0.0"
         SolidBrush primaryBrush(Color(255, 28, 28, 30));
         SolidBrush secondaryBrush(Color(255, 110, 110, 115));
         SolidBrush blueBrush(Color(255, 0, 122, 255));
@@ -750,7 +750,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
         RectF verPill(134.0f * s, 15.0f * s, 42.0f * s, 17.0f * s);
         FillRoundRect(g, verPill, 8.5f * s, Color(36, 0, 122, 255));
-        g.DrawString(L"v1.1.1", -1, &fVersion, verPill, &sfCenter, &blueBrush);
+        g.DrawString(L"v2.0.0", -1, &fVersion, verPill, &sfCenter, &blueBrush);
 
         RectF subBrandRect(66.0f * s, 34.0f * s, 215.0f * s, 18.0f * s);
         g.DrawString(L"Native TSF \u2022 Kh\u00F4ng quy\u1EC1n Tr\u1EE3 n\u0103ng", -1, &fHeaderSub, subBrandRect, &sfLeft, &secondaryBrush);
