@@ -291,7 +291,14 @@ void VieLotusEngine::loadUserEnvConfig() {
     }
     std::string line;
     while (std::getline(in, line)) {
-        if (line.rfind("GRAMMAR_PROFILE=", 0) == 0) {
+        if (line.rfind("INPUT_METHOD=", 0) == 0) {
+            hasEnvInputMethod_ = true;
+            envInputMethod_ =
+                (line.find("vni") != std::string::npos ||
+                 line.find("VNI") != std::string::npos)
+                    ? VIELOTUS_INPUT_VNI
+                    : VIELOTUS_INPUT_TELEX;
+        } else if (line.rfind("GRAMMAR_PROFILE=", 0) == 0) {
             if (line.find("classic") != std::string::npos) {
                 config_.grammarProfile.setValue(VieLotusGrammarMode::Classic);
             } else {
@@ -390,7 +397,7 @@ void VieLotusEngine::keyEvent(const InputMethodEntry& entry,
     if (state) {
         int32_t method = (entry.uniqueName() == "vielotus-vni")
             ? VIELOTUS_INPUT_VNI
-            : VIELOTUS_INPUT_TELEX;
+            : (hasEnvInputMethod_ ? envInputMethod_ : VIELOTUS_INPUT_TELEX);
         state->setInputMethod(method);
         state->keyEvent(keyEvent);
     }

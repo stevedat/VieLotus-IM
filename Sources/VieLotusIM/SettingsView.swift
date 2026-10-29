@@ -99,6 +99,12 @@ struct SettingsView: View {
 
                 Spacer()
 
+                Link("NidoOffice", destination: URL(string: "https://educenter.app")!)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.indigo)
+
+                Text("•").font(.system(size: 10)).foregroundColor(.secondary)
+
                 Link("YouPersona.com", destination: URL(string: "https://youpersona.com")!)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(.accentColor)
@@ -158,16 +164,16 @@ struct SettingsView: View {
                     HStack(spacing: 10) {
                         inputMethodCard(
                             method: .telex,
-                            title: "Telex Tự Do",
+                            title: "Telex Tự Do (Mặc định)",
                             badge: "s f r x j w",
                             subtitle: "vieetj → việt • w → ư",
                             icon: "command.square.fill"
                         )
                         inputMethodCard(
                             method: .vni,
-                            title: "VNI Chuẩn",
-                            badge: "1–5 • 6–9",
-                            subtitle: "vie65t → việt • 9 → đ",
+                            title: "VNI (Số 1–9)",
+                            badge: "1–5  6 7 8 9",
+                            subtitle: "viet65 → việt • 9 → đ",
                             icon: "number.square.fill"
                         )
                     }
@@ -577,8 +583,54 @@ struct SettingsView: View {
                         .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
                 )
 
-                // 3. Sản phẩm khác của tác giả — YouPersona.com (Giới thiệu gọn + CTA)
-                VStack(alignment: .leading, spacing: 8) {
+                // 3. Sản phẩm khác của tác giả — NidoOffice & YouPersona.com (Giới thiệu gọn + CTA)
+                VStack(alignment: .leading, spacing: 10) {
+                    // 3a. NidoOffice (Bộ Office AI)
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "doc.text.image.fill")
+                            .font(.system(size: 15))
+                            .foregroundColor(.indigo)
+                            .frame(width: 20)
+                            .padding(.top, 1)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text("NidoOffice")
+                                    .font(.system(size: 12.5, weight: .bold))
+                                Text("BỘ OFFICE AI • EDUCENTER.APP")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.indigo.opacity(0.15))
+                                    .foregroundColor(.indigo)
+                                    .clipShape(Capsule())
+                            }
+                            Text("Bộ công cụ Văn phòng & Soạn thảo Tài liệu, Trang trình bày, Bảng tính tích hợp Trí tuệ Nhân tạo (AI) thế hệ mới.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                                .lineSpacing(1.5)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        Link(destination: URL(string: "https://educenter.app")!) {
+                            HStack(spacing: 4) {
+                                Text("Mở ngay")
+                                Image(systemName: "arrow.up.right")
+                            }
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.indigo)
+                            .foregroundColor(.white)
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Divider()
+
+                    // 3b. YouPersona.com (Quản lý Thu Chi AI)
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "chart.pie.fill")
                             .font(.system(size: 15))
@@ -626,7 +678,7 @@ struct SettingsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.teal.opacity(0.25), lineWidth: 0.9)
+                        .strokeBorder(Color.indigo.opacity(0.22), lineWidth: 0.9)
                 )
 
                 // 4. Cộng đồng & Tác giả

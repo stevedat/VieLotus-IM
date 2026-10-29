@@ -16,6 +16,9 @@ GRAMMAR_PROFILE="sen_flex"
 SMART_BILINGUAL="true"
 MODERN_ORTHOGRAPHY="true"
 QUICK_TELEX="false"
+RELAXED_CODA="false"
+MACRO_ENABLED="true"
+DEVELOPER_MODE="false"
 
 load_config() {
     if [ ! -f "${CONFIG_FILE}" ]; then
@@ -56,6 +59,24 @@ load_config() {
                 case "${val}" in
                     true|True|TRUE|1) QUICK_TELEX="true" ;;
                     *) QUICK_TELEX="false" ;;
+                esac
+                ;;
+            RELAXED_CODA)
+                case "${val}" in
+                    true|True|TRUE|1) RELAXED_CODA="true" ;;
+                    *) RELAXED_CODA="false" ;;
+                esac
+                ;;
+            MACRO_ENABLED)
+                case "${val}" in
+                    false|False|FALSE|0) MACRO_ENABLED="false" ;;
+                    *) MACRO_ENABLED="true" ;;
+                esac
+                ;;
+            DEVELOPER_MODE)
+                case "${val}" in
+                    true|True|TRUE|1) DEVELOPER_MODE="true" ;;
+                    *) DEVELOPER_MODE="false" ;;
                 esac
                 ;;
         esac
@@ -200,6 +221,9 @@ GRAMMAR_PROFILE="${GRAMMAR_PROFILE}"
 SMART_BILINGUAL="${SMART_BILINGUAL}"
 MODERN_ORTHOGRAPHY="${MODERN_ORTHOGRAPHY}"
 QUICK_TELEX="${QUICK_TELEX}"
+RELAXED_CODA="${RELAXED_CODA}"
+MACRO_ENABLED="${MACRO_ENABLED}"
+DEVELOPER_MODE="${DEVELOPER_MODE}"
 ENV_EOF
 
     ENGINE_ID="vielotus"
@@ -267,12 +291,12 @@ PYEOF
 run_gtk_settings() {
     SMOKE_MODE="${1:-0}"
     python3 - "${CONFIG_FILE}" "${SMOKE_MODE}" <<'GTK_PYEOF'
-import os, subprocess, sys
+import os, subprocess, sys, webbrowser
 
 try:
     import gi
     gi.require_version("Gtk", "3.0")
-    from gi.repository import Gtk, GLib
+    from gi.repository import Gtk, Gdk, GLib
 except Exception:
     sys.exit(2)
 
@@ -289,6 +313,9 @@ cfg = {
     "SMART_BILINGUAL": "true",
     "MODERN_ORTHOGRAPHY": "true",
     "QUICK_TELEX": "false",
+    "RELAXED_CODA": "false",
+    "MACRO_ENABLED": "true",
+    "DEVELOPER_MODE": "false",
 }
 if os.path.exists(config_path):
     with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -297,146 +324,453 @@ if os.path.exists(config_path):
                 k, v = line.strip().split("=", 1)
                 cfg[k.strip()] = v.strip().strip('"').strip("'")
 
-win = Gtk.Window(title="Sen Việt (VieLotusIM) — Cài đặt bộ gõ")
-win.set_default_size(500, 460)
+# Always-On Smart Engine parity with macOS
+cfg["SMART_BILINGUAL"] = "true"
+cfg["MODERN_ORTHOGRAPHY"] = "true"
+
+css = b"""
+.bento-win { background-color: #f5f5f7; }
+.bento-header { background-color: #ffffff; border-bottom: 1px solid #e5e5ea; padding: 10px 16px; }
+.bento-footer { background-color: #ffffff; border-top: 1px solid #e5e5ea; padding: 8px 16px; }
+.bento-card { background-color: #ffffff; border: 1px solid #e2e2e8; border-radius: 10px; padding: 10px 12px; }
+.bento-card-active { background-color: #ecf5ff; border: 2px solid #007aff; border-radius: 10px; padding: 10px 12px; }
+.bento-strip { background-color: #edeefd; border: 1px solid #c6caf8; border-radius: 9px; padding: 8px 12px; }
+"""
+style_provider = Gtk.CssProvider()
+try:
+    style_provider.load_from_data(css)
+    screen = Gdk.Screen.get_default()
+    if screen is not None:
+        Gtk.StyleContext.add_provider_for_screen(
+            screen, style_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+except Exception:
+    pass
+
+win = Gtk.Window(title="Sen Việt (VieLotusIM) — Cài đặt")
+win.set_default_size(520, 510)
+win.set_resizable(False)
 win.set_position(Gtk.WindowPosition.CENTER)
-win.set_border_width(18)
+win.get_style_context().add_class("bento-win")
 try:
     win.set_icon_name("vielotus")
 except Exception:
     pass
 
-vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-win.add(vbox)
+root_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+win.add(root_vbox)
 
-# Header
-header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+# 1. Top Header Bar (Matches macOS SettingsView.swift: Brand + 2-Tab Switcher)
+header_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+header_bar.get_style_context().add_class("bento-header")
+
+brand_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
 title_lbl = Gtk.Label()
-title_lbl.set_markup("<span size='x-large' weight='bold'>🌸 Sen Việt (VieLotusIM) v1.1.1</span>")
+title_lbl.set_markup(
+    "<span size='large' weight='bold' foreground='#1c1c1e'>🌸 Sen Việt</span> "
+    "<span size='small' weight='bold' foreground='#007aff'>v1.1.1</span>"
+)
 title_lbl.set_xalign(0)
-sub_lbl = Gtk.Label(label="Bộ gõ tiếng Việt thế hệ mới · Hỗ trợ đồng thời IBus & Fcitx5")
+sub_lbl = Gtk.Label()
+sub_lbl.set_markup("<span size='small' foreground='#6e6e73'>IBus &amp; Fcitx5 Native • Không quyền Trợ năng</span>")
 sub_lbl.set_xalign(0)
-header_box.pack_start(title_lbl, False, False, 0)
-header_box.pack_start(sub_lbl, False, False, 0)
-vbox.pack_start(header_box, False, False, 4)
+brand_vbox.pack_start(title_lbl, False, False, 0)
+brand_vbox.pack_start(sub_lbl, False, False, 0)
+header_bar.pack_start(brand_vbox, True, True, 0)
 
-vbox.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 2)
+stack = Gtk.Stack()
+stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+stack.set_transition_duration(120)
 
-# Grid for Input Method & Grammar Profile
-grid = Gtk.Grid()
-grid.set_column_spacing(16)
-grid.set_row_spacing(10)
+stack_switcher = Gtk.StackSwitcher()
+stack_switcher.set_stack(stack)
+header_bar.pack_end(stack_switcher, False, False, 0)
+root_vbox.pack_start(header_bar, False, False, 0)
 
-im_lbl = Gtk.Label()
-im_lbl.set_markup("<b>Kiểu gõ tiếng Việt:</b>")
-im_lbl.set_xalign(0)
-im_combo = Gtk.ComboBoxText()
-im_combo.append("telex", "Telex (Gõ dấu tự do — Khuyên dùng)")
-im_combo.append("vni", "VNI (Gõ dấu bằng phím số 1–9)")
-im_combo.set_active_id("vni" if cfg["INPUT_METHOD"] == "vni" else "telex")
-im_combo.set_hexpand(True)
+def save_current_config(*_):
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    with open(config_path, "w", encoding="utf-8") as f:
+        for key in (
+            "INPUT_METHOD",
+            "GRAMMAR_PROFILE",
+            "SMART_BILINGUAL",
+            "MODERN_ORTHOGRAPHY",
+            "QUICK_TELEX",
+            "RELAXED_CODA",
+            "MACRO_ENABLED",
+            "DEVELOPER_MODE",
+        ):
+            f.write(f'{key}="{cfg[key]}"\n')
+    settings_bin = "/usr/bin/vielotus-settings"
+    if not os.path.exists(settings_bin):
+        settings_bin = os.path.abspath(sys.argv[0])
+    im_flag = "--vni" if cfg["INPUT_METHOD"] == "vni" else "--telex"
+    subprocess.call([settings_bin, im_flag])
 
-gr_lbl = Gtk.Label()
-gr_lbl.set_markup("<b>Chế độ đặt dấu:</b>")
-gr_lbl.set_xalign(0)
-gr_combo = Gtk.ComboBoxText()
-gr_combo.append("sen_flex", "SEN Flex (Gõ dấu tự do ở mọi vị trí)")
-gr_combo.append("classic", "Classic (Chuẩn truyền thống)")
-gr_combo.set_active_id("classic" if cfg["GRAMMAR_PROFILE"] == "classic" else "sen_flex")
-gr_combo.set_hexpand(True)
+# ==============================================================================
+# TAB 1: CÀI ĐẶT (Matches macOS 2-Card Hero + 2x2 Bento Grid + Smart Strip)
+# ==============================================================================
+tab_settings = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+tab_settings.set_border_width(14)
 
-grid.attach(im_lbl, 0, 0, 1, 1)
-grid.attach(im_combo, 1, 0, 1, 1)
-grid.attach(gr_lbl, 0, 1, 1, 1)
-grid.attach(gr_combo, 1, 1, 1, 1)
-vbox.pack_start(grid, False, False, 4)
+# Section 1 Header
+sec1_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+sec1_left = Gtk.Label()
+sec1_left.set_markup("<span size='small' weight='bold' foreground='#6e6e73'>KIỂU GÕ TIẾNG VIỆT</span>")
+sec1_left.set_xalign(0)
+sec1_right = Gtk.Label()
+sec1_right.set_markup("<span size='small' weight='bold' foreground='#007aff'>Bỏ dấu tự do mọi vị trí</span>")
+sec1_right.set_xalign(1)
+sec1_hdr.pack_start(sec1_left, True, True, 0)
+sec1_hdr.pack_end(sec1_right, False, False, 0)
+tab_settings.pack_start(sec1_hdr, False, False, 0)
 
-# Checkboxes
-opt_frame = Gtk.Frame(label=" Trí tuệ ngôn ngữ & Tùy chọn gõ ")
-opt_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-opt_box.set_border_width(12)
-opt_frame.add(opt_box)
+# Hero Input Method Cards (Telex Tự Do vs VNI Chuẩn)
+hero_grid = Gtk.Grid()
+hero_grid.set_column_homogeneous(True)
+hero_grid.set_column_spacing(10)
 
-chk_sb = Gtk.CheckButton(label="Song ngữ thông minh Anh–Việt (Smart Bilingual — tự khôi phục từ tiếng Anh)")
-chk_sb.set_active(cfg["SMART_BILINGUAL"] != "false")
+btn_telex = Gtk.Button()
+btn_vni = Gtk.Button()
 
-chk_mod = Gtk.CheckButton(label="Chính tả hiện đại: oà, uý (thay vì òa, úy)")
-chk_mod.set_active(cfg["MODERN_ORTHOGRAPHY"] != "false")
+def refresh_hero_cards():
+    is_vni = cfg["INPUT_METHOD"] == "vni"
+    for btn, active in ((btn_telex, not is_vni), (btn_vni, is_vni)):
+        ctx = btn.get_style_context()
+        ctx.remove_class("bento-card")
+        ctx.remove_class("bento-card-active")
+        ctx.add_class("bento-card-active" if active else "bento-card")
 
-chk_qt = Gtk.CheckButton(label="Gõ tắt phụ âm (Quick Telex: cc=ch, gg=gi, kk=kh, nn=ng, qq=qu, tt=th)")
+def build_hero_card_content(title, code_pill, desc):
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    l1 = Gtk.Label()
+    l1.set_markup(f"<span weight='bold' foreground='#1c1c1e'>{title}</span>")
+    l1.set_xalign(0)
+    l2 = Gtk.Label()
+    l2.set_markup(
+        f"<tt><span size='small' weight='bold' foreground='#007aff'>[{code_pill}]</span></tt> "
+        f"<span size='small' foreground='#6e6e73'>{desc}</span>"
+    )
+    l2.set_xalign(0)
+    box.pack_start(l1, False, False, 0)
+    box.pack_start(l2, False, False, 0)
+    return box
+
+btn_telex.add(build_hero_card_content("Telex Tự Do", "s f r x j w", "vieetj → việt • w → ư"))
+btn_vni.add(build_hero_card_content("VNI Chuẩn", "1–5 • 6–9", "vie65t → việt • 9 → đ"))
+
+def on_select_im(mode):
+    if cfg["INPUT_METHOD"] != mode:
+        cfg["INPUT_METHOD"] = mode
+        refresh_hero_cards()
+        save_current_config()
+
+btn_telex.connect("clicked", lambda *_: on_select_im("telex"))
+btn_vni.connect("clicked", lambda *_: on_select_im("vni"))
+refresh_hero_cards()
+
+hero_grid.attach(btn_telex, 0, 0, 1, 1)
+hero_grid.attach(btn_vni, 1, 0, 1, 1)
+tab_settings.pack_start(hero_grid, False, False, 0)
+
+# Section 2 Header
+sec2_lbl = Gtk.Label()
+sec2_lbl.set_markup("<span size='small' weight='bold' foreground='#6e6e73'>TIỆN ÍCH &amp; KHÔNG GIAN LÀM VIỆC</span>")
+sec2_lbl.set_xalign(0)
+tab_settings.pack_start(sec2_lbl, False, False, 0)
+
+# 2x2 Bento Feature Grid
+bento_grid = Gtk.Grid()
+bento_grid.set_column_homogeneous(True)
+bento_grid.set_row_homogeneous(True)
+bento_grid.set_column_spacing(10)
+bento_grid.set_row_spacing(10)
+
+# Tile 1: Bảng gõ tắt
+tile1 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+tile1.get_style_context().add_class("bento-card")
+t1_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+t1_lbl = Gtk.Label()
+t1_lbl.set_markup("<span weight='bold' foreground='#1c1c1e'>Bảng gõ tắt</span>")
+t1_lbl.set_xalign(0)
+sw_macro = Gtk.Switch()
+sw_macro.set_active(cfg["MACRO_ENABLED"] != "false")
+t1_top.pack_start(t1_lbl, True, True, 0)
+t1_top.pack_end(sw_macro, False, False, 0)
+
+t1_bot = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+t1_sub = Gtk.Label()
+def update_macro_sub():
+    on = sw_macro.get_active()
+    t1_sub.set_markup(
+        f"<span size='small' foreground='#6e6e73'>{'Đang bật • 38 cụm từ' if on else 'Đang tắt gõ tắt'}</span>"
+    )
+update_macro_sub()
+t1_sub.set_xalign(0)
+btn_macro_mgr = Gtk.Button(label="Quản lý")
+def on_open_macros(*_):
+    macro_file = os.path.join(os.path.dirname(config_path), "macros.json")
+    if not os.path.exists(macro_file):
+        os.makedirs(os.path.dirname(macro_file), exist_ok=True)
+        with open(macro_file, "w", encoding="utf-8") as mf:
+            mf.write('{\n  "ks": "Khách sạn",\n  "vn": "Việt Nam",\n  "tphcm": "TP. Hồ Chí Minh",\n  "ko": "không"\n}\n')
+    try:
+        subprocess.Popen(["xdg-open", macro_file])
+    except Exception:
+        pass
+btn_macro_mgr.connect("clicked", on_open_macros)
+t1_bot.pack_start(t1_sub, True, True, 0)
+t1_bot.pack_end(btn_macro_mgr, False, False, 0)
+tile1.pack_start(t1_top, False, False, 0)
+tile1.pack_start(t1_bot, False, False, 0)
+
+def on_macro_toggled(sw, _pspec):
+    cfg["MACRO_ENABLED"] = "true" if sw.get_active() else "false"
+    update_macro_sub()
+    save_current_config()
+sw_macro.connect("notify::active", on_macro_toggled)
+
+# Tile 2: Chế độ Code & Dev
+tile2 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+tile2.get_style_context().add_class("bento-card")
+t2_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+t2_lbl = Gtk.Label()
+t2_lbl.set_markup("<span weight='bold' foreground='#1c1c1e'>Chế độ Code &amp; Dev</span>")
+t2_lbl.set_xalign(0)
+sw_dev = Gtk.Switch()
+sw_dev.set_active(cfg["DEVELOPER_MODE"] == "true")
+t2_top.pack_start(t2_lbl, True, True, 0)
+t2_top.pack_end(sw_dev, False, False, 0)
+t2_sub = Gtk.Label()
+def update_dev_sub():
+    on = sw_dev.get_active()
+    t2_sub.set_markup(
+        f"<span size='small' foreground='#6e6e73'>{'Tự ngắt dấu trong `code`' if on else 'Gõ tiếng Việt bình thường'}</span>"
+    )
+update_dev_sub()
+t2_sub.set_xalign(0)
+tile2.pack_start(t2_top, False, False, 0)
+tile2.pack_start(t2_sub, False, False, 0)
+
+def on_dev_toggled(sw, _pspec):
+    cfg["DEVELOPER_MODE"] = "true" if sw.get_active() else "false"
+    update_dev_sub()
+    save_current_config()
+sw_dev.connect("notify::active", on_dev_toggled)
+
+# Tile 3: Tốc gõ phụ âm (2 chips: Đầu cc/gg/qq & Cuối -g/-h/-k)
+tile3 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+tile3.get_style_context().add_class("bento-card")
+t3_lbl = Gtk.Label()
+t3_lbl.set_markup("<span weight='bold' foreground='#1c1c1e'>⚡ Tốc gõ phụ âm</span>")
+t3_lbl.set_xalign(0)
+t3_chips = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+chk_qt = Gtk.ToggleButton(label="Đầu (cc/gg/qq)")
 chk_qt.set_active(cfg["QUICK_TELEX"] == "true")
+chk_rc = Gtk.ToggleButton(label="Cuối (-g/-h/-k)")
+chk_rc.set_active(cfg["RELAXED_CODA"] == "true")
+t3_chips.pack_start(chk_qt, True, True, 0)
+t3_chips.pack_start(chk_rc, True, True, 0)
+tile3.pack_start(t3_lbl, False, False, 0)
+tile3.pack_start(t3_chips, False, False, 0)
 
-opt_box.pack_start(chk_sb, False, False, 0)
-opt_box.pack_start(chk_mod, False, False, 0)
-opt_box.pack_start(chk_qt, False, False, 0)
-vbox.pack_start(opt_frame, False, False, 4)
+def on_qt_toggled(btn):
+    cfg["QUICK_TELEX"] = "true" if btn.get_active() else "false"
+    save_current_config()
+def on_rc_toggled(btn):
+    cfg["RELAXED_CODA"] = "true" if btn.get_active() else "false"
+    save_current_config()
+chk_qt.connect("toggled", on_qt_toggled)
+chk_rc.connect("toggled", on_rc_toggled)
 
-# Live Test Entry
-test_frame = Gtk.Frame(label=" Ô gõ thử trực tiếp (Live Test) ")
-test_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-test_box.set_border_width(10)
-test_entry = Gtk.Entry()
-test_entry.set_placeholder_text("Gõ thử tiếng Việt tại đây (ví dụ: vieetj nam -> việt nam)...")
-test_box.pack_start(test_entry, False, False, 0)
-test_frame.add(test_box)
-vbox.pack_start(test_frame, False, False, 4)
-
-status_lbl = Gtk.Label(label="")
-status_lbl.set_xalign(0)
-vbox.pack_start(status_lbl, False, False, 0)
-
-# Buttons
-btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-btn_fcitx = Gtk.Button(label="Mở Fcitx5 Config")
+# Tile 4: Phím tắt Đổi bộ gõ
+tile4 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+tile4.get_style_context().add_class("bento-card")
+t4_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+t4_lbl = Gtk.Label()
+t4_lbl.set_markup("<span weight='bold' foreground='#1c1c1e'>Phím tắt Đổi bộ gõ</span>")
+t4_lbl.set_xalign(0)
+btn_fcitx = Gtk.Button(label="Mở cài đặt ↗")
 def on_fcitx_clicked(_btn):
-    for cmd in ("fcitx5-configtool", "fcitx5-config-qt"):
+    for cmd in (["fcitx5-configtool"], ["fcitx5-config-qt"], ["gnome-control-center", "keyboard"]):
         try:
-            subprocess.Popen([cmd])
+            subprocess.Popen(cmd)
             return
         except Exception:
             pass
 btn_fcitx.connect("clicked", on_fcitx_clicked)
+t4_top.pack_start(t4_lbl, True, True, 0)
+t4_top.pack_end(btn_fcitx, False, False, 0)
+t4_sub = Gtk.Label()
+t4_sub.set_markup("<span size='small' foreground='#6e6e73'>Super+Space • Ctrl+Space đổi nhanh</span>")
+t4_sub.set_xalign(0)
+tile4.pack_start(t4_top, False, False, 0)
+tile4.pack_start(t4_sub, False, False, 0)
 
-btn_close = Gtk.Button(label="Đóng")
-btn_close.connect("clicked", lambda *_: Gtk.main_quit())
+bento_grid.attach(tile1, 0, 0, 1, 1)
+bento_grid.attach(tile2, 1, 0, 1, 1)
+bento_grid.attach(tile3, 0, 1, 1, 1)
+bento_grid.attach(tile4, 1, 1, 1, 1)
+tab_settings.pack_start(bento_grid, False, False, 0)
 
-btn_apply = Gtk.Button(label="Lưu & Áp dụng ngay")
-btn_apply.get_style_context().add_class("suggested-action")
+# Section 3: Compact Smart Engine Status Strip
+strip_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+strip_box.get_style_context().add_class("bento-strip")
+strip_lbl = Gtk.Label()
+strip_lbl.set_markup(
+    "<span size='small' weight='bold' foreground='#5856d6'>✦ Trí tuệ Sen Việt tự động:</span> "
+    "<span size='small' foreground='#6e6e73'>Song ngữ • Chuẩn mới • Huỷ dấu w/a/e/o • IBus &amp; Fcitx5</span>"
+)
+strip_lbl.set_xalign(0)
+strip_box.pack_start(strip_lbl, True, True, 0)
+tab_settings.pack_start(strip_box, False, False, 0)
 
-def apply_changes(*_):
-    im_val = im_combo.get_active_id() or "telex"
-    gr_val = gr_combo.get_active_id() or "sen_flex"
-    sb_val = "true" if chk_sb.get_active() else "false"
-    mod_val = "true" if chk_mod.get_active() else "false"
-    qt_val = "true" if chk_qt.get_active() else "false"
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "w", encoding="utf-8") as f:
-        f.write(f'INPUT_METHOD="{im_val}"\n')
-        f.write(f'GRAMMAR_PROFILE="{gr_val}"\n')
-        f.write(f'SMART_BILINGUAL="{sb_val}"\n')
-        f.write(f'MODERN_ORTHOGRAPHY="{mod_val}"\n')
-        f.write(f'QUICK_TELEX="{qt_val}"\n')
-    settings_bin = "/usr/bin/vielotus-settings"
-    if not os.path.exists(settings_bin):
-        settings_bin = os.path.abspath(sys.argv[0])
-    subprocess.call([settings_bin, f"--{im_val}"])
-    status_lbl.set_markup(
-        f"<span foreground='#10b981' weight='bold'>✓ Đã lưu và kích hoạt kiểu gõ {im_val.upper()} ({gr_val})!</span>"
+stack.add_titled(tab_settings, "settings", "Cài đặt")
+
+# ==============================================================================
+# TAB 2: VỀ ỨNG DỤNG (Matches macOS aboutTabView + NidoOffice & YouPersona.com)
+# ==============================================================================
+tab_about = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+tab_about.set_border_width(14)
+
+# Card 1: SỨ MỆNH TỐI THƯỢNG
+c_mission = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+c_mission.get_style_context().add_class("bento-card")
+m_hdr = Gtk.Label()
+m_hdr.set_markup("<span size='small' weight='bold' foreground='#5856d6'>✦ SỨ MỆNH TỐI THƯỢNG</span>")
+m_hdr.set_xalign(0)
+m_body = Gtk.Label(
+    label='Sen Việt được phát triển theo kim chỉ nam "Hãy để việc gõ là gõ, dù bạn gõ tiếng Việt hay tiếng Anh; nhanh hay chậm; gõ là Sen Việt".'
+)
+m_body.set_line_wrap(True)
+m_body.set_xalign(0)
+c_mission.pack_start(m_hdr, False, False, 0)
+c_mission.pack_start(m_body, False, False, 0)
+tab_about.pack_start(c_mission, False, False, 0)
+
+# Card 2: VietQR
+c_qr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+c_qr.get_style_context().add_class("bento-card")
+qr_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+qr_t = Gtk.Label()
+qr_t.set_markup("<span weight='bold' foreground='#1c1c1e'>☕ Mời tác giả ly cà phê nhỏ (VietQR)</span>")
+qr_t.set_xalign(0)
+qr_s = Gtk.Label()
+qr_s.set_markup(
+    "<span size='small' foreground='#5856d6' weight='bold'>MB Bank • STK: 0979266045</span> "
+    "<span size='small' foreground='#6e6e73'>• Chủ TK: Trần Phát Đạt</span>"
+)
+qr_s.set_xalign(0)
+qr_vbox.pack_start(qr_t, False, False, 0)
+qr_vbox.pack_start(qr_s, False, False, 0)
+btn_copy_stk = Gtk.Button(label="Sao chép STK")
+def on_copy_stk(btn):
+    try:
+        cb = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        cb.set_text("0979266045", -1)
+        btn.set_label("✓ Đã chép")
+    except Exception:
+        pass
+btn_copy_stk.connect("clicked", on_copy_stk)
+c_qr.pack_start(qr_vbox, True, True, 0)
+c_qr.pack_end(btn_copy_stk, False, False, 0)
+tab_about.pack_start(c_qr, False, False, 0)
+
+# Card 3: Ecosystem Showcase — NidoOffice (https://educenter.app) & YouPersona.com
+c_eco = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+c_eco.get_style_context().add_class("bento-card")
+
+def make_eco_row(title, badge, badge_color, desc, url):
+    row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    vb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+    lbl_top = Gtk.Label()
+    lbl_top.set_markup(
+        f"<span weight='bold' foreground='#1c1c1e'>{title}</span>  "
+        f"<span size='small' weight='bold' foreground='{badge_color}'>[{badge}]</span>"
     )
+    lbl_top.set_xalign(0)
+    lbl_sub = Gtk.Label()
+    lbl_sub.set_markup(f"<span size='small' foreground='#6e6e73'>{desc}</span>")
+    lbl_sub.set_xalign(0)
+    vb.pack_start(lbl_top, False, False, 0)
+    vb.pack_start(lbl_sub, False, False, 0)
+    btn = Gtk.Button(label="Khám phá ↗")
+    btn.connect("clicked", lambda *_: webbrowser.open(url))
+    row.pack_start(vb, True, True, 0)
+    row.pack_end(btn, False, False, 0)
+    return row
 
-btn_apply.connect("clicked", apply_changes)
+c_eco.pack_start(
+    make_eco_row(
+        "NidoOffice",
+        "BỘ OFFICE AI • EDUCENTER.APP",
+        "#5856d6",
+        "Soạn thảo văn bản, bảng tính, thuyết trình &amp; học liệu AI thế hệ mới.",
+        "https://educenter.app",
+    ),
+    False,
+    False,
+    0,
+)
+c_eco.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 2)
+c_eco.pack_start(
+    make_eco_row(
+        "YouPersona.com",
+        "QUẢN LÝ THU CHI AI",
+        "#0d9488",
+        "Trợ lý Tài chính Cá nhân AI — ghi chép giọng nói, quét hoá đơn &amp; 6 chiếc lọ.",
+        "https://youpersona.com",
+    ),
+    False,
+    False,
+    0,
+)
+tab_about.pack_start(c_eco, False, False, 0)
 
-btn_box.pack_start(btn_fcitx, False, False, 0)
-btn_box.pack_end(btn_apply, False, False, 0)
-btn_box.pack_end(btn_close, False, False, 0)
-vbox.pack_end(btn_box, False, False, 0)
+# Card 4: Cộng đồng & Tác giả
+c_links = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+c_links.get_style_context().add_class("bento-card")
+for lbl_txt, link_url in (
+    ("Cộng đồng Zalo ↗", "https://zalo.me/g/6wwyvywyvhsb0n6rwkze"),
+    ("Tác giả: Trần Phát Đạt (LinkedIn) ↗", "https://www.linkedin.com/in/stevedat/?isSelfProfile=true"),
+    ("Mã nguồn GitHub ↗", "https://github.com/stevedat/VieLotus-IM"),
+):
+    b = Gtk.Button(label=lbl_txt)
+    b.connect("clicked", lambda _b, u=link_url: webbrowser.open(u))
+    c_links.pack_start(b, True, True, 0)
+tab_about.pack_start(c_links, False, False, 0)
+
+stack.add_titled(tab_about, "about", "Về ứng dụng")
+root_vbox.pack_start(stack, True, True, 0)
+
+# 3. Bottom Footer Bar (Matches macOS & Windows footer: Status + NidoOffice • YouPersona.com • Zalo • GitHub)
+footer_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+footer_bar.get_style_context().add_class("bento-footer")
+f_status = Gtk.Label()
+f_status.set_markup(
+    "<span foreground='#22c55e'>●</span> "
+    "<span size='small' foreground='#6e6e73'>Song ngữ • Chuẩn mới • Tự động lưu</span>"
+)
+f_status.set_xalign(0)
+footer_bar.pack_start(f_status, True, True, 0)
+
+for f_txt, f_url in (
+    ("NidoOffice", "https://educenter.app"),
+    ("YouPersona.com", "https://youpersona.com"),
+    ("Zalo", "https://zalo.me/g/6wwyvywyvhsb0n6rwkze"),
+    ("GitHub", "https://github.com/stevedat/VieLotus-IM"),
+):
+    fb = Gtk.LinkButton.new_with_label(f_url, f_txt)
+    footer_bar.pack_start(fb, False, False, 0)
+
+root_vbox.pack_end(footer_bar, False, False, 0)
 
 win.connect("destroy", Gtk.main_quit)
 win.show_all()
 
 if smoke_mode:
     def _smoke_step():
-        apply_changes()
+        save_current_config()
         Gtk.main_quit()
         return False
     GLib.timeout_add(150, _smoke_step)
@@ -471,6 +805,9 @@ case "${1:-}" in
         echo "SMART_BILINGUAL=${SMART_BILINGUAL}"
         echo "MODERN_ORTHOGRAPHY=${MODERN_ORTHOGRAPHY}"
         echo "QUICK_TELEX=${QUICK_TELEX}"
+        echo "RELAXED_CODA=${RELAXED_CODA}"
+        echo "MACRO_ENABLED=${MACRO_ENABLED}"
+        echo "DEVELOPER_MODE=${DEVELOPER_MODE}"
         exit 0
         ;;
     --smoke-test-gui)

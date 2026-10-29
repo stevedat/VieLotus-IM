@@ -9,6 +9,7 @@ public enum EngineBackend: String, CaseIterable, Sendable {
 final class Preferences: ObservableObject {
     static let shared = Preferences()
     private let defaults = UserDefaults.standard
+    private var isReloading = false
     
     private enum Key {
         static let inputMethod = "VieLotusIM.inputMethod"
@@ -36,8 +37,20 @@ final class Preferences: ObservableObject {
 
     @Published var inputMethod: InputMethodType {
         didSet {
+            guard !isReloading else { return }
             defaults.set(Int(inputMethod.rawValue), forKey: Key.inputMethod)
+            CFPreferencesSetAppValue(
+                Key.inputMethod as CFString,
+                NSNumber(value: inputMethod.rawValue),
+                kCFPreferencesCurrentApplication
+            )
             flushDefaults()
+            DistributedNotificationCenter.default().postNotificationName(
+                Self.preferencesChangedNotification,
+                object: nil,
+                userInfo: nil,
+                deliverImmediately: true
+            )
         }
     }
     
@@ -149,13 +162,19 @@ final class Preferences: ObservableObject {
     }
     
     private init() {
-        let rawIM = defaults.integer(forKey: Key.inputMethod)
-        self.inputMethod = InputMethodType(rawValue: Int32(rawIM)) ?? .telex
+        CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
+        let rawMethod: Int
+        if let cfNum = CFPreferencesCopyAppValue(Key.inputMethod as CFString, kCFPreferencesCurrentApplication) as? NSNumber {
+            rawMethod = cfNum.intValue
+        } else {
+            rawMethod = defaults.integer(forKey: Key.inputMethod)
+        }
+        self.inputMethod = InputMethodType(rawValue: Int32(rawMethod)) ?? .telex
         
         self.modernOrthography = true
         self.relaxedCoda = defaults.bool(forKey: Key.relaxedCoda)
         self.quickTelex = defaults.bool(forKey: Key.quickTelex)
-        self.vietnameseEnabled = true
+        self.vietnameseEnabled = defaults.object(forKey: Key.vietnameseEnabled) as? Bool ?? true
         self.smartBilingual = true
         self.terminalDirectMode = defaults.object(forKey: Key.terminalDirectMode) as? Bool ?? true
         self.passthroughRemoteApps = defaults.object(forKey: Key.passthroughRemoteApps) as? Bool ?? true
@@ -199,15 +218,26 @@ final class Preferences: ObservableObject {
     }
 
     public func reload() {
-        let rawIM = defaults.integer(forKey: Key.inputMethod)
-        self.inputMethod = InputMethodType(rawValue: Int32(rawIM)) ?? .telex
+        isReloading = true
+        defer { isReloading = false }
+        CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
+        let rawMethod: Int
+        if let cfNum = CFPreferencesCopyAppValue(Key.inputMethod as CFString, kCFPreferencesCurrentApplication) as? NSNumber {
+            rawMethod = cfNum.intValue
+        } else {
+            rawMethod = defaults.integer(forKey: Key.inputMethod)
+        }
+        let resolvedMethod = InputMethodType(rawValue: Int32(rawMethod)) ?? .telex
+        if self.inputMethod != resolvedMethod {
+            self.inputMethod = resolvedMethod
+        }
 
         self.grammarProfile = .senFlex
 
         self.modernOrthography = true
         self.relaxedCoda = defaults.bool(forKey: Key.relaxedCoda)
         self.quickTelex = defaults.bool(forKey: Key.quickTelex)
-        self.vietnameseEnabled = true
+        self.vietnameseEnabled = defaults.object(forKey: Key.vietnameseEnabled) as? Bool ?? true
         self.smartBilingual = true
         self.terminalDirectMode = defaults.object(forKey: Key.terminalDirectMode) as? Bool ?? true
         self.passthroughRemoteApps = defaults.object(forKey: Key.passthroughRemoteApps) as? Bool ?? true

@@ -44,8 +44,13 @@ static void ibus_vielotus_load_user_config(IBusVieLotusEngine *vl_engine) {
         return;
     }
     char line[256];
+    gboolean has_input_method_override = FALSE;
+    gboolean config_is_vni = FALSE;
     while (fgets(line, sizeof(line), fp)) {
-        if (strncmp(line, "GRAMMAR_PROFILE=", 16) == 0) {
+        if (strncmp(line, "INPUT_METHOD=", 13) == 0) {
+            has_input_method_override = TRUE;
+            config_is_vni = (strstr(line, "vni") != NULL || strstr(line, "VNI") != NULL);
+        } else if (strncmp(line, "GRAMMAR_PROFILE=", 16) == 0) {
             vl_engine->sen_flex = (strstr(line, "classic") == NULL);
         } else if (strncmp(line, "SMART_BILINGUAL=", 16) == 0) {
             vl_engine->smart_bilingual = (strstr(line, "false") == NULL && strstr(line, "0") == NULL);
@@ -57,6 +62,16 @@ static void ibus_vielotus_load_user_config(IBusVieLotusEngine *vl_engine) {
     }
     fclose(fp);
 
+    const gchar *engine_name = ibus_engine_get_name((IBusEngine *)vl_engine);
+    if (engine_name && strstr(engine_name, "vni") != NULL) {
+        vl_engine->is_vni = TRUE;
+    } else if (has_input_method_override) {
+        vl_engine->is_vni = config_is_vni;
+    }
+    vielotus_set_input_method(
+        vl_engine->session,
+        vl_engine->is_vni ? VIELOTUS_INPUT_VNI : VIELOTUS_INPUT_TELEX
+    );
     vielotus_set_grammar_profile(
         vl_engine->session,
         vl_engine->sen_flex ? VIELOTUS_GRAMMAR_SEN_FLEX : VIELOTUS_GRAMMAR_CLASSIC

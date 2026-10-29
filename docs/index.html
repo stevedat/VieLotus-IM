@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Sen Việt — Ghi chép thiết kế & Bộ gõ tiếng Việt tự nhiên</title>
-  <meta name="description" content="Nghiên cứu và xây dựng bộ gõ tiếng Việt tự nhiên: không xin quyền theo dõi bàn phím, không lặp chữ trên trình duyệt, phân giải song ngữ Anh–Việt đối xứng trên macOS, Windows, Linux, iOS và Android.">
+  <title>Sen Việt (VieLotusIM) — Hồ sơ Nghiên cứu, Thực nghiệm & Phát hành Đa nền tảng</title>
+  <meta name="description" content="Hồ sơ kỹ thuật và đối chiếu thực nghiệm bộ gõ tiếng Việt Sen Việt (VieLotusIM): giao thức bàn phím gốc (0 Accessibility), phân giải song ngữ Anh–Việt đối xứng trên 9.091 ca kiểm thử, phát hành trên macOS, Windows, Linux, iOS và Android.">
 
   <!-- Canonical & OpenGraph -->
   <link rel="canonical" href="https://stevedat.github.io/VieLotus-IM/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://stevedat.github.io/VieLotus-IM/">
-  <meta property="og:title" content="Sen Việt — Ghi chép thiết kế & Bộ gõ tiếng Việt tự nhiên">
-  <meta property="og:description" content="Gõ tiếng Việt xen lẫn tiếng Anh tự nhiên, không xin quyền theo dõi bàn phím. Tìm hiểu nguyên lý, những đánh đổi thẳng thắn và tải trải nghiệm.">
+  <meta property="og:title" content="Sen Việt (VieLotusIM) — Hồ sơ Nghiên cứu & Thực nghiệm Bộ gõ Tiếng Việt">
+  <meta property="og:description" content="Phân tích kiến trúc bộ gõ tiếng Việt theo giao thức gốc của hệ điều hành (0 Accessibility), kiểm định đối xứng 9.091 ca và danh mục phát hành trên macOS, Windows, Linux, iOS, Android.">
   <meta property="og:image" content="https://stevedat.github.io/VieLotus-IM/assets/app-icon-512x512.png">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Sen Việt — Ghi chép thiết kế & Bộ gõ tiếng Việt tự nhiên">
-  <meta name="twitter:description" content="Gõ tiếng Việt xen lẫn tiếng Anh tự nhiên, không xin quyền theo dõi bàn phím trên macOS, Windows, Linux, iOS và Android.">
+  <meta name="twitter:title" content="Sen Việt (VieLotusIM) — Hồ sơ Nghiên cứu & Thực nghiệm Bộ gõ Tiếng Việt">
+  <meta name="twitter:description" content="Kiến trúc bộ gõ tiếng Việt chuẩn hệ điều hành (0 Accessibility) trên macOS, Windows, Linux, iOS và Android.">
   <meta name="twitter:image" content="https://stevedat.github.io/VieLotus-IM/assets/app-icon-512x512.png">
 
   <!-- Favicons -->
@@ -67,8 +67,9 @@
       color: var(--ink-primary);
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
-      line-height: 1.68;
+      line-height: 1.65;
       scroll-behavior: smooth;
+      scroll-padding-top: 64px;
     }
 
     body {
@@ -86,21 +87,27 @@
 
     .container {
       width: 100%;
-      max-width: 840px;
+      max-width: 920px;
       margin: 0 auto;
     }
 
     /* =========================================================
-       HEADER & ANCHOR NAVIGATION
+       TOP HEADER & STICKY SECTION TOC MENU
        ========================================================= */
     header {
-      padding: 18px 0;
+      padding: 16px 0 12px;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      border-bottom: 1px solid var(--ink-primary);
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
     .brand {
@@ -112,35 +119,45 @@
       font-size: 18px;
       letter-spacing: -0.02em;
       color: var(--ink-primary);
-      min-height: 44px;
+      min-height: 40px;
     }
 
     .brand img {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
       flex-shrink: 0;
     }
 
-    .header-nav {
+    .doc-type-badge {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--ink-secondary);
+      background: var(--keycap-putty);
+      border: 1px solid var(--border-hairline);
+      padding: 2px 8px;
+      border-radius: 5px;
+    }
+
+    .header-utility {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 14px;
-      font-size: 13.5px;
+      font-size: 13px;
     }
 
-    .nav-link {
+    .util-link {
       display: inline-flex;
       align-items: center;
-      min-height: 40px;
-      color: var(--ink-secondary);
-      font-weight: 500;
-      transition: color 0.15s ease;
+      min-height: 36px;
+      color: var(--lotus-teal);
+      font-weight: 600;
     }
 
-    .nav-link:hover {
-      color: var(--ink-primary);
+    .util-link:hover {
+      text-decoration: underline;
     }
 
     .lang-switch {
@@ -157,8 +174,8 @@
       color: var(--ink-secondary);
       font-size: 12px;
       font-weight: 600;
-      min-height: 32px;
-      padding: 4px 10px;
+      min-height: 30px;
+      padding: 3px 10px;
       border-radius: 5px;
       cursor: pointer;
     }
@@ -169,8 +186,54 @@
       box-shadow: 0 1px 2px rgba(17, 30, 24, 0.08);
     }
 
+    /* Sticky Multi-Section Jump Menu */
+    .section-toc-bar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(243, 245, 243, 0.94);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--ink-primary);
+      padding: 8px 0;
+      overflow-x: auto;
+    }
+
+    .toc-list {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      list-style: none;
+      white-space: nowrap;
+    }
+
+    .toc-item a {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 34px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--ink-secondary);
+      transition: background-color 0.12s ease, color 0.12s ease;
+    }
+
+    .toc-item a:hover {
+      background: var(--keycap-putty);
+      color: var(--ink-primary);
+    }
+
+    .toc-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--lotus-forest);
+    }
+
     /* =========================================================
-       PINNED TOP SUMMARY LEDGER (CRITICAL FACTS AT A GLANCE)
+       PINNED TOP SUMMARY LEDGER (CRITICAL EMPIRICAL METRICS)
        ========================================================= */
     .pinned-ledger {
       display: grid;
@@ -194,7 +257,7 @@
 
     .ledger-figure {
       font-family: var(--font-mono);
-      font-size: 18px;
+      font-size: 17.5px;
       font-weight: 600;
       font-variant-numeric: tabular-nums;
       color: var(--lotus-forest);
@@ -202,14 +265,14 @@
     }
 
     .ledger-caption {
-      font-size: 12.5px;
+      font-size: 12.25px;
       color: var(--ink-secondary);
       line-height: 1.45;
       margin-top: 3px;
     }
 
     /* =========================================================
-       HERO & UNIFIED DOWNLOAD STRIP
+       HERO ABSTRACT & INTERACTIVE SPECIMEN
        ========================================================= */
     main {
       flex: 1;
@@ -217,153 +280,39 @@
     }
 
     .hero-editorial {
-      padding: 34px 0 28px;
+      padding: 30px 0 28px;
     }
 
     h1 {
       font-family: var(--font-display);
-      font-size: 31px;
+      font-size: 29px;
       font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.16;
+      letter-spacing: -0.025em;
+      line-height: 1.18;
       color: var(--ink-primary);
-      max-width: 24ch;
-      margin-bottom: 14px;
+      max-width: 28ch;
+      margin-bottom: 12px;
     }
 
     .hero-prose {
-      font-size: 16px;
+      font-size: 15.25px;
       color: var(--ink-secondary);
-      line-height: 1.7;
-      max-width: 64ch;
+      line-height: 1.68;
+      max-width: 68ch;
       margin-bottom: 24px;
     }
 
-    /* Compact, Restrained Download Strip */
-    .download-strip {
-      background: var(--porcelain-sheet);
-      border: 1px solid var(--border-bezel);
-      border-radius: 12px;
-      padding: 14px 16px;
-      margin-bottom: 28px;
-    }
-
-    .dl-top-row {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border-hairline);
-    }
-
-    .dl-primary-group {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .btn-primary-dl {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 44px;
-      padding: 10px 18px;
-      background: var(--lotus-forest);
-      color: #FFFFFF;
-      font-size: 14px;
-      font-weight: 600;
-      border-radius: 8px;
-      transition: background-color 0.15s ease;
-    }
-
-    .btn-primary-dl:hover {
-      background: var(--lotus-forest-hover);
-    }
-
-    .brew-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      min-height: 44px;
-      background: var(--paper-canvas);
-      border: 1px solid var(--border-hairline);
-      border-radius: 8px;
-      padding: 6px 8px 6px 12px;
-      font-family: var(--font-mono);
-      font-size: 12.5px;
-      color: var(--ink-primary);
-    }
-
-    .brew-pill code {
-      white-space: nowrap;
-      overflow-x: auto;
-    }
-
-    .btn-copy-inline {
-      border: 1px solid var(--border-hairline);
-      background: var(--porcelain-sheet);
-      color: var(--ink-primary);
-      font-family: var(--font-body);
-      font-size: 12px;
-      font-weight: 500;
-      min-height: 30px;
-      padding: 3px 10px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    .btn-copy-inline:hover {
-      background: var(--keycap-putty);
-    }
-
-    .dl-os-bar {
-      padding-top: 11px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px 18px;
-      font-size: 13px;
-      color: var(--ink-secondary);
-    }
-
-    .dl-os-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .dl-os-name {
-      font-weight: 600;
-      color: var(--ink-primary);
-    }
-
-    .dl-os-link {
-      color: var(--lotus-teal);
-      font-weight: 600;
-      min-height: 28px;
-      display: inline-flex;
-      align-items: center;
-    }
-
-    .dl-os-link:hover {
-      text-decoration: underline;
-    }
-
-    /* =========================================================
-       THE MEMORABLE CENTERPIECE: TACTILE KEYSTROKE SPECIMEN
-       ========================================================= */
+    /* Interactive Keystroke Specimen Stage */
     .specimen-stage {
       background: var(--porcelain-sheet);
       border: 1px solid var(--ink-primary);
-      border-radius: 14px;
-      box-shadow: 0 10px 28px rgba(17, 30, 24, 0.06);
+      border-radius: 12px;
       overflow: hidden;
     }
 
     .specimen-header {
       background: var(--keycap-putty);
-      padding: 12px 16px;
+      padding: 11px 16px;
       border-bottom: 1px solid var(--border-hairline);
       display: flex;
       flex-wrap: wrap;
@@ -374,7 +323,7 @@
 
     .specimen-title {
       font-family: var(--font-display);
-      font-size: 15px;
+      font-size: 14.5px;
       font-weight: 700;
       color: var(--ink-primary);
     }
@@ -390,13 +339,12 @@
       background: var(--porcelain-sheet);
       color: var(--ink-secondary);
       font-family: var(--font-body);
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 500;
-      min-height: 36px;
-      padding: 5px 12px;
-      border-radius: 7px;
+      min-height: 34px;
+      padding: 4px 11px;
+      border-radius: 6px;
       cursor: pointer;
-      transition: background-color 0.12s ease, color 0.12s ease;
     }
 
     .scenario-btn:hover {
@@ -411,14 +359,13 @@
       font-weight: 600;
     }
 
-    /* Tactile Physical Keycap Tray */
     .keycap-tray {
-      padding: 18px 16px;
+      padding: 16px;
       background: var(--paper-canvas);
       border-bottom: 1px solid var(--border-hairline);
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 9px;
     }
 
     .keycap-meta {
@@ -427,7 +374,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      font-size: 12.5px;
+      font-size: 12.25px;
       color: var(--ink-secondary);
     }
 
@@ -449,14 +396,14 @@
       align-items: center;
       justify-content: center;
       min-width: 34px;
-      height: 36px;
+      height: 34px;
       padding: 0 9px;
       background: var(--porcelain-sheet);
       border: 1px solid var(--border-bezel);
       border-bottom: 3px solid var(--border-bezel);
-      border-radius: 7px;
+      border-radius: 6px;
       font-family: var(--font-mono);
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--ink-primary);
       user-select: none;
@@ -469,29 +416,28 @@
     }
 
     kbd.keycap.space {
-      padding: 0 14px;
-      font-size: 12px;
+      padding: 0 12px;
+      font-size: 11.5px;
       color: var(--ink-secondary);
     }
 
     .keycap-prefix {
       font-family: var(--font-mono);
-      font-size: 13px;
+      font-size: 12.5px;
       color: var(--ink-secondary);
       background: var(--keycap-putty);
-      padding: 4px 9px;
-      border-radius: 6px;
+      padding: 4px 8px;
+      border-radius: 5px;
       margin-right: 4px;
     }
 
-    /* Split Editor Comparison Inside Specimen */
     .specimen-panes {
       display: grid;
       grid-template-columns: 1fr;
     }
 
     .editor-pane {
-      padding: 18px 16px;
+      padding: 16px;
       border-bottom: 1px solid var(--border-hairline);
     }
 
@@ -507,10 +453,7 @@
       font-size: 12px;
       font-weight: 600;
       color: var(--ink-muted);
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      margin-bottom: 7px;
     }
 
     .editor-pane.sen-viet .pane-label {
@@ -519,14 +462,14 @@
 
     .pane-output {
       font-family: var(--font-mono);
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 600;
       color: var(--ink-primary);
-      padding: 10px 12px;
+      padding: 9px 12px;
       background: var(--paper-canvas);
       border-left: 3px solid var(--border-bezel);
-      border-radius: 0 6px 6px 0;
-      margin-bottom: 10px;
+      border-radius: 0 5px 5px 0;
+      margin-bottom: 9px;
     }
 
     .editor-pane.sen-viet .pane-output {
@@ -535,22 +478,23 @@
     }
 
     .pane-note {
-      font-size: 13.5px;
+      font-size: 13.25px;
       color: var(--ink-secondary);
-      line-height: 1.58;
+      line-height: 1.56;
     }
 
     .specimen-cite {
-      padding: 11px 16px;
+      padding: 10px 16px;
       background: var(--paper-canvas);
       border-top: 1px solid var(--border-hairline);
-      font-size: 12.25px;
+      font-size: 12px;
       color: var(--ink-muted);
       line-height: 1.5;
     }
 
     .specimen-cite a,
-    .cite-row a {
+    .cite-row a,
+    .table-link {
       color: var(--lotus-teal);
       font-weight: 600;
       text-decoration: underline;
@@ -558,7 +502,8 @@
     }
 
     .specimen-cite code,
-    .cite-row code {
+    .cite-row code,
+    .inline-code {
       font-family: var(--font-mono);
       font-size: 11.5px;
       background: var(--keycap-putty);
@@ -569,63 +514,202 @@
 
     .cite-row {
       margin-top: 6px;
-      font-size: 12.25px;
+      font-size: 12px;
       color: var(--ink-muted);
       line-height: 1.5;
     }
 
     /* =========================================================
-       EDITORIAL SECTIONS (CLEAN TYPOGRAPHIC HIERARCHY, NO BOX SPAM)
+       EDITORIAL SECTIONS & ACADEMIC TABLES
        ========================================================= */
     .editorial-section {
-      padding: 44px 0;
+      padding: 40px 0;
       border-top: 1px solid var(--ink-primary);
     }
 
     .section-head-grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 8px;
-      margin-bottom: 24px;
+      gap: 6px;
+      margin-bottom: 20px;
     }
 
     .sec-num {
       font-family: var(--font-mono);
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
       color: var(--lotus-forest);
     }
 
     h2 {
       font-family: var(--font-display);
-      font-size: 23px;
+      font-size: 22px;
       font-weight: 800;
       letter-spacing: -0.02em;
       line-height: 1.25;
       color: var(--ink-primary);
     }
 
-    .sec-lead {
-      font-size: 15px;
-      color: var(--ink-secondary);
-      max-width: 64ch;
-      line-height: 1.68;
+    h3.sub-heading {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink-primary);
+      margin: 22px 0 10px;
     }
 
-    /* Section 1: Zero-Permission Architectural Ledger */
+    .sec-lead {
+      font-size: 14.5px;
+      color: var(--ink-secondary);
+      max-width: 68ch;
+      line-height: 1.65;
+    }
+
+    /* Academic Data Tables (Used for Platforms, Benchmarks, Upstream PRs, Prior Art) */
+    .data-table-wrap {
+      overflow-x: auto;
+      background: var(--porcelain-sheet);
+      border: 1px solid var(--border-bezel);
+      border-radius: 8px;
+      margin-bottom: 14px;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+      line-height: 1.52;
+    }
+
+    table.data-table th {
+      background: var(--keycap-putty);
+      color: var(--ink-primary);
+      font-weight: 600;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-bezel);
+      vertical-align: bottom;
+    }
+
+    table.data-table td {
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--border-hairline);
+      color: var(--ink-secondary);
+      vertical-align: top;
+    }
+
+    table.data-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    table.data-table td strong {
+      color: var(--ink-primary);
+      font-weight: 600;
+    }
+
+    .channel-pills {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .channel-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 28px;
+      padding: 3px 9px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--lotus-tint);
+      color: var(--lotus-forest);
+      border: 1px solid rgba(27, 94, 58, 0.25);
+    }
+
+    .channel-pill:hover {
+      background: var(--lotus-forest);
+      color: #FFFFFF;
+    }
+
+    .channel-pill.secondary {
+      background: var(--paper-canvas);
+      color: var(--lotus-teal);
+      border-color: var(--border-hairline);
+    }
+
+    .channel-pill.secondary:hover {
+      background: var(--keycap-putty);
+      color: var(--ink-primary);
+    }
+
+    .cli-inline-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 5px;
+      padding: 3px 7px;
+      background: var(--paper-canvas);
+      border: 1px solid var(--border-hairline);
+      border-radius: 5px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--ink-primary);
+    }
+
+    .btn-copy-inline {
+      border: 1px solid var(--border-hairline);
+      background: var(--porcelain-sheet);
+      color: var(--ink-primary);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      min-height: 24px;
+      padding: 1px 7px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-copy-inline:hover {
+      background: var(--keycap-putty);
+    }
+
+    /* PR Status Badges */
+    .pr-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--lotus-tint);
+      color: var(--lotus-forest);
+      white-space: nowrap;
+    }
+
+    .repo-tag {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink-primary);
+    }
+
+    /* Zero-Permission Architectural Ledger */
     .arch-ledger {
       border-top: 1px solid var(--border-hairline);
       border-bottom: 1px solid var(--border-hairline);
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
 
     .arch-row {
       display: grid;
       grid-template-columns: 1fr;
       gap: 10px;
-      padding: 16px 0;
+      padding: 15px 0;
       border-bottom: 1px solid var(--border-hairline);
-      font-size: 14px;
+      font-size: 13.75px;
     }
 
     .arch-row:last-child {
@@ -670,29 +754,29 @@
     .tradeoffs-block {
       background: var(--ochre-tint);
       border-left: 3px solid var(--ochre-ink);
-      padding: 18px 20px;
-      border-radius: 0 10px 10px 0;
+      padding: 16px 18px;
+      border-radius: 0 8px 8px 0;
     }
 
     .tradeoffs-heading {
       font-family: var(--font-display);
-      font-size: 16.5px;
+      font-size: 15.5px;
       font-weight: 700;
       color: var(--ink-primary);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .tradeoffs-items {
       display: grid;
-      gap: 14px;
+      gap: 12px;
     }
 
     .tradeoff-entry {
-      padding-top: 12px;
-      border-top: 1px solid rgba(120, 75, 14, 0.18);
-      font-size: 14px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(120, 75, 14, 0.16);
+      font-size: 13.5px;
       color: var(--ink-secondary);
-      line-height: 1.62;
+      line-height: 1.6;
     }
 
     .tradeoff-entry:first-child {
@@ -705,17 +789,18 @@
       font-weight: 600;
     }
 
-    /* Section 2: Three Core Problems (2-Column Essays) */
+    /* Core Linguistic Essays */
     .essay-list {
       display: grid;
-      gap: 28px;
+      gap: 24px;
+      margin-bottom: 24px;
     }
 
     .essay-row {
       display: grid;
       grid-template-columns: 1fr;
       gap: 10px;
-      padding-top: 24px;
+      padding-top: 20px;
       border-top: 1px solid var(--border-hairline);
     }
 
@@ -726,7 +811,7 @@
 
     .essay-title {
       font-family: var(--font-display);
-      font-size: 17.5px;
+      font-size: 16.5px;
       font-weight: 700;
       color: var(--ink-primary);
       line-height: 1.3;
@@ -734,94 +819,18 @@
 
     .essay-figure {
       font-family: var(--font-mono);
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 600;
       color: var(--lotus-forest);
       margin-top: 4px;
     }
 
     .essay-prose {
-      font-size: 14.5px;
+      font-size: 14px;
       color: var(--ink-secondary);
-      line-height: 1.7;
+      line-height: 1.66;
       display: grid;
-      gap: 10px;
-    }
-
-    .essay-prose strong {
-      color: var(--ink-primary);
-      font-weight: 600;
-    }
-
-    .essay-prose code {
-      font-family: var(--font-mono);
-      font-size: 0.9em;
-      background: var(--keycap-putty);
-      padding: 1px 5px;
-      border-radius: 4px;
-      color: var(--ink-primary);
-    }
-
-    /* Expandable Empirical Table */
-    details.empirical-drawer {
-      margin-top: 28px;
-      border-top: 1px solid var(--border-hairline);
-      border-bottom: 1px solid var(--border-hairline);
-    }
-
-    details.empirical-drawer summary {
-      padding: 14px 0;
-      font-size: 14.5px;
-      font-weight: 600;
-      color: var(--lotus-teal);
-      cursor: pointer;
-      list-style: none;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    details.empirical-drawer summary::-webkit-details-marker {
-      display: none;
-    }
-
-    .drawer-body {
-      padding-bottom: 20px;
-      font-size: 13.75px;
-      color: var(--ink-secondary);
-    }
-
-    .data-table-wrap {
-      overflow-x: auto;
-      margin: 12px 0 14px;
-      background: var(--porcelain-sheet);
-      border: 1px solid var(--border-hairline);
-      border-radius: 8px;
-    }
-
-    table.data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      text-align: left;
-    }
-
-    table.data-table th {
-      background: var(--keycap-putty);
-      color: var(--ink-primary);
-      font-weight: 600;
-      padding: 9px 12px;
-      border-bottom: 1px solid var(--border-hairline);
-    }
-
-    table.data-table td {
-      padding: 9px 12px;
-      border-bottom: 1px solid var(--border-hairline);
-      color: var(--ink-secondary);
-    }
-
-    table.data-table tr:last-child td {
-      border-bottom: 0;
+      gap: 8px;
     }
 
     .num {
@@ -830,13 +839,7 @@
       white-space: nowrap;
     }
 
-    .monograph-link {
-      font-weight: 600;
-      color: var(--lotus-teal);
-      text-decoration: underline;
-    }
-
-    /* Section 3: Connected 3-Stage Roadmap Stepper */
+    /* Roadmap Stepper */
     .roadmap-stepper {
       display: grid;
       grid-template-columns: 1fr;
@@ -844,14 +847,14 @@
     }
 
     .rm-step {
-      padding: 20px 0;
+      padding: 18px 0;
       border-bottom: 1px solid var(--border-hairline);
     }
 
     .rm-badge {
       display: inline-block;
       font-family: var(--font-mono);
-      font-size: 11.5px;
+      font-size: 11px;
       font-weight: 600;
       padding: 2px 8px;
       border-radius: 4px;
@@ -875,7 +878,7 @@
 
     .rm-title {
       font-family: var(--font-display);
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
       color: var(--ink-primary);
       margin-bottom: 8px;
@@ -884,10 +887,10 @@
     .rm-list {
       list-style: none;
       display: grid;
-      gap: 7px;
-      font-size: 13.75px;
+      gap: 6px;
+      font-size: 13.5px;
       color: var(--ink-secondary);
-      line-height: 1.58;
+      line-height: 1.56;
     }
 
     .rm-list li {
@@ -902,54 +905,13 @@
       color: var(--ink-muted);
     }
 
-    /* Ecosystem Contributions & Upstream Acknowledgments */
-    .ecosystem-block {
-      margin-top: 24px;
-      background: var(--lotus-tint);
-      border-left: 3px solid var(--lotus-forest);
-      padding: 18px 20px;
-      border-radius: 0 10px 10px 0;
-    }
-
-    .ecosystem-heading {
-      font-family: var(--font-display);
-      font-size: 16.5px;
-      font-weight: 700;
-      color: var(--ink-primary);
-      margin-bottom: 10px;
-    }
-
-    .ecosystem-items {
-      display: grid;
-      gap: 12px;
-    }
-
-    .ecosystem-entry {
-      padding-top: 10px;
-      border-top: 1px solid rgba(27, 94, 67, 0.16);
-      font-size: 13.75px;
-      color: var(--ink-secondary);
-      line-height: 1.62;
-    }
-
-    .ecosystem-entry:first-child {
-      padding-top: 0;
-      border-top: 0;
-    }
-
-    .ecosystem-entry a {
-      color: var(--lotus-forest);
-      font-weight: 600;
-      text-decoration: underline;
-    }
-
     /* =========================================================
        FOOTER & VIETQR
        ========================================================= */
     footer {
-      padding: 24px 0 max(32px, env(safe-area-inset-bottom));
+      padding: 22px 0 max(32px, env(safe-area-inset-bottom));
       border-top: 1px solid var(--ink-primary);
-      font-size: 13px;
+      font-size: 12.75px;
       color: var(--ink-muted);
       display: flex;
       flex-direction: column;
@@ -966,14 +928,14 @@
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 8px 18px;
+      gap: 8px 16px;
     }
 
     .footer-links a,
     .footer-donate {
       display: inline-flex;
       align-items: center;
-      min-height: 34px;
+      min-height: 32px;
     }
 
     .footer-links a:hover {
@@ -996,10 +958,10 @@
 
     .vietqr-drawer {
       display: none;
-      padding: 16px;
+      padding: 14px;
       background: var(--porcelain-sheet);
       border: 1px solid var(--border-hairline);
-      border-radius: 10px;
+      border-radius: 8px;
     }
 
     .vietqr-drawer.open {
@@ -1015,16 +977,16 @@
     }
 
     .vietqr-img {
-      width: 112px;
-      height: 112px;
-      border-radius: 8px;
+      width: 108px;
+      height: 108px;
+      border-radius: 6px;
       border: 1px solid var(--border-hairline);
       padding: 4px;
       background: #FFFFFF;
     }
 
     .vietqr-meta {
-      font-size: 13px;
+      font-size: 12.75px;
       color: var(--ink-secondary);
       line-height: 1.6;
     }
@@ -1036,9 +998,9 @@
     }
 
     /* =========================================================
-       DESKTOP BREAKPOINT (min-width: 680px)
+       DESKTOP BREAKPOINT (min-width: 720px)
        ========================================================= */
-    @media (min-width: 680px) {
+    @media (min-width: 720px) {
       body {
         padding-left: 28px;
         padding-right: 28px;
@@ -1064,13 +1026,7 @@
       }
 
       h1 {
-        font-size: 38px;
-      }
-
-      .dl-top-row {
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
+        font-size: 34px;
       }
 
       .specimen-panes {
@@ -1079,7 +1035,7 @@
 
       .editor-pane {
         border-bottom: 0;
-        padding: 20px;
+        padding: 18px 20px;
       }
 
       .editor-pane:first-child {
@@ -1094,7 +1050,7 @@
 
       .essay-row {
         grid-template-columns: 230px 1fr;
-        gap: 32px;
+        gap: 28px;
         align-items: start;
       }
 
@@ -1103,7 +1059,7 @@
       }
 
       .rm-step {
-        padding: 22px 20px;
+        padding: 20px 18px;
         border-bottom: 0;
         border-right: 1px solid var(--border-hairline);
       }
@@ -1134,31 +1090,44 @@
 <body>
 
   <div class="container">
-    <!-- Top Header with Direct Section Jump Links -->
+    <!-- Top Header: Brand, External Dossier Links & Language Switch -->
     <header>
-      <a href="index.html" class="brand">
-        <img src="assets/app-icon-512x512.png" alt="Sen Việt">
-        <span>Sen Việt</span>
-      </a>
+      <div class="brand-group">
+        <a href="index.html" class="brand">
+          <img src="assets/app-icon-512x512.png" alt="Sen Việt">
+          <span>Sen Việt (VieLotusIM)</span>
+        </a>
+        <span class="doc-type-badge" data-i18n="hdr.badge">Hồ sơ Kỹ thuật &amp; Thực nghiệm v1.1.1</span>
+      </div>
 
-      <nav class="header-nav" aria-label="Điều hướng chính">
-        <a href="#sec-perm" class="nav-link" data-i18n="nav.perm">0 xin quyền &amp; Đánh đổi</a>
-        <a href="#sec-notes" class="nav-link" data-i18n="nav.notes">Ba bài toán cốt lõi</a>
-        <a href="#sec-roadmap" class="nav-link" data-i18n="nav.roadmap">Lộ trình</a>
-        <a href="research.html" class="nav-link" data-i18n="nav.paper">Chuyên khảo</a>
-        <a href="support.html" class="nav-link" data-i18n="nav.support">Hướng dẫn</a>
+      <div class="header-utility">
+        <a href="research.html" class="util-link" data-i18n="nav.paper">Chuyên khảo Kiến trúc</a>
+        <a href="support.html" class="util-link" data-i18n="nav.support">Hướng dẫn Kích hoạt</a>
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="util-link">GitHub</a>
         <div class="lang-switch" role="group" aria-label="Ngôn ngữ">
           <button id="btn-vi" class="lang-btn active" onclick="setLang('vi')">VI</button>
           <button id="btn-en" class="lang-btn" onclick="setLang('en')">EN</button>
         </div>
-      </nav>
+      </div>
     </header>
 
-    <!-- Pinned Top Summary Ledger (Rule: Critical empirical data pinned to top) -->
+    <!-- Sticky Section Navigation Bar (6 Logical Sections) -->
+    <nav class="section-toc-bar" aria-label="Mục lục hồ sơ">
+      <ul class="toc-list">
+        <li class="toc-item"><a href="#sec-sim"><span class="toc-num">§1</span><span data-i18n="toc.s1">Mô phỏng thực nghiệm</span></a></li>
+        <li class="toc-item"><a href="#sec-platforms"><span class="toc-num">§2</span><span data-i18n="toc.s2">Nền tảng &amp; Phát hành (5 OS)</span></a></li>
+        <li class="toc-item"><a href="#sec-perm"><span class="toc-num">§3</span><span data-i18n="toc.s3">Giao thức gốc &amp; Đánh đổi</span></a></li>
+        <li class="toc-item"><a href="#sec-notes"><span class="toc-num">§4</span><span data-i18n="toc.s4">Lõi ngôn ngữ &amp; Kiểm định</span></a></li>
+        <li class="toc-item"><a href="#sec-upstream"><span class="toc-num">§5</span><span data-i18n="toc.s5">Đóng góp Upstream (PR Trace)</span></a></li>
+        <li class="toc-item"><a href="#sec-roadmap"><span class="toc-num">§6</span><span data-i18n="toc.s6">Lộ trình nghiên cứu</span></a></li>
+      </ul>
+    </nav>
+
+    <!-- Pinned Top Summary Ledger -->
     <section class="pinned-ledger" aria-label="Số liệu thực chứng cốt lõi">
       <div class="ledger-cell">
-        <div class="ledger-figure">0 Accessibility</div>
-        <div class="ledger-caption" data-i18n="led.c1">Không xin quyền theo dõi bàn phím hay kết nối mạng</div>
+        <div class="ledger-figure">0 Global Hooks</div>
+        <div class="ledger-caption" data-i18n="led.c1">Không bẫy phím ngầm · 0 Accessibility (macOS), 0 Full Access (iOS), 0 Hook (Win/Linux)</div>
       </div>
       <div class="ledger-cell">
         <div class="ledger-figure">100.00% (9.091)</div>
@@ -1166,69 +1135,27 @@
       </div>
       <div class="ledger-cell">
         <div class="ledger-figure">97.33% · 182/182</div>
-        <div class="ledger-caption" data-i18n="led.c3">Đối xứng hai chiều (365/375) &amp; giữ 100% đường gõ Việt duy nhất</div>
+        <div class="ledger-caption" data-i18n="led.c3">Đối xứng hai chiều (365/375) &amp; bảo toàn 100% đường gõ Việt duy nhất</div>
       </div>
       <div class="ledger-cell">
         <div class="ledger-figure">&lt; 0.2 ms (p99)</div>
-        <div class="ledger-caption" data-i18n="led.c4">Độ trễ phản hồi qua 250.000 phím liên tục trên Apple Silicon</div>
+        <div class="ledger-caption" data-i18n="led.c4">Độ trễ xử lý qua 250.000 phím liên tục (lõi Swift 6 đa nền tảng)</div>
       </div>
     </section>
 
     <main>
-      <!-- Hero & Tactile Specimen Stage -->
-      <section class="hero-editorial">
-        <h1 data-i18n="hero.title">Làm lại bộ gõ tiếng Việt theo chuẩn bàn phím gốc của hệ điều hành</h1>
+      <!-- SECTION 1: Hero Abstract & Interactive Specimen Stage -->
+      <section id="sec-sim" class="hero-editorial">
+        <div class="sec-num" style="margin-bottom: 6px;">§1 / 06 · EMPIRICAL SPECIMEN</div>
+        <h1 data-i18n="hero.title">Nghiên cứu và thiết kế bộ gõ tiếng Việt theo giao thức bàn phím gốc đa nền tảng</h1>
         <p class="hero-prose" data-i18n="hero.lead">
-          Hai điểm gây ức chế nhất của bộ gõ tiếng Việt hiện nay là: (1) đòi quyền theo dõi phím toàn cục dễ gây lặp chữ trên trình duyệt, và (2) biến các từ tiếng Anh thông dụng như turn thành âm vô nghĩa "tủn", hoặc biến last thành "lát". Dưới đây là đối chiếu thực chứng, các đánh đổi kiến trúc có dẫn nguồn và bộ cài cho 5 hệ điều hành.
+          Sen Việt (VieLotusIM) lấy hệ sinh thái Apple (macOS, iOS, iPadOS) làm kiến trúc tham chiếu trọng tâm bằng ngôn ngữ Pure Swift 6, đồng thời vận hành đồng nhất cùng một lõi ngôn ngữ trên Windows, Linux và Android. Dự án tập trung giải quyết hai bài toán kỹ thuật: (1) thay thế cơ chế bẫy phím ngầm đòi quyền nhạy cảm bằng kênh nhập liệu chính thống của từng hệ điều hành, và (2) xử lý điểm mù từ vựng khi các từ tiếng Anh thông dụng như turn bị biến thành âm vô nghĩa "tủn", hoặc last thành "lát".
         </p>
 
-        <!-- Quiet, Compact Download Strip -->
-        <div class="download-strip" aria-label="Tải bộ cài theo thiết bị">
-          <div class="dl-top-row">
-            <div class="dl-primary-group">
-              <a id="btn-download-pkg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg" class="btn-primary-dl">
-                <span data-i18n="cta.pkg">Tải cho macOS (.pkg)</span>
-              </a>
-              <div class="brew-pill">
-                <code>brew install stevedat/tap/vielotus</code>
-                <button type="button" class="btn-copy-inline" onclick="copyBrew(this)" data-i18n="cta.copy">Chép</button>
-              </div>
-            </div>
-            <a href="support.html" class="dl-os-link" data-i18n="cta.guide">Xem cách bật bàn phím sau khi cài</a>
-          </div>
-
-          <div class="dl-os-bar">
-            <div class="dl-os-item">
-              <span class="dl-os-name">macOS 13+:</span>
-              <a id="link-mac-pkg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg" class="dl-os-link">.pkg (Universal)</a>
-            </div>
-            <div class="dl-os-item">
-              <span class="dl-os-name">Windows 10/11:</span>
-              <a id="link-win-exe" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe" class="dl-os-link">.exe (x64)</a>
-              <span>/</span>
-              <a id="link-win-arm64" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe" class="dl-os-link">ARM64</a>
-            </div>
-            <div class="dl-os-item">
-              <span class="dl-os-name">Linux:</span>
-              <a id="link-lin-deb" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_1.1.1_amd64.deb" class="dl-os-link">.deb (x64)</a>
-              <span>/</span>
-              <a id="link-lin-release" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_1.1.1_arm64.deb" class="dl-os-link">ARM64</a>
-              <span>·</span>
-              <button type="button" class="btn-copy-inline" onclick="copyText('curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh', this)" data-i18n="cta.copy_linux">Lệnh 1 dòng</button>
-            </div>
-            <div class="dl-os-item">
-              <span class="dl-os-name" data-i18n="plat.mobile_label">Điện thoại:</span>
-              <a href="https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799" target="_blank" rel="noopener noreferrer" class="dl-os-link">App Store</a>
-              <span>/</span>
-              <a href="https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard" target="_blank" rel="noopener noreferrer" class="dl-os-link">Google Play</a>
-            </div>
-          </div>
-        </div>
-
-        <!-- THE MEMORABLE CENTERPIECE: Interactive Keycap & Editor Stage -->
-        <div id="sec-sim" class="specimen-stage">
+        <!-- Interactive Keycap & Editor Stage -->
+        <div class="specimen-stage">
           <div class="specimen-header">
-            <span class="specimen-title" data-i18n="sim.title">Bàn thử nghiệm tình huống gõ thực tế</span>
+            <span class="specimen-title" data-i18n="sim.title">Mô phỏng đối chiếu 4 ca biên ngôn ngữ &amp; bộ đệm</span>
             <div class="scenario-selector" role="tablist">
               <button type="button" class="scenario-btn active" onclick="selectScenario(0)" data-i18n="sim.tab0">1. Gõ "turn" (không ra "tủn")</button>
               <button type="button" class="scenario-btn" onclick="selectScenario(1)" data-i18n="sim.tab1">2. Gõ "last" vs. "lát"</button>
@@ -1239,28 +1166,26 @@
 
           <div class="keycap-tray">
             <div class="keycap-meta">
-              <span data-i18n="sim.typed_label">Chuỗi phím vật lý bạn bấm:</span>
+              <span data-i18n="sim.typed_label">Chuỗi phím vật lý đầu vào:</span>
               <span id="sim-context" class="keycap-context">Từ tiếng Anh bị biến thành âm vô nghĩa (turn → tủn)</span>
             </div>
-            <div id="sim-keycaps" class="keycap-row" aria-live="polite">
-              <!-- Populated dynamically with tactile <kbd class="keycap"> elements -->
-            </div>
+            <div id="sim-keycaps" class="keycap-row" aria-live="polite"></div>
           </div>
 
           <div class="specimen-panes">
             <div class="editor-pane">
               <div class="pane-label">
-                <span data-i18n="sim.old_head">Bộ gõ chỉ kiểm tra luật ghép vần</span>
+                <span data-i18n="sim.old_head">Bộ lọc chỉ kiểm tra khuôn ghép vần (Phonotactic-only)</span>
               </div>
               <div id="sim-old-out" class="pane-output">tủn</div>
               <p id="sim-old-exp" class="pane-note">
-                Các bộ gõ hiện nay khôi phục được từ sai cấu trúc vần (như window), nhưng với "turn", tổ hợp t-u-n đúng luật ghép phụ âm – nguyên âm nên bị biến thành âm vô nghĩa "tủn".
+                Các bộ gõ hiện nay khôi phục được từ sai cấu trúc vần (như window), nhưng với "turn", tổ hợp t-u-n đúng khuôn phụ âm – nguyên âm nên bị biến thành âm vô nghĩa "tủn".
               </p>
             </div>
 
             <div class="editor-pane sen-viet">
               <div class="pane-label">
-                <span data-i18n="sim.new_head">Cách Sen Việt xử lý</span>
+                <span data-i18n="sim.new_head">Trọng tài từ vựng &amp; ngữ cảnh (Sen Việt)</span>
               </div>
               <div id="sim-new-out" class="pane-output">turn </div>
               <p id="sim-new-exp" class="pane-note">
@@ -1272,52 +1197,196 @@
           <div class="specimen-cite">
             <span data-i18n="sim.cite_prefix">Nguồn đối chiếu:</span>
             <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/BENCHMARK_REPORT.md" target="_blank" rel="noopener noreferrer">BENCHMARK_REPORT.md</a>
-            · <span data-i18n="sim.cite_corpus">Unit test kiểm chứng: SmartBilingualDetectorTests.swift (turn, last, list, best, cost, rest)</span>
-            · <span data-i18n="sim.cite_cmd">Tự chạy:</span> <code>./Binaries/VieLotusCLI --benchmark</code>
+            · <span data-i18n="sim.cite_corpus">Ca kiểm thử đơn vị: SmartBilingualDetectorTests.swift (turn, last, list, best, cost, rest)</span>
+            · <span data-i18n="sim.cite_cmd">Tự kiểm chứng:</span> <code>./Binaries/VieLotusCLI --benchmark</code>
           </div>
         </div>
       </section>
 
-      <!-- SECTION 1: Zero-Permission Orientation & Honest Trade-offs -->
+      <!-- SECTION 2: Published Platforms, Store URLs & Verified Hardware/OS Matrix -->
+      <section id="sec-platforms" class="editorial-section">
+        <div class="section-head-grid">
+          <div class="sec-num">§2 / 06 · PUBLISHED DISTRIBUTIONS &amp; VERIFIED ENVIRONMENTS</div>
+          <h2 data-i18n="plat.heading">Danh mục nền tảng đã phát hành, dòng máy kiểm chứng &amp; liên kết chính thức</h2>
+          <p class="sec-lead" data-i18n="plat.desc">
+            Cùng một lõi trạng thái Pure Swift 6 (VieLotusCore &amp; VieLotusCAPI) đã được biên dịch, đóng gói và xuất bản chính thức trên 5 hệ điều hành máy tính và di động. Bảng dưới đây tổng hợp giao thức hệ thống, phần cứng đã đo kiểm và đường dẫn tải/kho ứng dụng chính thức của từng nền tảng.
+          </p>
+        </div>
+
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 19%;" data-i18n="plat.th1">Hệ điều hành &amp; Giao thức</th>
+                <th style="width: 25%;" data-i18n="plat.th2">Dòng máy &amp; Kiến trúc CPU đã kiểm thử</th>
+                <th style="width: 26%;" data-i18n="plat.th3">Môi trường &amp; Ứng dụng xác thực</th>
+                <th style="width: 30%;" data-i18n="plat.th4">Kênh phát hành &amp; URL chính thức</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 1. macOS -->
+              <tr>
+                <td>
+                  <strong>macOS 13 – 15</strong><br>
+                  <span class="inline-code">InputMethodKit</span><br>
+                  <span style="font-size: 11.5px; color: var(--ink-muted);">Ventura, Sonoma, Sequoia</span>
+                </td>
+                <td data-i18n="plat.mac_hw">
+                  <strong>Apple Silicon</strong> (M1 / M2 / M3 / M4 — MacBook Air/Pro, Mac mini, iMac, Mac Studio) &amp; <strong>Intel</strong> (x86_64)
+                </td>
+                <td data-i18n="plat.mac_apps">
+                  Safari, Notes, Xcode, Office; Chrome, Arc, VS Code, Cursor, Slack, Notion, Zalo; Terminal, iTerm2, Ghostty, Kitty, Alacritty, Warp
+                </td>
+                <td>
+                  <div class="channel-pills">
+                    <a id="link-mac-pkg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg" class="channel-pill">VieLotusIM.pkg (Notarized)</a>
+                    <a id="link-mac-zip" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.app.zip" class="channel-pill secondary">.app.zip</a>
+                  </div>
+                  <div class="cli-inline-box">
+                    <code>brew install stevedat/tap/vielotus</code>
+                    <button type="button" class="btn-copy-inline" onclick="copyText('brew install stevedat/tap/vielotus', this)" data-i18n="cta.copy">Chép</button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 2. Windows -->
+              <tr>
+                <td>
+                  <strong>Windows 10 / 11</strong><br>
+                  <span class="inline-code">Win32 TSF COM</span><br>
+                  <span style="font-size: 11.5px; color: var(--ink-muted);">21H2, 22H2, 23H2, 24H2</span>
+                </td>
+                <td data-i18n="plat.win_hw">
+                  <strong>Intel / AMD</strong> (x64) &amp; <strong>ARM64</strong> (Snapdragon X Elite/Plus, Surface Pro ARM, Parallels trên Mac M-series)
+                </td>
+                <td data-i18n="plat.win_apps">
+                  WinUI 3 / UWP (Windows 11 Notepad, Windows Terminal, Windows Search, Edge) &amp; Win32 (Office 365, Chrome, VS Code, Zalo PC)
+                </td>
+                <td>
+                  <div class="channel-pills">
+                    <a id="link-win-exe" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-x64.exe" class="channel-pill">Setup x64 (.exe)</a>
+                    <a id="link-win-arm64" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotus-Setup-arm64.exe" class="channel-pill">Setup ARM64 (.exe)</a>
+                    <a href="https://github.com/stevedat/VieLotus-IM/releases/latest" target="_blank" rel="noopener noreferrer" class="channel-pill secondary">Microsoft Store / MSIX</a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 3. Linux -->
+              <tr>
+                <td>
+                  <strong>Linux (Debian / Ubuntu)</strong><br>
+                  <span class="inline-code">IBus &amp; Fcitx5</span><br>
+                  <span style="font-size: 11.5px; color: var(--ink-muted);">Ubuntu 22.04/24.04, Debian 12, Mint, Fedora, Arch</span>
+                </td>
+                <td data-i18n="plat.lin_hw">
+                  <strong>x86_64</strong> (amd64 PC/Laptop) &amp; <strong>ARM64</strong> (aarch64 — Raspberry Pi 4/5, máy trạm ARM)
+                </td>
+                <td data-i18n="plat.lin_apps">
+                  X11 &amp; Wayland (GNOME, KDE Plasma); Firefox, Chromium, VS Code, LibreOffice, GNOME Terminal, Konsole, Ghostty
+                </td>
+                <td>
+                  <div class="channel-pills">
+                    <a href="https://snapcraft.io/vielotus" target="_blank" rel="noopener noreferrer" class="channel-pill">Snap Store (vielotus)</a>
+                    <a id="link-lin-deb" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_1.1.1_amd64.deb" class="channel-pill secondary">.deb (amd64)</a>
+                    <a id="link-lin-release" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_1.1.1_arm64.deb" class="channel-pill secondary">.deb (arm64)</a>
+                  </div>
+                  <div class="cli-inline-box">
+                    <code>curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh</code>
+                    <button type="button" class="btn-copy-inline" onclick="copyText('curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh', this)" data-i18n="cta.copy">Chép</button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 4. iOS & iPadOS -->
+              <tr>
+                <td>
+                  <strong>iOS &amp; iPadOS 16 – 18</strong><br>
+                  <span class="inline-code">UIInputViewController</span><br>
+                  <span style="font-size: 11.5px; color: var(--ink-muted);">0 Full Access · 100% Offline</span>
+                </td>
+                <td data-i18n="plat.ios_hw">
+                  <strong>iPhone</strong> (XS → 16 Pro Max) &amp; <strong>iPad</strong> (iPad Air, mini, iPad Pro M1–M4)
+                </td>
+                <td data-i18n="plat.ios_apps">
+                  Bàn phím cảm ứng 60/120Hz (hỗ trợ gõ lướt Glide Typing) &amp; bàn phím cứng Magic Keyboard / Bluetooth
+                </td>
+                <td>
+                  <div class="channel-pills">
+                    <a href="https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799" target="_blank" rel="noopener noreferrer" class="channel-pill">Apple App Store (id6821782799)</a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 5. Android -->
+              <tr>
+                <td>
+                  <strong>Android 8.0 – 15</strong><br>
+                  <span class="inline-code">InputMethodService</span><br>
+                  <span style="font-size: 11.5px; color: var(--ink-muted);">API 26+ · JNI C-ABI</span>
+                </td>
+                <td data-i18n="plat.and_hw">
+                  <strong>arm64-v8a, armeabi-v7a, x86_64</strong> (Samsung Galaxy Phone/Tab/DeX, Google Pixel, Xiaomi, OPPO)
+                </td>
+                <td data-i18n="plat.and_apps">
+                  Bàn phím ảo cảm ứng &amp; bàn phím cơ vật lý rời kết nối qua USB / Bluetooth (chế độ điện thoại, tablet &amp; Samsung DeX)
+                </td>
+                <td>
+                  <div class="channel-pills">
+                    <a href="https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard" target="_blank" rel="noopener noreferrer" class="channel-pill">Google Play (org.vielotus.hardwarekeyboard)</a>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="cite-row">
+          <span data-i18n="plat.note">Tài liệu hướng dẫn kích hoạt từng bước sau khi cài đặt:</span>
+          <a href="support.html" data-i18n="plat.note_link">Hướng dẫn Kích hoạt &amp; Khắc phục sự cố (macOS, Windows, Linux, iOS, Android)</a>
+          · <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/COMPATIBILITY.md" target="_blank" rel="noopener noreferrer">COMPATIBILITY.md</a>
+        </div>
+      </section>
+
+      <!-- SECTION 3: Zero-Hook Native Protocol Orientation & Honest Trade-offs -->
       <section id="sec-perm" class="editorial-section">
         <div class="section-head-grid">
-          <div class="sec-num">01 / 03</div>
-          <h2 data-i18n="perm.heading">Định hướng "Không xin quyền" và những sự đánh đổi thẳng thắn</h2>
+          <div class="sec-num">§3 / 06 · SYSTEM BOUNDARY &amp; TRADE-OFF ANALYSIS</div>
+          <h2 data-i18n="perm.heading">Kiến trúc giao thức gốc (không bẫy phím ngầm) và ba sự đánh đổi thẳng thắn</h2>
           <p class="sec-lead" data-i18n="perm.desc">
-            Đa số bộ gõ tiếng Việt bên thứ ba yêu cầu cấp quyền Trợ năng (Accessibility), Theo dõi bàn phím (Input Monitoring) hoặc Truy cập đầy đủ trên di động để chặn sự kiện phím. Sen Việt đi theo hướng ngược lại: chỉ giao tiếp qua chuẩn bàn phím gốc của hệ điều hành.
+            Nhiều bộ gõ tiếng Việt truyền thống hoạt động bằng cách cài bẫy sự kiện phím ở tầng hệ thống (đòi quyền Accessibility trên macOS, cài Keyboard Hook trên Windows, hoặc yêu cầu Full Access trên di động). Sen Việt chọn hướng tiếp cận chuẩn mực của từng nền tảng — lấy hệ sinh thái Apple làm chuẩn tham chiếu và áp dụng tương đương trên Windows, Linux, Android.
           </p>
         </div>
 
         <!-- Clean Typographic Comparison Ledger -->
         <div class="arch-ledger">
           <div class="arch-row">
-            <div class="arch-dim" data-i18n="perm.r1_dim">Quyền hệ thống &amp; Riêng tư</div>
+            <div class="arch-dim" data-i18n="perm.r1_dim">Ranh giới quyền &amp; Riêng tư</div>
             <div class="arch-col-old">
-              <span class="col-tag-inline old" data-i18n="perm.tag_old">Cách phổ biến</span>
-              <span data-i18n="perm.r1_old">Đòi quyền Accessibility / Input Monitoring toàn cục (CGEventTap trên macOS, SetWindowsHookEx WH_KEYBOARD_LL trên Windows) hoặc Full Access trên điện thoại.</span>
+              <span class="col-tag-inline old" data-i18n="perm.tag_old">Cơ chế Hook</span>
+              <span data-i18n="perm.r1_old">Can thiệp sự kiện phím toàn cục: yêu cầu quyền Accessibility / Input Monitoring (CGEventTap) trên macOS, cài SetWindowsHookEx (WH_KEYBOARD_LL) trên Windows, hoặc đòi quyền Full Access trên iOS/Android.</span>
             </div>
             <div class="arch-col-new">
               <span class="col-tag-inline new">Sen Việt</span>
-              <span data-i18n="perm.r1_new">0 quyền theo dõi phím, 0 kết nối mạng. Vận hành thuần qua giao thức bàn phím gốc (InputMethodKit, Windows TSF, Linux IBus/Fcitx5, UIInputViewController).</span>
+              <span data-i18n="perm.r1_new">Vận hành 100% qua khung dịch vụ bàn phím chính thống (InputMethodKit trên macOS, UIInputViewController 0 Full Access trên iOS/iPadOS, Win32 TSF trên Windows, IBus/Fcitx5 trên Linux, InputMethodService trên Android) với 0 kết nối mạng.</span>
               <div class="cite-row">
                 <span data-i18n="cite.label">Nguồn:</span>
-                <a href="https://developer.apple.com/documentation/inputmethodkit" target="_blank" rel="noopener noreferrer">Apple InputMethodKit</a> vs.
-                <a href="https://developer.apple.com/documentation/coregraphics/1454426-cgeventtapcreate" target="_blank" rel="noopener noreferrer">Quartz CGEventTap (TCC)</a> ·
+                <a href="https://developer.apple.com/documentation/inputmethodkit" target="_blank" rel="noopener noreferrer">Apple InputMethodKit</a> ·
                 <a href="https://learn.microsoft.com/en-us/windows/win32/tsf/text-services-framework" target="_blank" rel="noopener noreferrer">Microsoft Win32 TSF</a> ·
+                <a href="https://developer.apple.com/documentation/uikit/uiinputviewcontroller" target="_blank" rel="noopener noreferrer">iOS UIInputViewController</a> ·
                 <code>grep -rn "CGEvent" Sources/</code> (0 hit)
               </div>
             </div>
           </div>
 
           <div class="arch-row">
-            <div class="arch-dim" data-i18n="perm.r2_dim">Cơ chế thay chữ trên màn hình</div>
+            <div class="arch-dim" data-i18n="perm.r2_dim">Cơ chế đồng bộ văn bản</div>
             <div class="arch-col-old">
-              <span class="col-tag-inline old" data-i18n="perm.tag_old">Cách phổ biến</span>
-              <span data-i18n="perm.r2_old">Để chữ thô lọt vào ô nhập rồi bắn phím Xóa (Backspace) giả lập tốc độ cao — dễ đua lệnh (race condition) với gợi ý tự động trên thanh địa chỉ và làm vỡ lịch sử Undo.</span>
+              <span class="col-tag-inline old" data-i18n="perm.tag_old">Cơ chế Hook</span>
+              <span data-i18n="perm.r2_old">Để chữ thô lọt vào ô nhập rồi bắn chuỗi phím Xóa (Backspace) giả lập tốc độ cao — dễ đua lệnh (race condition) với gợi ý tự động trên trình duyệt và làm hỏng lịch sử hoàn tác Undo.</span>
             </div>
             <div class="arch-col-new">
               <span class="col-tag-inline new">Sen Việt</span>
-              <span data-i18n="perm.r2_new">Thay thế nguyên tử theo tọa độ UTF-16 (insertText:replacementRange:) hoặc khóa phiên ghép vần chuẩn W3C (setMarkedText:), giữ nguyên lịch sử hoàn tác Cmd+Z / Ctrl+Z.</span>
+              <span data-i18n="perm.r2_new">Thay thế nguyên tử theo vùng chọn (insertText:replacementRange: trên macOS, ITfEditSession trên Windows TSF, SurroundingText trên Linux) hoặc phiên ghép vần chuẩn W3C (Marked Text / Composition), giữ nguyên lịch sử Cmd+Z / Ctrl+Z.</span>
               <div class="cite-row">
                 <span data-i18n="cite.label">Nguồn:</span>
                 <a href="https://www.w3.org/TR/uievents/#events-compositionevents" target="_blank" rel="noopener noreferrer">W3C UI Events (Composition Lifecycle)</a> ·
@@ -1328,17 +1397,17 @@
           </div>
 
           <div class="arch-row">
-            <div class="arch-dim" data-i18n="perm.r3_dim">Độ ổn định khi nâng cấp OS</div>
+            <div class="arch-dim" data-i18n="perm.r3_dim">Độ ổn định &amp; Cô lập bảo mật</div>
             <div class="arch-col-old">
-              <span class="col-tag-inline old" data-i18n="perm.tag_old">Cách phổ biến</span>
-              <span data-i18n="perm.r3_old">Khi cập nhật bản mới trên macOS, chữ ký nhị phân (csreq) đổi khiến hạt nhân TCC âm thầm hủy phím giả lập dù công tắc trong System Settings vẫn báo bật (AXIsProcessTrusted() == true).</span>
+              <span class="col-tag-inline old" data-i18n="perm.tag_old">Cơ chế Hook</span>
+              <span data-i18n="perm.r3_old">Trên macOS, khi cập nhật bản mới làm đổi chữ ký (csreq), hạt nhân TCC âm thầm hủy phím giả lập dù công tắc quyền vẫn báo bật; trên Linux Wayland hoặc ứng dụng quyền cao của Windows, cơ chế chặn phím toàn cục bị hệ điều hành cô lập.</span>
             </div>
             <div class="arch-col-new">
               <span class="col-tag-inline new">Sen Việt</span>
-              <span data-i18n="perm.r3_new">Không dùng cơ chế chặn sự kiện toàn cục nên miễn nhiễm hoàn toàn với lỗi kẹt quyền ngầm của TCC hoặc lỗi ngắt bộ gõ khi hệ thống quá tải (.tapDisabledByTimeout).</span>
+              <span data-i18n="perm.r3_new">Đăng ký làm dịch vụ bàn phím hợp lệ của hệ điều hành nên không bao giờ bị lỗi kẹt quyền TCC trên macOS, tương thích tự nhiên với cơ chế cô lập cửa sổ của Linux Wayland và ứng dụng UWP/WinUI 3 trên Windows 11.</span>
               <div class="cite-row">
                 <span data-i18n="cite.label">Nguồn:</span>
-                <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/COMPATIBILITY.md#3-deliberate-architecture-boundary-no-event-tap-no-accessibility" target="_blank" rel="noopener noreferrer">COMPATIBILITY.md §3 (TCC csreq &amp; Event Tap Analysis)</a>
+                <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/COMPATIBILITY.md#3-deliberate-architecture-boundary-no-event-tap-no-accessibility" target="_blank" rel="noopener noreferrer">COMPATIBILITY.md §3 (System Boundary Analysis)</a>
               </div>
             </div>
           </div>
@@ -1347,36 +1416,36 @@
         <!-- Honest Trade-offs Callout Block -->
         <div class="tradeoffs-block">
           <div class="tradeoffs-heading" data-i18n="to.header">
-            Ba sự đánh đổi thực tế khi từ chối dùng quyền can thiệp ngầm
+            Ba sự đánh đổi kỹ thuật khi tuân thủ tuyệt đối giao thức gốc của hệ điều hành
           </div>
           <div class="tradeoffs-items">
             <div class="tradeoff-entry" data-i18n="to.d1">
-              <strong>1. Nét gạch chân tạm thời trên trình duyệt &amp; Electron:</strong> Trên ứng dụng gốc (Notes, Pages, Safari, Word, Xcode), Sen Việt đổi dấu trực tiếp không gạch chân. Riêng trên Chrome, Electron, VS Code, Zalo, từ đang gõ có nét gạch chân mảnh chuẩn W3C (nhấn Space là tự tắt). Chấp nhận nét gạch chân này giúp triệt tiêu 100% lỗi lặp chữ (t-ti-tiếng) và nhảy con trỏ do xung đột Virtual DOM.
+              <strong>1. Nét gạch chân tạm thời trên trình duyệt &amp; Electron:</strong> Trên các khung ứng dụng gốc hỗ trợ thay thế tại chỗ (như AppKit/Safari/Office trên macOS hay Win32 trên Windows), Sen Việt đổi dấu trực tiếp không gạch chân. Riêng trên trình duyệt Chromium, Electron, VS Code, Zalo, từ đang gõ hiển thị nét gạch chân mảnh chuẩn W3C (nhấn Space là tự tắt) nhằm triệt tiêu 100% lỗi lặp chữ (t-ti-tiếng) và nhảy con trỏ do xung đột Virtual DOM.
             </div>
             <div class="tradeoff-entry" data-i18n="to.d2">
-              <strong>2. Hợp tác thay vì cưỡng bức khung nhập liệu tự vẽ:</strong> Với phần mềm tự vẽ ô nhập chữ không trả về tọa độ con trỏ (NSNotFound), Sen Việt tự lùi về chế độ gạch chân an toàn thay vì bắn phím xóa giả lập đè lên màn hình. Đổi lại, lớp bảo vệ DirectReplacementGuard đảm bảo không bao giờ xóa nhầm văn bản nằm ngoài từ đang gõ.
+              <strong>2. Hợp tác thay vì cưỡng bức khung nhập liệu tự vẽ:</strong> Với các phần mềm đồ họa/game tự vẽ ô nhập chữ không cung cấp tọa độ con trỏ cho hệ điều hành, Sen Việt tự lùi về chế độ ghép vần tiêu chuẩn thay vì bắn phím Backspace giả lập mù vào màn hình. Đổi lại, bộ gõ đảm bảo không bao giờ xóa nhầm văn bản nằm ngoài âm tiết đang gõ.
             </div>
             <div class="tradeoff-entry" data-i18n="to.d3">
-              <strong>3. Đăng ký qua trình quản lý bàn phím hệ thống:</strong> Ở lần cài đặt đầu tiên trên máy mới, hệ điều hành yêu cầu bạn bật bàn phím trong mục Input Sources (hoặc đăng xuất một lần để TextInputMenuAgent nạp danh sách), thay vì ứng dụng tự chiếm quyền bàn phím ngầm.
+              <strong>3. Kích hoạt qua trình quản lý bàn phím của hệ điều hành:</strong> Vì không tự ý chiếm quyền điều khiển bàn phím ngầm, ở lần cài đặt đầu tiên trên thiết bị mới, người dùng chủ động bật Sen Việt trong phần quản lý bàn phím của từng hệ điều hành (Input Sources trên macOS, Settings → Keyboard trên iOS/Android, hoặc chuyển bằng Win+Space / Super+Space trên Windows &amp; Linux).
             </div>
           </div>
         </div>
       </section>
 
-      <!-- SECTION 2: Three Core Linguistic & Engineering Problems -->
+      <!-- SECTION 4: Three Core Linguistic & Engineering Problems + 9,091-Case Matrix -->
       <section id="sec-notes" class="editorial-section">
         <div class="section-head-grid">
-          <div class="sec-num">02 / 03</div>
-          <h2 data-i18n="notes.heading">Ba bài toán cốt lõi bên trong lõi xử lý ngôn ngữ</h2>
+          <div class="sec-num">§4 / 06 · LINGUISTIC ARBITRATION &amp; BENCHMARK VERIFICATION</div>
+          <h2 data-i18n="notes.heading">Ba bài toán cốt lõi trong lõi ngôn ngữ &amp; Ma trận kiểm định đối xứng (9.091 ca)</h2>
           <p class="sec-lead" data-i18n="notes.desc">
-            Bên cạnh ranh giới an toàn với hệ điều hành, lõi ngôn ngữ phải giải quyết bài toán va chạm giữa các từ tiếng Anh thông dụng và các âm tiết tiếng Việt hợp lệ.
+            Bên cạnh ranh giới an toàn với hệ điều hành, lõi ngôn ngữ phải phân xử chính xác sự va chạm giữa các từ tiếng Anh thông dụng và các âm tiết tiếng Việt hợp lệ mà không làm mất từ của bên nào.
           </p>
         </div>
 
         <div class="essay-list">
           <div class="essay-row">
             <div>
-              <div class="essay-title" data-i18n="n1.title">Giải quyết điểm mù của cơ chế tự khôi phục tiếng Anh (turn, last, rest)</div>
+              <div class="essay-title" data-i18n="n1.title">1. Giải quyết điểm mù của cơ chế tự khôi phục tiếng Anh (turn, last, rest)</div>
               <div class="essay-figure">9.091 ca (100%) · 365/375 (97.33%)</div>
             </div>
             <div class="essay-prose">
@@ -1396,7 +1465,7 @@
 
           <div class="essay-row">
             <div>
-              <div class="essay-title" data-i18n="n2.title">Thích ứng 4 chế độ hiển thị &amp; khóa biên UTF-16</div>
+              <div class="essay-title" data-i18n="n2.title">2. Thích ứng 4 chế độ hiển thị &amp; khóa biên UTF-16</div>
               <div class="essay-figure" data-i18n="n2.fig">ClientAdapter · typing-modes.yml</div>
             </div>
             <div class="essay-prose">
@@ -1413,7 +1482,7 @@
 
           <div class="essay-row">
             <div>
-              <div class="essay-title" data-i18n="n3.title">Một lõi Swift 6 thuần khiết cho cả 5 hệ điều hành</div>
+              <div class="essay-title" data-i18n="n3.title">3. Một lõi Swift 6 thuần khiết cho cả 5 hệ điều hành</div>
               <div class="essay-figure" data-i18n="n3.fig">p99 &lt; 200 µs · 26 hàm C-ABI</div>
             </div>
             <div class="essay-prose">
@@ -1429,107 +1498,234 @@
           </div>
         </div>
 
-        <!-- Expandable Empirical Table -->
-        <details class="empirical-drawer">
-          <summary>
-            <span data-i18n="drawer.title">Xem bảng số liệu kiểm định chi tiết (9.091 ca) &amp; tài liệu chuyên khảo kỹ thuật</span>
-            <span data-i18n="drawer.hint">Mở bảng số liệu ▾</span>
-          </summary>
-          <div class="drawer-body">
-            <div class="data-table-wrap">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th data-i18n="drawer.th1">Hạng mục đo kiểm</th>
-                    <th data-i18n="drawer.th2">Ý nghĩa thực tế</th>
-                    <th class="num" data-i18n="drawer.th3">Kết quả đo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong>Bộ kiểm thử chính (5 nhóm có ngữ cảnh)</strong></td>
-                    <td data-i18n="drawer.r1">Biến đổi âm tiết Việt, giữ từ tiếng Anh, hủy dấu cuối từ và phân giải từ lưỡng nghĩa</td>
-                    <td class="num"><strong>9.091 / 9.091 (100.00%)</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Đối xứng hai chiều (ambiguous_both_sides)</strong></td>
-                    <td data-i18n="drawer.r2">Ra đúng tiếng Anh khi có ngữ cảnh VÀ ra đúng tiếng Việt khi gõ độc lập</td>
-                    <td class="num"><strong>365 / 375 (97.33%)</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Đường gõ tiếng Việt duy nhất (whitelist_safe = never)</strong></td>
-                    <td data-i18n="drawer.r3">Các âm tiết tiếng Việt chỉ có một cách bấm phím duy nhất, không được phép mất</td>
-                    <td class="num"><strong>182 / 182 (100.00%)</strong></td>
-                  </tr>
-                  <tr>
-                    <td><strong>Độ trễ đuôi p99 (250.000 phím liên tục)</strong></td>
-                    <td data-i18n="drawer.r4">Thời gian xử lý 99% số lần gõ phím Telex / VNI trên Apple Silicon</td>
-                    <td class="num"><strong>&lt; 200 µs (&gt; 40.000 phím/giây)</strong></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <a href="research.html" class="monograph-link" data-i18n="drawer.link">
-              Đọc toàn văn Chuyên khảo Kiến trúc Kỹ thuật &amp; hướng dẫn tự chạy lệnh kiểm chứng (Open-Core)
-            </a>
-          </div>
-        </details>
+        <!-- Visible Academic Benchmark Table -->
+        <h3 class="sub-heading" data-i18n="drawer.title">Bảng tổng hợp kết quả kiểm định hồi quy (9.091 ca)</h3>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th data-i18n="drawer.th1">Nhóm đo kiểm (Metric Bucket)</th>
+                <th data-i18n="drawer.th2">Điều kiện thực thi &amp; Ý nghĩa thực nghiệm</th>
+                <th class="num" data-i18n="drawer.th3">Kết quả đo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong data-i18n="drawer.b1">Bộ kiểm thử chính (5 nhóm có ngữ cảnh)</strong></td>
+                <td data-i18n="drawer.r1">Biến đổi âm tiết Việt (400), giữ từ tiếng Anh (362), hủy dấu cuối từ (67), khôi phục từ thô (7.213) và phân giải từ lưỡng nghĩa có ngữ cảnh (1.049)</td>
+                <td class="num"><strong>9.091 / 9.091 (100.00%)</strong></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="drawer.b2">Đối xứng hai chiều (ambiguous_both_sides)</strong></td>
+                <td data-i18n="drawer.r2">375 từ trùng phím viết thường chạy lặp lại ở cả 2 chiều: đúng tiếng Anh khi có ngữ cảnh VÀ đúng tiếng Việt khi gõ độc lập (vn_survives_collision)</td>
+                <td class="num"><strong>365 / 375 (97.33%)</strong></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="drawer.b3">Đường gõ tiếng Việt duy nhất (whitelist_safe = never)</strong></td>
+                <td data-i18n="drawer.r3">Các âm tiết tiếng Việt chỉ có duy nhất một chuỗi phím Telex/VNI để tạo thành (0 tổn thất bắt buộc bởi VNCollisionRatchetTests)</td>
+                <td class="num"><strong>182 / 182 (100.00%)</strong></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="drawer.b4">Độ trễ đuôi p99 &amp; Thông lượng (250.000 phím)</strong></td>
+                <td data-i18n="drawer.r4">Thời gian xử lý 99% số lần gõ phím liên tục qua bài kiểm thử chịu tải (--stress) trên Apple Silicon</td>
+                <td class="num"><strong>&lt; 200 µs (&gt; 40.000 keys/s)</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cite-row">
+          <a href="research.html" class="table-link" data-i18n="drawer.link">
+            Đọc toàn văn Chuyên khảo Kiến trúc Kỹ thuật &amp; hướng dẫn tự chạy lệnh kiểm chứng độc lập (Open-Core)
+          </a>
+        </div>
       </section>
 
-      <!-- SECTION 3: 3-Stage Project Roadmap -->
+      <!-- SECTION 5: Traceable Upstream Contributions Ledger & Prior Art Matrix -->
+      <section id="sec-upstream" class="editorial-section">
+        <div class="section-head-grid">
+          <div class="sec-num">§5 / 06 · UPSTREAM CONTRIBUTIONS &amp; PRIOR ART TRACEABILITY</div>
+          <h2 data-i18n="up.heading">Sổ cái đóng góp mã nguồn ngược dòng (Upstream PRs) &amp; Đối chiếu học thuật</h2>
+          <p class="sec-lead" data-i18n="up.desc">
+            Nghiên cứu kỹ thuật chỉ bền vững khi có tính kế thừa và đóng góp ngược lại cho cộng đồng. Khi phát hiện các lỗi biên trong quá trình kiểm thử chéo, nhóm phát triển gửi trực tiếp bản vá (Pull Request) kèm bộ unit test về các kho mã nguồn cùng hệ sinh thái để có thể truy vết minh bạch.
+          </p>
+        </div>
+
+        <!-- Table A: Traceable Upstream Pull Requests across Repositories -->
+        <h3 class="sub-heading" data-i18n="up.sub_prs">A. Danh mục Pull Request &amp; Đặc tả kỹ thuật đóng góp ngược dòng (Traceable PR Ledger)</h3>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 17%;" data-i18n="up.th_pr">Mã PR / Đặc tả</th>
+                <th style="width: 22%;" data-i18n="up.th_repo">Kho mã nguồn (Repository)</th>
+                <th style="width: 39%;" data-i18n="up.th_rca">Phân tích căn nguyên (Root-Cause) &amp; Bản vá</th>
+                <th style="width: 22%;" data-i18n="up.th_vec">Vector kiểm chứng &amp; Trace</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <a href="https://github.com/ptrinh/viettelex/pull/133" target="_blank" rel="noopener noreferrer" class="pr-badge">PR #133 ↗</a>
+                </td>
+                <td>
+                  <a href="https://github.com/ptrinh/viettelex" target="_blank" rel="noopener noreferrer" class="repo-tag">ptrinh/viettelex</a><br>
+                  <span style="font-size: 11.5px; color: var(--ink-muted);">Swift · macOS InputMethodKit</span>
+                </td>
+                <td data-i18n="up.pr1_desc">
+                  Khắc phục lỗi mất đồng bộ trạng thái âm tiết sau khi đã gán thanh điệu, chuẩn hóa quy tắc tách âm tiết liên tiếp V-C-V và hoàn tác dấu Telex khi gõ vượt quá âm tiết đóng.
+                </td>
+                <td>
+                  <code>dduowcj + u</code><br>
+                  <code>vieetj + u</code><br>
+                  <a href="https://github.com/ptrinh/viettelex/pull/133" target="_blank" rel="noopener noreferrer" class="table-link" data-i18n="up.trace_link">Xem diff &amp; unit tests</a>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <a href="https://github.com/uvie-project/uvie-rs/pull/20" target="_blank" rel="noopener noreferrer" class="pr-badge">PR #20 ↗</a>
+                </td>
+                <td>
+                  <a href="https://github.com/uvie-project/uvie-rs" target="_blank" rel="noopener noreferrer" class="repo-tag">uvie-project/uvie-rs</a><br>
+                  <span style="font-size: 11.5px; color: var(--ink-muted);">Rust · Core Engine FSM</span>
+                </td>
+                <td data-i18n="up.pr2_desc">
+                  Sửa lỗi lệch máy trạng thái hữu hạn (FSM) trong lõi Rust khi nhập tiếp nguyên âm sau âm tiết đã mang dấu nặng/sắc, ngăn hiện tượng nhảy ký tự và rớt dấu thanh.
+                </td>
+                <td>
+                  <code>dduowcj + u</code><br>
+                  <code>vieetj + u</code><br>
+                  <a href="https://github.com/uvie-project/uvie-rs/pull/20" target="_blank" rel="noopener noreferrer" class="table-link" data-i18n="up.trace_link">Xem diff &amp; unit tests</a>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <a href="https://github.com/uvie-project/uvie-mac/pull/25" target="_blank" rel="noopener noreferrer" class="pr-badge">PR #25 ↗</a>
+                </td>
+                <td>
+                  <a href="https://github.com/uvie-project/uvie-mac" target="_blank" rel="noopener noreferrer" class="repo-tag">uvie-project/uvie-mac</a><br>
+                  <span style="font-size: 11.5px; color: var(--ink-muted);">Swift · IMKInputController</span>
+                </td>
+                <td data-i18n="up.pr3_desc">
+                  Đồng bộ hóa vùng đệm markedText / insertText ở tầng macOS shell với lõi uvie-rs khi chuyển tiếp âm tiết liên hoàn, khắc phục lỗi nuốt ký tự cuối từ.
+                </td>
+                <td>
+                  <code>IMKInputController</code><br>
+                  <a href="https://github.com/uvie-project/uvie-mac/pull/25" target="_blank" rel="noopener noreferrer" class="table-link" data-i18n="up.trace_link">Xem diff &amp; unit tests</a>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <a href="https://github.com/stevedat/VieLotus-IM/blob/main/Resources/typing-modes.yml" target="_blank" rel="noopener noreferrer" class="pr-badge">Open Spec ↗</a>
+                </td>
+                <td>
+                  <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer" class="repo-tag">stevedat/VieLotus-IM</a><br>
+                  <span style="font-size: 11.5px; color: var(--ink-muted);">YAML &amp; Markdown · MIT</span>
+                </td>
+                <td data-i18n="up.pr4_desc">
+                  Công bố mở cơ sở dữ liệu phân loại chế độ hiển thị theo Bundle ID (typing-modes.yml) và tài liệu phân tích cơ chế TCC csreq / AXSecureTextField để các bộ gõ dùng chung.
+                </td>
+                <td>
+                  <code>typing-modes.yml</code><br>
+                  <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/COMPATIBILITY.md" target="_blank" rel="noopener noreferrer" class="table-link">COMPATIBILITY.md</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Table B: Foundational Prior Art & Ecosystem Reference Matrix -->
+        <h3 class="sub-heading" data-i18n="up.sub_prior">B. Đối chiếu &amp; Tri ân các công trình nền tảng trong hệ sinh thái (Foundational Prior Art)</h3>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 24%;" data-i18n="up.th_proj">Dự án &amp; Tác giả</th>
+                <th style="width: 16%;" data-i18n="up.th_lic">Giấy phép</th>
+                <th style="width: 60%;" data-i18n="up.th_role">Di sản kỹ thuật &amp; Giá trị tham chiếu học thuật</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>UniKey</strong><br><span style="font-size: 12px; color: var(--ink-muted);">Phạm Kim Long</span></td>
+                <td><span class="inline-code">GNU GPL</span></td>
+                <td data-i18n="up.pa1">Đặt nền móng cho máy trạng thái âm tiết tiếng Việt, quy tắc đặt dấu thanh và chuẩn mã hóa tiếng Việt trên máy tính cá nhân.</td>
+              </tr>
+              <tr>
+                <td><strong><a href="https://github.com/tuyenvm/OpenKey" target="_blank" rel="noopener noreferrer" class="table-link">OpenKey</a></strong><br><span style="font-size: 12px; color: var(--ink-muted);">Mai Vũ Tuyên</span></td>
+                <td><span class="inline-code">GNU GPLv3</span></td>
+                <td data-i18n="up.pa2">Tham chiếu cấu trúc ánh xạ bảng mã di sản (TCVN3, VNI Windows, Unicode tổ hợp) và ma trận kiểm tra hình vị âm tiết.</td>
+              </tr>
+              <tr>
+                <td><strong><a href="https://github.com/BambooEngine/bamboo-core" target="_blank" rel="noopener noreferrer" class="table-link">Bamboo Engine</a></strong><br><span style="font-size: 12px; color: var(--ink-muted);">Lương Thanh Lam</span></td>
+                <td><span class="inline-code">GNU GPLv3</span></td>
+                <td data-i18n="up.pa3">Tham chiếu các heuristic phân rã cấu trúc âm tiết tiếng Việt trên Linux (IBus) và xử lý xóa ký tự phía trước.</td>
+              </tr>
+              <tr>
+                <td><strong><a href="https://github.com/ptrinh/viettelex" target="_blank" rel="noopener noreferrer" class="table-link">VietTelex</a></strong><br><span style="font-size: 12px; color: var(--ink-muted);">Phil Trịnh</span></td>
+                <td><span class="inline-code">MIT License</span></td>
+                <td data-i18n="up.pa4">Tư liệu thực nghiệm về hành vi của Apple InputMethodKit, nhận diện AXSecureTextField và cấu trúc bộ kiểm thử hồi quy 9.091 ca.</td>
+              </tr>
+              <tr>
+                <td><strong><a href="https://github.com/uvie-project/uvie-rs" target="_blank" rel="noopener noreferrer" class="table-link">UVie (uvie-rs / uvie-mac)</a></strong><br><span style="font-size: 12px; color: var(--ink-muted);">UVie Project</span></td>
+                <td><span class="inline-code">MIT License</span></td>
+                <td data-i18n="up.pa5">Kiến trúc tách biệt lõi xử lý ngôn ngữ (Rust) và vỏ giao tiếp InputMethodKit (Swift), cùng hợp tác kiểm thử chéo các ca biên V-C-V.</td>
+              </tr>
+              <tr>
+                <td><strong><a href="https://github.com/xmannv/xkey" target="_blank" rel="noopener noreferrer" class="table-link">XKey</a> &amp; <a href="https://github.com/PhamHungTien/PHTV" target="_blank" rel="noopener noreferrer" class="table-link">PHTV</a></strong><br><span style="font-size: 12px; color: var(--ink-muted);">xmannv · Phạm Hùng Tiến</span></td>
+                <td><span class="inline-code">MIT / AGPLv3</span></td>
+                <td data-i18n="up.pa6">Tham chiếu tư duy chẩn đoán luồng phím thời gian thực và ghi chép tương thích ứng dụng đặc thù (TeXstudio, JetBrains, Claude Code CLI).</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cite-row">
+          <span data-i18n="up.notice_label">Hồ sơ pháp lý &amp; ghi nhận bản quyền đầy đủ:</span>
+          <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener noreferrer">THIRD_PARTY_NOTICES.md</a>
+        </div>
+      </section>
+
+      <!-- SECTION 6: 3-Stage Engineering Roadmap -->
       <section id="sec-roadmap" class="editorial-section">
         <div class="section-head-grid">
-          <div class="sec-num">03 / 03</div>
-          <h2 data-i18n="rm.heading">Lộ trình phát triển dự án</h2>
+          <div class="sec-num">§6 / 06 · RESEARCH &amp; ENGINEERING ROADMAP</div>
+          <h2 data-i18n="rm.heading">Lộ trình nghiên cứu &amp; phát triển kỹ thuật</h2>
           <p class="sec-lead" data-i18n="rm.desc">
-            Triển khai từng bước theo thứ tự ưu tiên: độ chính xác của lõi ngôn ngữ, tính chuẩn mực với hệ điều hành, và khả năng mở rộng đa nền tảng.
+            Triển khai theo thứ tự ưu tiên: độ chính xác đối xứng của lõi ngôn ngữ, tính chuẩn mực với giao thức hệ điều hành, và khả năng kiểm chứng độc lập trên cả 5 nền tảng.
           </p>
         </div>
 
         <div class="roadmap-stepper">
           <div class="rm-step">
-            <span class="rm-badge done" data-i18n="rm.s1_badge">Chặng 1 · Đã hoàn thiện</span>
-            <div class="rm-title" data-i18n="rm.s1_title">Lõi ngôn ngữ &amp; chuẩn không xin quyền</div>
+            <span class="rm-badge done" data-i18n="rm.s1_badge">Giai đoạn 1 · Đã xuất bản (v1.1.x)</span>
+            <div class="rm-title" data-i18n="rm.s1_title">Lõi ngôn ngữ đối xứng &amp; Phát hành 5 hệ điều hành</div>
             <ul class="rm-list">
               <li data-i18n="rm.s1_i1">Hoàn thiện lõi gõ tự do &amp; phân giải song ngữ đối xứng (9.091 ca có ngữ cảnh đạt 100.00%, đối xứng 97.33% trên 365/375 ca, bảo toàn 182/182 đường gõ duy nhất).</li>
-              <li data-i18n="rm.s1_i2">Phát hành chính thức không xin quyền theo dõi phím trên macOS, App Store (iOS/iPadOS) và Google Play (Android).</li>
-              <li data-i18n="rm.s1_i3">Công bố kiến trúc Open-Core: mở mã nguồn phần vỏ giao tiếp hệ thống kèm công cụ kiểm chứng dòng lệnh VieLotusCLI.</li>
+              <li data-i18n="rm.s1_i2">Phát hành chính thức trên cả 5 nền tảng: macOS (.pkg / Homebrew), Windows 10/11 TSF (x64 &amp; ARM64), Linux (Snap Store &amp; .deb), iOS/iPadOS (App Store) và Android (Google Play).</li>
+              <li data-i18n="rm.s1_i3">Công bố kiến trúc Open-Core kèm công cụ kiểm chứng dòng lệnh độc lập VieLotusCLI.</li>
             </ul>
           </div>
 
           <div class="rm-step">
-            <span class="rm-badge active" data-i18n="rm.s2_badge">Chặng 2 · Đang triển khai</span>
-            <div class="rm-title" data-i18n="rm.s2_title">Đồng bộ sâu Windows, Linux &amp; Terminal</div>
+            <span class="rm-badge active" data-i18n="rm.s2_badge">Giai đoạn 2 · Đang triển khai</span>
+            <div class="rm-title" data-i18n="rm.s2_title">Mở rộng quy tắc tương thích &amp; Hợp tác Upstream</div>
             <ul class="rm-list">
-              <li data-i18n="rm.s2_i1">Hoàn thiện bộ cài chuẩn TSF cho Windows 10/11 với cơ chế nạp DLL cô lập cho cả x64 và Windows 11 ARM64.</li>
-              <li data-i18n="rm.s2_i2">Đóng gói chuẩn .deb cho Linux (Ubuntu/Debian trên x64 và ARM64 với IBus &amp; Fcitx5).</li>
-              <li data-i18n="rm.s2_i3">Tinh chỉnh chế độ nhập liệu trực tiếp cho các GPU Terminal hiện đại (Ghostty, Kitty, WezTerm, Claude Code).</li>
+              <li data-i18n="rm.s2_i1">Mở rộng cơ sở dữ liệu quy tắc ứng dụng (typing-modes.yml) để cộng đồng bổ sung cấu hình tương thích cho các phần mềm chuyên ngành mà không cần biên dịch lại.</li>
+              <li data-i18n="rm.s2_i2">Tinh chỉnh sâu chế độ nhập liệu cho các GPU Terminal, trình soạn thảo LaTeX và công cụ AI CLI thế hệ mới (Ghostty, Kitty, WezTerm, Claude Code).</li>
+              <li data-i18n="rm.s2_i3">Tiếp tục đóng góp các bản vá lỗi biên âm vị học và bộ ca kiểm thử ngược dòng (Upstream PRs) cho hệ sinh thái bộ gõ mở.</li>
             </ul>
           </div>
 
           <div class="rm-step">
-            <span class="rm-badge next" data-i18n="rm.s3_badge">Chặng 3 · Định hướng tiếp theo</span>
-            <div class="rm-title" data-i18n="rm.s3_title">Quy tắc tương thích mở &amp; cá nhân hóa cục bộ</div>
+            <span class="rm-badge next" data-i18n="rm.s3_badge">Giai đoạn 3 · Nghiên cứu tiếp theo</span>
+            <div class="rm-title" data-i18n="rm.s3_title">Mô hình thích nghi cục bộ trên RAM &amp; Cử chỉ 120Hz</div>
             <ul class="rm-list">
-              <li data-i18n="rm.s3_i1">Mở rộng danh mục quy tắc ứng dụng (typing-modes.yml) để cộng đồng bổ sung cấu hình tương thích mà không cần chờ bản dựng mới.</li>
-              <li data-i18n="rm.s3_i2">Nâng cấp độ chính xác khi gõ lướt (Glide Typing) trên màn hình cảm ứng iOS &amp; Android.</li>
-              <li data-i18n="rm.s3_i3">Hoàn thiện gợi ý từ ghép tự thích nghi theo văn phong cá nhân hoàn toàn trên RAM (tự xóa sau 14 ngày, 0 ghi đĩa).</li>
+              <li data-i18n="rm.s3_i1">Hoàn thiện mô hình gợi ý từ ghép thích nghi theo văn phong cá nhân vận hành thuần trên RAM (tối đa 512 mục, tự rã sau 14 ngày, 0 ghi ổ cứng).</li>
+              <li data-i18n="rm.s3_i2">Nâng cấp thuật toán giải mã quỹ đạo gõ lướt (Glide Typing) 120Hz trên màn hình cảm ứng iOS, iPadOS và Android.</li>
+              <li data-i18n="rm.s3_i3">Mở rộng công cụ quan sát sự kiện độc lập (VieLotusLab) phục vụ gỡ lỗi giao thức nhập liệu đa nền tảng.</li>
             </ul>
-          </div>
-        </div>
-
-        <div class="ecosystem-block">
-          <div class="ecosystem-heading" data-i18n="eco.heading">Đóng góp &amp; Tri ân hệ sinh thái bộ gõ tiếng Việt mở</div>
-          <div class="ecosystem-items">
-            <div class="ecosystem-entry" data-i18n="eco.d1">
-              1. Tri ân nền tảng đi trước: Sen Việt trân trọng kế thừa các nguyên lý âm vị học, máy trạng thái chính tả và bộ ca kiểm chuẩn từ UniKey (Phạm Kim Long), OpenKey (Mai Vũ Tuyên), Bamboo Engine (Lương Thanh Lam), VietTelex (Phil Trịnh) và UVie.
-            </div>
-            <div class="ecosystem-entry">
-              <span data-i18n="eco.d2_pre">2. Đóng góp ngược lại cho cộng đồng (Upstream PRs): Khi phát hiện các ca biên phức tạp về đồng bộ trạng thái âm tiết, tách âm V-C-V và hoàn tác Telex, nhóm phát triển chủ động gửi bản vá kèm bộ unit test ngược lại cho các dự án cùng hệ sinh thái — tiêu biểu là </span><a href="https://github.com/ptrinh/viettelex/pull/133" target="_blank" rel="noopener noreferrer" data-i18n="eco.d2_link1">PR #133 trên ptrinh/viettelex</a><span data-i18n="eco.d2_mid1">, </span><a href="https://github.com/uvie-project/uvie-rs/pull/20" target="_blank" rel="noopener noreferrer" data-i18n="eco.d2_link2">PR #20 trên uvie-project/uvie-rs</a><span data-i18n="eco.d2_mid2"> và </span><a href="https://github.com/uvie-project/uvie-mac/pull/25" target="_blank" rel="noopener noreferrer" data-i18n="eco.d2_link3">PR #25 trên uvie-project/uvie-mac</a><span data-i18n="eco.d2_post"> khắc phục lỗi mất đồng bộ trạng thái Telex khiến ký tự bị nhảy và rớt dấu khi gõ tiếp sau âm tiết hoàn chỉnh (như dduowcj + u, vieetj + u).</span>
-            </div>
-            <div class="ecosystem-entry">
-              <span data-i18n="eco.d3_pre">3. Chia sẻ dữ liệu tương thích &amp; đặc tả mở: Toàn bộ danh mục phân loại ứng dụng (</span><code>typing-modes.yml</code><span data-i18n="eco.d3_mid">) và báo cáo </span><a href="research.html" data-i18n="eco.d3_link">Chuyên khảo Kỹ thuật</a><span data-i18n="eco.d3_post"> được mở công khai theo giấy phép MIT để mọi bộ gõ tiếng Việt trên macOS, Windows và Linux đều có thể đối chiếu và sử dụng chung.</span>
-            </div>
           </div>
         </div>
       </section>
@@ -1537,17 +1733,17 @@
 
     <footer>
       <div class="footer-bar">
-        <span data-i18n="footer.copy">Sen Việt — Chia sẻ miễn phí cho cộng đồng người Việt.</span>
+        <span data-i18n="footer.copy">Sen Việt (VieLotusIM) — Dự án nghiên cứu &amp; phát triển bộ gõ tiếng Việt mở cho cộng đồng.</span>
         <div class="footer-links">
-          <a href="research.html" data-i18n="nav.paper">Chuyên khảo</a>
-          <a href="support.html" data-i18n="nav.support">Hướng dẫn</a>
+          <a href="research.html" data-i18n="nav.paper">Chuyên khảo Kiến trúc</a>
+          <a href="support.html" data-i18n="nav.support">Hướng dẫn Kích hoạt</a>
           <a href="privacy.html" data-i18n="footer.privacy">Quyền riêng tư</a>
           <a href="terms.html" data-i18n="footer.terms">Điều khoản</a>
           <a id="link-footer-releases" href="https://github.com/stevedat/VieLotus-IM/releases/latest" target="_blank" rel="noopener noreferrer" data-i18n="footer.releases">Bản phát hành</a>
           <a href="https://zalo.me/g/6wwyvywyvhsb0n6rwkze" target="_blank" rel="noopener noreferrer" data-i18n="footer.discuss">Thảo luận (Zalo)</a>
           <a href="https://www.linkedin.com/in/stevedat/?isSelfProfile=true" target="_blank" rel="noopener noreferrer" data-i18n="footer.author">Tác giả</a>
           <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener noreferrer">GitHub</a>
-          <button type="button" class="footer-donate" onclick="toggleVietQR()" data-i18n="footer.donate">Mời cà phê ☕ (VietQR)</button>
+          <button type="button" class="footer-donate" onclick="toggleVietQR()" data-i18n="footer.donate">Đóng góp duy trì ☕ (VietQR)</button>
         </div>
       </div>
 
@@ -1584,7 +1780,7 @@
         ctx_vi: 'Từ tiếng Anh bị biến thành âm vô nghĩa (turn → tủn)',
         ctx_en: 'English word mangled into a meaningless syllable (turn → tủn)',
         old_out: 'tủn',
-        old_exp_vi: 'Các bộ gõ hiện nay khôi phục được từ sai cấu trúc vần (như window), nhưng với "turn", tổ hợp t-u-n đúng luật ghép phụ âm – nguyên âm nên bị biến thành âm vô nghĩa "tủn".',
+        old_exp_vi: 'Các bộ gõ hiện nay khôi phục được từ sai cấu trúc vần (như window), nhưng với "turn", tổ hợp t-u-n đúng khuôn phụ âm – nguyên âm nên bị biến thành âm vô nghĩa "tủn".',
         old_exp_en: 'Modern IMEs restore words that violate vowel-coda rules (like window), but because t-u-n matches a valid Vietnamese rhyme pattern, they turn "turn" into the meaningless syllable "tủn".',
         new_out: 'turn ',
         new_exp_vi: 'Đối chiếu từ điển âm tiết thực tế thay vì chỉ ghép vần cơ học: nhận diện "tủn" không phải từ tiếng Việt có nghĩa độc lập nên tự trả về ngay "turn".',
@@ -1683,216 +1879,278 @@
 
     const i18n = {
       vi: {
-        'nav.perm': '0 xin quyền & Đánh đổi',
-        'nav.notes': 'Ba bài toán cốt lõi',
-        'nav.roadmap': 'Lộ trình',
-        'nav.paper': 'Chuyên khảo',
-        'nav.support': 'Hướng dẫn',
-        'led.c1': 'Không xin quyền theo dõi bàn phím hay kết nối mạng',
+        'hdr.badge': 'Hồ sơ Kỹ thuật & Thực nghiệm v1.1.1',
+        'nav.paper': 'Chuyên khảo Kiến trúc',
+        'nav.support': 'Hướng dẫn Kích hoạt',
+        'toc.s1': 'Mô phỏng thực nghiệm',
+        'toc.s2': 'Nền tảng & Phát hành (5 OS)',
+        'toc.s3': 'Giao thức gốc & Đánh đổi',
+        'toc.s4': 'Lõi ngôn ngữ & Kiểm định',
+        'toc.s5': 'Đóng góp Upstream (PR Trace)',
+        'toc.s6': 'Lộ trình nghiên cứu',
+        'led.c1': 'Không bẫy phím ngầm · 0 Accessibility (macOS), 0 Full Access (iOS), 0 Hook (Win/Linux)',
         'led.c2': 'Độ chính xác bộ kiểm thử chính có ngữ cảnh (Telex & VNI)',
-        'led.c3': 'Đối xứng hai chiều (365/375) & giữ 100% đường gõ Việt duy nhất',
-        'led.c4': 'Độ trễ phản hồi qua 250.000 phím liên tục trên Apple Silicon',
-        'hero.title': 'Làm lại bộ gõ tiếng Việt theo chuẩn bàn phím gốc của hệ điều hành',
-        'hero.lead': 'Hai điểm gây ức chế nhất của bộ gõ tiếng Việt hiện nay là: (1) đòi quyền theo dõi phím toàn cục dễ gây lặp chữ trên trình duyệt, và (2) biến các từ tiếng Anh thông dụng như turn thành âm vô nghĩa "tủn", hoặc biến last thành "lát". Dưới đây là đối chiếu thực chứng, các đánh đổi kiến trúc có dẫn nguồn và bộ cài cho 5 hệ điều hành.',
-        'cta.pkg': 'Tải cho macOS (.pkg)',
+        'led.c3': 'Đối xứng hai chiều (365/375) & bảo toàn 100% đường gõ Việt duy nhất',
+        'led.c4': 'Độ trễ xử lý qua 250.000 phím liên tục (lõi Swift 6 đa nền tảng)',
+        'hero.title': 'Nghiên cứu và thiết kế bộ gõ tiếng Việt theo giao thức bàn phím gốc đa nền tảng',
+        'hero.lead': 'Sen Việt (VieLotusIM) lấy hệ sinh thái Apple (macOS, iOS, iPadOS) làm kiến trúc tham chiếu trọng tâm bằng ngôn ngữ Pure Swift 6, đồng thời vận hành đồng nhất cùng một lõi ngôn ngữ trên Windows, Linux và Android. Dự án tập trung giải quyết hai bài toán kỹ thuật: (1) thay thế cơ chế bẫy phím ngầm đòi quyền nhạy cảm bằng kênh nhập liệu chính thống của từng hệ điều hành, và (2) xử lý điểm mù từ vựng khi các từ tiếng Anh thông dụng như turn bị biến thành âm vô nghĩa "tủn", hoặc last thành "lát".',
         'cta.copy': 'Chép',
-        'cta.copy_linux': 'Lệnh 1 dòng',
-        'cta.guide': 'Xem cách bật bàn phím sau khi cài',
-        'plat.mobile_label': 'Điện thoại:',
-        'sim.title': 'Bàn thử nghiệm tình huống gõ thực tế',
+        'sim.title': 'Mô phỏng đối chiếu 4 ca biên ngôn ngữ & bộ đệm',
         'sim.tab0': '1. Gõ "turn" (không ra "tủn")',
         'sim.tab1': '2. Gõ "last" vs. "lát"',
         'sim.tab2': '3. Từ trùng khít (rest / rét)',
         'sim.tab3': '4. Xóa lùi sửa dấu',
-        'sim.typed_label': 'Chuỗi phím vật lý bạn bấm:',
-        'sim.old_head': 'Bộ gõ chỉ kiểm tra luật ghép vần',
-        'sim.new_head': 'Cách Sen Việt xử lý',
+        'sim.typed_label': 'Chuỗi phím vật lý đầu vào:',
+        'sim.old_head': 'Bộ lọc chỉ kiểm tra khuôn ghép vần (Phonotactic-only)',
+        'sim.new_head': 'Trọng tài từ vựng & ngữ cảnh (Sen Việt)',
         'sim.cite_prefix': 'Nguồn đối chiếu:',
-        'sim.cite_corpus': 'Unit test kiểm chứng: SmartBilingualDetectorTests.swift (turn, last, list, best, cost, rest)',
-        'sim.cite_cmd': 'Tự chạy:',
+        'sim.cite_corpus': 'Ca kiểm thử đơn vị: SmartBilingualDetectorTests.swift (turn, last, list, best, cost, rest)',
+        'sim.cite_cmd': 'Tự kiểm chứng:',
         'cite.label': 'Nguồn:',
-        'perm.heading': 'Định hướng "Không xin quyền" và những sự đánh đổi thẳng thắn',
-        'perm.desc': 'Đa số bộ gõ tiếng Việt bên thứ ba yêu cầu cấp quyền Trợ năng (Accessibility), Theo dõi bàn phím (Input Monitoring) hoặc Truy cập đầy đủ trên di động để chặn sự kiện phím. Sen Việt đi theo hướng ngược lại: chỉ giao tiếp qua chuẩn bàn phím gốc của hệ điều hành.',
-        'perm.tag_old': 'Cách phổ biến',
-        'perm.r1_dim': 'Quyền hệ thống & Riêng tư',
-        'perm.r1_old': 'Đòi quyền Accessibility / Input Monitoring toàn cục (CGEventTap trên macOS, SetWindowsHookEx WH_KEYBOARD_LL trên Windows) hoặc Full Access trên điện thoại.',
-        'perm.r1_new': '0 quyền theo dõi phím, 0 kết nối mạng. Vận hành thuần qua giao thức bàn phím gốc (InputMethodKit, Windows TSF, Linux IBus/Fcitx5, UIInputViewController).',
-        'perm.r2_dim': 'Cơ chế thay chữ trên màn hình',
-        'perm.r2_old': 'Để chữ thô lọt vào ô nhập rồi bắn phím Xóa (Backspace) giả lập tốc độ cao — dễ đua lệnh (race condition) với gợi ý tự động trên thanh địa chỉ và làm vỡ lịch sử Undo.',
-        'perm.r2_new': 'Thay thế nguyên tử theo tọa độ UTF-16 (insertText:replacementRange:) hoặc khóa phiên ghép vần chuẩn W3C (setMarkedText:), giữ nguyên lịch sử hoàn tác Cmd+Z / Ctrl+Z.',
-        'perm.r3_dim': 'Độ ổn định khi nâng cấp OS',
-        'perm.r3_old': 'Khi cập nhật bản mới trên macOS, chữ ký nhị phân (csreq) đổi khiến hạt nhân TCC âm thầm hủy phím giả lập dù công tắc trong System Settings vẫn báo bật (AXIsProcessTrusted() == true).',
-        'perm.r3_new': 'Không dùng cơ chế chặn sự kiện toàn cục nên miễn nhiễm hoàn toàn với lỗi kẹt quyền ngầm của TCC hoặc lỗi ngắt bộ gõ khi hệ thống quá tải (.tapDisabledByTimeout).',
-        'to.header': 'Ba sự đánh đổi thực tế khi từ chối dùng quyền can thiệp ngầm',
-        'to.d1': '1. Nét gạch chân tạm thời trên trình duyệt & Electron: Trên ứng dụng gốc (Notes, Pages, Safari, Word, Xcode), Sen Việt đổi dấu trực tiếp không gạch chân. Riêng trên Chrome, Electron, VS Code, Zalo, từ đang gõ có nét gạch chân mảnh chuẩn W3C (nhấn Space là tự tắt). Chấp nhận nét gạch chân này giúp triệt tiêu 100% lỗi lặp chữ (t-ti-tiếng) và nhảy con trỏ do xung đột Virtual DOM.',
-        'to.d2': '2. Hợp tác thay vì cưỡng bức khung nhập liệu tự vẽ: Với phần mềm tự vẽ ô nhập chữ không trả về tọa độ con trỏ (NSNotFound), Sen Việt tự lùi về chế độ gạch chân an toàn thay vì bắn phím xóa giả lập đè lên màn hình. Đổi lại, lớp bảo vệ DirectReplacementGuard đảm bảo không bao giờ xóa nhầm văn bản nằm ngoài từ đang gõ.',
-        'to.d3': '3. Đăng ký qua trình quản lý bàn phím hệ thống: Ở lần cài đặt đầu tiên trên máy mới, hệ điều hành yêu cầu bạn bật bàn phím trong mục Input Sources (hoặc đăng xuất một lần để TextInputMenuAgent nạp danh sách), thay vì ứng dụng tự chiếm quyền bàn phím ngầm.',
-        'notes.heading': 'Ba bài toán cốt lõi bên trong lõi xử lý ngôn ngữ',
-        'notes.desc': 'Bên cạnh ranh giới an toàn với hệ điều hành, lõi ngôn ngữ phải giải quyết bài toán va chạm giữa các từ tiếng Anh thông dụng và các âm tiết tiếng Việt hợp lệ.',
-        'n1.title': 'Giải quyết điểm mù của cơ chế tự khôi phục tiếng Anh (turn, last, rest)',
+        'plat.heading': 'Danh mục nền tảng đã phát hành, dòng máy kiểm chứng & liên kết chính thức',
+        'plat.desc': 'Cùng một lõi trạng thái Pure Swift 6 (VieLotusCore & VieLotusCAPI) đã được biên dịch, đóng gói và xuất bản chính thức trên 5 hệ điều hành máy tính và di động. Bảng dưới đây tổng hợp giao thức hệ thống, phần cứng đã đo kiểm và đường dẫn tải/kho ứng dụng chính thức của từng nền tảng.',
+        'plat.th1': 'Hệ điều hành & Giao thức',
+        'plat.th2': 'Dòng máy & Kiến trúc CPU đã kiểm thử',
+        'plat.th3': 'Môi trường & Ứng dụng xác thực',
+        'plat.th4': 'Kênh phát hành & URL chính thức',
+        'plat.mac_hw': 'Apple Silicon (M1 / M2 / M3 / M4 — MacBook Air/Pro, Mac mini, iMac, Mac Studio) & Intel (x86_64)',
+        'plat.mac_apps': 'Safari, Notes, Xcode, Office; Chrome, Arc, VS Code, Cursor, Slack, Notion, Zalo; Terminal, iTerm2, Ghostty, Kitty, Alacritty, Warp',
+        'plat.win_hw': 'Intel / AMD (x64) & ARM64 (Snapdragon X Elite/Plus, Surface Pro ARM, Parallels trên Mac M-series)',
+        'plat.win_apps': 'WinUI 3 / UWP (Windows 11 Notepad, Windows Terminal, Windows Search, Edge) & Win32 (Office 365, Chrome, VS Code, Zalo PC)',
+        'plat.lin_hw': 'x86_64 (amd64 PC/Laptop) & ARM64 (aarch64 — Raspberry Pi 4/5, máy trạm ARM)',
+        'plat.lin_apps': 'X11 & Wayland (GNOME, KDE Plasma); Firefox, Chromium, VS Code, LibreOffice, GNOME Terminal, Konsole, Ghostty',
+        'plat.ios_hw': 'iPhone (XS → 16 Pro Max) & iPad (iPad Air, mini, iPad Pro M1–M4)',
+        'plat.ios_apps': 'Bàn phím cảm ứng 60/120Hz (hỗ trợ gõ lướt Glide Typing) & bàn phím cứng Magic Keyboard / Bluetooth',
+        'plat.and_hw': 'arm64-v8a, armeabi-v7a, x86_64 (Samsung Galaxy Phone/Tab/DeX, Google Pixel, Xiaomi, OPPO)',
+        'plat.and_apps': 'Bàn phím ảo cảm ứng & bàn phím cơ vật lý rời kết nối qua USB / Bluetooth (chế độ điện thoại, tablet & Samsung DeX)',
+        'plat.note': 'Tài liệu hướng dẫn kích hoạt từng bước sau khi cài đặt:',
+        'plat.note_link': 'Hướng dẫn Kích hoạt & Khắc phục sự cố (macOS, Windows, Linux, iOS, Android)',
+        'perm.heading': 'Kiến trúc giao thức gốc (không bẫy phím ngầm) và ba sự đánh đổi thẳng thắn',
+        'perm.desc': 'Nhiều bộ gõ tiếng Việt truyền thống hoạt động bằng cách cài bẫy sự kiện phím ở tầng hệ thống (đòi quyền Accessibility trên macOS, cài Keyboard Hook trên Windows, hoặc yêu cầu Full Access trên di động). Sen Việt chọn hướng tiếp cận chuẩn mực của từng nền tảng — lấy hệ sinh thái Apple làm chuẩn tham chiếu và áp dụng tương đương trên Windows, Linux, Android.',
+        'perm.tag_old': 'Cơ chế Hook',
+        'perm.r1_dim': 'Ranh giới quyền & Riêng tư',
+        'perm.r1_old': 'Can thiệp sự kiện phím toàn cục: yêu cầu quyền Accessibility / Input Monitoring (CGEventTap) trên macOS, cài SetWindowsHookEx (WH_KEYBOARD_LL) trên Windows, hoặc đòi quyền Full Access trên iOS/Android.',
+        'perm.r1_new': 'Vận hành 100% qua khung dịch vụ bàn phím chính thống (InputMethodKit trên macOS, UIInputViewController 0 Full Access trên iOS/iPadOS, Win32 TSF trên Windows, IBus/Fcitx5 trên Linux, InputMethodService trên Android) với 0 kết nối mạng.',
+        'perm.r2_dim': 'Cơ chế đồng bộ văn bản',
+        'perm.r2_old': 'Để chữ thô lọt vào ô nhập rồi bắn chuỗi phím Xóa (Backspace) giả lập tốc độ cao — dễ đua lệnh (race condition) với gợi ý tự động trên trình duyệt và làm hỏng lịch sử hoàn tác Undo.',
+        'perm.r2_new': 'Thay thế nguyên tử theo vùng chọn (insertText:replacementRange: trên macOS, ITfEditSession trên Windows TSF, SurroundingText trên Linux) hoặc phiên ghép vần chuẩn W3C (Marked Text / Composition), giữ nguyên lịch sử Cmd+Z / Ctrl+Z.',
+        'perm.r3_dim': 'Độ ổn định & Cô lập bảo mật',
+        'perm.r3_old': 'Trên macOS, khi cập nhật bản mới làm đổi chữ ký (csreq), hạt nhân TCC âm thầm hủy phím giả lập dù công tắc quyền vẫn báo bật; trên Linux Wayland hoặc ứng dụng quyền cao của Windows, cơ chế chặn phím toàn cục bị hệ điều hành cô lập.',
+        'perm.r3_new': 'Đăng ký làm dịch vụ bàn phím hợp lệ của hệ điều hành nên không bao giờ bị lỗi kẹt quyền TCC trên macOS, tương thích tự nhiên với cơ chế cô lập cửa sổ của Linux Wayland và ứng dụng UWP/WinUI 3 trên Windows 11.',
+        'to.header': 'Ba sự đánh đổi kỹ thuật khi tuân thủ tuyệt đối giao thức gốc của hệ điều hành',
+        'to.d1': '1. Nét gạch chân tạm thời trên trình duyệt & Electron: Trên các khung ứng dụng gốc hỗ trợ thay thế tại chỗ (như AppKit/Safari/Office trên macOS hay Win32 trên Windows), Sen Việt đổi dấu trực tiếp không gạch chân. Riêng trên trình duyệt Chromium, Electron, VS Code, Zalo, từ đang gõ hiển thị nét gạch chân mảnh chuẩn W3C (nhấn Space là tự tắt) nhằm triệt tiêu 100% lỗi lặp chữ (t-ti-tiếng) và nhảy con trỏ do xung đột Virtual DOM.',
+        'to.d2': '2. Hợp tác thay vì cưỡng bức khung nhập liệu tự vẽ: Với các phần mềm đồ họa/game tự vẽ ô nhập chữ không cung cấp tọa độ con trỏ cho hệ điều hành, Sen Việt tự lùi về chế độ ghép vần tiêu chuẩn thay vì bắn phím Backspace giả lập mù vào màn hình. Đổi lại, bộ gõ đảm bảo không bao giờ xóa nhầm văn bản nằm ngoài âm tiết đang gõ.',
+        'to.d3': '3. Kích hoạt qua trình quản lý bàn phím của hệ điều hành: Vì không tự ý chiếm quyền điều khiển bàn phím ngầm, ở lần cài đặt đầu tiên trên thiết bị mới, người dùng chủ động bật Sen Việt trong phần quản lý bàn phím của từng hệ điều hành (Input Sources trên macOS, Settings → Keyboard trên iOS/Android, hoặc chuyển bằng Win+Space / Super+Space trên Windows & Linux).',
+        'notes.heading': 'Ba bài toán cốt lõi trong lõi ngôn ngữ & Ma trận kiểm định đối xứng (9.091 ca)',
+        'notes.desc': 'Bên cạnh ranh giới an toàn với hệ điều hành, lõi ngôn ngữ phải phân xử chính xác sự va chạm giữa các từ tiếng Anh thông dụng và các âm tiết tiếng Việt hợp lệ mà không làm mất từ của bên nào.',
+        'n1.title': '1. Giải quyết điểm mù của cơ chế tự khôi phục tiếng Anh (turn, last, rest)',
         'n1.p1': 'Các bộ gõ hiện đại đều khôi phục tốt những từ sai quy tắc ghép vần (như window). Nhưng chúng thất bại ở 3 nhóm: (1) Từ như turn (t-u-r-n) tạo ra "tủn" đúng khuôn phụ âm – nguyên âm nên bị bỏ lọt dù "tủn" không có nghĩa; (2) Từ như last (l-a-s-t), best, cost, list có phím s nằm giữa từ bị biến thành "lát", "bét", "cót", "lít" — trong khi Sen Việt trả thẳng về last (còn gõ tiếng Việt l-a-t-s vẫn ra lát); (3) Từ trùng khít đường gõ duy nhất của tiếng Việt như rest / rét, if / ì, as / á.',
         'n1.p2': 'Công bố đối xứng hai chiều: Khi có ngữ cảnh tiếng Anh đi trước, Sen Việt đạt 100.00% (9.091 / 9.091 ca, gồm 1.049/1.049 ca lưỡng nghĩa). Khi phát lại chính bộ từ đó ở trạng thái độc lập không có ngữ cảnh tiếng Anh, bộ gõ giữ đúng 97.33% (365 / 375) cho tiếng Việt và bảo toàn tuyệt đối 100.00% (182 / 182 — 0 tổn thất) các âm tiết tiếng Việt chỉ có duy nhất một đường bấm phím.',
-        'n2.title': 'Thích ứng 4 chế độ hiển thị & khóa biên UTF-16',
+        'n2.title': '2. Thích ứng 4 chế độ hiển thị & khóa biên UTF-16',
         'n2.fig': 'ClientAdapter · typing-modes.yml',
         'n2.p1': 'Khung soạn thảo gốc (AppKit/Win32), trình duyệt (Chromium/Electron) và GPU Terminal (Ghostty, Kitty, Alacritty, Claude Code) xử lý bộ đệm văn bản hoàn toàn khác nhau. Sen Việt tự động phân loại ứng dụng sang 4 chế độ (Direct Replacement, Marked Text, Terminal Direct phát byte DEL \\u{7F}, Passthrough) và cho phép cộng đồng tùy chỉnh quy tắc qua tệp cấu hình mở typing-modes.yml mà không cần biên dịch lại.',
-        'n3.title': 'Một lõi Swift 6 thuần khiết cho cả 5 hệ điều hành',
+        'n3.title': '3. Một lõi Swift 6 thuần khiết cho cả 5 hệ điều hành',
         'n3.fig': 'p99 < 200 µs · 26 hàm C-ABI',
         'n3.p1': 'Toàn bộ máy trạng thái (InputSessionManager), bộ tách âm 5 tầng và trọng tài ngữ cảnh nằm trong thư viện độc lập VieLotusCore, kết nối trực tiếp với macOS/iOS và xuất cầu nối C-ABI không sao chép (vielotus.h) cho Windows TSF, Linux IBus/Fcitx5 và Android JNI. Dữ liệu gợi ý từ ghép cá nhân chỉ lưu trên RAM (tối đa 512 mục, tự rã sau 14 ngày, không ghi ổ cứng).',
-        'drawer.title': 'Xem bảng số liệu kiểm định chi tiết (9.091 ca) & tài liệu chuyên khảo kỹ thuật',
-        'drawer.hint': 'Mở bảng số liệu ▾',
-        'drawer.th1': 'Hạng mục đo kiểm',
-        'drawer.th2': 'Ý nghĩa thực tế',
+        'drawer.title': 'Bảng tổng hợp kết quả kiểm định hồi quy (9.091 ca)',
+        'drawer.th1': 'Nhóm đo kiểm (Metric Bucket)',
+        'drawer.th2': 'Điều kiện thực thi & Ý nghĩa thực nghiệm',
         'drawer.th3': 'Kết quả đo',
-        'drawer.r1': 'Biến đổi âm tiết Việt, giữ từ tiếng Anh, hủy dấu cuối từ và phân giải từ lưỡng nghĩa',
-        'drawer.r2': 'Ra đúng tiếng Anh khi có ngữ cảnh VÀ ra đúng tiếng Việt khi gõ độc lập',
-        'drawer.r3': 'Các âm tiết tiếng Việt chỉ có một cách bấm phím duy nhất, không được phép mất',
-        'drawer.r4': 'Thời gian xử lý 99% số lần gõ phím Telex / VNI trên Apple Silicon',
-        'drawer.link': 'Đọc toàn văn Chuyên khảo Kiến trúc Kỹ thuật & hướng dẫn tự chạy lệnh kiểm chứng (Open-Core)',
-        'rm.heading': 'Lộ trình phát triển dự án',
-        'rm.desc': 'Triển khai từng bước theo thứ tự ưu tiên: độ chính xác của lõi ngôn ngữ, tính chuẩn mực với hệ điều hành, và khả năng mở rộng đa nền tảng.',
-        'rm.s1_badge': 'Chặng 1 · Đã hoàn thiện',
-        'rm.s1_title': 'Lõi ngôn ngữ & chuẩn không xin quyền',
+        'drawer.b1': 'Bộ kiểm thử chính (5 nhóm có ngữ cảnh)',
+        'drawer.r1': 'Biến đổi âm tiết Việt (400), giữ từ tiếng Anh (362), hủy dấu cuối từ (67), khôi phục từ thô (7.213) và phân giải từ lưỡng nghĩa có ngữ cảnh (1.049)',
+        'drawer.b2': 'Đối xứng hai chiều (ambiguous_both_sides)',
+        'drawer.r2': '375 từ trùng phím viết thường chạy lặp lại ở cả 2 chiều: đúng tiếng Anh khi có ngữ cảnh VÀ đúng tiếng Việt khi gõ độc lập (vn_survives_collision)',
+        'drawer.b3': 'Đường gõ tiếng Việt duy nhất (whitelist_safe = never)',
+        'drawer.r3': 'Các âm tiết tiếng Việt chỉ có duy nhất một chuỗi phím Telex/VNI để tạo thành (0 tổn thất bắt buộc bởi VNCollisionRatchetTests)',
+        'drawer.b4': 'Độ trễ đuôi p99 & Thông lượng (250.000 phím)',
+        'drawer.r4': 'Thời gian xử lý 99% số lần gõ phím liên tục qua bài kiểm thử chịu tải (--stress) trên Apple Silicon',
+        'drawer.link': 'Đọc toàn văn Chuyên khảo Kiến trúc Kỹ thuật & hướng dẫn tự chạy lệnh kiểm chứng độc lập (Open-Core)',
+        'up.heading': 'Sổ cái đóng góp mã nguồn ngược dòng (Upstream PRs) & Đối chiếu học thuật',
+        'up.desc': 'Nghiên cứu kỹ thuật chỉ bền vững khi có tính kế thừa và đóng góp ngược lại cho cộng đồng. Khi phát hiện các lỗi biên trong quá trình kiểm thử chéo, nhóm phát triển gửi trực tiếp bản vá (Pull Request) kèm bộ unit test về các kho mã nguồn cùng hệ sinh thái để có thể truy vết minh bạch.',
+        'up.sub_prs': 'A. Danh mục Pull Request & Đặc tả kỹ thuật đóng góp ngược dòng (Traceable PR Ledger)',
+        'up.th_pr': 'Mã PR / Đặc tả',
+        'up.th_repo': 'Kho mã nguồn (Repository)',
+        'up.th_rca': 'Phân tích căn nguyên (Root-Cause) & Bản vá',
+        'up.th_vec': 'Vector kiểm chứng & Trace',
+        'up.pr1_desc': 'Khắc phục lỗi mất đồng bộ trạng thái âm tiết sau khi đã gán thanh điệu, chuẩn hóa quy tắc tách âm tiết liên tiếp V-C-V và hoàn tác dấu Telex khi gõ vượt quá âm tiết đóng.',
+        'up.pr2_desc': 'Sửa lỗi lệch máy trạng thái hữu hạn (FSM) trong lõi Rust khi nhập tiếp nguyên âm sau âm tiết đã mang dấu nặng/sắc, ngăn hiện tượng nhảy ký tự và rớt dấu thanh.',
+        'up.pr3_desc': 'Đồng bộ hóa vùng đệm markedText / insertText ở tầng macOS shell với lõi uvie-rs khi chuyển tiếp âm tiết liên hoàn, khắc phục lỗi nuốt ký tự cuối từ.',
+        'up.pr4_desc': 'Công bố mở cơ sở dữ liệu phân loại chế độ hiển thị theo Bundle ID (typing-modes.yml) và tài liệu phân tích cơ chế TCC csreq / AXSecureTextField để các bộ gõ dùng chung.',
+        'up.trace_link': 'Xem diff & unit tests',
+        'up.sub_prior': 'B. Đối chiếu & Tri ân các công trình nền tảng trong hệ sinh thái (Foundational Prior Art)',
+        'up.th_proj': 'Dự án & Tác giả',
+        'up.th_lic': 'Giấy phép',
+        'up.th_role': 'Di sản kỹ thuật & Giá trị tham chiếu học thuật',
+        'up.pa1': 'Đặt nền móng cho máy trạng thái âm tiết tiếng Việt, quy tắc đặt dấu thanh và chuẩn mã hóa tiếng Việt trên máy tính cá nhân.',
+        'up.pa2': 'Tham chiếu cấu trúc ánh xạ bảng mã di sản (TCVN3, VNI Windows, Unicode tổ hợp) và ma trận kiểm tra hình vị âm tiết.',
+        'up.pa3': 'Tham chiếu các heuristic phân rã cấu trúc âm tiết tiếng Việt trên Linux (IBus) và xử lý xóa ký tự phía trước.',
+        'up.pa4': 'Tư liệu thực nghiệm về hành vi của Apple InputMethodKit, nhận diện AXSecureTextField và cấu trúc bộ kiểm thử hồi quy 9.091 ca.',
+        'up.pa5': 'Kiến trúc tách biệt lõi xử lý ngôn ngữ (Rust) và vỏ giao tiếp InputMethodKit (Swift), cùng hợp tác kiểm thử chéo các ca biên V-C-V.',
+        'up.pa6': 'Tham chiếu tư duy chẩn đoán luồng phím thời gian thực và ghi chép tương thích ứng dụng đặc thù (TeXstudio, JetBrains, Claude Code CLI).',
+        'up.notice_label': 'Hồ sơ pháp lý & ghi nhận bản quyền đầy đủ:',
+        'rm.heading': 'Lộ trình nghiên cứu & phát triển kỹ thuật',
+        'rm.desc': 'Triển khai theo thứ tự ưu tiên: độ chính xác đối xứng của lõi ngôn ngữ, tính chuẩn mực với giao thức hệ điều hành, và khả năng kiểm chứng độc lập trên cả 5 nền tảng.',
+        'rm.s1_badge': 'Giai đoạn 1 · Đã xuất bản (v1.1.x)',
+        'rm.s1_title': 'Lõi ngôn ngữ đối xứng & Phát hành 5 hệ điều hành',
         'rm.s1_i1': 'Hoàn thiện lõi gõ tự do & phân giải song ngữ đối xứng (9.091 ca có ngữ cảnh đạt 100.00%, đối xứng 97.33% trên 365/375 ca, bảo toàn 182/182 đường gõ duy nhất).',
-        'rm.s1_i2': 'Phát hành chính thức không xin quyền theo dõi phím trên macOS, App Store (iOS/iPadOS) và Google Play (Android).',
-        'rm.s1_i3': 'Công bố kiến trúc Open-Core: mở mã nguồn phần vỏ giao tiếp hệ thống kèm công cụ kiểm chứng dòng lệnh VieLotusCLI.',
-        'rm.s2_badge': 'Chặng 2 · Đang triển khai',
-        'rm.s2_title': 'Đồng bộ sâu Windows, Linux & Terminal',
-        'rm.s2_i1': 'Hoàn thiện bộ cài chuẩn TSF cho Windows 10/11 với cơ chế nạp DLL cô lập cho cả x64 và Windows 11 ARM64.',
-        'rm.s2_i2': 'Đóng gói chuẩn .deb cho Linux (Ubuntu/Debian trên x64 và ARM64 với IBus & Fcitx5).',
-        'rm.s2_i3': 'Tinh chỉnh chế độ nhập liệu trực tiếp cho các GPU Terminal hiện đại (Ghostty, Kitty, WezTerm, Claude Code).',
-        'rm.s3_badge': 'Chặng 3 · Định hướng tiếp theo',
-        'rm.s3_title': 'Quy tắc tương thích mở & cá nhân hóa cục bộ',
-        'rm.s3_i1': 'Mở rộng danh mục quy tắc ứng dụng (typing-modes.yml) để cộng đồng bổ sung cấu hình tương thích mà không cần chờ bản dựng mới.',
-        'rm.s3_i2': 'Nâng cấp độ chính xác khi gõ lướt (Glide Typing) trên màn hình cảm ứng iOS & Android.',
-        'rm.s3_i3': 'Hoàn thiện gợi ý từ ghép tự thích nghi theo văn phong cá nhân hoàn toàn trên RAM (tự xóa sau 14 ngày, 0 ghi đĩa).',
-        'eco.heading': 'Đóng góp & Tri ân hệ sinh thái bộ gõ tiếng Việt mở',
-        'eco.d1': '1. Tri ân nền tảng đi trước: Sen Việt trân trọng kế thừa các nguyên lý âm vị học, máy trạng thái chính tả và bộ ca kiểm chuẩn từ UniKey (Phạm Kim Long), OpenKey (Mai Vũ Tuyên), Bamboo Engine (Lương Thanh Lam), VietTelex (Phil Trịnh) và UVie.',
-        'eco.d2_pre': '2. Đóng góp ngược lại cho cộng đồng (Upstream PRs): Khi phát hiện các ca biên phức tạp về đồng bộ trạng thái âm tiết, tách âm V-C-V và hoàn tác Telex, nhóm phát triển chủ động gửi bản vá kèm bộ unit test ngược lại cho các dự án cùng hệ sinh thái — tiêu biểu là ',
-        'eco.d2_link1': 'PR #133 trên ptrinh/viettelex',
-        'eco.d2_mid1': ', ',
-        'eco.d2_link2': 'PR #20 trên uvie-project/uvie-rs',
-        'eco.d2_mid2': ' và ',
-        'eco.d2_link3': 'PR #25 trên uvie-project/uvie-mac',
-        'eco.d2_post': ' khắc phục lỗi mất đồng bộ trạng thái Telex khiến ký tự bị nhảy và rớt dấu khi gõ tiếp sau âm tiết hoàn chỉnh (như dduowcj + u, vieetj + u).',
-        'eco.d3_pre': '3. Chia sẻ dữ liệu tương thích & đặc tả mở: Toàn bộ danh mục phân loại ứng dụng (',
-        'eco.d3_mid': ') và báo cáo ',
-        'eco.d3_link': 'Chuyên khảo Kỹ thuật',
-        'eco.d3_post': ' được mở công khai theo giấy phép MIT để mọi bộ gõ tiếng Việt trên macOS, Windows và Linux đều có thể đối chiếu và sử dụng chung.',
-        'footer.copy': 'Sen Việt — Chia sẻ miễn phí cho cộng đồng người Việt.',
+        'rm.s1_i2': 'Phát hành chính thức trên cả 5 nền tảng: macOS (.pkg / Homebrew), Windows 10/11 TSF (x64 & ARM64), Linux (Snap Store & .deb), iOS/iPadOS (App Store) và Android (Google Play).',
+        'rm.s1_i3': 'Công bố kiến trúc Open-Core kèm công cụ kiểm chứng dòng lệnh độc lập VieLotusCLI.',
+        'rm.s2_badge': 'Giai đoạn 2 · Đang triển khai',
+        'rm.s2_title': 'Mở rộng quy tắc tương thích & Hợp tác Upstream',
+        'rm.s2_i1': 'Mở rộng cơ sở dữ liệu quy tắc ứng dụng (typing-modes.yml) để cộng đồng bổ sung cấu hình tương thích cho các phần mềm chuyên ngành mà không cần biên dịch lại.',
+        'rm.s2_i2': 'Tinh chỉnh sâu chế độ nhập liệu cho các GPU Terminal, trình soạn thảo LaTeX và công cụ AI CLI thế hệ mới (Ghostty, Kitty, WezTerm, Claude Code).',
+        'rm.s2_i3': 'Tiếp tục đóng góp các bản vá lỗi biên âm vị học và bộ ca kiểm thử ngược dòng (Upstream PRs) cho hệ sinh thái bộ gõ mở.',
+        'rm.s3_badge': 'Giai đoạn 3 · Nghiên cứu tiếp theo',
+        'rm.s3_title': 'Mô hình thích nghi cục bộ trên RAM & Cử chỉ 120Hz',
+        'rm.s3_i1': 'Hoàn thiện mô hình gợi ý từ ghép thích nghi theo văn phong cá nhân vận hành thuần trên RAM (tối đa 512 mục, tự rã sau 14 ngày, 0 ghi ổ cứng).',
+        'rm.s3_i2': 'Nâng cấp thuật toán giải mã quỹ đạo gõ lướt (Glide Typing) 120Hz trên màn hình cảm ứng iOS, iPadOS và Android.',
+        'rm.s3_i3': 'Mở rộng công cụ quan sát sự kiện độc lập (VieLotusLab) phục vụ gỡ lỗi giao thức nhập liệu đa nền tảng.',
+        'footer.copy': 'Sen Việt (VieLotusIM) — Dự án nghiên cứu & phát triển bộ gõ tiếng Việt mở cho cộng đồng.',
         'footer.privacy': 'Quyền riêng tư',
         'footer.terms': 'Điều khoản',
         'footer.releases': 'Bản phát hành',
         'footer.discuss': 'Thảo luận (Zalo)',
         'footer.author': 'Tác giả',
-        'footer.donate': 'Mời cà phê ☕ (VietQR)',
+        'footer.donate': 'Đóng góp duy trì ☕ (VietQR)',
         'qr.bank': 'Ngân hàng Quân đội (MB Bank)',
         'qr.acc_label': 'STK:',
         'qr.holder_label': 'Chủ TK:',
         'qr.memo_label': 'Nội dung:'
       },
       en: {
-        'nav.perm': 'Zero-permission & Trade-offs',
-        'nav.notes': 'Core problems',
-        'nav.roadmap': 'Roadmap',
-        'nav.paper': 'Monograph',
-        'nav.support': 'Guide',
-        'led.c1': 'No keystroke monitoring permissions or network calls',
+        'hdr.badge': 'Technical & Empirical Dossier v1.1.1',
+        'nav.paper': 'Architecture Monograph',
+        'nav.support': 'Activation Guide',
+        'toc.s1': 'Empirical Specimen',
+        'toc.s2': 'Platforms & Releases (5 OS)',
+        'toc.s3': 'Native Protocol & Trade-offs',
+        'toc.s4': 'Linguistic Core & Benchmarks',
+        'toc.s5': 'Upstream PR Traceability',
+        'toc.s6': 'Research Roadmap',
+        'led.c1': 'No global keystroke hooks · 0 Accessibility (macOS), 0 Full Access (iOS), 0 Hook (Win/Linux)',
         'led.c2': 'Context-isolated primary regression suite (Telex & VNI)',
         'led.c3': 'Two-sided symmetry (365/375) & 100% unique Vietnamese paths',
-        'led.c4': 'p99 keystroke response across 250,000 continuous keys',
-        'hero.title': 'Rethinking Vietnamese input within the native OS keyboard contract',
-        'hero.lead': 'Two persistent frustrations in Vietnamese input today are: (1) global keyboard hooks that duplicate syllables in browsers, and (2) turning common English words like turn into the meaningless syllable "tủn", or last into "lát". Below is an empirical comparison, documented architectural trade-offs with source citations, and installers across 5 platforms.',
-        'cta.pkg': 'Download for macOS (.pkg)',
+        'led.c4': 'p99 keystroke latency across 250,000 continuous keys (cross-platform Swift 6 core)',
+        'hero.title': 'Researching and architecting Vietnamese input across native OS keyboard protocols',
+        'hero.lead': 'Sen Việt (VieLotusIM) takes the Apple ecosystem (macOS, iOS, iPadOS) as its primary Pure Swift 6 reference architecture while compiling and running the exact same linguistic core across Windows, Linux, and Android. It addresses two foundational problems: (1) replacing invasive global keyboard hooks with each operating system’s official text input protocol, and (2) resolving lexical collisions where everyday English words like turn are mangled into the meaningless syllable "tủn", or last into "lát".',
         'cta.copy': 'Copy',
-        'cta.copy_linux': '1-line CLI',
-        'cta.guide': 'How to enable after installing',
-        'plat.mobile_label': 'Mobile:',
-        'sim.title': 'Interactive real-world typing scenarios',
+        'sim.title': 'Interactive comparison of 4 linguistic & composition boundary cases',
         'sim.tab0': '1. "turn" (never "tủn")',
         'sim.tab1': '2. "last" vs. "lát"',
         'sim.tab2': '3. Exact collision (rest / rét)',
         'sim.tab3': '4. Backspace tone edit',
-        'sim.typed_label': 'Physical keys you press:',
-        'sim.old_head': 'Rule-only phonotactic filter',
-        'sim.new_head': 'How Sen Việt handles it',
+        'sim.typed_label': 'Physical keystroke sequence:',
+        'sim.old_head': 'Phonotactic-only rhyme filter',
+        'sim.new_head': 'Lexical & context-aware arbiter (Sen Việt)',
         'sim.cite_prefix': 'Source benchmark:',
-        'sim.cite_corpus': 'Verified in SmartBilingualDetectorTests.swift (turn, last, list, best, cost, rest)',
+        'sim.cite_corpus': 'Unit test verification: SmartBilingualDetectorTests.swift (turn, last, list, best, cost, rest)',
         'sim.cite_cmd': 'Verify locally:',
         'cite.label': 'Source:',
-        'perm.heading': 'The "Zero-Permission" orientation and our honest trade-offs',
-        'perm.desc': 'Most third-party Vietnamese IMEs require system-wide Accessibility, Input Monitoring, or Full Access permissions to intercept keystrokes. Sen Việt takes the opposite path: communicating strictly through official OS keyboard protocols.',
-        'perm.tag_old': 'Common approach',
-        'perm.r1_dim': 'System permissions & Privacy',
-        'perm.r1_old': 'Demands global Accessibility / Input Monitoring hooks (CGEventTap on macOS, SetWindowsHookEx WH_KEYBOARD_LL on Windows) or Full Access on mobile.',
-        'perm.r1_new': '0 keystroke monitoring permissions, 0 network calls. Operates strictly through native OS protocols (InputMethodKit, Windows TSF, Linux IBus/Fcitx5, UIInputViewController).',
-        'perm.r2_dim': 'How text reaches the screen',
-        'perm.r2_old': 'Lets raw characters enter the editor, then fires high-speed synthetic Backspaces — causing race conditions with browser address-bar autocomplete and breaking Undo history.',
-        'perm.r2_new': 'Performs atomic UTF-16 range replacement (insertText:replacementRange:) or W3C-compliant marked composition (setMarkedText:), preserving Cmd+Z / Ctrl+Z undo stacks.',
-        'perm.r3_dim': 'Stability across OS updates',
-        'perm.r3_old': 'When macOS updates or the binary signature (csreq) changes, the TCC kernel silently drops synthetic events even while System Settings still shows the toggle enabled (AXIsProcessTrusted() == true).',
-        'perm.r3_new': 'Immune to silent TCC permission breakage and event-tap timeouts (.tapDisabledByTimeout) because it never intercepts global events.',
-        'to.header': 'Three honest trade-offs when refusing invasive system hooks',
-        'to.d1': '1. Temporary composition underline in browsers & Electron: In native apps (Notes, Pages, Safari, Word, Xcode), Sen Việt updates accents in place with no underline. In Chrome, Electron, VS Code, or Zalo, the active syllable shows a thin W3C composition underline (cleared on Space). Accepting this underline eliminates 100% of duplicated syllables (t-ti-tiếng) and jumping cursors.',
-        'to.d2': '2. Cooperating with custom controls rather than forcing them: In niche apps with custom-drawn inputs that return NSNotFound for caret position, Sen Việt falls back to safe marked composition instead of firing blind Backspaces. In return, DirectReplacementGuard guarantees it never deletes text outside the active word.',
-        'to.d3': '3. Enabling via OS Input Sources on first install: On a fresh machine, the OS asks you to enable the keyboard in Input Sources (or log out once so TextInputMenuAgent refreshes), rather than hijacking input automatically.',
-        'notes.heading': 'Three core problems inside the linguistic engine',
-        'notes.desc': 'Beyond respecting OS boundaries, the linguistic core must resolve collisions between high-frequency English words and phonotactically legal Vietnamese syllables.',
-        'n1.title': 'Solving the blind spots of English auto-restore (turn, last, rest)',
+        'plat.heading': 'Published platforms, verified hardware matrix & official distribution URLs',
+        'plat.desc': 'A single Pure Swift 6 state machine (VieLotusCore & VieLotusCAPI) is compiled, packaged, and officially published across 5 desktop and mobile operating systems. The table below documents the native OS protocol, tested hardware/CPU architectures, verified host apps, and official release channels for each platform.',
+        'plat.th1': 'OS & Native Protocol',
+        'plat.th2': 'Tested Hardware & CPU Architectures',
+        'plat.th3': 'Verified Host Environments & Apps',
+        'plat.th4': 'Official Published Channels & URLs',
+        'plat.mac_hw': 'Apple Silicon (M1 / M2 / M3 / M4 — MacBook Air/Pro, Mac mini, iMac, Mac Studio) & Intel (x86_64)',
+        'plat.mac_apps': 'Safari, Notes, Xcode, Office; Chrome, Arc, VS Code, Cursor, Slack, Notion, Zalo; Terminal, iTerm2, Ghostty, Kitty, Alacritty, Warp',
+        'plat.win_hw': 'Intel / AMD (x64) & ARM64 (Snapdragon X Elite/Plus, Surface Pro ARM, Parallels on Apple Silicon)',
+        'plat.win_apps': 'WinUI 3 / UWP (Windows 11 Notepad, Windows Terminal, Windows Search, Edge) & Win32 (Office 365, Chrome, VS Code, Zalo PC)',
+        'plat.lin_hw': 'x86_64 (amd64 PC/Laptop) & ARM64 (aarch64 — Raspberry Pi 4/5, ARM workstations)',
+        'plat.lin_apps': 'X11 & Wayland (GNOME, KDE Plasma); Firefox, Chromium, VS Code, LibreOffice, GNOME Terminal, Konsole, Ghostty',
+        'plat.ios_hw': 'iPhone (XS → 16 Pro Max) & iPad (iPad Air, mini, iPad Pro M1–M4)',
+        'plat.ios_apps': '60/120Hz touch keyboard (with Glide Typing) & physical Magic Keyboard / Bluetooth hardware keyboards',
+        'plat.and_hw': 'arm64-v8a, armeabi-v7a, x86_64 (Samsung Galaxy Phone/Tab/DeX, Google Pixel, Xiaomi, OPPO)',
+        'plat.and_apps': 'On-screen touch keyboard & external USB / Bluetooth physical keyboards across phone, tablet & Samsung DeX modes',
+        'plat.note': 'Step-by-step post-installation activation guide:',
+        'plat.note_link': 'Activation & Troubleshooting Guide (macOS, Windows, Linux, iOS, Android)',
+        'perm.heading': 'Native OS protocol boundary (zero global hooks) and three explicit trade-offs',
+        'perm.desc': 'Many traditional Vietnamese IMEs intercept keystrokes at the system level (requiring Accessibility on macOS, installing global Keyboard Hooks on Windows, or requesting Full Access on mobile). Sen Việt follows each platform’s native input contract — anchored in the Apple ecosystem as its primary reference and applied symmetrically across Windows, Linux, and Android.',
+        'perm.tag_old': 'Hook approach',
+        'perm.r1_dim': 'Permission boundary & Privacy',
+        'perm.r1_old': 'Intercepts global keystrokes: demands Accessibility / Input Monitoring (CGEventTap) on macOS, SetWindowsHookEx (WH_KEYBOARD_LL) on Windows, or Full Access on iOS/Android.',
+        'perm.r1_new': 'Operates 100% within official keyboard services (InputMethodKit on macOS, UIInputViewController with 0 Full Access on iOS/iPadOS, Win32 TSF on Windows, IBus/Fcitx5 on Linux, InputMethodService on Android) with 0 network calls.',
+        'perm.r2_dim': 'Text buffer synchronization',
+        'perm.r2_old': 'Lets raw characters enter the editor, then fires high-speed synthetic Backspaces — causing race conditions with browser autocomplete and breaking Undo history.',
+        'perm.r2_new': 'Performs atomic range replacement (insertText:replacementRange: on macOS, ITfEditSession on Windows TSF, SurroundingText on Linux) or W3C-compliant composition (Marked Text), preserving Cmd+Z / Ctrl+Z undo stacks.',
+        'perm.r3_dim': 'OS upgrade & sandbox stability',
+        'perm.r3_old': 'On macOS, binary signature (csreq) changes across updates cause the TCC kernel to silently drop synthetic events; on Linux Wayland or elevated Windows apps, global hooks are blocked by window isolation.',
+        'perm.r3_new': 'Registered as a legitimate OS keyboard service, making it immune to silent TCC breakage on macOS and naturally compatible with Linux Wayland isolation and Windows 11 UWP/WinUI 3 apps.',
+        'to.header': 'Three explicit engineering trade-offs when strictly honoring native OS input contracts',
+        'to.d1': '1. Temporary composition underline in browsers & Electron: In native apps that support in-place replacement (AppKit/Safari/Office on macOS or Win32 on Windows), Sen Việt updates accents in place with no underline. In Chromium, Electron, VS Code, or Zalo, the active syllable shows a thin W3C composition underline (cleared on Space) to eliminate 100% of duplicated syllables (t-ti-tiếng) and jumping cursors.',
+        'to.d2': '2. Cooperating with custom controls rather than forcing them: In graphics or game apps with custom-drawn inputs that do not report caret coordinates to the OS, Sen Việt falls back to standard marked composition instead of firing blind Backspaces. In return, it guarantees never deleting text outside the active syllable.',
+        'to.d3': '3. Enabling via the OS keyboard manager on first install: Because it does not hijack input behind the scenes, on a fresh device the user enables Sen Việt once in the OS keyboard settings (Input Sources on macOS, Settings → Keyboard on iOS/Android, or Win+Space / Super+Space on Windows & Linux).',
+        'notes.heading': 'Three core problems in the linguistic engine & Symmetric regression matrix (9,091 cases)',
+        'notes.desc': 'Beyond respecting OS boundaries, the linguistic core must resolve collisions between high-frequency English words and phonotactically legal Vietnamese syllables without sacrificing either language.',
+        'n1.title': '1. Solving the blind spots of English auto-restore (turn, last, rest)',
         'n1.p1': 'Modern IMEs easily restore words that violate basic vowel-coda rules (like window). Yet they fail across three categories: (1) Words like turn (t-u-r-n) match a valid consonant-vowel-coda template and become the meaningless syllable "tủn"; (2) Words like last (l-a-s-t), best, cost, list have a mid-word "s" before "-t" and turn into "lát", "bét", "cót", "lít" — whereas Sen Việt outputs "last" directly (while typing l-a-t-s still produces Vietnamese "lát"); (3) Exact single-path collisions like rest / rét, if / ì, as / á.',
         'n1.p2': 'Symmetric two-sided disclosure: With preceding English context, Sen Việt achieves 100.00% (9,091 / 9,091 cases, including 1,049/1,049 ambiguous cases). When replaying those exact words standalone with no English context, it preserves 97.33% (365 / 375) as Vietnamese and 100.00% (182 / 182 — 0 critical losses) of Vietnamese syllables that have only a single keystroke path.',
-        'n2.title': '4 adaptive presentation modes & UTF-16 range guard',
+        'n2.title': '2. Four adaptive presentation modes & UTF-16 range guard',
         'n2.fig': 'ClientAdapter · typing-modes.yml',
         'n2.p1': 'Native views (AppKit/Win32), web browsers (Chromium/Electron), and GPU terminals (Ghostty, Kitty, Alacritty, Claude Code) handle text buffers differently. Sen Việt classifies each host into 4 modes (Direct Replacement, Marked Text, Terminal Direct emitting DEL \\u{7F}, Passthrough) and supports hot-reloadable community rules via typing-modes.yml without rebuilding.',
-        'n3.title': 'One pure Swift 6 core across all 5 platforms',
+        'n3.title': '3. One pure Swift 6 core across all 5 platforms',
         'n3.fig': 'p99 < 200 µs · 26 C-ABI functions',
         'n3.p1': 'The state machine (InputSessionManager), 5-stage syllable parser, and context arbiter live in a standalone VieLotusCore library powering macOS/iOS directly and exposing a zero-copy C-ABI bridge (vielotus.h) for Windows TSF, Linux IBus/Fcitx5, and Android JNI. Personal word suggestions live in RAM only (512-entry cap, 14-day decay, zero disk writes).',
-        'drawer.title': 'View detailed empirical benchmark table (9,091 cases) & technical monograph',
-        'drawer.hint': 'Expand table ▾',
-        'drawer.th1': 'Benchmark dimension',
-        'drawer.th2': 'Practical meaning',
-        'drawer.th3': 'Measured result',
-        'drawer.r1': 'Vietnamese syllable transform, English preservation, trailing cancel, and context-primed ambiguity',
-        'drawer.r2': 'Correct as English with context AND correct as Vietnamese without context',
-        'drawer.r3': 'Vietnamese syllables with only one possible keystroke path (zero losses allowed)',
-        'drawer.r4': '99th-percentile keystroke latency across 250,000 continuous keystrokes',
+        'drawer.title': 'Empirical regression benchmark summary (9,091 cases)',
+        'drawer.th1': 'Metric Bucket',
+        'drawer.th2': 'Drive Condition & Empirical Meaning',
+        'drawer.th3': 'Measured Result',
+        'drawer.b1': 'Primary Regression Suite (5 context-isolated buckets)',
+        'drawer.r1': 'Vietnamese transform (400), English keep (362), trailing cancel (67), raw word restore (7,213), and context-primed ambiguity (1,049)',
+        'drawer.b2': 'Two-Sided Symmetry (ambiguous_both_sides)',
+        'drawer.r2': '375 lowercase collision words replayed both ways: correct as English with context AND correct as Vietnamese without context (vn_survives_collision)',
+        'drawer.b3': 'Unique Vietnamese Keystroke Paths (whitelist_safe = never)',
+        'drawer.r3': 'Vietnamese syllables that have only one possible Telex/VNI keystroke path (0 losses enforced by VNCollisionRatchetTests)',
+        'drawer.b4': 'p99 Tail Latency & Throughput (250,000 keys)',
+        'drawer.r4': '99th-percentile keystroke processing time under continuous stress testing (--stress) on Apple Silicon',
         'drawer.link': 'Read the full Technical Architecture Monograph & reproducible CLI verification guide (Open-Core)',
-        'rm.heading': 'Project development roadmap',
-        'rm.desc': 'Executed in strict priority order: linguistic accuracy first, OS protocol compliance second, cross-platform reach third.',
-        'rm.s1_badge': 'Stage 1 · Completed',
-        'rm.s1_title': 'Linguistic core & zero-permission foundation',
+        'up.heading': 'Upstream open-source contribution ledger (PR Trace) & Foundational prior art',
+        'up.desc': 'Rigorous systems research builds upon prior art and contributes fixes back upstream. When cross-engine benchmarking uncovers subtle edge cases, we submit root-cause analyses, patches, and unit test suites directly to peer open-source repositories so every contribution is publicly traceable.',
+        'up.sub_prs': 'A. Traceable Upstream Pull Requests & Open Specifications Ledger',
+        'up.th_pr': 'PR / Spec ID',
+        'up.th_repo': 'Target Repository',
+        'up.th_rca': 'Root-Cause Analysis & Technical Patch',
+        'up.th_vec': 'Test Vectors & Trace',
+        'up.pr1_desc': 'Fixed post-toned syllable state desynchronization, standardized V-C-V consecutive syllable splitting, and restored clean Telex tone undo when typing past a closed syllable.',
+        'up.pr2_desc': 'Resolved finite-state machine (FSM) state drift in the Rust core when appending vowels after a sắc/nặng closed syllable, preventing character jumping and dropped tones.',
+        'up.pr3_desc': 'Synchronized markedText / insertText buffer boundaries in the macOS IMKInputController shell with uvie-rs during chained syllable transitions.',
+        'up.pr4_desc': 'Published the open Bundle-ID presentation rules database (typing-modes.yml) and documented TCC csreq / AXSecureTextField behaviors under MIT for all IMEs.',
+        'up.trace_link': 'View diff & unit tests',
+        'up.sub_prior': 'B. Foundational Prior Art & Ecosystem Attribution Matrix',
+        'up.th_proj': 'Project & Author',
+        'up.th_lic': 'License',
+        'up.th_role': 'Technical Heritage & Academic Reference Role',
+        'up.pa1': 'Pioneered the foundational Vietnamese syllable state machine, diacritic placement rules, and encoding standards on personal computers.',
+        'up.pa2': 'Structural reference for legacy codepage mappings (TCVN3, VNI Windows, Unicode Compound) and phonotactic validation matrices.',
+        'up.pa3': 'Reference for Vietnamese syllable decomposition heuristics on Linux (IBus) and forward-deletion disambiguation.',
+        'up.pa4': 'Empirical documentation on Apple InputMethodKit runtime behaviors, AXSecureTextField detection, and the 9,091-case benchmark structure.',
+        'up.pa5': 'Clean separation between a Rust linguistic engine and a Swift InputMethodKit shell, plus collaborative V-C-V boundary testing.',
+        'up.pa6': 'Reference for real-time keystroke stream diagnostics and host-specific compatibility notes (TeXstudio, JetBrains, Claude Code CLI).',
+        'up.notice_label': 'Full legal attribution & third-party notices:',
+        'rm.heading': 'Research & engineering roadmap',
+        'rm.desc': 'Executed in strict priority order: symmetric linguistic accuracy first, native OS protocol compliance second, cross-platform reproducibility third.',
+        'rm.s1_badge': 'Stage 1 · Published (v1.1.x)',
+        'rm.s1_title': 'Symmetric linguistic core & 5-OS release',
         'rm.s1_i1': 'Completed free-order Vietnamese syllable engine & symmetric bilingual disambiguation (100.00% across 9,091 primary cases, 97.33% symmetric both-sides across 365/375 cases, 182/182 unique Vietnamese paths preserved).',
-        'rm.s1_i2': 'Shipped zero-permission native keyboards on macOS, App Store (iOS/iPadOS), and Google Play (Android).',
-        'rm.s1_i3': 'Published Open-Core architecture: open-source OS shell paired with the VieLotusCLI verification binary.',
-        'rm.s2_badge': 'Stage 2 · In progress',
-        'rm.s2_title': 'Deep Windows, Linux & Terminal integration',
-        'rm.s2_i1': 'Refining native Windows 10/11 TSF installers with isolated dynamic DLL loading for both x64 and Windows 11 ARM64.',
-        'rm.s2_i2': 'Packaging .deb installers for Linux (Ubuntu/Debian on x64 and ARM64 with IBus & Fcitx5).',
-        'rm.s2_i3': 'Tuning direct composition for modern GPU terminals and CLI tools (Ghostty, Kitty, WezTerm, Claude Code).',
-        'rm.s3_badge': 'Stage 3 · Next horizon',
-        'rm.s3_title': 'Open compatibility rules & local personalization',
-        'rm.s3_i1': 'Expanding community-driven app presentation rules (typing-modes.yml) so niche apps can be tuned without rebuilding the binary.',
-        'rm.s3_i2': 'Advancing touch glide-typing accuracy on iOS & Android.',
-        'rm.s3_i3': 'Enhancing RAM-only adaptive compound word suggestions (14-day decay, zero disk persistence).',
-        'eco.heading': 'Ecosystem contributions & open-source acknowledgments',
-        'eco.d1': '1. Honoring foundational prior art: Sen Việt gratefully builds upon the phonological principles, orthographic state machines, and regression test corpora pioneered by UniKey (Phạm Kim Long), OpenKey (Mai Vũ Tuyên), Bamboo Engine (Lương Thanh Lam), VietTelex (Phil Trịnh), and UVie.',
-        'eco.d2_pre': '2. Giving back upstream (Pull Requests): When uncovering subtle edge cases in syllable state synchronization, V-C-V syllable splitting, and Telex undo, we contribute fixes and unit test suites back to peer open-source IMEs — including ',
-        'eco.d2_link1': 'PR #133 on ptrinh/viettelex',
-        'eco.d2_mid1': ', ',
-        'eco.d2_link2': 'PR #20 on uvie-project/uvie-rs',
-        'eco.d2_mid2': ', and ',
-        'eco.d2_link3': 'PR #25 on uvie-project/uvie-mac',
-        'eco.d2_post': ' addressing Telex state desynchronization where typing past a completed syllable (e.g., dduowcj + u, vieetj + u) caused character jumping and dropped tones.',
-        'eco.d3_pre': '3. Shared compatibility rules & open specifications: Our host-app classification matrix (',
-        'eco.d3_mid': ') and ',
-        'eco.d3_link': 'Technical Monograph',
-        'eco.d3_post': ' are published under the MIT License so any Vietnamese IME across macOS, Windows, and Linux can cross-reference and benefit.',
-        'footer.copy': 'Sen Việt — Free for the Vietnamese community.',
+        'rm.s1_i2': 'Officially released across all 5 platforms: macOS (.pkg / Homebrew), Windows 10/11 TSF (x64 & ARM64), Linux (Snap Store & .deb), iOS/iPadOS (App Store), and Android (Google Play).',
+        'rm.s1_i3': 'Published Open-Core architecture paired with the standalone VieLotusCLI verification binary.',
+        'rm.s2_badge': 'Stage 2 · In Progress',
+        'rm.s2_title': 'Open compatibility rules & Upstream collaboration',
+        'rm.s2_i1': 'Expanding the community-driven app presentation database (typing-modes.yml) so specialized apps can be tuned without rebuilding the binary.',
+        'rm.s2_i2': 'Deepening direct composition tuning for GPU terminals, LaTeX editors, and next-gen AI CLI tools (Ghostty, Kitty, WezTerm, Claude Code).',
+        'rm.s2_i3': 'Continuing upstream pull requests and shared regression test vectors across the open-source Vietnamese IME ecosystem.',
+        'rm.s3_badge': 'Stage 3 · Next Horizon',
+        'rm.s3_title': 'RAM-only local adaptation & 120Hz gesture decoding',
+        'rm.s3_i1': 'Refining adaptive compound-word suggestions in volatile RAM only (512-entry cap, 14-day decay, zero disk writes).',
+        'rm.s3_i2': 'Advancing 120Hz touch glide-typing trajectory decoding on iOS, iPadOS, and Android.',
+        'rm.s3_i3': 'Expanding the standalone VieLotusLab event observer for cross-platform input protocol diagnostics.',
+        'footer.copy': 'Sen Việt (VieLotusIM) — Open Vietnamese input method research & engineering for the community.',
         'footer.privacy': 'Privacy',
         'footer.terms': 'Terms',
         'footer.releases': 'Releases',
         'footer.discuss': 'Community (Zalo)',
         'footer.author': 'Author',
-        'footer.donate': 'Coffee via VietQR ☕',
+        'footer.donate': 'Support maintenance ☕ (VietQR)',
         'qr.bank': 'Military Commercial Joint Stock Bank (MB Bank)',
         'qr.acc_label': 'Account:',
         'qr.holder_label': 'Holder:',
@@ -1901,51 +2159,46 @@
     };
 
     function setLang(lang) {
-      currentLang = lang;
-      document.documentElement.lang = lang;
-      localStorage.setItem('vielotus_lang', lang);
+      currentLang = lang === 'en' ? 'en' : 'vi';
+      document.documentElement.lang = currentLang;
+      document.getElementById('btn-vi').classList.toggle('active', currentLang === 'vi');
+      document.getElementById('btn-en').classList.toggle('active', currentLang === 'en');
 
-      document.getElementById('btn-vi').classList.toggle('active', lang === 'vi');
-      document.getElementById('btn-en').classList.toggle('active', lang === 'en');
-
+      const dict = i18n[currentLang];
       document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
-        if (i18n[lang] && i18n[lang][key]) {
-          el.textContent = i18n[lang][key];
+        if (dict[key]) {
+          el.textContent = dict[key];
         }
       });
 
       renderScenario();
+      try { localStorage.setItem('vielotus_lang', currentLang); } catch (_) {}
     }
 
     function copyText(text, btn) {
+      if (!navigator.clipboard) return;
       navigator.clipboard.writeText(text).then(() => {
-        const original = btn.textContent;
-        btn.textContent = currentLang === 'en' ? 'Copied' : 'Đã chép';
-        setTimeout(() => { btn.textContent = original; }, 1800);
+        const prev = btn.textContent;
+        btn.textContent = currentLang === 'en' ? 'Copied!' : 'Đã chép!';
+        setTimeout(() => { btn.textContent = prev; }, 1600);
       });
-    }
-
-    function copyBrew(btn) {
-      copyText('brew install stevedat/tap/vielotus', btn);
     }
 
     function toggleVietQR() {
       const box = document.getElementById('vietqr-box');
-      box.classList.toggle('open');
-      if (box.classList.contains('open')) {
-        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
+      if (box) box.classList.toggle('open');
     }
 
-    (function init() {
+    // Initialize interactive stage & language preference
+    renderScenario();
+    try {
       const saved = localStorage.getItem('vielotus_lang');
-      if (saved === 'en' || saved === 'vi') {
-        setLang(saved);
-      } else {
-        renderScenario();
-      }
+      if (saved === 'en' || saved === 'vi') setLang(saved);
+    } catch (_) {}
 
+    // Resolve latest GitHub release asset download links dynamically
+    (function resolveReleaseAssets() {
       fetch('https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest')
         .then(r => r.ok ? r.json() : null)
         .then(rel => {
@@ -1953,10 +2206,11 @@
           rel.assets.forEach(asset => {
             if (!asset || !asset.name || !asset.browser_download_url) return;
             if (asset.name === 'VieLotusIM.pkg') {
-              const btnPkg = document.getElementById('btn-download-pkg');
               const rowPkg = document.getElementById('link-mac-pkg');
-              if (btnPkg) btnPkg.href = asset.browser_download_url;
               if (rowPkg) rowPkg.href = asset.browser_download_url;
+            } else if (asset.name === 'VieLotusIM.app.zip') {
+              const rowZip = document.getElementById('link-mac-zip');
+              if (rowZip) rowZip.href = asset.browser_download_url;
             } else if (asset.name === 'VieLotus-Setup-x64.exe') {
               const rowExe = document.getElementById('link-win-exe');
               if (rowExe) rowExe.href = asset.browser_download_url;

@@ -266,7 +266,7 @@ if ($makeappx) {
 
     $outBundle = "$msixDistDir\VieLotus_$Version.0_x64_arm64.msixbundle"
     if (Test-Path $outBundle) { Remove-Item $outBundle -Force }
-    & $makeappx bundle /d $bundleInputDir /p $outBundle /o | Out-Null
+    & $makeappx bundle /d $bundleInputDir /p $outBundle /bv "$Version.0" /o | Out-Null
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✅ Đã tạo gói Microsoft Store MSIXBundle tại: $outBundle" -ForegroundColor Cyan
     }
