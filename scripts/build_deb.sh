@@ -283,6 +283,40 @@ PYEOF
     # 6. Desktop Application Launcher, GUI/CLI Settings Utility & AppStream Metadata
     install_desktop_integration "${pkg_dir}"
 
+    # 7. System-wide Fontconfig rule for Vietnamese Latin Extended Additional (U+1EA0..U+1EF9: ệ, ộ, ậ, ử...)
+    mkdir -p "${pkg_dir}/etc/fonts/conf.d"
+    cat <<'FC_SYS_EOF' > "${pkg_dir}/etc/fonts/conf.d/64-vielotus-vietnamese.conf"
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <alias>
+    <family>Ubuntu</family>
+    <prefer>
+      <family>Noto Sans</family>
+      <family>DejaVu Sans</family>
+      <family>Ubuntu</family>
+    </prefer>
+  </alias>
+  <alias>
+    <family>Ubuntu Sans</family>
+    <prefer>
+      <family>Noto Sans</family>
+      <family>DejaVu Sans</family>
+      <family>Ubuntu Sans</family>
+    </prefer>
+  </alias>
+  <alias>
+    <family>sans-serif</family>
+    <prefer>
+      <family>Noto Sans</family>
+      <family>DejaVu Sans</family>
+      <family>Ubuntu</family>
+      <family>Ubuntu Sans</family>
+    </prefer>
+  </alias>
+</fontconfig>
+FC_SYS_EOF
+
     local installed_size
     installed_size=$(du -sk "${pkg_dir}" | awk '{print $1}')
 
@@ -295,8 +329,8 @@ Architecture: ${target_arch}
 Installed-Size: ${installed_size}
 Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
 Homepage: https://github.com/stevedat/VieLotus-IM
-Depends: libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3, python3-gi, gir1.2-gtk-3.0
-Recommends: ibus | fcitx5, im-config, zenity, fonts-noto-core | fonts-dejavu-core, fonts-ubuntu-classic
+Depends: libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3, python3-gi, gir1.2-gtk-3.0, fonts-dejavu-core | fonts-noto-core
+Recommends: ibus | fcitx5, im-config, zenity, fonts-noto-core, fonts-dejavu-core, fonts-ubuntu-classic
 Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
 Provides: fcitx5-vielotus, ibus-vielotus
 Enhances: fcitx5, ibus, language-selector-common

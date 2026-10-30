@@ -53,6 +53,7 @@ subprocess.call([\"ibus\", \"write-cache\"], stdout=subprocess.DEVNULL, stderr=s
         if [ "${1:-}" = "purge" ] && [ -n "${TARGET_HOME}" ]; then
             rm -rf "${TARGET_HOME}/.config/vielotus" \
                    "${TARGET_HOME}/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf" \
+                   "${TARGET_HOME}/.local/share/fonts/vielotus" \
                    "${TARGET_HOME}/.local/share/fcitx5/addon/vielotus.conf" \
                    "${TARGET_HOME}/.local/share/fcitx5/inputmethod/vielotus-telex.conf" \
                    "${TARGET_HOME}/.local/share/fcitx5/inputmethod/vielotus-vni.conf" 2>/dev/null || true
