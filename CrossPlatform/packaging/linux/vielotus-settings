@@ -4,6 +4,7 @@
 # Supports both Fcitx5 (fcitx5-configtool) and IBus (GNOME Input Sources)
 # ==============================================================================
 
+export LD_LIBRARY_PATH="/usr/lib:/usr/lib/vielotus:${LD_LIBRARY_PATH:-}"
 UID_CUR="$(id -u 2>/dev/null || echo 1000)"
 CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
 DATA_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}"
@@ -710,6 +711,230 @@ tab_settings.pack_start(strip_box, False, False, 0)
 stack.add_titled(tab_settings, "settings", "Cài đặt")
 
 # ==============================================================================
+# TAB 2: PHÒNG LAB (Kiểm chứng Biến đổi Tiếng Việt & Trả thô Song ngữ trực tiếp)
+# ==============================================================================
+tab_lab = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+tab_lab.set_border_width(12)
+
+import ctypes, time
+
+class _LabEngine:
+    def __init__(self):
+        self.lib = None
+        for p in ("/usr/lib/libVieLotusCAPI.so", "libVieLotusCAPI.so"):
+            try:
+                self.lib = ctypes.CDLL(p)
+                break
+            except Exception:
+                pass
+        if self.lib is not None:
+            self.lib.vielotus_create_session.restype = ctypes.c_void_p
+            self.lib.vielotus_destroy_session.argtypes = [ctypes.c_void_p]
+            self.lib.vielotus_reset_session.argtypes = [ctypes.c_void_p]
+            self.lib.vielotus_set_input_method.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+            self.lib.vielotus_set_grammar_profile.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+            self.lib.vielotus_set_smart_bilingual.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+            self.lib.vielotus_set_modern_orthography.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+            self.lib.vielotus_set_quick_telex.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+            self.lib.vielotus_feed_char.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+            self.lib.vielotus_feed_char.restype = ctypes.c_int32
+            self.lib.vielotus_commit_word.argtypes = [ctypes.c_void_p]
+            self.lib.vielotus_commit_word.restype = ctypes.c_int32
+            self.lib.vielotus_is_composing.argtypes = [ctypes.c_void_p]
+            self.lib.vielotus_is_composing.restype = ctypes.c_bool
+            self.lib.vielotus_get_composing_text.argtypes = [ctypes.c_void_p]
+            self.lib.vielotus_get_composing_text.restype = ctypes.c_char_p
+            self.lib.vielotus_get_raw_text.argtypes = [ctypes.c_void_p]
+            self.lib.vielotus_get_raw_text.restype = ctypes.c_char_p
+            self.lib.vielotus_get_last_text.argtypes = [ctypes.c_void_p]
+            self.lib.vielotus_get_last_text.restype = ctypes.c_char_p
+            self.lib.vielotus_get_last_is_override.argtypes = [ctypes.c_void_p]
+            self.lib.vielotus_get_last_is_override.restype = ctypes.c_bool
+            self.lib.vielotus_append_context.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+
+    def trace_keys(self, keystrokes, context_str="", is_vni=False, quick_telex=False):
+        if self.lib is None:
+            return [], "", "Không nạp được /usr/lib/libVieLotusCAPI.so", 0.0
+        s = self.lib.vielotus_create_session()
+        self.lib.vielotus_set_input_method(s, 1 if is_vni else 0)
+        self.lib.vielotus_set_grammar_profile(s, 1)
+        self.lib.vielotus_set_smart_bilingual(s, True)
+        self.lib.vielotus_set_modern_orthography(s, True)
+        self.lib.vielotus_set_quick_telex(s, bool(quick_telex))
+        if context_str.strip():
+            for w in context_str.strip().split():
+                self.lib.vielotus_append_context(s, w.encode("utf-8"))
+
+        steps = []
+        final_out = []
+        last_preedit = ""
+        t0 = time.perf_counter()
+
+        for idx, ch in enumerate(keystrokes, 1):
+            cp = ord(ch)
+            is_alpha = ("a" <= ch <= "z") or ("A" <= ch <= "Z")
+            is_digit = "0" <= ch <= "9"
+            composing_before = bool(self.lib.vielotus_is_composing(s))
+            raw_before = (self.lib.vielotus_get_raw_text(s) or b"").decode("utf-8", "replace")
+            pre_before = (self.lib.vielotus_get_composing_text(s) or b"").decode("utf-8", "replace")
+            is_word_char = is_alpha or (is_vni and is_digit and composing_before)
+
+            if not is_word_char:
+                if composing_before:
+                    self.lib.vielotus_feed_char(s, cp)
+                    committed = (self.lib.vielotus_get_last_text(s) or b"").decode("utf-8", "replace")
+                    override = bool(self.lib.vielotus_get_last_is_override(s))
+                    self.lib.vielotus_reset_session(s)
+                    out_token = committed + ch
+                    final_out.append(out_token)
+                    restored = override or (committed.lower() == raw_before.lower() and pre_before.lower() != committed.lower())
+                    mode_lbl = "🔄 Trả thô EN (Restore Raw)" if restored else "🇻🇳 Biến đổi VN (Transform)"
+                    steps.append((str(idx), "␣" if ch == " " else ch, raw_before, pre_before, out_token, mode_lbl))
+                else:
+                    self.lib.vielotus_feed_char(s, cp)
+                    final_out.append(ch)
+                    steps.append((str(idx), "␣" if ch == " " else ch, "", "", ch, "⏩ Ký tự phân cách"))
+            else:
+                act = self.lib.vielotus_feed_char(s, cp)
+                raw_now = (self.lib.vielotus_get_raw_text(s) or b"").decode("utf-8", "replace")
+                pre_now = (self.lib.vielotus_get_composing_text(s) or b"").decode("utf-8", "replace")
+                last_preedit = pre_now
+                if act == 3:
+                    committed = (self.lib.vielotus_get_last_text(s) or b"").decode("utf-8", "replace")
+                    self.lib.vielotus_reset_session(s)
+                    final_out.append(committed)
+                    steps.append((str(idx), ch, raw_now, pre_now, committed, "⚡ Commit trực tiếp"))
+                else:
+                    changed = pre_now.lower() != raw_now.lower()
+                    mode_lbl = "🇻🇳 Đang biến đổi dấu" if changed else "⌨️ Đang thu thập phím"
+                    steps.append((str(idx), ch, raw_now, pre_now, "(đang gõ)", mode_lbl))
+
+        if self.lib.vielotus_is_composing(s):
+            raw_before = (self.lib.vielotus_get_raw_text(s) or b"").decode("utf-8", "replace")
+            pre_before = (self.lib.vielotus_get_composing_text(s) or b"").decode("utf-8", "replace")
+            last_preedit = pre_before
+            self.lib.vielotus_commit_word(s)
+            committed = (self.lib.vielotus_get_last_text(s) or b"").decode("utf-8", "replace")
+            override = bool(self.lib.vielotus_get_last_is_override(s))
+            final_out.append(committed)
+            restored = override or (committed.lower() == raw_before.lower() and pre_before.lower() != committed.lower())
+            mode_lbl = "🔄 Trả thô EN (Restore Raw)" if restored else "🇻🇳 Biến đổi VN (Transform)"
+            steps.append(("Commit", "⏎", raw_before, pre_before, committed, mode_lbl))
+
+        dt_us = (time.perf_counter() - t0) * 1e6 / max(len(keystrokes), 1)
+        self.lib.vielotus_destroy_session(s)
+        return steps, last_preedit, "".join(final_out), dt_us
+
+lab_engine = _LabEngine()
+
+lab_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+entry_keys = Gtk.Entry()
+entry_keys.set_placeholder_text("Gõ chuỗi phím (VD: vieetj window theres sex turn)...")
+entry_keys.set_text("vieetj nam window theres ")
+entry_ctx = Gtk.Entry()
+entry_ctx.set_width_chars(12)
+entry_ctx.set_placeholder_text("Ngữ cảnh EN...")
+btn_suite = Gtk.Button(label="▶ Chạy 20 Ca Chuẩn")
+lab_top.pack_start(entry_keys, True, True, 0)
+lab_top.pack_start(entry_ctx, False, False, 0)
+lab_top.pack_end(btn_suite, False, False, 0)
+tab_lab.pack_start(lab_top, False, False, 0)
+
+presets_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+for p_lbl, p_keys, p_ctx in (
+    ("🇻🇳 vieetj nam", "vieetj nam ", ""),
+    ("🔄 window theres", "window theres making ", ""),
+    ("⚖️ turn/sex (Không ctx → VN)", "turn sex ", ""),
+    ("⚖️ turn/sex (Có ctx EN → Trả thô)", "turn sex ", "please"),
+    ("💻 print(vieetj)", "print(vieetj)", ""),
+):
+    pb = Gtk.Button(label=p_lbl)
+    def _on_preset(_b, k=p_keys, c=p_ctx):
+        entry_ctx.set_text(c)
+        entry_keys.set_text(k)
+    pb.connect("clicked", _on_preset)
+    presets_bar.pack_start(pb, True, True, 0)
+tab_lab.pack_start(presets_bar, False, False, 0)
+
+lbl_lab_summary = Gtk.Label()
+lbl_lab_summary.set_xalign(0)
+lbl_lab_summary.get_style_context().add_class("bento-strip")
+tab_lab.pack_start(lbl_lab_summary, False, False, 0)
+
+lab_store = Gtk.ListStore(str, str, str, str, str, str)
+lab_tree = Gtk.TreeView(model=lab_store)
+for col_i, col_title in enumerate(("Bước/Ca", "Phím", "Bộ đệm thô (Raw)", "Biến đổi (Preedit VN)", "Kết quả (Output)", "Cơ chế")):
+    renderer = Gtk.CellRendererText()
+    col = Gtk.TreeViewColumn(col_title, renderer, text=col_i)
+    col.set_resizable(True)
+    lab_tree.append_column(col)
+
+lab_scroll = Gtk.ScrolledWindow()
+lab_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+lab_scroll.add(lab_tree)
+tab_lab.pack_start(lab_scroll, True, True, 0)
+
+def refresh_lab_trace(*_):
+    keys = entry_keys.get_text()
+    ctx = entry_ctx.get_text()
+    steps, last_pre, final_str, dt_us = lab_engine.trace_keys(
+        keys, ctx, cfg["INPUT_METHOD"] == "vni", cfg["QUICK_TELEX"] == "true"
+    )
+    lab_store.clear()
+    for row in steps:
+        lab_store.append(list(row))
+    lbl_lab_summary.set_markup(
+        f"<span size='small' weight='bold' foreground='#1c1c1e'>Đầu ra:</span> "
+        f"<tt><span weight='bold' foreground='#007aff'>{GLib.markup_escape_text(final_str)}</span></tt>   "
+        f"<span size='small' foreground='#6e6e73'>(Ngữ cảnh: '{GLib.markup_escape_text(ctx or 'trống')}' • {dt_us:.1f} µs/phím)</span>"
+    )
+
+def run_lab_suite(*_):
+    cases = [
+        ("VN Transform", "vieetj ", "", "việt "),
+        ("VN Transform", "tieengs ", "", "tiếng "),
+        ("VN Transform", "nguwowif ", "", "người "),
+        ("VN Transform", "duwowcj ", "", "được "),
+        ("VN Transform", "hoaf ", "", "hoà "),
+        ("EN Restore Raw", "window ", "", "window "),
+        ("EN Restore Raw", "theres ", "", "theres "),
+        ("EN Restore Raw", "making ", "", "making "),
+        ("EN Restore Raw", "work ", "", "work "),
+        ("EN Restore Raw", "issue ", "", "issue "),
+        ("EN Restore Raw", "feature ", "", "feature "),
+        ("EN Restore Raw", "awesome ", "", "awesome "),
+        ("VN Collision (No Ctx)", "turn ", "", "tủn "),
+        ("VN Collision (No Ctx)", "sex ", "", "sẽ "),
+        ("VN Collision (No Ctx)", "law ", "", "lă "),
+        ("EN Collision (With Ctx)", "turn ", "please", "turn "),
+        ("EN Collision (With Ctx)", "sex ", "have", "sex "),
+        ("EN Collision (With Ctx)", "law ", "the", "law "),
+        ("Code Delimiter", "print(", "", "print("),
+        ("Trailing Cancel", "uwow", "", "uow"),
+    ]
+    lab_store.clear()
+    passed = 0
+    for cat, k, c, exp in cases:
+        steps, _, out, _ = lab_engine.trace_keys(k, c, False, False)
+        pre_mid = steps[-1][3] if steps else ""
+        ok = (out == exp)
+        if ok:
+            passed += 1
+        mech = "🔄 Trả thô EN" if out.strip().lower() == k.strip().lower() and pre_mid.lower() != out.strip().lower() else "🇻🇳 Biến đổi VN"
+        status = f"✅ PASS ({mech})" if ok else f"❌ FAIL (kỳ vọng '{exp}')"
+        lab_store.append([cat, f"ctx='{c}'" if c else "(no ctx)", k.strip(), pre_mid, out, status])
+    lbl_lab_summary.set_markup(
+        f"<span size='small' weight='bold' foreground='#22c55e'>● Kết quả Bộ Kiểm Thử Chuẩn: {passed}/{len(cases)} PASS ({passed * 100.0 / len(cases):.1f}%)</span>"
+    )
+
+entry_keys.connect("changed", refresh_lab_trace)
+entry_ctx.connect("changed", refresh_lab_trace)
+btn_suite.connect("clicked", run_lab_suite)
+refresh_lab_trace()
+
+stack.add_titled(tab_lab, "lab", "Phòng Lab")
+
+# ==============================================================================
 # TAB 2: VỀ ỨNG DỤNG (Matches macOS aboutTabView + NidoOffice & YouPersona.com)
 # ==============================================================================
 tab_about = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -860,9 +1085,178 @@ if smoke_mode:
         Gtk.main_quit()
         return False
     GLib.timeout_add(150, _smoke_step)
+elif len(sys.argv) > 2 and sys.argv[2] == "lab":
+    stack.set_visible_child_name("lab")
 
 Gtk.main()
 GTK_PYEOF
+}
+
+run_cli_lab() {
+    MODE_ARG="${1:---lab}"
+    TRACE_STR="${2:-}"
+    CTX_STR="${3:-}"
+    python3 - "${MODE_ARG}" "${TRACE_STR}" "${CTX_STR}" <<'CLI_LAB_PYEOF'
+import ctypes, sys, time
+
+lib = None
+for p in ("/usr/lib/libVieLotusCAPI.so", "libVieLotusCAPI.so"):
+    try:
+        lib = ctypes.CDLL(p)
+        break
+    except Exception:
+        pass
+
+if lib is None:
+    print("❌ Không thể nạp /usr/lib/libVieLotusCAPI.so. Hãy kiểm tra gói cài đặt vielotus.")
+    sys.exit(1)
+
+lib.vielotus_create_session.restype = ctypes.c_void_p
+lib.vielotus_destroy_session.argtypes = [ctypes.c_void_p]
+lib.vielotus_reset_session.argtypes = [ctypes.c_void_p]
+lib.vielotus_set_input_method.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+lib.vielotus_set_grammar_profile.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+lib.vielotus_set_smart_bilingual.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+lib.vielotus_set_modern_orthography.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+lib.vielotus_set_quick_telex.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+lib.vielotus_feed_char.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+lib.vielotus_feed_char.restype = ctypes.c_int32
+lib.vielotus_commit_word.argtypes = [ctypes.c_void_p]
+lib.vielotus_commit_word.restype = ctypes.c_int32
+lib.vielotus_is_composing.argtypes = [ctypes.c_void_p]
+lib.vielotus_is_composing.restype = ctypes.c_bool
+lib.vielotus_get_composing_text.argtypes = [ctypes.c_void_p]
+lib.vielotus_get_composing_text.restype = ctypes.c_char_p
+lib.vielotus_get_raw_text.argtypes = [ctypes.c_void_p]
+lib.vielotus_get_raw_text.restype = ctypes.c_char_p
+lib.vielotus_get_last_text.argtypes = [ctypes.c_void_p]
+lib.vielotus_get_last_text.restype = ctypes.c_char_p
+lib.vielotus_get_last_is_override.argtypes = [ctypes.c_void_p]
+lib.vielotus_get_last_is_override.restype = ctypes.c_bool
+lib.vielotus_append_context.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+
+def run_trace(keystrokes, context_str=""):
+    s = lib.vielotus_create_session()
+    lib.vielotus_set_input_method(s, 0)
+    lib.vielotus_set_grammar_profile(s, 1)
+    lib.vielotus_set_smart_bilingual(s, True)
+    lib.vielotus_set_modern_orthography(s, True)
+    if context_str.strip():
+        for w in context_str.strip().split():
+            lib.vielotus_append_context(s, w.encode("utf-8"))
+    steps = []
+    final_out = []
+    for idx, ch in enumerate(keystrokes, 1):
+        cp = ord(ch)
+        is_alpha = ("a" <= ch <= "z") or ("A" <= ch <= "Z")
+        composing_before = bool(lib.vielotus_is_composing(s))
+        raw_before = (lib.vielotus_get_raw_text(s) or b"").decode("utf-8", "replace")
+        pre_before = (lib.vielotus_get_composing_text(s) or b"").decode("utf-8", "replace")
+        if not is_alpha:
+            if composing_before:
+                lib.vielotus_feed_char(s, cp)
+                committed = (lib.vielotus_get_last_text(s) or b"").decode("utf-8", "replace")
+                override = bool(lib.vielotus_get_last_is_override(s))
+                lib.vielotus_reset_session(s)
+                out_token = committed + ch
+                final_out.append(out_token)
+                restored = override or (committed.lower() == raw_before.lower() and pre_before.lower() != committed.lower())
+                mode_lbl = "🔄 Trả thô EN (Restore Raw)" if restored else "🇻🇳 Biến đổi VN (Transform)"
+                steps.append((str(idx), "␣" if ch == " " else ch, raw_before, pre_before, out_token, mode_lbl))
+            else:
+                lib.vielotus_feed_char(s, cp)
+                final_out.append(ch)
+                steps.append((str(idx), "␣" if ch == " " else ch, "", "", ch, "⏩ Ký tự phân cách"))
+        else:
+            lib.vielotus_feed_char(s, cp)
+            raw_now = (lib.vielotus_get_raw_text(s) or b"").decode("utf-8", "replace")
+            pre_now = (lib.vielotus_get_composing_text(s) or b"").decode("utf-8", "replace")
+            changed = pre_now.lower() != raw_now.lower()
+            steps.append((str(idx), ch, raw_now, pre_now, "(đang gõ)", "🇻🇳 Đang biến đổi dấu" if changed else "⌨️ Đang thu thập phím"))
+    if lib.vielotus_is_composing(s):
+        raw_before = (lib.vielotus_get_raw_text(s) or b"").decode("utf-8", "replace")
+        pre_before = (lib.vielotus_get_composing_text(s) or b"").decode("utf-8", "replace")
+        lib.vielotus_commit_word(s)
+        committed = (lib.vielotus_get_last_text(s) or b"").decode("utf-8", "replace")
+        override = bool(lib.vielotus_get_last_is_override(s))
+        final_out.append(committed)
+        restored = override or (committed.lower() == raw_before.lower() and pre_before.lower() != committed.lower())
+        mode_lbl = "🔄 Trả thô EN (Restore Raw)" if restored else "🇻🇳 Biến đổi VN (Transform)"
+        steps.append(("Commit", "⏎", raw_before, pre_before, committed, mode_lbl))
+    lib.vielotus_destroy_session(s)
+    return steps, "".join(final_out)
+
+def print_trace_table(keystrokes, context_str=""):
+    steps, final_str = run_trace(keystrokes, context_str)
+    print(f"\n🔬 SOI TỪNG PHÍM: input={keystrokes!r} | context={context_str!r}")
+    print("-" * 88)
+    print(f"{'Bước':<6} | {'Phím':<4} | {'Bộ đệm thô (Raw)':<16} | {'Đang biến đổi (Preedit)':<22} | {'Xuất ra (Commit)':<14} | {'Cơ chế'}")
+    print("-" * 88)
+    for b, k, r, p, o, m in steps:
+        print(f"{b:<6} | {k:<4} | {r:<16} | {p:<22} | {o:<14} | {m}")
+    print("-" * 88)
+    print(f"👉 KẾT QUẢ CUỐI CÙNG: {final_str!r}\n")
+
+mode = sys.argv[1]
+arg_keys = sys.argv[2] if len(sys.argv) > 2 else ""
+arg_ctx = sys.argv[3] if len(sys.argv) > 3 else ""
+
+if mode == "--trace":
+    if arg_keys:
+        print_trace_table(arg_keys, arg_ctx)
+    else:
+        print("🌸 === Sen Việt Linux Lab — Chế độ Soi Từng Phím Trực Tiếp (Interactive Trace) ===")
+        print("Nhập chuỗi phím bất kỳ để xem quá trình Biến đổi (Preedit) & Trả thô (Restore Raw). Gõ 'q' để thoát.")
+        while True:
+            try:
+                line = input("\n⌨️  Nhập chuỗi phím (VD: vieetj window sex): ")
+            except EOFError:
+                break
+            if line.strip().lower() in ("q", "quit", "exit"):
+                break
+            print_trace_table(line, "")
+    sys.exit(0)
+
+print("🌸 ======================================================================================")
+print("🌸 SEN VIỆT (VIELOTUS v2.0.0) — PHÒNG LAB KIỂM CHỨNG BIẾN ĐỔI & TRẢ THÔ TRÊN LINUX")
+print("🌸 ======================================================================================")
+cases = [
+    ("transform", "vieetj ", "", "việt "),
+    ("transform", "tieengs ", "", "tiếng "),
+    ("transform", "nguwowif ", "", "người "),
+    ("transform", "duwowcj ", "", "được "),
+    ("transform", "hoaf ", "", "hoà "),
+    ("restore_raw", "window ", "", "window "),
+    ("restore_raw", "theres ", "", "theres "),
+    ("restore_raw", "making ", "", "making "),
+    ("restore_raw", "work ", "", "work "),
+    ("restore_raw", "issue ", "", "issue "),
+    ("restore_raw", "feature ", "", "feature "),
+    ("restore_raw", "awesome ", "", "awesome "),
+    ("vn_survives_collision", "turn ", "", "tủn "),
+    ("vn_survives_collision", "sex ", "", "sẽ "),
+    ("vn_survives_collision", "law ", "", "lă "),
+    ("ambiguous_needs_context", "turn ", "please", "turn "),
+    ("ambiguous_needs_context", "sex ", "have", "sex "),
+    ("ambiguous_needs_context", "law ", "the", "law "),
+    ("code_delimiter", "print(", "", "print("),
+    ("cancel_keep_composed", "uwow", "", "uow"),
+]
+print(f"{'Nhóm':<24} | {'Phím gõ':<10} | {'Ctx':<6} | {'Biến đổi giữa':<14} | {'Kết quả':<10} | {'Cơ chế':<16} | {'KQ'}")
+print("-" * 98)
+passed = 0
+for cat, k, c, exp in cases:
+    steps, out = run_trace(k, c)
+    pre_mid = steps[-1][3] if steps else ""
+    ok = (out == exp)
+    if ok:
+        passed += 1
+    mech = "🔄 Trả thô EN" if out.strip().lower() == k.strip().lower() and pre_mid.lower() != out.strip().lower() else "🇻🇳 Biến đổi VN"
+    print(f"{cat:<24} | {k.strip():<10} | {c or '-':<6} | {pre_mid:<14} | {out.strip():<10} | {mech:<16} | {'✅ PASS' if ok else '❌ FAIL'}")
+print("-" * 98)
+print(f"🎯 TỔNG KẾT: {passed}/{len(cases)} PASS ({passed * 100.0 / len(cases):.2f}%)")
+print_trace_table("vieetj window ", "")
+CLI_LAB_PYEOF
 }
 
 case "${1:-}" in
@@ -901,6 +1295,19 @@ case "${1:-}" in
         save_and_apply "${INPUT_METHOD}"
         run_gtk_settings "1"
         echo "✅ GTK3 Settings GUI smoke test PASSED."
+        exit 0
+        ;;
+    --lab)
+        run_cli_lab "--lab" "${2:-}" "${3:-}"
+        exit 0
+        ;;
+    --trace)
+        run_cli_lab "--trace" "${2:-}" "${3:-}"
+        exit 0
+        ;;
+    --lab-gui)
+        load_config
+        run_gtk_settings "lab"
         exit 0
         ;;
 esac
