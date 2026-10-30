@@ -115,7 +115,7 @@ DEB_VERSION="${VERSION}-${DEB_REV}"
 cat > "${SRC_DIR}/debian/changelog" << CHLOG
 vielotus (${DEB_VERSION}) unstable; urgency=medium
 
-  * Initial release. (Closes: #XXXXXX)
+  * Initial release. (Closes: #1152533)
   * Pure C++20 native engine — zero Swift runtime dependency.
   * Native Fcitx5 addon and IBus engine integration.
   * Smart Bilingual English-Vietnamese collision resolution.
