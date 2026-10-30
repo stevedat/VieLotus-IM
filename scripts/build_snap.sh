@@ -99,10 +99,6 @@ exec "${USER_LIB_BASE}/ibus/ibus-engine-vielotus" "\$@"
 IBUS_WRAP_EOF
 chmod 755 "${USER_LIB_BASE}/ibus/ibus-engine-vielotus-runner" 2>/dev/null || true
 
-if [ ! -x /usr/lib/ibus/ibus-engine-vielotus ] && pgrep -x ibus-daemon >/dev/null 2>&1; then
-    nohup "${USER_LIB_BASE}/ibus/ibus-engine-vielotus-runner" >/dev/null 2>&1 &
-fi
-
 ENV_D_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d"
 mkdir -p "${ENV_D_DIR}" 2>/dev/null || true
 cat <<ENV_EOF > "${ENV_D_DIR}/90-vielotus.conf" 2>/dev/null || true

@@ -168,12 +168,29 @@ finalize_linux_integration() {
 # ------------------------------------------------------------------------------
 # Distro Package Manager Dispatch
 # ------------------------------------------------------------------------------
+# Clean up any legacy user-local Snap export overrides (~/.local/lib/vielotus)
+REAL_USER="${SUDO_USER:-$(id -un)}"
+REAL_HOME="$(getent passwd "${REAL_USER}" 2>/dev/null | cut -d: -f6 || echo "${HOME}")"
+if [ -n "${REAL_HOME}" ] && [ -d "${REAL_HOME}" ]; then
+    rm -rf "${REAL_HOME}/.local/lib/vielotus" 2>/dev/null || ${SUDO} rm -rf "${REAL_HOME}/.local/lib/vielotus" 2>/dev/null || true
+    rm -f "${REAL_HOME}/.config/environment.d/90-vielotus.conf" 2>/dev/null || ${SUDO} rm -f "${REAL_HOME}/.config/environment.d/90-vielotus.conf" 2>/dev/null || true
+fi
+
+if command -v pkill >/dev/null 2>&1; then
+    ${SUDO} pkill -9 -f "ibus-engine-vielotus" >/dev/null 2>&1 || true
+    ${SUDO} pkill -9 -f "vielotus-settings" >/dev/null 2>&1 || true
+    ${SUDO} pkill -9 -f "vielotus-snap-runner" >/dev/null 2>&1 || true
+fi
+
 if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
     echo "📦 Phát hiện hệ sinh thái Debian / Ubuntu (apt)..."
     # Remove any sandboxed Snap installation so native /usr/bin/vielotus & system IBus/Fcitx5 take precedence
     if command -v snap >/dev/null 2>&1 && snap list vielotus >/dev/null 2>&1; then
         echo "🧹 Đang gỡ bản Snap cũ để đồng bộ sang gói hệ thống (.deb) chuẩn..."
-        ${SUDO} snap remove vielotus >/dev/null 2>&1 || true
+        for chg_id in $(snap changes 2>/dev/null | awk '/vielotus/ && ($2=="Doing" || $2=="Do") {print $1}'); do
+            ${SUDO} snap abort "${chg_id}" >/dev/null 2>&1 || true
+        done
+        ${SUDO} snap remove --purge vielotus >/dev/null 2>&1 || ${SUDO} snap remove vielotus >/dev/null 2>&1 || true
     fi
     PKG_DEPENDS="/usr/share/language-selector/data/pkg_depends"
     if [ -f "${PKG_DEPENDS}" ]; then
@@ -183,9 +200,9 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
     fi
     ${SUDO} apt-get update -qq || true
     ${SUDO} apt-get install -y --no-install-recommends python3-gi gir1.2-gtk-3.0 zenity fonts-noto-core fonts-dejavu-core 2>/dev/null || true
-    ${SUDO} apt-get install -y "${TMP_DEB}" || (${SUDO} dpkg -i "${TMP_DEB}" && ${SUDO} apt-get install -f -y)
+    ${SUDO} dpkg -i --force-overwrite "${TMP_DEB}" || ${SUDO} apt-get install -f -y
     if command -v fc-cache >/dev/null 2>&1; then
-        ${SUDO} fc-cache -f >/dev/null 2>&1 || true
+        nohup ${SUDO} fc-cache -f >/dev/null 2>&1 &
     fi
 elif command -v pacman >/dev/null 2>&1; then
     echo "📦 Phát hiện hệ sinh thái Arch Linux / Manjaro (pacman)..."
