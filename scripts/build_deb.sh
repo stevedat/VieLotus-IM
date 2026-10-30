@@ -285,37 +285,59 @@ PYEOF
 
     # 7. System-wide Fontconfig rule for Vietnamese Latin Extended Additional (U+1EA0..U+1EF9: ệ, ộ, ậ, ử...)
     mkdir -p "${pkg_dir}/etc/fonts/conf.d"
-    cat <<'FC_SYS_EOF' > "${pkg_dir}/etc/fonts/conf.d/64-vielotus-vietnamese.conf"
+    cat <<'FC_SYS_EOF' > "${pkg_dir}/etc/fonts/conf.d/99-vielotus-vietnamese.conf"
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <fontconfig>
-  <alias>
-    <family>Ubuntu</family>
-    <prefer>
-      <family>Noto Sans</family>
-      <family>DejaVu Sans</family>
-      <family>Ubuntu</family>
-    </prefer>
-  </alias>
-  <alias>
-    <family>Ubuntu Sans</family>
-    <prefer>
-      <family>Noto Sans</family>
-      <family>DejaVu Sans</family>
-      <family>Ubuntu Sans</family>
-    </prefer>
-  </alias>
+  <selectfont>
+    <rejectfont>
+      <glob>/usr/share/fonts/truetype/ubuntu/*</glob>
+      <glob>/var/lib/snapd/hostfs/usr/share/fonts/truetype/ubuntu/*</glob>
+      <glob>/snap/*/usr/share/fonts/truetype/ubuntu/*</glob>
+    </rejectfont>
+  </selectfont>
+  <match target="pattern">
+    <test qual="any" name="family">
+      <string>Ubuntu</string>
+    </test>
+    <edit name="family" mode="assign" binding="same">
+      <string>DejaVu Sans</string>
+    </edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family">
+      <string>Ubuntu Sans</string>
+    </test>
+    <edit name="family" mode="assign" binding="same">
+      <string>DejaVu Sans</string>
+    </edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family">
+      <string>Ubuntu Mono</string>
+    </test>
+    <edit name="family" mode="assign" binding="same">
+      <string>DejaVu Sans Mono</string>
+    </edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family">
+      <string>Ubuntu Sans Mono</string>
+    </test>
+    <edit name="family" mode="assign" binding="same">
+      <string>DejaVu Sans Mono</string>
+    </edit>
+  </match>
   <alias>
     <family>sans-serif</family>
     <prefer>
-      <family>Noto Sans</family>
       <family>DejaVu Sans</family>
-      <family>Ubuntu</family>
-      <family>Ubuntu Sans</family>
+      <family>Noto Sans</family>
     </prefer>
   </alias>
 </fontconfig>
 FC_SYS_EOF
+    cp -f "${pkg_dir}/etc/fonts/conf.d/99-vielotus-vietnamese.conf" "${pkg_dir}/etc/fonts/conf.d/64-vielotus-vietnamese.conf"
 
     local installed_size
     installed_size=$(du -sk "${pkg_dir}" | awk '{print $1}')
