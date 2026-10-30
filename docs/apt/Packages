@@ -1,0 +1,45 @@
+Package: vielotus
+Version: 2.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Installed-Size: 63216
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3, python3-gi, gir1.2-gtk-3.0, fonts-dejavu-core | fonts-noto-core
+Recommends: ibus | fcitx5, im-config, zenity, fonts-noto-core, fonts-dejavu-core, fonts-ubuntu-classic
+Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
+Provides: fcitx5-vielotus, ibus-vielotus
+Enhances: fcitx5, ibus, language-selector-common
+Description: VieLotusIM (Sen Viet) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
+ All-in-one installer containing the Pure Swift 6 Vietnamese engine core
+ (libVieLotusCAPI.so + bundled Swift runtime) alongside both native IBus
+ and Fcitx5 input method plugins for Ubuntu, Debian, Mint, and Pop!_OS.
+Filename: ./vielotus_2.0.0_amd64.deb
+Size: 16330396
+MD5sum: ed957fe4c63b8cba7a6573bc42b6fdbc
+SHA1: 008e9a4efce16fa274d513cf51195a4b43e6b119
+SHA256: de2df28fed45518d264b940579a47348ff1e5fc022ae4aafd1d044484454fcf2
+
+Package: vielotus
+Version: 2.0.0
+Section: utils
+Priority: optional
+Architecture: arm64
+Installed-Size: 62412
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3, python3-gi, gir1.2-gtk-3.0, fonts-dejavu-core | fonts-noto-core
+Recommends: ibus | fcitx5, im-config, zenity, fonts-noto-core, fonts-dejavu-core, fonts-ubuntu-classic
+Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
+Provides: fcitx5-vielotus, ibus-vielotus
+Enhances: fcitx5, ibus, language-selector-common
+Description: VieLotusIM (Sen Viet) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
+ All-in-one installer containing the Pure Swift 6 Vietnamese engine core
+ (libVieLotusCAPI.so + bundled Swift runtime) alongside both native IBus
+ and Fcitx5 input method plugins for Ubuntu, Debian, Mint, and Pop!_OS.
+Filename: ./vielotus_2.0.0_arm64.deb
+Size: 15357812
+MD5sum: 97260c8ccfaad34afed2858ed27aeed4
+SHA1: 09f22cc09b098c3ebe49a64f0bc0a1b19a540f70
+SHA256: d3cd60521a54bcda99421f2cc0fc110010a4c3b9c476e11e07683656234893b2
