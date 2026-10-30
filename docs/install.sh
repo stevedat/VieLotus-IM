@@ -17,6 +17,7 @@
 # ==============================================================================
 set -e
 
+main() {
 VERSION="${VIELOTUS_VERSION:-2.0.0}"
 OS_NAME="$(uname -s)"
 ARCH_RAW="$(uname -m)"
@@ -201,9 +202,9 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
             printf "\n# Sen Việt (VieLotusIM) Vietnamese Input Method\nim:vi::vielotus\nim:vi:fcitx5:fcitx5-vielotus\nim:vi:ibus:ibus-vielotus\n" | ${SUDO} tee -a "${PKG_DEPENDS}" >/dev/null || true
         fi
     fi
-    ${SUDO} apt-get update -qq || true
-    ${SUDO} apt-get install -y --no-install-recommends python3-gi gir1.2-gtk-3.0 zenity fonts-noto-core fonts-dejavu-core 2>/dev/null || true
-    ${SUDO} dpkg -i --force-overwrite "${TMP_DEB}" || ${SUDO} apt-get install -f -y
+    ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
+    ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-gi gir1.2-gtk-3.0 zenity fonts-noto-core fonts-dejavu-core 2>/dev/null || true
+    ${SUDO} env DEBIAN_FRONTEND=noninteractive dpkg -i --force-overwrite "${TMP_DEB}" || ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -f -y
     if command -v fc-cache >/dev/null 2>&1; then
         nohup ${SUDO} fc-cache -f >/dev/null 2>&1 &
     fi
@@ -248,3 +249,6 @@ echo "  • Chuyển sang kiểu gõ Telex     : vielotus --telex"
 echo "  • Chuyển sang kiểu gõ VNI       : vielotus --vni"
 echo "  • Xem trạng thái hiện tại       : vielotus --status"
 echo "======================================================================"
+}
+
+main "$@"
