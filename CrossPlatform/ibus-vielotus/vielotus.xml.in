@@ -18,7 +18,7 @@
     <engines>
         <engine>
             <name>vielotus</name>
-            <longname>Tiếng Việt (Sen Việt - Telex)</longname>
+            <longname>Sen Việt - Telex</longname>
             <description>Bộ gõ tiếng Việt Sen Việt thế hệ mới (Telex)</description>
             <language>vi</language>
             <license>MIT</license>
@@ -31,7 +31,7 @@
         </engine>
         <engine>
             <name>vielotus-vni</name>
-            <longname>Tiếng Việt (Sen Việt - VNI)</longname>
+            <longname>Sen Việt - VNI</longname>
             <description>Bộ gõ tiếng Việt Sen Việt thế hệ mới (VNI)</description>
             <language>vi</language>
             <license>MIT</license>

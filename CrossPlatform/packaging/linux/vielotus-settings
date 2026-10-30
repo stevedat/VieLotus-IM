@@ -318,11 +318,11 @@ def get_sources_list(key):
     except Exception:
         return []
 
+legacy_vn = ("vielotus", "vielotus-vni", "Unikey", "unikey", "bamboo", "Bamboo", "BambooUs")
 sources = get_sources_list("sources")
+sources = [s for s in sources if not (s[0] == "ibus" and s[1] in legacy_vn) and not (s[0] == "xkb" and s[1] == "vn")]
 if not sources:
     sources = [("xkb", "us")]
-
-sources = [s for s in sources if not (s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni"))]
 sources.insert(0, ("ibus", engine_id))
 formatted_sources = "[" + ", ".join(f"('{k}', '{v}')" for k, v in sources) + "]"
 subprocess.call(
@@ -332,7 +332,7 @@ subprocess.call(
 )
 
 mru = get_sources_list("mru-sources")
-mru = [s for s in mru if not (s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni"))]
+mru = [s for s in mru if not (s[0] == "ibus" and s[1] in legacy_vn) and not (s[0] == "xkb" and s[1] == "vn")]
 mru.insert(0, ("ibus", engine_id))
 for s in sources:
     if s not in mru:
