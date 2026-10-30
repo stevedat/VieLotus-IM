@@ -1,4 +1,4 @@
-From: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+From: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
 Subject: [PATCH] data/pkg_depends: Register ibus-vielotus and fcitx5-vielotus for Vietnamese (vi)
 
 Registers the split packages `ibus-vielotus` (when `ibus` is active) and
