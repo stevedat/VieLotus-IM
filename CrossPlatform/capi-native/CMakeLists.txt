@@ -41,10 +41,11 @@ if(EXISTS "${CORE_CPP_SRC}")
 else()
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
         set(DEB_ARCH "arm64")
+        set(MULTIARCH_DIR "aarch64-linux-gnu")
     else()
         set(DEB_ARCH "amd64")
+        set(MULTIARCH_DIR "x86_64-linux-gnu")
     endif()
-    set(PREBUILT_SO "${REPO_ROOT}/Binaries/linux/libVieLotusCAPI.so")
     set(PREBUILT_DEB "${REPO_ROOT}/Binaries/linux/libvielotus0_2.0.0_${DEB_ARCH}.deb")
     set(OUT_SO "${CMAKE_CURRENT_BINARY_DIR}/libVieLotusCAPI.so.0.2.0")
 
@@ -53,10 +54,12 @@ else()
                "${CMAKE_CURRENT_BINARY_DIR}/libVieLotusCAPI.so.0"
                "${CMAKE_CURRENT_BINARY_DIR}/libVieLotusCAPI.so"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/extracted"
-        COMMAND sh -c "if [ -f '${PREBUILT_SO}' ]; then cp '${PREBUILT_SO}' '${OUT_SO}'; else dpkg-deb -x '${PREBUILT_DEB}' '${CMAKE_CURRENT_BINARY_DIR}/extracted' && cp '${CMAKE_CURRENT_BINARY_DIR}/extracted'/usr/lib/*/libVieLotusCAPI.so.0 '${OUT_SO}'; fi"
+        COMMAND dpkg-deb -x "${PREBUILT_DEB}" "${CMAKE_CURRENT_BINARY_DIR}/extracted"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_BINARY_DIR}/extracted/usr/lib/${MULTIARCH_DIR}/libVieLotusCAPI.so.0" "${OUT_SO}"
         COMMAND ${CMAKE_COMMAND} -E create_symlink "libVieLotusCAPI.so.0.2.0" "${CMAKE_CURRENT_BINARY_DIR}/libVieLotusCAPI.so.0"
         COMMAND ${CMAKE_COMMAND} -E create_symlink "libVieLotusCAPI.so.0" "${CMAKE_CURRENT_BINARY_DIR}/libVieLotusCAPI.so"
         COMMENT "Staging prebuilt libVieLotusCAPI.so (${DEB_ARCH})"
+        VERBATIM
     )
     add_custom_target(VieLotusCAPI ALL
         DEPENDS "${OUT_SO}"
