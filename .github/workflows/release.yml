@@ -172,9 +172,9 @@ jobs:
           if [ -f Binaries/windows/VieLotus-Store-Setup.exe ]; then
             cp Binaries/windows/VieLotus-Store-Setup.exe .build/dist/
           fi
-          cp Binaries/linux/*.deb .build/dist/
+          cp Binaries/linux/vielotus_*.deb .build/dist/
           cd .build/dist
-          shasum -a 256 VieLotusIM.pkg VieLotus-Store-Setup.exe VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe *.deb > checksums.sha256
+          shasum -a 256 VieLotusIM.pkg VieLotus-Store-Setup.exe VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe vielotus_*.deb > checksums.sha256
           cat checksums.sha256
 
       - name: Prepare Release Notes Body
