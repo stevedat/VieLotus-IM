@@ -202,6 +202,9 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
             printf "\n# Sen Việt (VieLotusIM) Vietnamese Input Method\nim:vi::vielotus\nim:vi:fcitx5:fcitx5-vielotus\nim:vi:ibus:ibus-vielotus\n" | ${SUDO} tee -a "${PKG_DEPENDS}" >/dev/null || true
         fi
     fi
+    if [ -d /etc/apt/sources.list.d ]; then
+        echo "deb [trusted=yes] https://github.com/stevedat/VieLotus-IM/releases/latest/download ./" | ${SUDO} tee /etc/apt/sources.list.d/vielotus.list >/dev/null || true
+    fi
     ${SUDO} rm -f /var/cache/apt/archives/vielotus* 2>/dev/null || true
     ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
     ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-gi gir1.2-gtk-3.0 zenity fonts-noto-core fonts-dejavu-core 2>/dev/null || true
