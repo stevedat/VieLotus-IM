@@ -1,6 +1,8 @@
-vielotus (2.0.0-1) noble; urgency=medium
+vielotus (2.0.0-1) unstable; urgency=medium
 
+  * Initial release. (Closes: #1152533)
   * Official multi-architecture (amd64 & arm64) release of Sen Việt (VieLotusIM).
+  * Pure C++20 native engine — zero Swift runtime dependency.
   * Native Fcitx5 addon (vielotus-telex, vielotus-vni) and IBus engine integration.
   * Ubuntu Language Support (language-selector-common) auto-registration for Vietnamese (vi).
 
