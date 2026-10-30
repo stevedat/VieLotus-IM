@@ -1,0 +1,56 @@
+# Maintainer: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+pkgname=vielotus
+pkgver=2.0.0
+pkgrel=1
+pkgdesc="Sen Việt (VieLotusIM) — Next-Gen Vietnamese Input Method for IBus & Fcitx5 (Pure C++20 Native Engine)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/stevedat/VieLotus-IM"
+license=('GPL-3.0-or-later')
+depends=('glibc' 'gcc-libs' 'glib2' 'ibus' 'fcitx5' 'python' 'python-gobject' 'gtk3')
+makedepends=('cmake' 'pkgconf' 'fcitx5')
+provides=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
+conflicts=('vielotus-bin')
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/stevedat/VieLotus-IM/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "${srcdir}/VieLotus-IM-${pkgver}"
+
+    cmake -S CrossPlatform/capi-native -B build-core \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr
+    cmake --build build-core
+
+    cmake -S CrossPlatform/fcitx5-vielotus -B build-fcitx5 \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DVIELOTUS_LIB_DIR="${PWD}/build-core" \
+        -DVIELOTUS_INCLUDE_DIR="${PWD}/Sources/VieLotusCAPI/include"
+    cmake --build build-fcitx5
+
+    cmake -S CrossPlatform/ibus-vielotus -B build-ibus \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DVIELOTUS_LIB_DIR="${PWD}/build-core" \
+        -DVIELOTUS_INCLUDE_DIR="${PWD}/Sources/VieLotusCAPI/include"
+    cmake --build build-ibus
+}
+
+package() {
+    cd "${srcdir}/VieLotus-IM-${pkgver}"
+
+    DESTDIR="${pkgdir}" cmake --install build-core
+    DESTDIR="${pkgdir}" cmake --install build-fcitx5
+    DESTDIR="${pkgdir}" cmake --install build-ibus
+
+    install -Dm644 Resources/typing-modes.yml \
+        "${pkgdir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml"
+    install -Dm755 CrossPlatform/packaging/linux/vielotus-settings \
+        "${pkgdir}/usr/bin/vielotus-settings"
+    install -Dm644 CrossPlatform/packaging/linux/vielotus.desktop \
+        "${pkgdir}/usr/share/applications/vielotus.desktop"
+    install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml \
+        "${pkgdir}/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml"
+}
