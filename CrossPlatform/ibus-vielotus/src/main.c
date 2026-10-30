@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <time.h>
 #include "vielotus.h"
 
 #define IBUS_TYPE_VIELOTUS_ENGINE (ibus_vielotus_engine_get_type())
@@ -210,6 +211,7 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
             snprintf(buf, sizeof(buf), "%s", committed);
         }
     }
+
     if (trailing_ascii && trailing_ascii[0] != '\0') {
         size_t len = strlen(buf);
         if (len < sizeof(buf) - 1) {

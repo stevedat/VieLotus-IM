@@ -4,6 +4,7 @@
 # Supports both Fcitx5 (fcitx5-configtool) and IBus (GNOME Input Sources)
 # ==============================================================================
 
+export LD_LIBRARY_PATH="/usr/lib:/usr/lib/vielotus:${LD_LIBRARY_PATH:-}"
 UID_CUR="$(id -u 2>/dev/null || echo 1000)"
 CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
 DATA_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}"
