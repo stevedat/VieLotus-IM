@@ -222,7 +222,15 @@ package_single_arch() {
 
     # 1. Core C-ABI Library & Header
     cp "${arch_bin_dir}/libVieLotusCAPI.so" "${pkg_dir}/usr/lib/"
-    cp "${ROOT_DIR}/Sources/VieLotusCAPI/include/vielotus.h" "${pkg_dir}/usr/include/vielotus.h"
+    python3 - "${ROOT_DIR}/Sources/VieLotusCAPI/include/vielotus.h" "${pkg_dir}/usr/include/vielotus.h" << 'PYEOF'
+import re, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    h = f.read()
+h = re.sub(r"// =+\n// Context-Aware Word Suggestion Engine\n// =+\n.*?(?=// =+\n// Version & Metadata)", "", h, flags=re.S)
+h = re.sub(r"\n*// =+\n// EDU-TYPE Local Loopback Bridge.*?(?=\n#ifdef __cplusplus)", "\n", h, flags=re.S)
+with open(sys.argv[2], "w", encoding="utf-8") as f:
+    f.write(h)
+PYEOF
 
     if [ -d "${arch_bin_dir}/swift-runtime" ]; then
         cp -a "${arch_bin_dir}/swift-runtime/"*.so* "${pkg_dir}/usr/lib/vielotus/" 2>/dev/null || true
@@ -264,12 +272,17 @@ package_single_arch() {
     fi
 
     # 5. Desktop resource files (typing-modes.yml only)
+    local yml_src=""
     if [ -f "${ROOT_DIR}/Resources/typing-modes.yml" ]; then
-        mkdir -p "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
-        cp "${ROOT_DIR}/Resources/typing-modes.yml" "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/"
+        yml_src="${ROOT_DIR}/Resources/typing-modes.yml"
+    elif [ -f "${ROOT_DIR}/CrossPlatform/resources/typing-modes.yml" ]; then
+        yml_src="${ROOT_DIR}/CrossPlatform/resources/typing-modes.yml"
     elif [ -f "${ROOT_DIR}/Sources/VieLotusCore/Resources/typing-modes.yml" ]; then
+        yml_src="${ROOT_DIR}/Sources/VieLotusCore/Resources/typing-modes.yml"
+    fi
+    if [ -n "${yml_src}" ]; then
         mkdir -p "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
-        cp "${ROOT_DIR}/Sources/VieLotusCore/Resources/typing-modes.yml" "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/"
+        cp "${yml_src}" "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/"
     fi
 
     # 6. Desktop Application Launcher, GUI/CLI Settings Utility & AppStream Metadata
