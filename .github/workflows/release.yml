@@ -212,7 +212,7 @@ jobs:
             .build/dist/VieLotusIM.pkg
             .build/dist/VieLotus-Store-Setup.exe
             .build/dist/VieLotus-Setup-*.exe
-            .build/dist/*.deb
+            .build/dist/vielotus_*.deb
             .build/dist/checksums.sha256
           draft: false
           prerelease: false
