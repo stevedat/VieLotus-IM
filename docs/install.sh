@@ -177,9 +177,8 @@ if [ -n "${REAL_HOME}" ] && [ -d "${REAL_HOME}" ]; then
 fi
 
 if command -v pkill >/dev/null 2>&1; then
-    ${SUDO} pkill -9 -f "ibus-engine-vielotus" >/dev/null 2>&1 || true
-    ${SUDO} pkill -9 -f "vielotus-settings" >/dev/null 2>&1 || true
-    ${SUDO} pkill -9 -f "vielotus-snap-runner" >/dev/null 2>&1 || true
+    ${SUDO} pkill -9 -f "[i]bus-engine-vielotus" >/dev/null 2>&1 || true
+    ${SUDO} pkill -9 -f "[v]ielotus-snap-runner" >/dev/null 2>&1 || true
 fi
 
 if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
