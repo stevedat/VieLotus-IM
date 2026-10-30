@@ -22,6 +22,7 @@ echo "GPG keys imported:"
 gpg --list-secret-keys --keyid-format long 2>&1 | head -8
 
 # ── PPA source packages (noble + jammy) ──
+FIRST_SERIES=true
 for series in noble jammy; do
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -61,9 +62,14 @@ CHLOG
 
     echo "   📋 Version: ${PPA_VERSION}"
 
-    # Build source-only package
+    # Build source-only package (-sa for first series, -sd for subsequent series sharing orig.tar.xz)
     cd "${SRC_DIR}"
-    dpkg-buildpackage -S -d -us -uc 2>&1 | tail -15
+    if [ "${FIRST_SERIES}" = true ]; then
+        dpkg-buildpackage -S -sa -d -us -uc 2>&1 | tail -15
+        FIRST_SERIES=false
+    else
+        dpkg-buildpackage -S -sd -d -us -uc 2>&1 | tail -15
+    fi
 
     # Sign with debsign
     cd "${SERIES_DIR}"
