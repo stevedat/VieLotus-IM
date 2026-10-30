@@ -1,19 +1,45 @@
 #!/usr/bin/make -f
 export DH_VERBOSE = 1
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
 %:
 	dh $@
 
 override_dh_auto_build:
-	swift build -c release --product VieLotusCAPI
-	cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+	cmake -B build-core -S CrossPlatform/capi-native -G Ninja \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH)
+	cmake --build build-core
+	cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DVIELOTUS_LIB_PATH=$(CURDIR)/build-core/libVieLotusCAPI.so
 	cmake --build build-fcitx5
-	cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+	cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBEXECDIR=/usr/lib/ibus \
+		-DLIBEXECDIR=/usr/lib/ibus \
+		-DVIELOTUS_LIB_PATH=$(CURDIR)/build-core/libVieLotusCAPI.so
 	cmake --build build-ibus
 
 override_dh_auto_install:
-	DESTDIR=$(CURDIR)/debian/vielotus cmake --install build-fcitx5
-	DESTDIR=$(CURDIR)/debian/vielotus cmake --install build-ibus
-	install -Dm755 .build/release/libVieLotusCAPI.so $(CURDIR)/debian/vielotus/usr/lib/libVieLotusCAPI.so
-	install -Dm644 Sources/VieLotusCAPI/include/vielotus.h $(CURDIR)/debian/vielotus/usr/include/vielotus.h
-	install -Dm644 Resources/typing-modes.yml $(CURDIR)/debian/vielotus/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml
+	DESTDIR=$(CURDIR)/debian/libvielotus0 cmake --install build-core
+	mkdir -p $(CURDIR)/debian/libvielotus0/usr/lib
+	ln -sf $(DEB_HOST_MULTIARCH)/libVieLotusCAPI.so.0 $(CURDIR)/debian/libvielotus0/usr/lib/libVieLotusCAPI.so
+	install -Dm644 Resources/typing-modes.yml \
+		$(CURDIR)/debian/libvielotus0/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml
+	DESTDIR=$(CURDIR)/debian/fcitx5-vielotus cmake --install build-fcitx5
+	DESTDIR=$(CURDIR)/debian/ibus-vielotus cmake --install build-ibus
+	install -Dm755 CrossPlatform/packaging/linux/vielotus-settings \
+		$(CURDIR)/debian/ibus-vielotus/usr/bin/vielotus-settings
+	install -Dm644 CrossPlatform/packaging/linux/vielotus.desktop \
+		$(CURDIR)/debian/ibus-vielotus/usr/share/applications/vielotus.desktop
+	install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml \
+		$(CURDIR)/debian/ibus-vielotus/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml
+
+override_dh_auto_clean:
+	rm -rf build-core build-fcitx5 build-ibus
