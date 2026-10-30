@@ -194,67 +194,12 @@ static void ibus_vielotus_engine_reset_internal(IBusVieLotusEngine *vl_engine) {
     ibus_vielotus_clear_preedit((IBusEngine *)vl_engine);
 }
 
-static void ibus_vielotus_append_trace_log(
-    const char *stage,
-    const char *raw_str,
-    const char *preedit_str,
-    const char *commit_str,
-    const char *mode_str
-) {
-    gchar *dir_path = ibus_vielotus_get_config_dir();
-    if (!dir_path) {
-        return;
-    }
-    g_mkdir_with_parents(dir_path, 0755);
-    gchar *log_path = g_build_filename(dir_path, "lab-trace.log", NULL);
-    g_free(dir_path);
-
-    struct stat st;
-    const char *open_mode = "a";
-    if (stat(log_path, &st) == 0 && st.st_size > 262144) {
-        open_mode = "w";
-    }
-    FILE *fp = fopen(log_path, open_mode);
-    g_free(log_path);
-    if (!fp) {
-        return;
-    }
-    time_t now = time(NULL);
-    struct tm tm_info;
-    char tbuf[32];
-    tbuf[0] = '\0';
-    if (localtime_r(&now, &tm_info)) {
-        strftime(tbuf, sizeof(tbuf), "%H:%M:%S", &tm_info);
-    }
-    fprintf(
-        fp,
-        "[%s] %-7s | raw=\"%s\" | preedit=\"%s\" | commit=\"%s\" | %s\n",
-        tbuf,
-        stage ? stage : "",
-        raw_str ? raw_str : "",
-        preedit_str ? preedit_str : "",
-        commit_str ? commit_str : "",
-        mode_str ? mode_str : ""
-    );
-    fclose(fp);
-}
-
 static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const char *trailing_ascii) {
     IBusEngine *engine = (IBusEngine *)vl_engine;
     char buf[1024];
-    char raw_before[512];
-    char pre_before[512];
     buf[0] = '\0';
-    raw_before[0] = '\0';
-    pre_before[0] = '\0';
-    gboolean is_override = FALSE;
 
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
-        const char *r0 = vielotus_get_raw_text(vl_engine->session);
-        const char *p0 = vielotus_get_composing_text(vl_engine->session);
-        if (r0) snprintf(raw_before, sizeof(raw_before), "%s", r0);
-        if (p0) snprintf(pre_before, sizeof(pre_before), "%s", p0);
-
         if (trailing_ascii && trailing_ascii[0] != '\0' && trailing_ascii[1] == '\0') {
             uint32_t cp = (uint32_t)(unsigned char)trailing_ascii[0];
             vielotus_feed_char(vl_engine->session, cp);
@@ -262,13 +207,10 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
             vielotus_commit_word(vl_engine->session);
         }
         const char *committed = vielotus_get_last_text(vl_engine->session);
-        is_override = vielotus_get_last_is_override(vl_engine->session);
         if (committed && committed[0] != '\0') {
             snprintf(buf, sizeof(buf), "%s", committed);
         }
     }
-    char word_only[512];
-    snprintf(word_only, sizeof(word_only), "%s", buf);
 
     if (trailing_ascii && trailing_ascii[0] != '\0') {
         size_t len = strlen(buf);
@@ -278,14 +220,6 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
     }
 
     if (buf[0] != '\0') {
-        gboolean restored = is_override || (raw_before[0] != '\0' && g_strcmp0(word_only, raw_before) == 0 && g_strcmp0(pre_before, word_only) != 0);
-        ibus_vielotus_append_trace_log(
-            "COMMIT",
-            raw_before,
-            pre_before,
-            buf,
-            restored ? "TRẢ THÔ EN (Restore Raw)" : "BIẾN ĐỔI VN (Transform)"
-        );
         IBusText *commit_text = ibus_text_new_from_string(buf);
         ibus_engine_commit_text(engine, commit_text);
     }
@@ -297,15 +231,7 @@ static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
     IBusEngine *engine = (IBusEngine *)vl_engine;
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
         const char *composing = vielotus_get_composing_text(vl_engine->session);
-        const char *raw_str = vielotus_get_raw_text(vl_engine->session);
         if (composing && composing[0] != '\0') {
-            ibus_vielotus_append_trace_log(
-                "PREEDIT",
-                raw_str ? raw_str : "",
-                composing,
-                "(đang gõ)",
-                (raw_str && g_strcmp0(raw_str, composing) != 0) ? "Đang biến đổi dấu VN" : "Đang thu thập phím"
-            );
             IBusText *text = ibus_text_new_from_string(composing);
             guint char_len = ibus_text_get_length(text);
             ibus_text_append_attribute(text, IBUS_ATTR_TYPE_UNDERLINE, IBUS_ATTR_UNDERLINE_SINGLE, 0, (gint)char_len);
