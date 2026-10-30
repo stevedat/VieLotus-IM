@@ -1,9 +1,139 @@
+Package: fcitx5-vielotus
+Source: vielotus
+Version: 2.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Installed-Size: 536
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libvielotus0 (= 2.0.0), libc6, libstdc++6, libgcc-s1, libfcitx5core7, libfcitx5config6, libfcitx5utils2, fcitx5
+Recommends: fcitx5-config-qt, fonts-dejavu-core | fonts-noto-core
+Enhances: fcitx5, language-selector-common
+Description: VieLotusIM (Sen Viet) Vietnamese Input Method plugin for Fcitx5
+ Native Fcitx5 input method addon (vielotus.so) for VieLotusIM (Sen Viet),
+ supporting Telex and VNI with free-tone SEN Flex composition and Smart
+ Bilingual English-Vietnamese restoration on KDE Plasma and Fcitx5 desktops.
+Filename: ./fcitx5-vielotus_2.0.0_amd64.deb
+Size: 407696
+MD5sum: e79271c5b3e0994e4223fd54de42dbbc
+SHA1: ed518ad2811e9e67afe7faff2b140c7d16fae8e0
+SHA256: 5d8e4ef0cc89ebbe2fbda040edf4d42a4a69a43d43341389c244731845adc9e6
+
+Package: fcitx5-vielotus
+Source: vielotus
+Version: 2.0.0
+Section: utils
+Priority: optional
+Architecture: arm64
+Installed-Size: 572
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libvielotus0 (= 2.0.0), libc6, libstdc++6, libgcc-s1, libfcitx5core7, libfcitx5config6, libfcitx5utils2, fcitx5
+Recommends: fcitx5-config-qt, fonts-dejavu-core | fonts-noto-core
+Enhances: fcitx5, language-selector-common
+Description: VieLotusIM (Sen Viet) Vietnamese Input Method plugin for Fcitx5
+ Native Fcitx5 input method addon (vielotus.so) for VieLotusIM (Sen Viet),
+ supporting Telex and VNI with free-tone SEN Flex composition and Smart
+ Bilingual English-Vietnamese restoration on KDE Plasma and Fcitx5 desktops.
+Filename: ./fcitx5-vielotus_2.0.0_arm64.deb
+Size: 406848
+MD5sum: 1872e4f528ae6a53945625aa41553afd
+SHA1: b85f8256b35830a23e1c83f5b061c5aaa8829aac
+SHA256: ed972c5aab669062f1e71d54d28cf2997960b285c8ce04930bc5beb0da10fdd3
+
+Package: ibus-vielotus
+Source: vielotus
+Version: 2.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Installed-Size: 540
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libvielotus0 (= 2.0.0), libc6, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, ibus (>= 1.5), python3, python3-gi, gir1.2-gtk-3.0
+Recommends: im-config, zenity, fonts-dejavu-core | fonts-noto-core
+Enhances: ibus, language-selector-common
+Description: VieLotusIM (Sen Viet) Vietnamese Input Method plugin for IBus
+ Native IBus input method engine (ibus-engine-vielotus) for VieLotusIM
+ (Sen Viet), supporting Telex and VNI with free-tone SEN Flex composition
+ and Smart Bilingual English-Vietnamese restoration on GNOME and IBus desktops.
+Filename: ./ibus-vielotus_2.0.0_amd64.deb
+Size: 416640
+MD5sum: 9926898315b241b6e37e1c32e3afe0c6
+SHA1: de31a3a979f9ebeebb03d00d4b3eef16be96fb49
+SHA256: 61954b5153d5b9236bfb04d38ab09ee628383dfe13a4d853743677f472854365
+
+Package: ibus-vielotus
+Source: vielotus
+Version: 2.0.0
+Section: utils
+Priority: optional
+Architecture: arm64
+Installed-Size: 540
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libvielotus0 (= 2.0.0), libc6, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, ibus (>= 1.5), python3, python3-gi, gir1.2-gtk-3.0
+Recommends: im-config, zenity, fonts-dejavu-core | fonts-noto-core
+Enhances: ibus, language-selector-common
+Description: VieLotusIM (Sen Viet) Vietnamese Input Method plugin for IBus
+ Native IBus input method engine (ibus-engine-vielotus) for VieLotusIM
+ (Sen Viet), supporting Telex and VNI with free-tone SEN Flex composition
+ and Smart Bilingual English-Vietnamese restoration on GNOME and IBus desktops.
+Filename: ./ibus-vielotus_2.0.0_arm64.deb
+Size: 415872
+MD5sum: 2c7d62cd64d92ccd10f4068da9fa8107
+SHA1: fcb9ce35e9d824f66eaec99a7d6c7e800a43535e
+SHA256: 1ec120560f319118ad878e6d20791f4268fd3c50e8684b5ab5c0fe39b24a9cb2
+
+Package: libvielotus0
+Source: vielotus
+Version: 2.0.0
+Section: libs
+Priority: optional
+Architecture: amd64
+Multi-Arch: same
+Installed-Size: 260
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libc6, libstdc++6, libgcc-s1
+Description: VieLotusIM (Sen Viet) Vietnamese Input Method shared C-ABI core
+ Shared C-ABI engine library (libVieLotusCAPI.so) implementing the VieLotusIM
+ (Sen Viet) Vietnamese syllable state machine, SEN Flex free-tone Telex/VNI
+ composition, and Smart Bilingual (English-Vietnamese) collision resolution.
+Filename: ./libvielotus0_2.0.0_amd64.deb
+Size: 79988
+MD5sum: 4b515250bae2e43aa2a22bbac14bdfab
+SHA1: cb05ec221831cd21077a2ce90f0280a5b8afdd07
+SHA256: 9434112f68f550429b98612607fae5a30619f388c1b793566555ff6b8dae1fde
+
+Package: libvielotus0
+Source: vielotus
+Version: 2.0.0
+Section: libs
+Priority: optional
+Architecture: arm64
+Multi-Arch: same
+Installed-Size: 252
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libc6, libstdc++6, libgcc-s1
+Description: VieLotusIM (Sen Viet) Vietnamese Input Method shared C-ABI core
+ Shared C-ABI engine library (libVieLotusCAPI.so) implementing the VieLotusIM
+ (Sen Viet) Vietnamese syllable state machine, SEN Flex free-tone Telex/VNI
+ composition, and Smart Bilingual (English-Vietnamese) collision resolution.
+Filename: ./libvielotus0_2.0.0_arm64.deb
+Size: 74312
+MD5sum: d82f64300dc1a55fbba3524586b06aa7
+SHA1: fbbe4b692f65650b03061e2091f9c04de5b98cfb
+SHA256: 7b2a3f76b8d54c4103ddb553e2e8a546500146255f747ec89b7088312171bd4d
+
 Package: vielotus
 Version: 2.0.0
 Section: utils
 Priority: optional
 Architecture: amd64
-Installed-Size: 63216
+Installed-Size: 960
 Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
 Homepage: https://github.com/stevedat/VieLotus-IM
 Depends: libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3, python3-gi, gir1.2-gtk-3.0, fonts-dejavu-core | fonts-noto-core
@@ -12,21 +142,21 @@ Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
 Provides: fcitx5-vielotus, ibus-vielotus
 Enhances: fcitx5, ibus, language-selector-common
 Description: VieLotusIM (Sen Viet) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
- All-in-one installer containing the Pure Swift 6 Vietnamese engine core
- (libVieLotusCAPI.so + bundled Swift runtime) alongside both native IBus
- and Fcitx5 input method plugins for Ubuntu, Debian, Mint, and Pop!_OS.
+ All-in-one installer containing the native C++20 Vietnamese engine core
+ (libVieLotusCAPI.so) alongside both native IBus and Fcitx5 input method
+ plugins for Ubuntu, Debian, Mint, and Pop!_OS.
 Filename: ./vielotus_2.0.0_amd64.deb
-Size: 16330396
-MD5sum: ed957fe4c63b8cba7a6573bc42b6fdbc
-SHA1: 008e9a4efce16fa274d513cf51195a4b43e6b119
-SHA256: de2df28fed45518d264b940579a47348ff1e5fc022ae4aafd1d044484454fcf2
+Size: 524584
+MD5sum: acf59aa921252c9f7a586f4e05ccf375
+SHA1: def8465f278ed8f3cfe0f7135557883ebb4eac74
+SHA256: c3eb6c32886720c71248e90ececa71501af693b99f5c155f2655119368845f44
 
 Package: vielotus
 Version: 2.0.0
 Section: utils
 Priority: optional
 Architecture: arm64
-Installed-Size: 62412
+Installed-Size: 988
 Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
 Homepage: https://github.com/stevedat/VieLotus-IM
 Depends: libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3, python3-gi, gir1.2-gtk-3.0, fonts-dejavu-core | fonts-noto-core
@@ -35,11 +165,11 @@ Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
 Provides: fcitx5-vielotus, ibus-vielotus
 Enhances: fcitx5, ibus, language-selector-common
 Description: VieLotusIM (Sen Viet) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
- All-in-one installer containing the Pure Swift 6 Vietnamese engine core
- (libVieLotusCAPI.so + bundled Swift runtime) alongside both native IBus
- and Fcitx5 input method plugins for Ubuntu, Debian, Mint, and Pop!_OS.
+ All-in-one installer containing the native C++20 Vietnamese engine core
+ (libVieLotusCAPI.so) alongside both native IBus and Fcitx5 input method
+ plugins for Ubuntu, Debian, Mint, and Pop!_OS.
 Filename: ./vielotus_2.0.0_arm64.deb
-Size: 15357812
-MD5sum: 97260c8ccfaad34afed2858ed27aeed4
-SHA1: 09f22cc09b098c3ebe49a64f0bc0a1b19a540f70
-SHA256: d3cd60521a54bcda99421f2cc0fc110010a4c3b9c476e11e07683656234893b2
+Size: 517508
+MD5sum: da8f94ddecea6b70b4e7d97cc6f2decd
+SHA1: 4f536d5791a8dec477155dec3836b5781f297413
+SHA256: d531c579523b842c49aea634912c6b88633552c902ab8ae8a9d9b748b63d7aec

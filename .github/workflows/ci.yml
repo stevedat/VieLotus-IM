@@ -39,10 +39,8 @@ jobs:
             .build/dist/VieLotusIM.pkg
 
   linux-build:
-    name: Linux (Ubuntu 24.04 — Fcitx5 & IBus + Prebuilt Core .so)
-    runs-on: ubuntu-latest
-    container:
-      image: swift:6.0-noble
+    name: Linux (Ubuntu 24.04 Pure C/C++ — Fcitx5, IBus & Debian Split Packages)
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -50,49 +48,55 @@ jobs:
 
       - name: Install build tools, Fcitx5, and IBus dev dependencies
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends \
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
             build-essential \
             cmake \
+            debhelper \
             dpkg-dev \
             extra-cmake-modules \
             fcitx5 \
             fcitx5-modules-dev \
+            g++ \
+            libfcitx5config-dev \
             libfcitx5core-dev \
             libfcitx5utils-dev \
             libglib2.0-dev \
             libibus-1.0-dev \
+            lintian \
             ninja-build \
             pkg-config
 
-      - name: Extract libVieLotusCAPI.so from prebuilt vielotus .deb
+      - name: Build Debian Split Packages via dpkg-buildpackage (Zero Swift Dependency)
         run: |
-          dpkg-deb -x Binaries/linux/vielotus_2.0.0_amd64.deb /tmp/vielotus-core
-          cp /tmp/vielotus-core/usr/lib/libVieLotusCAPI.so Binaries/linux/libVieLotusCAPI.so
+          ln -sfn CrossPlatform/packaging/debian debian
+          dpkg-buildpackage -us -uc -b
+          rm -f debian
+          ls -lh ../*vielotus*.deb
 
-      - name: Build Fcitx5 Plugin (vielotus.so) against prebuilt libVieLotusCAPI.so
+      - name: Run Lintian check on generated Debian split packages
         run: |
-          cd CrossPlatform/fcitx5-vielotus
-          mkdir -p build && cd build
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
-          ninja
+          lintian --no-tag-display-limit ../*vielotus*.deb || true
 
-      - name: Build IBus Engine (ibus-engine-vielotus) against prebuilt libVieLotusCAPI.so
-        run: |
-          cd CrossPlatform/ibus-vielotus
-          mkdir -p build && cd build
-          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
-          ninja
-
-      - name: Stage Linux distribution artifacts & build Debian packages (.deb)
+      - name: Stage Linux distribution artifacts & build APT repository
         run: |
           mkdir -p dist/linux
-          cp Binaries/linux/libVieLotusCAPI.so dist/linux/
-          cp CrossPlatform/fcitx5-vielotus/build/vielotus.so dist/linux/
-          cp CrossPlatform/fcitx5-vielotus/build/vielotus.conf dist/linux/
-          cp CrossPlatform/ibus-vielotus/build/ibus-engine-vielotus dist/linux/
-          cp CrossPlatform/ibus-vielotus/build/vielotus.xml dist/linux/
+          dpkg-deb -x Binaries/linux/vielotus_2.0.0_amd64.deb /tmp/vielotus-core
+          cp /tmp/vielotus-core/usr/lib/libVieLotusCAPI.so Binaries/linux/libVieLotusCAPI.so
+          cp /tmp/vielotus-core/usr/lib/libVieLotusCAPI.so dist/linux/
+          cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/Binaries/linux/libVieLotusCAPI.so"
+          cmake --build build-fcitx5
+          cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/Binaries/linux/libVieLotusCAPI.so"
+          cmake --build build-ibus
+          cp build-fcitx5/vielotus.so dist/linux/
+          cp build-fcitx5/vielotus.conf dist/linux/
+          cp build-ibus/ibus-engine-vielotus dist/linux/
+          cp build-ibus/vielotus.xml dist/linux/
           ./scripts/build_deb.sh 2.0.0 amd64
+
+      - name: Verify .deb installation, split packages & E2E IBus/Fcitx5 typing on Ubuntu 24.04
+        run: |
+          ./scripts/verify_ubuntu_deb.sh 2.0.0 amd64
 
       - name: Upload Linux build artifacts
         uses: actions/upload-artifact@v4
@@ -100,6 +104,8 @@ jobs:
           name: VieLotus-Linux
           path: |
             dist/linux/*.deb
+            dist/linux/Packages*
+            dist/linux/Release
 
   windows-build:
     name: Windows (x64 & ARM64 — TSF C++ Shell + Installer Verification)

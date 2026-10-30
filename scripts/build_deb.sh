@@ -349,9 +349,9 @@ Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
 Provides: fcitx5-vielotus, ibus-vielotus
 Enhances: fcitx5, ibus, language-selector-common
 Description: VieLotusIM (Sen Viet) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
- All-in-one installer containing the Pure Swift 6 Vietnamese engine core
- (libVieLotusCAPI.so + bundled Swift runtime) alongside both native IBus
- and Fcitx5 input method plugins for Ubuntu, Debian, Mint, and Pop!_OS.
+ All-in-one installer containing the native C++20 Vietnamese engine core
+ (libVieLotusCAPI.so) alongside both native IBus and Fcitx5 input method
+ plugins for Ubuntu, Debian, Mint, and Pop!_OS.
 EOF
 
     if command -v md5sum >/dev/null 2>&1; then
@@ -361,6 +361,107 @@ EOF
     write_maintainer_scripts "${pkg_dir}"
 
     build_deb "${pkg_dir}" "${DIST_LINUX}/${pkg_name}_${VERSION}_${target_arch}.deb"
+
+    # Also build Debian/Ubuntu split packages (libvielotus0, ibus-vielotus, fcitx5-vielotus)
+    local multiarch_dir="x86_64-linux-gnu"
+    if [ "${target_arch}" = "arm64" ]; then
+        multiarch_dir="aarch64-linux-gnu"
+    fi
+
+    # 1) libvielotus0
+    local lib_dir="${DEB_BASE}/libvielotus0_${VERSION}_${target_arch}"
+    rm -rf "${lib_dir}"
+    mkdir -p "${lib_dir}/DEBIAN" "${lib_dir}/usr/lib/${multiarch_dir}" "${lib_dir}/usr/include" "${lib_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
+    cp "${arch_bin_dir}/libVieLotusCAPI.so" "${lib_dir}/usr/lib/${multiarch_dir}/libVieLotusCAPI.so.0"
+    ln -sf "libVieLotusCAPI.so.0" "${lib_dir}/usr/lib/${multiarch_dir}/libVieLotusCAPI.so"
+    ln -sf "${multiarch_dir}/libVieLotusCAPI.so.0" "${lib_dir}/usr/lib/libVieLotusCAPI.so"
+    cp "${pkg_dir}/usr/include/vielotus.h" "${lib_dir}/usr/include/vielotus.h"
+    if [ -f "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml" ]; then
+        cp "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml" "${lib_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/"
+    fi
+    local lib_size
+    lib_size=$(du -sk "${lib_dir}" | awk '{print $1}')
+    cat <<EOF > "${lib_dir}/DEBIAN/control"
+Package: libvielotus0
+Source: vielotus
+Version: ${VERSION}
+Section: libs
+Priority: optional
+Architecture: ${target_arch}
+Multi-Arch: same
+Installed-Size: ${lib_size}
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libc6, libstdc++6, libgcc-s1
+Description: VieLotusIM (Sen Viet) Vietnamese Input Method shared C-ABI core
+ Shared C-ABI engine library (libVieLotusCAPI.so) implementing the VieLotusIM
+ (Sen Viet) Vietnamese syllable state machine, SEN Flex free-tone Telex/VNI
+ composition, and Smart Bilingual (English-Vietnamese) collision resolution.
+EOF
+    build_deb "${lib_dir}" "${DIST_LINUX}/libvielotus0_${VERSION}_${target_arch}.deb"
+
+    # 2) ibus-vielotus
+    local ibus_dir="${DEB_BASE}/ibus-vielotus_${VERSION}_${target_arch}"
+    rm -rf "${ibus_dir}"
+    mkdir -p "${ibus_dir}/DEBIAN" "${ibus_dir}/usr/lib/ibus" "${ibus_dir}/usr/share/ibus/component"
+    cp "${arch_bin_dir}/ibus-engine-vielotus" "${ibus_dir}/usr/lib/ibus/"
+    cp "${DIST_LINUX}/vielotus.xml" "${ibus_dir}/usr/share/ibus/component/"
+    cp -a "${pkg_dir}/usr/share/icons" "${ibus_dir}/usr/share/" 2>/dev/null || true
+    cp -a "${pkg_dir}/usr/share/vielotus" "${ibus_dir}/usr/share/" 2>/dev/null || true
+    install_desktop_integration "${ibus_dir}"
+    local ibus_size
+    ibus_size=$(du -sk "${ibus_dir}" | awk '{print $1}')
+    cat <<EOF > "${ibus_dir}/DEBIAN/control"
+Package: ibus-vielotus
+Source: vielotus
+Version: ${VERSION}
+Section: utils
+Priority: optional
+Architecture: ${target_arch}
+Installed-Size: ${ibus_size}
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libvielotus0 (= ${VERSION}), libc6, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, ibus (>= 1.5), python3, python3-gi, gir1.2-gtk-3.0
+Recommends: im-config, zenity, fonts-dejavu-core | fonts-noto-core
+Enhances: ibus, language-selector-common
+Description: VieLotusIM (Sen Viet) Vietnamese Input Method plugin for IBus
+ Native IBus input method engine (ibus-engine-vielotus) for VieLotusIM
+ (Sen Viet), supporting Telex and VNI with free-tone SEN Flex composition
+ and Smart Bilingual English-Vietnamese restoration on GNOME and IBus desktops.
+EOF
+    build_deb "${ibus_dir}" "${DIST_LINUX}/ibus-vielotus_${VERSION}_${target_arch}.deb"
+
+    # 3) fcitx5-vielotus
+    local fcitx_dir="${DEB_BASE}/fcitx5-vielotus_${VERSION}_${target_arch}"
+    rm -rf "${fcitx_dir}"
+    mkdir -p "${fcitx_dir}/DEBIAN" "${fcitx_dir}/usr/lib/fcitx5" "${fcitx_dir}/usr/lib/${multiarch_dir}/fcitx5" "${fcitx_dir}/usr/share/fcitx5/addon" "${fcitx_dir}/usr/share/fcitx5/inputmethod"
+    cp "${arch_bin_dir}/vielotus.so" "${fcitx_dir}/usr/lib/fcitx5/"
+    ln -sf ../../fcitx5/vielotus.so "${fcitx_dir}/usr/lib/${multiarch_dir}/fcitx5/vielotus.so"
+    cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus.conf.in" "${fcitx_dir}/usr/share/fcitx5/addon/vielotus.conf"
+    cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus-telex.conf" "${fcitx_dir}/usr/share/fcitx5/inputmethod/vielotus-telex.conf"
+    cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus-vni.conf" "${fcitx_dir}/usr/share/fcitx5/inputmethod/vielotus-vni.conf"
+    cp -a "${pkg_dir}/usr/share/icons" "${fcitx_dir}/usr/share/" 2>/dev/null || true
+    local fcitx_size
+    fcitx_size=$(du -sk "${fcitx_dir}" | awk '{print $1}')
+    cat <<EOF > "${fcitx_dir}/DEBIAN/control"
+Package: fcitx5-vielotus
+Source: vielotus
+Version: ${VERSION}
+Section: utils
+Priority: optional
+Architecture: ${target_arch}
+Installed-Size: ${fcitx_size}
+Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Homepage: https://github.com/stevedat/VieLotus-IM
+Depends: libvielotus0 (= ${VERSION}), libc6, libstdc++6, libgcc-s1, libfcitx5core7, libfcitx5config6, libfcitx5utils2, fcitx5
+Recommends: fcitx5-config-qt, fonts-dejavu-core | fonts-noto-core
+Enhances: fcitx5, language-selector-common
+Description: VieLotusIM (Sen Viet) Vietnamese Input Method plugin for Fcitx5
+ Native Fcitx5 input method addon (vielotus.so) for VieLotusIM (Sen Viet),
+ supporting Telex and VNI with free-tone SEN Flex composition and Smart
+ Bilingual English-Vietnamese restoration on KDE Plasma and Fcitx5 desktops.
+EOF
+    build_deb "${fcitx_dir}" "${DIST_LINUX}/fcitx5-vielotus_${VERSION}_${target_arch}.deb"
 }
 
 package_single_arch "${ARCH}"
@@ -378,7 +479,7 @@ import datetime, gzip, hashlib, os, re, sys, tarfile
 dist_dir, version, root_dir = sys.argv[1], sys.argv[2], sys.argv[3]
 deb_files = sorted(
     f for f in os.listdir(dist_dir)
-    if f.startswith(f"vielotus_{version}_") and f.endswith(".deb")
+    if f.endswith(".deb") and f"_{version}_" in f
 )
 
 def extract_control_from_deb(deb_path):
@@ -413,9 +514,9 @@ for fname in deb_files:
     md5 = hashlib.md5(blob).hexdigest()
     sha1 = hashlib.sha1(blob).hexdigest()
     sha256 = hashlib.sha256(blob).hexdigest()
-    if "_amd64.deb" in fname:
+    if fname == f"vielotus_{version}_amd64.deb":
         arch_sha256["amd64"] = sha256
-    elif "_arm64.deb" in fname:
+    elif fname == f"vielotus_{version}_arm64.deb":
         arch_sha256["arm64"] = sha256
     ctrl = extract_control_from_deb(fpath)
     stanza = (
