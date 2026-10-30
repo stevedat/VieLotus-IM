@@ -59,6 +59,13 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
 - Run the installer and press **`Win + Space`** to select **Sen Việt**.
 
 ### 3. Linux (Ubuntu / Debian / Mint / Fedora / Arch / openSUSE — `amd64` & `arm64`)
+- **Ubuntu Official Launchpad PPA (`Ubuntu 22.04 LTS & 24.04 LTS` — `amd64` & `arm64`)**:
+  ```bash
+  sudo add-apt-repository ppa:stevedat/vielotus
+  sudo apt update
+  sudo apt install ibus-vielotus     # GNOME / Ubuntu default (IBus)
+  # or: sudo apt install fcitx5-vielotus  # KDE Plasma / Wayland (Fcitx5)
+  ```
 - **Universal one-line installer (Auto-detects `apt`, `dnf`, `pacman`, `zypper` & `x86_64` / `aarch64`)**:
   ```bash
   curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh
