@@ -834,9 +834,13 @@ entry_keys.set_text("vieetj nam window theres ")
 entry_ctx = Gtk.Entry()
 entry_ctx.set_width_chars(12)
 entry_ctx.set_placeholder_text("Ngữ cảnh EN...")
-btn_suite = Gtk.Button(label="▶ Chạy 20 Ca Chuẩn")
+btn_suite = Gtk.Button(label="▶ 20 Ca Chuẩn")
+btn_live_log = Gtk.Button(label="📥 Log Thực Tế")
+btn_copy_log = Gtk.Button(label="📋 Chép Log")
 lab_top.pack_start(entry_keys, True, True, 0)
 lab_top.pack_start(entry_ctx, False, False, 0)
+lab_top.pack_end(btn_copy_log, False, False, 0)
+lab_top.pack_end(btn_live_log, False, False, 0)
 lab_top.pack_end(btn_suite, False, False, 0)
 tab_lab.pack_start(lab_top, False, False, 0)
 
@@ -927,9 +931,70 @@ def run_lab_suite(*_):
         f"<span size='small' weight='bold' foreground='#22c55e'>● Kết quả Bộ Kiểm Thử Chuẩn: {passed}/{len(cases)} PASS ({passed * 100.0 / len(cases):.1f}%)</span>"
     )
 
+def load_live_ibus_log(*_):
+    trace_file = os.path.join(os.path.dirname(config_path), "lab-trace.log")
+    lab_store.clear()
+    if not os.path.exists(trace_file):
+        lbl_lab_summary.set_markup(
+            f"<span size='small' foreground='#6e6e73'>Chưa có log gõ thực tế tại {GLib.markup_escape_text(trace_file)} (hãy gõ vài từ ở ứng dụng bất kỳ).</span>"
+        )
+        return
+    with open(trace_file, "r", encoding="utf-8", errors="replace") as tf:
+        lines = [ln.strip() for ln in tf.readlines() if ln.strip()][-150:]
+    for idx, ln in enumerate(lines, 1):
+        parts = [p.strip() for p in ln.split("|")]
+        if len(parts) >= 5:
+            hdr = parts[0]
+            r = parts[1].replace('raw=', '').strip('"')
+            p = parts[2].replace('preedit=', '').strip('"')
+            c = parts[3].replace('commit=', '').strip('"')
+            m = parts[4]
+            lab_store.append([str(idx), hdr, r, p, c, m])
+        else:
+            lab_store.append([str(idx), "", ln, "", "", ""])
+    lbl_lab_summary.set_markup(
+        f"<span size='small' weight='bold' foreground='#007aff'>📥 Đã nạp {len(lines)} dòng log gõ thực tế từ:</span> "
+        f"<tt><span size='small'>{GLib.markup_escape_text(trace_file)}</span></tt>"
+    )
+
+def copy_and_save_lab_log(*_):
+    report_file = os.path.join(os.path.dirname(config_path), "lab-report.log")
+    trace_file = os.path.join(os.path.dirname(config_path), "lab-trace.log")
+    out_lines = [
+        "# SEN VIỆT (VIELOTUS v2.0.0) — LINUX LAB REPORT",
+        f"# Input: {entry_keys.get_text()!r} | Context: {entry_ctx.get_text()!r}",
+        f"{'Bước/Ca':<22} | {'Phím':<12} | {'Thô (Raw)':<14} | {'Biến đổi (Preedit)':<18} | {'Kết quả (Output)':<14} | {'Cơ chế'}",
+        "-" * 96,
+    ]
+    for row in lab_store:
+        out_lines.append(f"{row[0]:<22} | {row[1]:<12} | {row[2]:<14} | {row[3]:<18} | {row[4]:<14} | {row[5]}")
+    if os.path.exists(trace_file):
+        out_lines.append("\n# LIVE IBUS TYPING LOG (~/.config/vielotus/lab-trace.log):")
+        with open(trace_file, "r", encoding="utf-8", errors="replace") as tf:
+            out_lines.extend([ln.rstrip("\n") for ln in tf.readlines()[-100:]])
+    full_txt = "\n".join(out_lines) + "\n"
+    try:
+        os.makedirs(os.path.dirname(report_file), exist_ok=True)
+        with open(report_file, "w", encoding="utf-8") as rf:
+            rf.write(full_txt)
+    except Exception:
+        pass
+    try:
+        cb = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        cb.set_text(full_txt, -1)
+        btn_copy_log.set_label("✓ Đã chép")
+    except Exception:
+        pass
+    lbl_lab_summary.set_markup(
+        f"<span size='small' weight='bold' foreground='#22c55e'>✓ Đã chép vào Clipboard &amp; lưu tại:</span> "
+        f"<tt><span size='small'>{GLib.markup_escape_text(report_file)}</span></tt>"
+    )
+
 entry_keys.connect("changed", refresh_lab_trace)
 entry_ctx.connect("changed", refresh_lab_trace)
 btn_suite.connect("clicked", run_lab_suite)
+btn_live_log.connect("clicked", load_live_ibus_log)
+btn_copy_log.connect("clicked", copy_and_save_lab_log)
 refresh_lab_trace()
 
 stack.add_titled(tab_lab, "lab", "Phòng Lab")
@@ -1308,6 +1373,21 @@ case "${1:-}" in
     --lab-gui)
         load_config
         run_gtk_settings "lab"
+        exit 0
+        ;;
+    --log)
+        echo "📂 === Đường dẫn các tệp Log của Sen Việt trên Linux ==="
+        echo "  • Log gõ thực tế (IBus Live Trace) : ${CONFIG_DIR}/lab-trace.log"
+        echo "  • Báo cáo Phòng Lab (Lab Report)   : ${CONFIG_DIR}/lab-report.log"
+        echo "  • Log khởi chạy GUI (Settings Log) : ${LOG_FILE}"
+        echo "----------------------------------------------------------------------"
+        if [ -f "${CONFIG_DIR}/lab-trace.log" ]; then
+            echo "📝 [100 dòng gần nhất trong ${CONFIG_DIR}/lab-trace.log]:"
+            tail -n 100 "${CONFIG_DIR}/lab-trace.log"
+        else
+            echo "ℹ️  Chưa có ${CONFIG_DIR}/lab-trace.log — đang chạy thử Phòng Lab để tạo log mẫu..."
+            run_cli_lab "--lab" | tee "${CONFIG_DIR}/lab-report.log"
+        fi
         exit 0
         ;;
 esac
