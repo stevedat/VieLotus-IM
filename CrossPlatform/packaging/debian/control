@@ -8,14 +8,14 @@ Build-Depends:
  extra-cmake-modules,
  g++ (>= 4:11),
  ninja-build,
- pkg-config | pkgconf,
+ pkgconf,
  fcitx5-modules-dev,
  libfcitx5config-dev,
  libfcitx5core-dev,
  libfcitx5utils-dev,
  libibus-1.0-dev,
  libglib2.0-dev
-Standards-Version: 4.6.2
+Standards-Version: 4.7.2
 Homepage: https://github.com/stevedat/VieLotus-IM
 Vcs-Git: https://github.com/stevedat/VieLotus-IM.git
 Vcs-Browser: https://github.com/stevedat/VieLotus-IM
