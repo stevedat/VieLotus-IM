@@ -279,57 +279,113 @@ ENV_EOF
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <fontconfig>
-  <alias>
-    <family>Ubuntu</family>
-    <prefer>
-      <family>Noto Sans</family>
-      <family>DejaVu Sans</family>
-      <family>Ubuntu</family>
-    </prefer>
-  </alias>
-  <alias>
-    <family>Ubuntu Sans</family>
-    <prefer>
-      <family>Noto Sans</family>
-      <family>DejaVu Sans</family>
-      <family>Ubuntu Sans</family>
-    </prefer>
-  </alias>
+  <selectfont>
+    <rejectfont>
+      <glob>/usr/share/fonts/truetype/ubuntu/*</glob>
+      <glob>/var/lib/snapd/hostfs/usr/share/fonts/truetype/ubuntu/*</glob>
+      <glob>/snap/*/usr/share/fonts/truetype/ubuntu/*</glob>
+    </rejectfont>
+  </selectfont>
+  <match target="pattern">
+    <test qual="any" name="family">
+      <string>Ubuntu</string>
+    </test>
+    <edit name="family" mode="assign" binding="same">
+      <string>DejaVu Sans</string>
+    </edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family">
+      <string>Ubuntu Sans</string>
+    </test>
+    <edit name="family" mode="assign" binding="same">
+      <string>DejaVu Sans</string>
+    </edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family">
+      <string>Ubuntu Mono</string>
+    </test>
+    <edit name="family" mode="assign" binding="same">
+      <string>DejaVu Sans Mono</string>
+    </edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family">
+      <string>Ubuntu Sans Mono</string>
+    </test>
+    <edit name="family" mode="assign" binding="same">
+      <string>DejaVu Sans Mono</string>
+    </edit>
+  </match>
   <alias>
     <family>sans-serif</family>
     <prefer>
-      <family>Noto Sans</family>
       <family>DejaVu Sans</family>
-      <family>Ubuntu</family>
-      <family>Ubuntu Sans</family>
+      <family>Noto Sans</family>
     </prefer>
   </alias>
   <alias>
     <family>system-ui</family>
     <prefer>
-      <family>Noto Sans</family>
       <family>DejaVu Sans</family>
-      <family>Ubuntu</family>
+      <family>Noto Sans</family>
     </prefer>
   </alias>
 </fontconfig>
 FC_EOF
+    cp -f "${FONTCONF_FILE}" "${CONFIG_ROOT}/fontconfig/fonts.conf" 2>/dev/null || true
     USER_FONTS_DIR="${DATA_ROOT}/fonts/vielotus"
     mkdir -p "${USER_FONTS_DIR}" 2>/dev/null || true
     for sys_font in \
         /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf \
         /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf \
+        /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf \
         /usr/share/fonts/truetype/noto/NotoSans-Regular.ttf \
         /usr/share/fonts/truetype/noto/NotoSans-Bold.ttf; do
         if [ -f "${sys_font}" ]; then
             cp -f "${sys_font}" "${USER_FONTS_DIR}/" 2>/dev/null || true
         fi
     done
+    # Switch GNOME interface font away from buggy Ubuntu Sans variable font if needed
+    if command -v gsettings >/dev/null 2>&1; then
+        CUR_FONT=$(gsettings get org.gnome.desktop.interface font-name 2>/dev/null || true)
+        case "${CUR_FONT}" in
+            *Ubuntu*)
+                if [ -f /usr/share/fonts/truetype/noto/NotoSans-Regular.ttf ]; then
+                    gsettings set org.gnome.desktop.interface font-name 'Noto Sans 11' 2>/dev/null || true
+                elif [ -f /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf ]; then
+                    gsettings set org.gnome.desktop.interface font-name 'DejaVu Sans 11' 2>/dev/null || true
+                fi
+                ;;
+        esac
+    fi
+    # Propagate fontconfig & fallback fonts into Snap sandboxes (especially snap-store / App Center)
+    mkdir -p "${HOME}/snap/snap-store/current" "${HOME}/snap/snap-store/common" 2>/dev/null || true
+    for snap_app_dir in "${HOME}"/snap/*; do
+        [ -d "${snap_app_dir}" ] || continue
+        for sub in current common; do
+            if [ -d "${snap_app_dir}/${sub}" ]; then
+                mkdir -p "${snap_app_dir}/${sub}/.config/fontconfig/conf.d" 2>/dev/null || true
+                cp -f "${FONTCONF_FILE}" "${snap_app_dir}/${sub}/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf" 2>/dev/null || true
+                cp -f "${FONTCONF_FILE}" "${snap_app_dir}/${sub}/.config/fontconfig/fonts.conf" 2>/dev/null || true
+                cp -f "${FONTCONF_FILE}" "${snap_app_dir}/${sub}/.fonts.conf" 2>/dev/null || true
+            fi
+        done
+        if [ -d "${snap_app_dir}/current" ]; then
+            mkdir -p "${snap_app_dir}/current/.local/share/fonts" 2>/dev/null || true
+            cp -f "${USER_FONTS_DIR}/"*.ttf "${snap_app_dir}/current/.local/share/fonts/" 2>/dev/null || true
+        fi
+    done
     rm -rf "${HOME}/.cache/fontconfig" \
            "${HOME}"/snap/*/common/.cache/fontconfig \
+           "${HOME}"/snap/*/current/.cache/fontconfig \
            "${HOME}"/snap/*/*/.cache/fontconfig 2>/dev/null || true
     if command -v fc-cache >/dev/null 2>&1; then
-        (fc-cache -f >/dev/null 2>&1 || true) &
+        fc-cache -f >/dev/null 2>&1 || true
+    fi
+    if command -v pkill >/dev/null 2>&1; then
+        pkill -f "[s]nap-store" >/dev/null 2>&1 || true
     fi
 
     # 3. Register and activate in GNOME / Ubuntu Input Sources (org.gnome.desktop.input-sources)
