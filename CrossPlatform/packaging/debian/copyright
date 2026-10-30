@@ -7,6 +7,16 @@ Files: *
 Copyright: 2026 Trần Phát Đạt (Steve Dat)
 License: GPL-3.0-or-later
 
+Files: CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml
+Copyright: 2026 Trần Phát Đạt (Steve Dat)
+License: FSFAP
+
+License: FSFAP
+ Copying and distribution of this file, with or without modification,
+ are permitted in any medium without royalty provided the copyright
+ notice and this notice are preserved.  This file is offered as-is,
+ without any warranty.
+
 License: GPL-3.0-or-later
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by

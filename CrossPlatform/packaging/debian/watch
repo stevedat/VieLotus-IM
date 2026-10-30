@@ -1,0 +1,4 @@
+version=4
+opts="filenamemangle=s%(?:.*?)?v?(\d[\d.]*)\.tar\.gz%vielotus-$1.tar.gz%" \
+https://github.com/stevedat/VieLotus-IM/tags \
+(?:.*?/)?v?(\d[\d.]*)\.tar\.gz debian uupdate
