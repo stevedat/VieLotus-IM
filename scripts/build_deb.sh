@@ -371,14 +371,13 @@ EOF
     # 1) libvielotus0
     local lib_dir="${DEB_BASE}/libvielotus0_${VERSION}_${target_arch}"
     rm -rf "${lib_dir}"
-    mkdir -p "${lib_dir}/DEBIAN" "${lib_dir}/usr/lib/${multiarch_dir}" "${lib_dir}/usr/include" "${lib_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
+    mkdir -p "${lib_dir}/DEBIAN" "${lib_dir}/usr/lib/${multiarch_dir}" "${lib_dir}/usr/include" "${lib_dir}/usr/share"
     cp "${arch_bin_dir}/libVieLotusCAPI.so" "${lib_dir}/usr/lib/${multiarch_dir}/libVieLotusCAPI.so.0"
     ln -sf "libVieLotusCAPI.so.0" "${lib_dir}/usr/lib/${multiarch_dir}/libVieLotusCAPI.so"
     ln -sf "${multiarch_dir}/libVieLotusCAPI.so.0" "${lib_dir}/usr/lib/libVieLotusCAPI.so"
     cp "${pkg_dir}/usr/include/vielotus.h" "${lib_dir}/usr/include/vielotus.h"
-    if [ -f "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml" ]; then
-        cp "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml" "${lib_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/"
-    fi
+    cp -a "${pkg_dir}/usr/share/icons" "${lib_dir}/usr/share/" 2>/dev/null || true
+    cp -a "${pkg_dir}/usr/share/vielotus" "${lib_dir}/usr/share/" 2>/dev/null || true
     local lib_size
     lib_size=$(du -sk "${lib_dir}" | awk '{print $1}')
     cat <<EOF > "${lib_dir}/DEBIAN/control"
@@ -406,8 +405,6 @@ EOF
     mkdir -p "${ibus_dir}/DEBIAN" "${ibus_dir}/usr/lib/ibus" "${ibus_dir}/usr/share/ibus/component"
     cp "${arch_bin_dir}/ibus-engine-vielotus" "${ibus_dir}/usr/lib/ibus/"
     cp "${DIST_LINUX}/vielotus.xml" "${ibus_dir}/usr/share/ibus/component/"
-    cp -a "${pkg_dir}/usr/share/icons" "${ibus_dir}/usr/share/" 2>/dev/null || true
-    cp -a "${pkg_dir}/usr/share/vielotus" "${ibus_dir}/usr/share/" 2>/dev/null || true
     install_desktop_integration "${ibus_dir}"
     local ibus_size
     ibus_size=$(du -sk "${ibus_dir}" | awk '{print $1}')
@@ -440,7 +437,6 @@ EOF
     cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus.conf.in" "${fcitx_dir}/usr/share/fcitx5/addon/vielotus.conf"
     cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus-telex.conf" "${fcitx_dir}/usr/share/fcitx5/inputmethod/vielotus-telex.conf"
     cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus-vni.conf" "${fcitx_dir}/usr/share/fcitx5/inputmethod/vielotus-vni.conf"
-    cp -a "${pkg_dir}/usr/share/icons" "${fcitx_dir}/usr/share/" 2>/dev/null || true
     local fcitx_size
     fcitx_size=$(du -sk "${fcitx_dir}" | awk '{print $1}')
     cat <<EOF > "${fcitx_dir}/DEBIAN/control"
