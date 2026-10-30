@@ -71,9 +71,7 @@ void VieLotusState::updatePreedit() {
         if (!preeditStr.empty()) {
             const bool useClientPreedit =
                 ic_->capabilityFlags().test(CapabilityFlag::Preedit);
-            TextFormatFlags formatFlags = useClientPreedit
-                ? TextFormatFlag::Underline
-                : TextFormatFlag::NoFlag;
+            TextFormatFlags formatFlags = TextFormatFlag::NoFlag;
             Text preedit(preeditStr, formatFlags);
             preedit.setCursor(static_cast<int>(preeditStr.size()));
             if (useClientPreedit) {
@@ -177,7 +175,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
             keyEvent.filterAndAccept();
             return;
         }
-        vielotus_feed_backspace(session_);
+        vielotus_reset_session(session_);
         return;
     }
 

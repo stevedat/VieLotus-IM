@@ -12,6 +12,9 @@
 #include "vielotus.h"
 
 #define IBUS_TYPE_VIELOTUS_ENGINE (ibus_vielotus_engine_get_type())
+#ifndef IBUS_ATTR_UNDERLINE_NONE
+#define IBUS_ATTR_UNDERLINE_NONE 0
+#endif
 
 typedef struct _IBusVieLotusEngine IBusVieLotusEngine;
 typedef struct _IBusVieLotusEngineClass IBusVieLotusEngineClass;
@@ -24,6 +27,10 @@ struct _IBusVieLotusEngine {
     gboolean sen_flex;
     gboolean modern_orthography;
     gboolean quick_telex;
+    gboolean relaxed_coda;
+    gboolean macro_enabled;
+    gboolean developer_mode;
+    gboolean preedit_underline;
     time_t config_mtime;
     IBusPropList *prop_list;
 };
@@ -81,6 +88,14 @@ static void ibus_vielotus_load_user_config(IBusVieLotusEngine *vl_engine) {
             vl_engine->modern_orthography = (strstr(line, "false") == NULL && strstr(line, "0") == NULL);
         } else if (strncmp(line, "QUICK_TELEX=", 12) == 0) {
             vl_engine->quick_telex = (strstr(line, "true") != NULL || strstr(line, "1") != NULL);
+        } else if (strncmp(line, "RELAXED_CODA=", 13) == 0) {
+            vl_engine->relaxed_coda = (strstr(line, "true") != NULL || strstr(line, "1") != NULL);
+        } else if (strncmp(line, "MACRO_ENABLED=", 14) == 0) {
+            vl_engine->macro_enabled = (strstr(line, "false") == NULL && strstr(line, "0") == NULL);
+        } else if (strncmp(line, "DEVELOPER_MODE=", 15) == 0) {
+            vl_engine->developer_mode = (strstr(line, "true") != NULL || strstr(line, "1") != NULL);
+        } else if (strncmp(line, "PREEDIT_UNDERLINE=", 18) == 0) {
+            vl_engine->preedit_underline = (strstr(line, "true") != NULL || strstr(line, "1") != NULL);
         }
     }
     fclose(fp);
@@ -123,6 +138,10 @@ static void ibus_vielotus_save_user_config(IBusVieLotusEngine *vl_engine) {
     fprintf(fp, "SMART_BILINGUAL=\"%s\"\n", vl_engine->smart_bilingual ? "true" : "false");
     fprintf(fp, "MODERN_ORTHOGRAPHY=\"%s\"\n", vl_engine->modern_orthography ? "true" : "false");
     fprintf(fp, "QUICK_TELEX=\"%s\"\n", vl_engine->quick_telex ? "true" : "false");
+    fprintf(fp, "RELAXED_CODA=\"%s\"\n", vl_engine->relaxed_coda ? "true" : "false");
+    fprintf(fp, "MACRO_ENABLED=\"%s\"\n", vl_engine->macro_enabled ? "true" : "false");
+    fprintf(fp, "DEVELOPER_MODE=\"%s\"\n", vl_engine->developer_mode ? "true" : "false");
+    fprintf(fp, "PREEDIT_UNDERLINE=\"%s\"\n", vl_engine->preedit_underline ? "true" : "false");
     fclose(fp);
     struct stat st;
     if (stat(path, &st) == 0) {
@@ -166,6 +185,13 @@ static void ibus_vielotus_build_prop_list(IBusVieLotusEngine *vl_engine) {
     prop = ibus_property_new("quick-telex", PROP_TYPE_TOGGLE, label, NULL, NULL,
                              TRUE, TRUE,
                              vl_engine->quick_telex ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
+                             NULL);
+    ibus_prop_list_append(vl_engine->prop_list, prop);
+
+    label = ibus_text_new_from_static_string("Gạch chân chữ đang gõ (Preedit Underline)");
+    prop = ibus_property_new("preedit-underline", PROP_TYPE_TOGGLE, label, NULL, NULL,
+                             TRUE, TRUE,
+                             vl_engine->preedit_underline ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
                              NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
@@ -234,7 +260,8 @@ static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
         if (composing && composing[0] != '\0') {
             IBusText *text = ibus_text_new_from_string(composing);
             guint char_len = ibus_text_get_length(text);
-            ibus_text_append_attribute(text, IBUS_ATTR_TYPE_UNDERLINE, IBUS_ATTR_UNDERLINE_SINGLE, 0, (gint)char_len);
+            guint ul_mode = vl_engine->preedit_underline ? IBUS_ATTR_UNDERLINE_SINGLE : IBUS_ATTR_UNDERLINE_NONE;
+            ibus_text_append_attribute(text, IBUS_ATTR_TYPE_UNDERLINE, ul_mode, 0, (gint)char_len);
             ibus_engine_update_preedit_text_with_mode(
                 engine,
                 text,
@@ -248,6 +275,141 @@ static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
     ibus_vielotus_clear_preedit(engine);
 }
 
+typedef struct {
+    const char *lower_utf8;
+    const char *upper_utf8;
+    char lower_base;
+    char upper_base;
+    uint8_t mod;  /* 0=none, 1=d-stroke, 2=circumflex(^), 3=breve(ă), 4=horn(ư/ơ) */
+    uint8_t tone; /* 0=none, 1=grave(f/2), 2=acute(s/1), 3=hook(r/3), 4=tilde(x/4), 5=dot(j/5) */
+} VieLotusUtf8CharMap;
+
+static const VieLotusUtf8CharMap kVnUtf8Map[] = {
+    { "đ", "Đ", 'd', 'D', 1, 0 },
+    { "à", "À", 'a', 'A', 0, 1 }, { "á", "Á", 'a', 'A', 0, 2 }, { "ả", "Ả", 'a', 'A', 0, 3 }, { "ã", "Ã", 'a', 'A', 0, 4 }, { "ạ", "Ạ", 'a', 'A', 0, 5 },
+    { "ă", "Ă", 'a', 'A', 3, 0 }, { "ằ", "Ằ", 'a', 'A', 3, 1 }, { "ắ", "Ắ", 'a', 'A', 3, 2 }, { "ẳ", "Ẳ", 'a', 'A', 3, 3 }, { "ẵ", "Ẵ", 'a', 'A', 3, 4 }, { "ặ", "Ặ", 'a', 'A', 3, 5 },
+    { "â", "Â", 'a', 'A', 2, 0 }, { "ầ", "Ầ", 'a', 'A', 2, 1 }, { "ấ", "Ấ", 'a', 'A', 2, 2 }, { "ẩ", "Ẩ", 'a', 'A', 2, 3 }, { "ẫ", "Ẫ", 'a', 'A', 2, 4 }, { "ậ", "Ậ", 'a', 'A', 2, 5 },
+    { "è", "È", 'e', 'E', 0, 1 }, { "é", "É", 'e', 'E', 0, 2 }, { "ẻ", "Ẻ", 'e', 'E', 0, 3 }, { "ẽ", "Ẽ", 'e', 'E', 0, 4 }, { "ẹ", "Ẹ", 'e', 'E', 0, 5 },
+    { "ê", "Ê", 'e', 'E', 2, 0 }, { "ề", "Ề", 'e', 'E', 2, 1 }, { "ế", "Ế", 'e', 'E', 2, 2 }, { "ể", "Ể", 'e', 'E', 2, 3 }, { "ễ", "Ễ", 'e', 'E', 2, 4 }, { "ệ", "Ệ", 'e', 'E', 2, 5 },
+    { "ì", "Ì", 'i', 'I', 0, 1 }, { "í", "Í", 'i', 'I', 0, 2 }, { "ỉ", "Ỉ", 'i', 'I', 0, 3 }, { "ĩ", "Ĩ", 'i', 'I', 0, 4 }, { "ị", "Ị", 'i', 'I', 0, 5 },
+    { "ò", "Ò", 'o', 'O', 0, 1 }, { "ó", "Ó", 'o', 'O', 0, 2 }, { "ỏ", "Ỏ", 'o', 'O', 0, 3 }, { "õ", "Õ", 'o', 'O', 0, 4 }, { "ọ", "Ọ", 'o', 'O', 0, 5 },
+    { "ô", "Ô", 'o', 'O', 2, 0 }, { "ồ", "Ồ", 'o', 'O', 2, 1 }, { "ố", "Ố", 'o', 'O', 2, 2 }, { "ổ", "Ổ", 'o', 'O', 2, 3 }, { "ỗ", "Ỗ", 'o', 'O', 2, 4 }, { "ộ", "Ộ", 'o', 'O', 2, 5 },
+    { "ơ", "Ơ", 'o', 'O', 4, 0 }, { "ờ", "Ờ", 'o', 'O', 4, 1 }, { "ớ", "Ớ", 'o', 'O', 4, 2 }, { "ở", "Ở", 'o', 'O', 4, 3 }, { "ỡ", "Ỡ", 'o', 'O', 4, 4 }, { "ợ", "Ợ", 'o', 'O', 4, 5 },
+    { "ù", "Ù", 'u', 'U', 0, 1 }, { "ú", "Ú", 'u', 'U', 0, 2 }, { "ủ", "Ủ", 'u', 'U', 0, 3 }, { "ũ", "Ũ", 'u', 'U', 0, 4 }, { "ụ", "Ụ", 'u', 'U', 0, 5 },
+    { "ư", "Ư", 'u', 'U', 4, 0 }, { "ừ", "Ừ", 'u', 'U', 4, 1 }, { "ứ", "Ứ", 'u', 'U', 4, 2 }, { "ử", "Ử", 'u', 'U', 4, 3 }, { "ữ", "Ữ", 'u', 'U', 4, 4 }, { "ự", "Ự", 'u', 'U', 4, 5 },
+    { "ỳ", "Ỳ", 'y', 'Y', 0, 1 }, { "ý", "Ý", 'y', 'Y', 0, 2 }, { "ỷ", "Ỷ", 'y', 'Y', 0, 3 }, { "ỹ", "Ỹ", 'y', 'Y', 0, 4 }, { "ỵ", "Ỵ", 'y', 'Y', 0, 5 },
+};
+
+static size_t ibus_vielotus_utf8_char_len(unsigned char b) {
+    if ((b & 0x80) == 0) return 1;
+    if ((b & 0xE0) == 0xC0) return 2;
+    if ((b & 0xF0) == 0xE0) return 3;
+    if ((b & 0xF8) == 0xF0) return 4;
+    return 1;
+}
+
+static void ibus_vielotus_raw_keys_for_utf8(const char *utf8_str, gboolean is_vni, char *out, size_t out_cap) {
+    size_t len = 0;
+    char tone_char = 0;
+    const char *p = utf8_str;
+    while (*p && len + 4 < out_cap) {
+        size_t clen = ibus_vielotus_utf8_char_len((unsigned char)*p);
+        if (clen == 1) {
+            out[len++] = *p;
+            p++;
+            continue;
+        }
+        gboolean matched = FALSE;
+        for (size_t i = 0; i < sizeof(kVnUtf8Map) / sizeof(kVnUtf8Map[0]); i++) {
+            gboolean is_lower = (strlen(kVnUtf8Map[i].lower_utf8) == clen && strncmp(p, kVnUtf8Map[i].lower_utf8, clen) == 0);
+            gboolean is_upper = !is_lower && (strlen(kVnUtf8Map[i].upper_utf8) == clen && strncmp(p, kVnUtf8Map[i].upper_utf8, clen) == 0);
+            if (is_lower || is_upper) {
+                char base = is_upper ? kVnUtf8Map[i].upper_base : kVnUtf8Map[i].lower_base;
+                out[len++] = base;
+                switch (kVnUtf8Map[i].mod) {
+                    case 1: /* đ / Đ */
+                        out[len++] = is_vni ? '9' : (is_upper ? 'D' : 'd');
+                        break;
+                    case 2: /* circumflex (â, ê, ô) */
+                        out[len++] = is_vni ? '6' : kVnUtf8Map[i].lower_base;
+                        break;
+                    case 3: /* breve (ă) */
+                        out[len++] = is_vni ? '8' : 'w';
+                        break;
+                    case 4: /* horn (ư, ơ) */
+                        if ((base == 'o' || base == 'O') && len >= 3 &&
+                            (out[len - 3] == 'u' || out[len - 3] == 'U') &&
+                            (out[len - 2] == 'w' || out[len - 2] == '7')) {
+                            out[len - 2] = base;
+                            out[len - 1] = is_vni ? '7' : 'w';
+                        } else {
+                            out[len++] = is_vni ? '7' : 'w';
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                if (kVnUtf8Map[i].tone > 0 && kVnUtf8Map[i].tone <= 5) {
+                    tone_char = is_vni ? "021345"[kVnUtf8Map[i].tone] : "0fsrxj"[kVnUtf8Map[i].tone];
+                }
+                matched = TRUE;
+                break;
+            }
+        }
+        if (!matched) {
+            for (size_t k = 0; k < clen && p[k] && len + 1 < out_cap; k++) {
+                out[len++] = p[k];
+            }
+        }
+        p += clen;
+    }
+    if (tone_char != 0 && len + 1 < out_cap) {
+        out[len++] = tone_char;
+    }
+    out[len] = '\0';
+}
+
+/* Whole-character Backspace while composing: deletes the last displayed UTF-8 character
+ * ("việt" -> "việ" -> "vi" -> "v" -> "", "được" -> "đượ" -> "đư" -> "đ" -> "")
+ * so Backspace never reverts a Vietnamese syllable to raw ASCII ("viêt"/"viet"). */
+static void ibus_vielotus_backspace_composing(IBusVieLotusEngine *vl_engine) {
+    const char *composing = vielotus_get_composing_text(vl_engine->session);
+    if (!composing || composing[0] == '\0') {
+        ibus_vielotus_engine_reset_internal(vl_engine);
+        return;
+    }
+    size_t len = strlen(composing);
+    if (len >= 512) {
+        ibus_vielotus_engine_reset_internal(vl_engine);
+        return;
+    }
+    char prefix[512];
+    memcpy(prefix, composing, len + 1);
+    size_t cut = len;
+    while (cut > 0 && ((unsigned char)prefix[cut - 1] & 0xC0) == 0x80) {
+        cut--;
+    }
+    if (cut > 0) {
+        cut--;
+    }
+    prefix[cut] = '\0';
+    if (cut == 0) {
+        ibus_vielotus_engine_reset_internal(vl_engine);
+        return;
+    }
+    char raw_keys[1024];
+    ibus_vielotus_raw_keys_for_utf8(prefix, vl_engine->is_vni, raw_keys, sizeof(raw_keys));
+    vielotus_reset_session(vl_engine->session);
+    for (size_t i = 0; raw_keys[i] != '\0'; i++) {
+        vielotus_feed_char(vl_engine->session, (uint32_t)(unsigned char)raw_keys[i]);
+    }
+    if (!vielotus_is_composing(vl_engine->session)) {
+        ibus_vielotus_engine_reset_internal(vl_engine);
+    } else {
+        ibus_vielotus_update_preedit(vl_engine);
+    }
+}
+
 static void ibus_vielotus_engine_init(IBusVieLotusEngine *vl_engine) {
     vl_engine->session = vielotus_create_session();
     vl_engine->is_vni = FALSE;
@@ -255,6 +417,10 @@ static void ibus_vielotus_engine_init(IBusVieLotusEngine *vl_engine) {
     vl_engine->sen_flex = TRUE;
     vl_engine->modern_orthography = TRUE;
     vl_engine->quick_telex = FALSE;
+    vl_engine->relaxed_coda = FALSE;
+    vl_engine->macro_enabled = TRUE;
+    vl_engine->developer_mode = FALSE;
+    vl_engine->preedit_underline = FALSE;
     vl_engine->prop_list = NULL;
 
     vielotus_set_input_method(vl_engine->session, VIELOTUS_INPUT_TELEX);
@@ -353,6 +519,8 @@ static void ibus_vielotus_engine_property_activate(
     } else if (g_strcmp0(prop_name, "quick-telex") == 0) {
         vl_engine->quick_telex = (prop_state == PROP_STATE_CHECKED);
         vielotus_set_quick_telex(vl_engine->session, vl_engine->quick_telex);
+    } else if (g_strcmp0(prop_name, "preedit-underline") == 0) {
+        vl_engine->preedit_underline = (prop_state == PROP_STATE_CHECKED);
     }
     ibus_vielotus_save_user_config(vl_engine);
     ibus_vielotus_build_prop_list(vl_engine);
@@ -416,15 +584,12 @@ static gboolean ibus_vielotus_engine_process_key_event(
     // Handle BackSpace
     if (keyval == IBUS_KEY_BackSpace) {
         if (vielotus_is_composing(vl_engine->session)) {
-            int32_t action = vielotus_feed_backspace(vl_engine->session);
-            if (action == VIELOTUS_ACTION_RESET || !vielotus_is_composing(vl_engine->session)) {
-                ibus_vielotus_engine_reset_internal(vl_engine);
-            } else {
-                ibus_vielotus_update_preedit(vl_engine);
-            }
+            ibus_vielotus_backspace_composing(vl_engine);
             return TRUE;
         }
-        vielotus_feed_backspace(vl_engine->session);
+        // When not composing, never call vielotus_feed_backspace (which would set editCaretBack=0
+        // and resurrect committed words into preedit on the 2nd BackSpace, causing word duplication).
+        vielotus_reset_session(vl_engine->session);
         return FALSE;
     }
 
