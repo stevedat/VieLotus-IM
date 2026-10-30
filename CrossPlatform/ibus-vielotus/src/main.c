@@ -369,6 +369,56 @@ static void ibus_vielotus_raw_keys_for_utf8(const char *utf8_str, gboolean is_vn
     out[len] = '\0';
 }
 
+static inline char vl_tolower(char c) {
+    return (c >= 'A' && c <= 'Z') ? (char)(c + ('a' - 'A')) : c;
+}
+
+static uint8_t ibus_vielotus_telex_tone_for_key(char lower_key) {
+    switch (lower_key) {
+        case 'f': return 1; /* grave (huyền) */
+        case 's': return 2; /* acute (sắc) */
+        case 'r': return 3; /* hook (hỏi) */
+        case 'x': return 4; /* tilde (ngã) */
+        case 'j': return 5; /* dot (nặng) */
+        default: return 0;
+    }
+}
+
+static gboolean ibus_vielotus_has_non_ascii(const char *utf8_str) {
+    if (!utf8_str) return FALSE;
+    for (const unsigned char *p = (const unsigned char *)utf8_str; *p; p++) {
+        if (*p >= 0x80) return TRUE;
+    }
+    return FALSE;
+}
+
+static uint8_t ibus_vielotus_active_tone_of_utf8(const char *utf8_str) {
+    if (!utf8_str) return 0;
+    const char *p = utf8_str;
+    while (*p) {
+        size_t clen = ibus_vielotus_utf8_char_len((unsigned char)*p);
+        if (clen > 1) {
+            for (size_t i = 0; i < sizeof(kVnUtf8Map) / sizeof(kVnUtf8Map[0]); i++) {
+                if ((strlen(kVnUtf8Map[i].lower_utf8) == clen && strncmp(p, kVnUtf8Map[i].lower_utf8, clen) == 0) ||
+                    (strlen(kVnUtf8Map[i].upper_utf8) == clen && strncmp(p, kVnUtf8Map[i].upper_utf8, clen) == 0)) {
+                    if (kVnUtf8Map[i].tone > 0) {
+                        return kVnUtf8Map[i].tone;
+                    }
+                }
+            }
+        }
+        p += clen;
+    }
+    return 0;
+}
+
+static void ibus_vielotus_replay_raw_keys(IBusVieLotusEngine *vl_engine, const char *raw_keys) {
+    vielotus_reset_session(vl_engine->session);
+    for (size_t i = 0; raw_keys[i] != '\0'; i++) {
+        vielotus_feed_char(vl_engine->session, (uint32_t)(unsigned char)raw_keys[i]);
+    }
+}
+
 /* Whole-character Backspace while composing: deletes the last displayed UTF-8 character
  * ("việt" -> "việ" -> "vi" -> "v" -> "", "được" -> "đượ" -> "đư" -> "đ" -> "")
  * so Backspace never reverts a Vietnamese syllable to raw ASCII ("viêt"/"viet"). */
@@ -620,7 +670,78 @@ static gboolean ibus_vielotus_engine_process_key_event(
             }
         }
 
+        if (!vl_engine->is_vni && vielotus_is_composing(vl_engine->session)) {
+            char lower_key = vl_tolower((char)keyval);
+            uint8_t key_tone = ibus_vielotus_telex_tone_for_key(lower_key);
+            const char *raw_before = vielotus_get_raw_text(vl_engine->session);
+            const char *comp_before = vielotus_get_composing_text(vl_engine->session);
+            if (key_tone > 0 && raw_before && comp_before && ibus_vielotus_has_non_ascii(comp_before)) {
+                size_t rlen = strlen(raw_before);
+                size_t clen = strlen(comp_before);
+                uint8_t active_tone = ibus_vielotus_active_tone_of_utf8(comp_before);
+                /* 1. Non-adjacent duplicate tone key (e.g. "vieejt" + 'j' after Backspace on "việt" -> "việ" + 't'):
+                 * keep the tone on "việt" and canonicalize raw keys to "vieetj" instead of cancelling to "viêtj". */
+                if (active_tone == key_tone && rlen > 0 && vl_tolower(raw_before[rlen - 1]) != lower_key) {
+                    char canon_raw[1024];
+                    ibus_vielotus_raw_keys_for_utf8(comp_before, FALSE, canon_raw, sizeof(canon_raw));
+                    ibus_vielotus_replay_raw_keys(vl_engine, canon_raw);
+                    ibus_vielotus_update_preedit(vl_engine);
+                    return TRUE;
+                }
+                /* 2. Stop-coda recovery when 's' or 'j' is pressed after an accidental rejected 'f'/'r'/'x'
+                 * on a modified Vietnamese stem (e.g. "vieetfj" -> "việt" instead of "viêtfj"). */
+                if ((key_tone == 2 || key_tone == 5) && active_tone == 0 && rlen >= 3 && clen >= 3 && rlen < 512) {
+                    char last_r = vl_tolower(raw_before[rlen - 1]);
+                    char prev_c = vl_tolower(comp_before[clen - 2]);
+                    if ((last_r == 'f' || last_r == 'r' || last_r == 'x') &&
+                        vl_tolower(comp_before[clen - 1]) == last_r &&
+                        (prev_c == 't' || prev_c == 'c' || prev_c == 'p' || prev_c == 'h')) {
+                        char fixed_raw[512];
+                        memcpy(fixed_raw, raw_before, rlen);
+                        fixed_raw[rlen - 1] = (char)keyval;
+                        fixed_raw[rlen] = '\0';
+                        ibus_vielotus_replay_raw_keys(vl_engine, fixed_raw);
+                        ibus_vielotus_update_preedit(vl_engine);
+                        return TRUE;
+                    }
+                }
+            }
+        }
+
         int32_t action = vielotus_feed_char(vl_engine->session, keyval);
+        if (!vl_engine->is_vni && vielotus_is_composing(vl_engine->session)) {
+            char lower_key = vl_tolower((char)keyval);
+            if (lower_key == 'a' || lower_key == 'e' || lower_key == 'o') {
+                const char *raw_after = vielotus_get_raw_text(vl_engine->session);
+                const char *comp_after = vielotus_get_composing_text(vl_engine->session);
+                if (raw_after && comp_after) {
+                    size_t rlen = strlen(raw_after);
+                    size_t clen = strlen(comp_after);
+                    /* 3. Mid-vowel tone before second circumflex vowel on open diphthongs (e.g. "vieje" -> "việ",
+                     * "tieje" -> "tiệ", "muojo" -> "muộ") so 'e'+'j'+'e' forms 'ệ' immediately instead of "viẹe". */
+                    if (rlen >= 3 && rlen < 512 && clen >= 2 &&
+                        vl_tolower(raw_after[rlen - 1]) == lower_key &&
+                        vl_tolower(raw_after[rlen - 3]) == lower_key &&
+                        vl_tolower(comp_after[clen - 1]) == lower_key) {
+                        uint8_t mid_tone = ibus_vielotus_telex_tone_for_key(vl_tolower(raw_after[rlen - 2]));
+                        gboolean allow_swap = (mid_tone == 5) ||
+                            (mid_tone > 0 && lower_key == 'e' && rlen >= 4 &&
+                             (vl_tolower(raw_after[rlen - 4]) == 'i' || vl_tolower(raw_after[rlen - 4]) == 'y') &&
+                             vl_tolower(raw_after[0]) != 'p') ||
+                            (mid_tone > 0 && lower_key == 'o' && rlen >= 4 &&
+                             vl_tolower(raw_after[rlen - 4]) == 'u');
+                        if (allow_swap && ibus_vielotus_active_tone_of_utf8(comp_after) == mid_tone) {
+                            char swapped_raw[512];
+                            memcpy(swapped_raw, raw_after, rlen + 1);
+                            char tmp = swapped_raw[rlen - 2];
+                            swapped_raw[rlen - 2] = swapped_raw[rlen - 1];
+                            swapped_raw[rlen - 1] = tmp;
+                            ibus_vielotus_replay_raw_keys(vl_engine, swapped_raw);
+                        }
+                    }
+                }
+            }
+        }
         if (action == VIELOTUS_ACTION_COMMIT) {
             const char *committed = vielotus_get_last_text(vl_engine->session);
             char buf[1024];
