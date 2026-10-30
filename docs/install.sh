@@ -174,6 +174,10 @@ REAL_HOME="$(getent passwd "${REAL_USER}" 2>/dev/null | cut -d: -f6 || echo "${H
 if [ -n "${REAL_HOME}" ] && [ -d "${REAL_HOME}" ]; then
     rm -rf "${REAL_HOME}/.local/lib/vielotus" 2>/dev/null || ${SUDO} rm -rf "${REAL_HOME}/.local/lib/vielotus" 2>/dev/null || true
     rm -f "${REAL_HOME}/.config/environment.d/90-vielotus.conf" 2>/dev/null || ${SUDO} rm -f "${REAL_HOME}/.config/environment.d/90-vielotus.conf" 2>/dev/null || true
+    ${SUDO} rm -f /tmp/vielotus-settings.log 2>/dev/null || true
+    if [ -d "${REAL_HOME}/.config/vielotus" ]; then
+        ${SUDO} chown -R "${REAL_USER}:${REAL_USER}" "${REAL_HOME}/.config/vielotus" 2>/dev/null || true
+    fi
 fi
 
 if command -v pkill >/dev/null 2>&1; then

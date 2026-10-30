@@ -13,3 +13,4 @@ Terminal=false
 Categories=Utility;Settings;DesktopSettings;
 Keywords=Vietnamese;Telex;VNI;Input Method;IBus;Fcitx5;Sen Viet;VieLotus;Bo go tieng Viet;
 StartupNotify=true
+StartupWMClass=vielotus
