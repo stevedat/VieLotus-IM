@@ -6,10 +6,10 @@ Version: 2.0.0
 Architectures: amd64 arm64
 Components: main
 Description: Official APT Repository for VieLotusIM (Sen Viet) Next-Gen Vietnamese Input Method
-Date: Fri, 30 Oct 2026 07:27:49 UTC
+Date: Fri, 30 Oct 2026 07:44:50 UTC
 MD5Sum:
- 836f3a8f962b8a6934f6465c7a47a79a             8187 Packages
- 16362ac66baeab62b5ef7fc6184157d2             1938 Packages.gz
+ dcba90cdfa42de1d0946498ce5c95d8a             8187 Packages
+ c97d77b488db277af81bac6a82493156             1939 Packages.gz
 SHA256:
- fd930a3c67ce3540ffcd63ecda25675ac3014dfa345a35c6a82b228970ebe95f             8187 Packages
- 8aa68a3fafbcd0fd8382553ba4bd423874f7a8fa02b969b523ffdad14eebbecb             1938 Packages.gz
+ 08573fa4fd6a8ea33d4bcb4804d4e91511c79d4baed051ba4ce652158d7d949c             8187 Packages
+ 12004c1b7f9b28b72fee72fb2d4e814fb23fa06aa76b50a67f12d09c8249fa9b             1939 Packages.gz
