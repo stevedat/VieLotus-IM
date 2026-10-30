@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>org.vielotus.VieLotus</id>
-  <metadata_license>MIT</metadata_license>
-  <project_license>MIT</project_license>
+  <metadata_license>FSFAP</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
   <name>Sen Việt (VieLotusIM)</name>
   <summary>Bộ gõ tiếng Việt thế hệ mới cho Linux (IBus &amp; Fcitx5)</summary>
   <description>
