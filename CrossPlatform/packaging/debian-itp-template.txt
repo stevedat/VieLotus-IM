@@ -1,0 +1,40 @@
+Subject: ITP: vielotus -- Next-Gen Vietnamese Input Method for IBus & Fcitx5
+Package: wnpp
+Severity: wishlist
+Owner: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+
+* Package name    : vielotus
+  Version         : 2.0.0
+  Upstream Author : Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+* URL             : https://github.com/stevedat/VieLotus-IM
+* License         : GPL-3.0-or-later
+  Programming Lang: C++20
+  Description     : Next-Gen Vietnamese Input Method for IBus & Fcitx5
+
+VieLotusIM (Sen Việt) is a modern Vietnamese input method engine supporting
+both Telex and VNI input methods with free-tone SEN Flex composition and
+Smart Bilingual English-Vietnamese collision resolution.
+
+Key features:
+ - Pure C++20 native engine (~250 KB shared library) with zero external
+   runtime dependencies beyond the standard C/C++ runtime
+ - Native IBus and Fcitx5 integration as split packages
+ - Smart Bilingual detection: 100.00% accuracy on 9,091-case regression
+   suite with symmetric collision metrics (vn_survives_collision: 97.33%,
+   whitelist_safe=never: 100.00%)
+ - Designed as a modern replacement for legacy Vietnamese input methods
+
+The package is split into:
+ - libvielotus0: Shared C-ABI engine library
+ - ibus-vielotus: IBus input method plugin
+ - fcitx5-vielotus: Fcitx5 input method addon
+ - vielotus: Convenience metapackage
+
+Binary packages built from this source:
+ libvielotus0, ibus-vielotus, fcitx5-vielotus, vielotus
+
+The package builds entirely from C++20 source using CMake + Ninja,
+requiring only standard development libraries (libibus-1.0-dev,
+fcitx5-modules-dev, etc.) as build dependencies.
+
+I intend to maintain this package within the Debian Input Method Team.

@@ -1,14 +1,14 @@
 Source: vielotus
 Section: utils
 Priority: optional
-Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+Maintainer: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
 Build-Depends:
  debhelper-compat (= 13),
  cmake (>= 3.16),
  extra-cmake-modules,
  g++ (>= 4:11),
  ninja-build,
- pkg-config,
+ pkg-config | pkgconf,
  fcitx5-modules-dev,
  libfcitx5config-dev,
  libfcitx5core-dev,
