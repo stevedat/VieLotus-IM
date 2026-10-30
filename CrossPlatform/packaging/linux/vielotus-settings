@@ -3,13 +3,18 @@
 # Sen Việt (VieLotusIM) — Linux Desktop Settings & Auto-Activation Utility
 # Supports both Fcitx5 (fcitx5-configtool) and IBus (GNOME Input Sources)
 # ==============================================================================
-set -e
 
+UID_CUR="$(id -u 2>/dev/null || echo 1000)"
 CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
 DATA_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}"
 CONFIG_DIR="${CONFIG_ROOT}/vielotus"
+mkdir -p "${CONFIG_DIR}" 2>/dev/null || true
+if [ ! -w "${CONFIG_DIR}" ]; then
+    CONFIG_DIR="/tmp/vielotus-cfg-${UID_CUR}"
+    mkdir -p "${CONFIG_DIR}" 2>/dev/null || true
+fi
 CONFIG_FILE="${CONFIG_DIR}/config.env"
-mkdir -p "${CONFIG_DIR}"
+LOG_FILE="${CONFIG_DIR}/settings.log"
 
 INPUT_METHOD="telex"
 GRAMMAR_PROFILE="sen_flex"
@@ -413,6 +418,11 @@ except Exception:
     pass
 
 win = Gtk.Window(title="Sen Việt (VieLotusIM) — Cài đặt")
+try:
+    GLib.set_prgname("vielotus")
+    GLib.set_application_name("Sen Việt")
+except Exception:
+    pass
 win.set_default_size(520, 510)
 win.set_resizable(False)
 win.set_position(Gtk.WindowPosition.CENTER)
@@ -839,6 +849,10 @@ root_vbox.pack_end(footer_bar, False, False, 0)
 
 win.connect("destroy", Gtk.main_quit)
 win.show_all()
+try:
+    win.present()
+except Exception:
+    pass
 
 if smoke_mode:
     def _smoke_step():
@@ -912,11 +926,11 @@ load_config
 
 # Launch Native GTK3 Desktop Settings Window if graphical session is available
 if command -v python3 >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
-    if run_gtk_settings "0" 2>/tmp/vielotus-settings.log; then
+    if run_gtk_settings "0" 2>"${LOG_FILE}"; then
         exit 0
     fi
     # Fallback to Python Tkinter GUI if python3-gi is not installed
-    if python3 - "${CONFIG_FILE}" <<'TK_PYEOF' 2>>/tmp/vielotus-settings.log; then
+    if python3 - "${CONFIG_FILE}" <<'TK_PYEOF' 2>>"${LOG_FILE}"; then
 import os, subprocess, sys
 import tkinter as tk
 from tkinter import ttk

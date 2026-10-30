@@ -34,11 +34,19 @@ if [ -z "${TARGET_USER}" ]; then
     TARGET_USER=$(who 2>/dev/null | awk '{print $1; exit}' || true)
 fi
 if [ -n "${TARGET_USER}" ] && [ "${TARGET_USER}" != "root" ] && [ -x /usr/bin/vielotus-settings ]; then
+    rm -f /tmp/vielotus-settings.log 2>/dev/null || true
     TARGET_UID=$(id -u "${TARGET_USER}" 2>/dev/null || true)
+    TARGET_HOME=$(getent passwd "${TARGET_USER}" 2>/dev/null | cut -d: -f6 || true)
+    if [ -n "${TARGET_HOME}" ] && [ -d "${TARGET_HOME}/.config/vielotus" ]; then
+        chown -R "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/.config/vielotus" 2>/dev/null || true
+    fi
     if [ -n "${TARGET_UID}" ] && [ -S "/run/user/${TARGET_UID}/bus" ]; then
         su - "${TARGET_USER}" -c "XDG_RUNTIME_DIR=/run/user/${TARGET_UID} DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${TARGET_UID}/bus /usr/bin/vielotus-settings --activate" >/dev/null 2>&1 || true
     else
         su - "${TARGET_USER}" -c "/usr/bin/vielotus-settings --activate" >/dev/null 2>&1 || true
+    fi
+    if [ -n "${TARGET_HOME}" ] && [ -d "${TARGET_HOME}/.config/vielotus" ]; then
+        chown -R "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/.config/vielotus" 2>/dev/null || true
     fi
 fi
 exit 0
