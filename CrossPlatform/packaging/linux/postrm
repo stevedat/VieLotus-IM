@@ -6,13 +6,57 @@ fi
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database -q /usr/share/applications >/dev/null 2>&1 || true
 fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor >/dev/null 2>&1 || true
+fi
 if command -v ibus >/dev/null 2>&1; then
     ibus write-cache --system >/dev/null 2>&1 || true
 fi
 if [ "${1:-}" = "remove" ] || [ "${1:-}" = "purge" ]; then
+    if command -v pkill >/dev/null 2>&1; then
+        pkill -9 -f "[i]bus-engine-vielotus" >/dev/null 2>&1 || true
+    fi
     PKG_DEPENDS="/usr/share/language-selector/data/pkg_depends"
     if [ -f "${PKG_DEPENDS}" ]; then
         sed -i '/# Sen Việt (VieLotusIM)/d;/vielotus/d' "${PKG_DEPENDS}" 2>/dev/null || true
+    fi
+
+    TARGET_USER="${SUDO_USER:-}"
+    if [ -z "${TARGET_USER}" ] && [ -n "${PKEXEC_UID:-}" ]; then
+        TARGET_USER=$(id -nu "${PKEXEC_UID}" 2>/dev/null || true)
+    fi
+    if [ -z "${TARGET_USER}" ]; then
+        TARGET_USER=$(who 2>/dev/null | awk '{print $1; exit}' || true)
+    fi
+    if [ -n "${TARGET_USER}" ] && [ "${TARGET_USER}" != "root" ]; then
+        TARGET_UID=$(id -u "${TARGET_USER}" 2>/dev/null || true)
+        TARGET_HOME=$(getent passwd "${TARGET_USER}" 2>/dev/null | cut -d: -f6 || true)
+        if [ -n "${TARGET_UID}" ] && [ -S "/run/user/${TARGET_UID}/bus" ] && command -v python3 >/dev/null 2>&1; then
+            su - "${TARGET_USER}" -c "XDG_RUNTIME_DIR=/run/user/${TARGET_UID} DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${TARGET_UID}/bus python3 -c '
+import ast, subprocess
+for key in (\"sources\", \"mru-sources\"):
+    try:
+        raw = subprocess.check_output([\"gsettings\", \"get\", \"org.gnome.desktop.input-sources\", key], stderr=subprocess.DEVNULL).decode().strip()
+        if raw.startswith(\"@a(ss) \"): raw = raw[len(\"@a(ss) \"):]
+        items = list(ast.literal_eval(raw)) if raw else []
+        items = [s for s in items if not (s[0] == \"ibus\" and s[1] in (\"vielotus\", \"vielotus-vni\"))]
+        if key == \"sources\" and not items:
+            items = [(\"xkb\", \"us\")]
+        fmt = \"[\" + \", \".join(f\"({repr(k)}, {repr(v)})\" for k, v in items) + \"]\"
+        subprocess.call([\"gsettings\", \"set\", \"org.gnome.desktop.input-sources\", key, fmt], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+subprocess.call([\"ibus\", \"engine\", \"xkb:us::eng\"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+subprocess.call([\"ibus\", \"write-cache\"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+'" >/dev/null 2>&1 || true
+        fi
+        if [ "${1:-}" = "purge" ] && [ -n "${TARGET_HOME}" ]; then
+            rm -rf "${TARGET_HOME}/.config/vielotus" \
+                   "${TARGET_HOME}/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf" \
+                   "${TARGET_HOME}/.local/share/fcitx5/addon/vielotus.conf" \
+                   "${TARGET_HOME}/.local/share/fcitx5/inputmethod/vielotus-telex.conf" \
+                   "${TARGET_HOME}/.local/share/fcitx5/inputmethod/vielotus-vni.conf" 2>/dev/null || true
+        fi
     fi
 fi
 exit 0

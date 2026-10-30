@@ -25,6 +25,7 @@ QUICK_TELEX="false"
 RELAXED_CODA="false"
 MACRO_ENABLED="true"
 DEVELOPER_MODE="false"
+PREEDIT_UNDERLINE="false"
 
 load_config() {
     if [ ! -f "${CONFIG_FILE}" ]; then
@@ -83,6 +84,12 @@ load_config() {
                 case "${val}" in
                     true|True|TRUE|1) DEVELOPER_MODE="true" ;;
                     *) DEVELOPER_MODE="false" ;;
+                esac
+                ;;
+            PREEDIT_UNDERLINE)
+                case "${val}" in
+                    true|True|TRUE|1) PREEDIT_UNDERLINE="true" ;;
+                    *) PREEDIT_UNDERLINE="false" ;;
                 esac
                 ;;
         esac
@@ -230,6 +237,7 @@ QUICK_TELEX="${QUICK_TELEX}"
 RELAXED_CODA="${RELAXED_CODA}"
 MACRO_ENABLED="${MACRO_ENABLED}"
 DEVELOPER_MODE="${DEVELOPER_MODE}"
+PREEDIT_UNDERLINE="${PREEDIT_UNDERLINE}"
 ENV_EOF
 
     ENGINE_ID="vielotus"
@@ -386,6 +394,7 @@ cfg = {
     "RELAXED_CODA": "false",
     "MACRO_ENABLED": "true",
     "DEVELOPER_MODE": "false",
+    "PREEDIT_UNDERLINE": "false",
 }
 if os.path.exists(config_path):
     with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -475,6 +484,7 @@ def save_current_config(*_):
             "RELAXED_CODA",
             "MACRO_ENABLED",
             "DEVELOPER_MODE",
+            "PREEDIT_UNDERLINE",
         ):
             f.write(f'{key}="{cfg[key]}"\n')
     settings_bin = "/usr/bin/vielotus-settings"
@@ -666,16 +676,16 @@ def on_rc_toggled(btn):
 chk_qt.connect("toggled", on_qt_toggled)
 chk_rc.connect("toggled", on_rc_toggled)
 
-# Tile 4: Phím tắt Đổi bộ gõ
+# Tile 4: Đa ứng dụng (Riêng từng cửa sổ) & Hiển thị gạch chân
 tile4 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
 tile4.get_style_context().add_class("bento-card")
 t4_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 t4_lbl = Gtk.Label()
-t4_lbl.set_markup("<span weight='bold' foreground='#1c1c1e'>Phím tắt Đổi bộ gõ</span>")
+t4_lbl.set_markup("<span weight='bold' foreground='#1c1c1e'>Đa ứng dụng &amp; Hiển thị</span>")
 t4_lbl.set_xalign(0)
-btn_fcitx = Gtk.Button(label="Mở cài đặt ↗")
+btn_fcitx = Gtk.Button(label="Phím tắt ↗")
 def on_fcitx_clicked(_btn):
-    for cmd in (["fcitx5-configtool"], ["fcitx5-config-qt"], ["gnome-control-center", "keyboard"]):
+    for cmd in (["gnome-control-center", "keyboard"], ["fcitx5-configtool"], ["fcitx5-config-qt"]):
         try:
             subprocess.Popen(cmd)
             return
@@ -684,11 +694,46 @@ def on_fcitx_clicked(_btn):
 btn_fcitx.connect("clicked", on_fcitx_clicked)
 t4_top.pack_start(t4_lbl, True, True, 0)
 t4_top.pack_end(btn_fcitx, False, False, 0)
-t4_sub = Gtk.Label()
-t4_sub.set_markup("<span size='small' foreground='#6e6e73'>Super+Space • Ctrl+Space đổi nhanh</span>")
-t4_sub.set_xalign(0)
+
+def get_gnome_per_window():
+    try:
+        out = subprocess.check_output(
+            ["gsettings", "get", "org.gnome.desktop.input-sources", "per-window"],
+            stderr=subprocess.DEVNULL,
+        ).decode().strip().lower()
+        return out == "true"
+    except Exception:
+        return False
+
+t4_chips = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+chk_pw = Gtk.ToggleButton(label="Riêng từng cửa sổ")
+chk_pw.set_tooltip_text("Nhớ chế độ bộ gõ riêng cho từng cửa sổ ứng dụng (VD: Terminal tiếng Anh, Trình duyệt tiếng Việt)")
+chk_pw.set_active(get_gnome_per_window())
+chk_ul = Gtk.ToggleButton(label="Gạch chân")
+chk_ul.set_tooltip_text("Bật/tắt đường gạch chân dưới từ đang gõ (mặc định: Tắt)")
+chk_ul.set_active(cfg.get("PREEDIT_UNDERLINE", "false") == "true")
+t4_chips.pack_start(chk_pw, True, True, 0)
+t4_chips.pack_start(chk_ul, False, False, 0)
+
+def on_pw_toggled(btn):
+    val = "true" if btn.get_active() else "false"
+    try:
+        subprocess.Popen(
+            ["gsettings", "set", "org.gnome.desktop.input-sources", "per-window", val],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+def on_ul_toggled(btn):
+    cfg["PREEDIT_UNDERLINE"] = "true" if btn.get_active() else "false"
+    save_current_config()
+
+chk_pw.connect("toggled", on_pw_toggled)
+chk_ul.connect("toggled", on_ul_toggled)
 tile4.pack_start(t4_top, False, False, 0)
-tile4.pack_start(t4_sub, False, False, 0)
+tile4.pack_start(t4_chips, False, False, 0)
 
 bento_grid.attach(tile1, 0, 0, 1, 1)
 bento_grid.attach(tile2, 1, 0, 1, 1)
@@ -895,6 +940,7 @@ case "${1:-}" in
         echo "RELAXED_CODA=${RELAXED_CODA}"
         echo "MACRO_ENABLED=${MACRO_ENABLED}"
         echo "DEVELOPER_MODE=${DEVELOPER_MODE}"
+        echo "PREEDIT_UNDERLINE=${PREEDIT_UNDERLINE}"
         exit 0
         ;;
     --smoke-test-gui)
@@ -946,6 +992,7 @@ cfg = {
     "RELAXED_CODA": "false",
     "MACRO_ENABLED": "true",
     "DEVELOPER_MODE": "false",
+    "PREEDIT_UNDERLINE": "false",
 }
 if os.path.exists(config_path):
     with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
