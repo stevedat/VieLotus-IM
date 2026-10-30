@@ -27,7 +27,7 @@ Recommends: ibus | fcitx5, im-config, zenity, fonts-noto-core | fonts-dejavu-cor
 Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
 Provides: fcitx5-vielotus, ibus-vielotus
 Enhances: fcitx5, ibus, language-selector-common
-Description: Sen Việt (VieLotusIM) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
- Sen Việt (VieLotusIM) is a Pure Swift 6 Vietnamese input method engine with
+Description: VieLotusIM (Sen Viet) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
+ VieLotusIM (Sen Viet) is a Pure Swift 6 Vietnamese input method engine with
  Smart Bilingual (English-Vietnamese) restoration and free-tone SEN Flex
  (Telex & VNI) support for both Fcitx5 and IBus on Ubuntu and Debian.

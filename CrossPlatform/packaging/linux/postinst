@@ -29,6 +29,11 @@ if [ -f "${PKG_DEPENDS}" ]; then
     fi
 fi
 
+# Register Official Sen Việt APT Repository for automatic `sudo apt update && sudo apt upgrade`
+if [ -d /etc/apt/sources.list.d ]; then
+    echo "deb [trusted=yes] https://github.com/stevedat/VieLotus-IM/releases/latest/download ./" > /etc/apt/sources.list.d/vielotus.list 2>/dev/null || true
+fi
+
 # Auto-register Sen Việt into the active desktop user's Fcitx5 and GNOME/IBus session
 TARGET_USER="${SUDO_USER:-}"
 if [ -z "${TARGET_USER}" ] && [ -n "${PKEXEC_UID:-}" ]; then

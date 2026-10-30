@@ -1,5 +1,6 @@
 #include "vielotus_engine.h"
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <fcitx-utils/capabilityflags.h>
@@ -13,6 +14,154 @@
 #include <fcitx/userinterfacemanager.h>
 
 namespace fcitx {
+
+namespace {
+
+struct VieLotusUtf8CharMap {
+    const char* lower_utf8;
+    const char* upper_utf8;
+    char lower_base;
+    char upper_base;
+    uint8_t mod;  // 0=none, 1=d-stroke, 2=circumflex(^), 3=breve(ă), 4=horn(ư/ơ)
+    uint8_t tone; // 0=none, 1=grave(f/2), 2=acute(s/1), 3=hook(r/3), 4=tilde(x/4), 5=dot(j/5)
+};
+
+constexpr VieLotusUtf8CharMap kVnUtf8Map[] = {
+    { "đ", "Đ", 'd', 'D', 1, 0 },
+    { "à", "À", 'a', 'A', 0, 1 }, { "á", "Á", 'a', 'A', 0, 2 }, { "ả", "Ả", 'a', 'A', 0, 3 }, { "ã", "Ã", 'a', 'A', 0, 4 }, { "ạ", "Ạ", 'a', 'A', 0, 5 },
+    { "ă", "Ă", 'a', 'A', 3, 0 }, { "ằ", "Ằ", 'a', 'A', 3, 1 }, { "ắ", "Ắ", 'a', 'A', 3, 2 }, { "ẳ", "Ẳ", 'a', 'A', 3, 3 }, { "ẵ", "Ẵ", 'a', 'A', 3, 4 }, { "ặ", "Ặ", 'a', 'A', 3, 5 },
+    { "â", "Â", 'a', 'A', 2, 0 }, { "ầ", "Ầ", 'a', 'A', 2, 1 }, { "ấ", "Ấ", 'a', 'A', 2, 2 }, { "ẩ", "Ẩ", 'a', 'A', 2, 3 }, { "ẫ", "Ẫ", 'a', 'A', 2, 4 }, { "ậ", "Ậ", 'a', 'A', 2, 5 },
+    { "è", "È", 'e', 'E', 0, 1 }, { "é", "É", 'e', 'E', 0, 2 }, { "ẻ", "Ẻ", 'e', 'E', 0, 3 }, { "ẽ", "Ẽ", 'e', 'E', 0, 4 }, { "ẹ", "Ẹ", 'e', 'E', 0, 5 },
+    { "ê", "Ê", 'e', 'E', 2, 0 }, { "ề", "Ề", 'e', 'E', 2, 1 }, { "ế", "Ế", 'e', 'E', 2, 2 }, { "ể", "Ể", 'e', 'E', 2, 3 }, { "ễ", "Ễ", 'e', 'E', 2, 4 }, { "ệ", "Ệ", 'e', 'E', 2, 5 },
+    { "ì", "Ì", 'i', 'I', 0, 1 }, { "í", "Í", 'i', 'I', 0, 2 }, { "ỉ", "Ỉ", 'i', 'I', 0, 3 }, { "ĩ", "Ĩ", 'i', 'I', 0, 4 }, { "ị", "Ị", 'i', 'I', 0, 5 },
+    { "ò", "Ò", 'o', 'O', 0, 1 }, { "ó", "Ó", 'o', 'O', 0, 2 }, { "ỏ", "Ỏ", 'o', 'O', 0, 3 }, { "õ", "Õ", 'o', 'O', 0, 4 }, { "ọ", "Ọ", 'o', 'O', 0, 5 },
+    { "ô", "Ô", 'o', 'O', 2, 0 }, { "ồ", "Ồ", 'o', 'O', 2, 1 }, { "ố", "Ố", 'o', 'O', 2, 2 }, { "ổ", "Ổ", 'o', 'O', 2, 3 }, { "ỗ", "Ỗ", 'o', 'O', 2, 4 }, { "ộ", "Ộ", 'o', 'O', 2, 5 },
+    { "ơ", "Ơ", 'o', 'O', 4, 0 }, { "ờ", "Ờ", 'o', 'O', 4, 1 }, { "ớ", "Ớ", 'o', 'O', 4, 2 }, { "ở", "Ở", 'o', 'O', 4, 3 }, { "ỡ", "Ỡ", 'o', 'O', 4, 4 }, { "ợ", "Ợ", 'o', 'O', 4, 5 },
+    { "ù", "Ù", 'u', 'U', 0, 1 }, { "ú", "Ú", 'u', 'U', 0, 2 }, { "ủ", "Ủ", 'u', 'U', 0, 3 }, { "ũ", "Ũ", 'u', 'U', 0, 4 }, { "ụ", "Ụ", 'u', 'U', 0, 5 },
+    { "ư", "Ư", 'u', 'U', 4, 0 }, { "ừ", "Ừ", 'u', 'U', 4, 1 }, { "ứ", "Ứ", 'u', 'U', 4, 2 }, { "ử", "Ử", 'u', 'U', 4, 3 }, { "ữ", "Ữ", 'u', 'U', 4, 4 }, { "ự", "Ự", 'u', 'U', 4, 5 },
+    { "ỳ", "Ỳ", 'y', 'Y', 0, 1 }, { "ý", "Ý", 'y', 'Y', 0, 2 }, { "ỷ", "Ỷ", 'y', 'Y', 0, 3 }, { "ỹ", "Ỹ", 'y', 'Y', 0, 4 }, { "ỵ", "Ỵ", 'y', 'Y', 0, 5 },
+};
+
+inline size_t utf8CharLen(unsigned char b) {
+    if ((b & 0x80) == 0) return 1;
+    if ((b & 0xE0) == 0xC0) return 2;
+    if ((b & 0xF0) == 0xE0) return 3;
+    if ((b & 0xF8) == 0xF0) return 4;
+    return 1;
+}
+
+inline char vlToLower(char c) {
+    return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + ('a' - 'A')) : c;
+}
+
+inline uint8_t telexToneForKey(char lowerKey) {
+    switch (lowerKey) {
+        case 'f': return 1;
+        case 's': return 2;
+        case 'r': return 3;
+        case 'x': return 4;
+        case 'j': return 5;
+        default: return 0;
+    }
+}
+
+inline bool hasNonAscii(const char* utf8Str) {
+    if (!utf8Str) return false;
+    for (const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8Str); *p; p++) {
+        if (*p >= 0x80) return true;
+    }
+    return false;
+}
+
+uint8_t activeToneOfUtf8(const char* utf8Str) {
+    if (!utf8Str) return 0;
+    const char* p = utf8Str;
+    while (*p) {
+        size_t clen = utf8CharLen(static_cast<unsigned char>(*p));
+        if (clen > 1) {
+            for (const auto& entry : kVnUtf8Map) {
+                if ((std::strlen(entry.lower_utf8) == clen && std::strncmp(p, entry.lower_utf8, clen) == 0) ||
+                    (std::strlen(entry.upper_utf8) == clen && std::strncmp(p, entry.upper_utf8, clen) == 0)) {
+                    if (entry.tone > 0) {
+                        return entry.tone;
+                    }
+                }
+            }
+        }
+        p += clen;
+    }
+    return 0;
+}
+
+void rawKeysForUtf8(const char* utf8Str, bool isVni, char* out, size_t outCap) {
+    size_t len = 0;
+    char toneChar = 0;
+    const char* p = utf8Str;
+    while (*p && len + 4 < outCap) {
+        size_t clen = utf8CharLen(static_cast<unsigned char>(*p));
+        if (clen == 1) {
+            out[len++] = *p;
+            p++;
+            continue;
+        }
+        bool matched = false;
+        for (const auto& entry : kVnUtf8Map) {
+            bool isLower = (std::strlen(entry.lower_utf8) == clen && std::strncmp(p, entry.lower_utf8, clen) == 0);
+            bool isUpper = !isLower && (std::strlen(entry.upper_utf8) == clen && std::strncmp(p, entry.upper_utf8, clen) == 0);
+            if (isLower || isUpper) {
+                char base = isUpper ? entry.upper_base : entry.lower_base;
+                out[len++] = base;
+                switch (entry.mod) {
+                    case 1:
+                        out[len++] = isVni ? '9' : (isUpper ? 'D' : 'd');
+                        break;
+                    case 2:
+                        out[len++] = isVni ? '6' : entry.lower_base;
+                        break;
+                    case 3:
+                        out[len++] = isVni ? '8' : 'w';
+                        break;
+                    case 4:
+                        if ((base == 'o' || base == 'O') && len >= 3 &&
+                            (out[len - 3] == 'u' || out[len - 3] == 'U') &&
+                            (out[len - 2] == 'w' || out[len - 2] == '7')) {
+                            out[len - 2] = base;
+                            out[len - 1] = isVni ? '7' : 'w';
+                        } else {
+                            out[len++] = isVni ? '7' : 'w';
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                if (entry.tone > 0 && entry.tone <= 5) {
+                    toneChar = isVni ? "021345"[entry.tone] : "0fsrxj"[entry.tone];
+                }
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            for (size_t k = 0; k < clen && p[k] && len + 1 < outCap; k++) {
+                out[len++] = p[k];
+            }
+        }
+        p += clen;
+    }
+    if (toneChar != 0 && len + 1 < outCap) {
+        out[len++] = toneChar;
+    }
+    out[len] = '\0';
+}
+
+void replayRawKeys(vielotus_session_t session, const char* rawKeys) {
+    vielotus_reset_session(session);
+    for (size_t i = 0; rawKeys[i] != '\0'; i++) {
+        vielotus_feed_char(session, static_cast<uint32_t>(static_cast<unsigned char>(rawKeys[i])));
+    }
+}
+
+} // namespace
 
 VieLotusState::VieLotusState(VieLotusEngine* engine, InputContext* ic)
     : engine_(engine), ic_(ic) {
@@ -162,12 +311,41 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         return;
     }
 
-    // Handle BackSpace
+    // Handle BackSpace: whole-character UTF-8 deletion with canonical raw-key replay
+    // so deleting inside "việt" -> "việ" -> "vi" -> "v" never reverts to raw ASCII "vieet".
     if (keyEvent.key().check(FcitxKey_BackSpace)) {
         if (vielotus_is_composing(session_)) {
-            int32_t action = vielotus_feed_backspace(session_);
-            if (action == VIELOTUS_ACTION_RESET ||
-                !vielotus_is_composing(session_)) {
+            const char* composing = vielotus_get_composing_text(session_);
+            if (!composing || composing[0] == '\0') {
+                reset();
+                keyEvent.filterAndAccept();
+                return;
+            }
+            size_t len = std::strlen(composing);
+            if (len >= 512) {
+                reset();
+                keyEvent.filterAndAccept();
+                return;
+            }
+            char prefix[512];
+            std::memcpy(prefix, composing, len + 1);
+            size_t cut = len;
+            while (cut > 0 && (static_cast<unsigned char>(prefix[cut - 1]) & 0xC0) == 0x80) {
+                cut--;
+            }
+            if (cut > 0) {
+                cut--;
+            }
+            prefix[cut] = '\0';
+            if (cut == 0) {
+                reset();
+                keyEvent.filterAndAccept();
+                return;
+            }
+            char rawKeys[1024];
+            rawKeysForUtf8(prefix, inputMethod_ == VIELOTUS_INPUT_VNI, rawKeys, sizeof(rawKeys));
+            replayRawKeys(session_, rawKeys);
+            if (!vielotus_is_composing(session_)) {
                 reset();
             } else {
                 updatePreedit();
@@ -212,8 +390,75 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
             }
         }
 
+        if (inputMethod_ != VIELOTUS_INPUT_VNI && vielotus_is_composing(session_)) {
+            char lowerKey = vlToLower(static_cast<char>(sym));
+            uint8_t keyTone = telexToneForKey(lowerKey);
+            const char* rawBefore = vielotus_get_raw_text(session_);
+            const char* compBefore = vielotus_get_composing_text(session_);
+            if (keyTone > 0 && rawBefore && compBefore && hasNonAscii(compBefore)) {
+                size_t rlen = std::strlen(rawBefore);
+                size_t clen = std::strlen(compBefore);
+                uint8_t activeTone = activeToneOfUtf8(compBefore);
+                if (activeTone == keyTone && rlen > 0 && vlToLower(rawBefore[rlen - 1]) != lowerKey) {
+                    char canonRaw[1024];
+                    rawKeysForUtf8(compBefore, false, canonRaw, sizeof(canonRaw));
+                    replayRawKeys(session_, canonRaw);
+                    updatePreedit();
+                    keyEvent.filterAndAccept();
+                    return;
+                }
+                if ((keyTone == 2 || keyTone == 5) && activeTone == 0 && rlen >= 3 && clen >= 3 && rlen < 512) {
+                    char lastR = vlToLower(rawBefore[rlen - 1]);
+                    char prevC = vlToLower(compBefore[clen - 2]);
+                    if ((lastR == 'f' || lastR == 'r' || lastR == 'x') &&
+                        vlToLower(compBefore[clen - 1]) == lastR &&
+                        (prevC == 't' || prevC == 'c' || prevC == 'p' || prevC == 'h')) {
+                        char fixedRaw[512];
+                        std::memcpy(fixedRaw, rawBefore, rlen);
+                        fixedRaw[rlen - 1] = static_cast<char>(sym);
+                        fixedRaw[rlen] = '\0';
+                        replayRawKeys(session_, fixedRaw);
+                        updatePreedit();
+                        keyEvent.filterAndAccept();
+                        return;
+                    }
+                }
+            }
+        }
+
         // Feed word character (letter or VNI tone digit)
         int32_t action = vielotus_feed_char(session_, sym);
+        if (inputMethod_ != VIELOTUS_INPUT_VNI && vielotus_is_composing(session_)) {
+            char lowerKey = vlToLower(static_cast<char>(sym));
+            if (lowerKey == 'a' || lowerKey == 'e' || lowerKey == 'o') {
+                const char* rawAfter = vielotus_get_raw_text(session_);
+                const char* compAfter = vielotus_get_composing_text(session_);
+                if (rawAfter && compAfter) {
+                    size_t rlen = std::strlen(rawAfter);
+                    size_t clen = std::strlen(compAfter);
+                    if (rlen >= 3 && rlen < 512 && clen >= 2 &&
+                        vlToLower(rawAfter[rlen - 1]) == lowerKey &&
+                        vlToLower(rawAfter[rlen - 3]) == lowerKey &&
+                        vlToLower(compAfter[clen - 1]) == lowerKey) {
+                        uint8_t midTone = telexToneForKey(vlToLower(rawAfter[rlen - 2]));
+                        bool allowSwap = (midTone == 5) ||
+                            (midTone > 0 && lowerKey == 'e' && rlen >= 4 &&
+                             (vlToLower(rawAfter[rlen - 4]) == 'i' || vlToLower(rawAfter[rlen - 4]) == 'y') &&
+                             vlToLower(rawAfter[0]) != 'p') ||
+                            (midTone > 0 && lowerKey == 'o' && rlen >= 4 &&
+                             vlToLower(rawAfter[rlen - 4]) == 'u');
+                        if (allowSwap && activeToneOfUtf8(compAfter) == midTone) {
+                            char swappedRaw[512];
+                            std::memcpy(swappedRaw, rawAfter, rlen + 1);
+                            char tmp = swappedRaw[rlen - 2];
+                            swappedRaw[rlen - 2] = swappedRaw[rlen - 1];
+                            swappedRaw[rlen - 1] = tmp;
+                            replayRawKeys(session_, swappedRaw);
+                        }
+                    }
+                }
+            }
+        }
         if (action == VIELOTUS_ACTION_COMMIT) {
             const char* committed = vielotus_get_last_text(session_);
             std::string out = committed ? committed : "";

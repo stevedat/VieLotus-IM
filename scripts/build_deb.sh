@@ -222,15 +222,7 @@ package_single_arch() {
 
     # 1. Core C-ABI Library & Header
     cp "${arch_bin_dir}/libVieLotusCAPI.so" "${pkg_dir}/usr/lib/"
-    python3 - "${ROOT_DIR}/Sources/VieLotusCAPI/include/vielotus.h" "${pkg_dir}/usr/include/vielotus.h" << 'PYEOF'
-import re, sys
-with open(sys.argv[1], "r", encoding="utf-8") as f:
-    h = f.read()
-h = re.sub(r"// =+\n// Context-Aware Word Suggestion Engine\n// =+\n.*?(?=// =+\n// Version & Metadata)", "", h, flags=re.S)
-h = re.sub(r"\n*// =+\n// EDU-TYPE Local Loopback Bridge.*?(?=\n#ifdef __cplusplus)", "\n", h, flags=re.S)
-with open(sys.argv[2], "w", encoding="utf-8") as f:
-    f.write(h)
-PYEOF
+    cp "${ROOT_DIR}/Sources/VieLotusCAPI/include/vielotus.h" "${pkg_dir}/usr/include/vielotus.h"
 
     if [ -d "${arch_bin_dir}/swift-runtime" ]; then
         cp -a "${arch_bin_dir}/swift-runtime/"*.so* "${pkg_dir}/usr/lib/vielotus/" 2>/dev/null || true
@@ -356,7 +348,7 @@ Recommends: ibus | fcitx5, im-config, zenity, fonts-noto-core, fonts-dejavu-core
 Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
 Provides: fcitx5-vielotus, ibus-vielotus
 Enhances: fcitx5, ibus, language-selector-common
-Description: Sen Việt (VieLotusIM) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
+Description: VieLotusIM (Sen Viet) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
  All-in-one installer containing the Pure Swift 6 Vietnamese engine core
  (libVieLotusCAPI.so + bundled Swift runtime) alongside both native IBus
  and Fcitx5 input method plugins for Ubuntu, Debian, Mint, and Pop!_OS.
@@ -379,7 +371,117 @@ fi
 
 rm -rf "${DEB_BASE}"
 
+# Generate Official APT Repository Metadata (Packages, Packages.gz, Release) & Arch PKGBUILD SHA256
+python3 - "${DIST_LINUX}" "${VERSION}" "${ROOT_DIR}" <<'PYEOF'
+import datetime, gzip, hashlib, os, re, sys, tarfile
+
+dist_dir, version, root_dir = sys.argv[1], sys.argv[2], sys.argv[3]
+deb_files = sorted(
+    f for f in os.listdir(dist_dir)
+    if f.startswith(f"vielotus_{version}_") and f.endswith(".deb")
+)
+
+def extract_control_from_deb(deb_path):
+    with open(deb_path, "rb") as f:
+        if f.read(8) != b"!<arch>\n":
+            raise RuntimeError(f"Invalid deb: {deb_path}")
+        while True:
+            hdr = f.read(60)
+            if len(hdr) < 60:
+                break
+            name = hdr[:16].decode("ascii", errors="ignore").strip().rstrip("/")
+            size = int(hdr[48:58].decode("ascii").strip())
+            data = f.read(size)
+            if size % 2 == 1:
+                f.read(1)
+            if name.startswith("control.tar"):
+                import io
+                with tarfile.open(fileobj=io.BytesIO(data), mode="r:*") as tf:
+                    for member in tf.getmembers():
+                        if member.name.endswith("/control") or member.name == "control":
+                            return tf.extractfile(member).read().decode("utf-8").strip()
+    raise RuntimeError(f"No control found in {deb_path}")
+
+stanzas = []
+arch_sha256 = {}
+
+for fname in deb_files:
+    fpath = os.path.join(dist_dir, fname)
+    with open(fpath, "rb") as f:
+        blob = f.read()
+    size = len(blob)
+    md5 = hashlib.md5(blob).hexdigest()
+    sha1 = hashlib.sha1(blob).hexdigest()
+    sha256 = hashlib.sha256(blob).hexdigest()
+    if "_amd64.deb" in fname:
+        arch_sha256["amd64"] = sha256
+    elif "_arm64.deb" in fname:
+        arch_sha256["arm64"] = sha256
+    ctrl = extract_control_from_deb(fpath)
+    stanza = (
+        f"{ctrl}\n"
+        f"Filename: ./{fname}\n"
+        f"Size: {size}\n"
+        f"MD5sum: {md5}\n"
+        f"SHA1: {sha1}\n"
+        f"SHA256: {sha256}\n"
+    )
+    stanzas.append(stanza)
+
+packages_content = "\n".join(stanzas).encode("utf-8")
+packages_gz_content = gzip.compress(packages_content, compresslevel=9, mtime=0)
+
+now_rfc2822 = datetime.datetime.now(datetime.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S UTC")
+
+def hashes_line(data, name):
+    return (
+        hashlib.md5(data).hexdigest(),
+        hashlib.sha256(data).hexdigest(),
+        len(data),
+        name,
+    )
+
+p_md5, p_sha256, p_len, _ = hashes_line(packages_content, "Packages")
+gz_md5, gz_sha256, gz_len, _ = hashes_line(packages_gz_content, "Packages.gz")
+
+release_content = (
+    "Origin: VieLotusIM (Sen Viet)\n"
+    "Label: VieLotusIM Official APT Repository\n"
+    "Suite: stable\n"
+    "Codename: stable\n"
+    f"Version: {version}\n"
+    "Architectures: amd64 arm64\n"
+    "Components: main\n"
+    "Description: Official APT Repository for VieLotusIM (Sen Viet) Next-Gen Vietnamese Input Method\n"
+    f"Date: {now_rfc2822}\n"
+    "MD5Sum:\n"
+    f" {p_md5} {p_len:16d} Packages\n"
+    f" {gz_md5} {gz_len:16d} Packages.gz\n"
+    "SHA256:\n"
+    f" {p_sha256} {p_len:16d} Packages\n"
+    f" {gz_sha256} {gz_len:16d} Packages.gz\n"
+).encode("utf-8")
+
+for target_dir in (dist_dir, os.path.join(root_dir, "docs", "apt")):
+    os.makedirs(target_dir, exist_ok=True)
+    with open(os.path.join(target_dir, "Packages"), "wb") as f:
+        f.write(packages_content)
+    with open(os.path.join(target_dir, "Packages.gz"), "wb") as f:
+        f.write(packages_gz_content)
+    with open(os.path.join(target_dir, "Release"), "wb") as f:
+        f.write(release_content)
+
+pkgbuild_path = os.path.join(root_dir, "CrossPlatform", "packaging", "arch", "PKGBUILD")
+if os.path.isfile(pkgbuild_path) and "amd64" in arch_sha256 and "arm64" in arch_sha256:
+    with open(pkgbuild_path, "r", encoding="utf-8") as f:
+        pb = f.read()
+    pb = re.sub(r"sha256sums_x86_64=\([^)]*\)", f"sha256sums_x86_64=('{arch_sha256['amd64']}')", pb)
+    pb = re.sub(r"sha256sums_aarch64=\([^)]*\)", f"sha256sums_aarch64=('{arch_sha256['arm64']}')", pb)
+    with open(pkgbuild_path, "w", encoding="utf-8") as f:
+        f.write(pb)
+PYEOF
+
 echo "======================================================="
-echo "🎉 Gói All-in-One Debian/Ubuntu (.deb) đã sẵn sàng tại:"
-ls -lh "${DIST_LINUX}/vielotus_${VERSION}"_*.deb
+echo "🎉 Gói All-in-One Debian/Ubuntu (.deb) & APT Repo đã sẵn sàng tại:"
+ls -lh "${DIST_LINUX}/vielotus_${VERSION}"_*.deb "${DIST_LINUX}/Packages"* "${DIST_LINUX}/Release"
 echo "======================================================="
