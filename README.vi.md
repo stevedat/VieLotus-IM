@@ -59,6 +59,13 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
 - Chạy bộ cài và nhấn **`Win + Space`** để chuyển sang **Sen Việt**.
 
 ### 3. Linux (Ubuntu / Debian / Mint / Fedora / Arch / openSUSE — `amd64` & `arm64`)
+- **Kho Launchpad PPA chính thức cho Ubuntu (`Ubuntu 22.04 LTS & 24.04 LTS` — `amd64` & `arm64`)**:
+  ```bash
+  sudo add-apt-repository ppa:stevedat/vielotus
+  sudo apt update
+  sudo apt install ibus-vielotus     # GNOME / Ubuntu mặc định (IBus)
+  # hoặc: sudo apt install fcitx5-vielotus  # KDE Plasma / Wayland (Fcitx5)
+  ```
 - **Cài đặt tự động 1 dòng lệnh (Tự nhận diện `apt`, `dnf`, `pacman`, `zypper` & `x86_64` / `aarch64`)**:
   ```bash
   curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh
