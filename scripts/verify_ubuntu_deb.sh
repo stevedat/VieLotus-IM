@@ -304,7 +304,7 @@ lib.vielotus_set_modern_orthography(session, True)
 
 test_cases = [
     ("Telex — Tiếng Việt chuẩn", VIELOTUS_INPUT_TELEX, "vieetj nam ddax hoaf binhf", "việt nam đã hoà bình"),
-    ("Telex — Song ngữ Anh-Việt & Code", VIELOTUS_INPUT_TELEX, "test commit print(x) ", "test commit print(x) "),
+    ("Telex — Song ngữ Anh-Việt & Code", VIELOTUS_INPUT_TELEX, "unit test commit print(x) ", "unit test commit print(x) "),
     ("VNI — Tiếng Việt chuẩn", VIELOTUS_INPUT_VNI, "vie65t nam d9a4 hoa2 binh2", "việt nam đã hoà bình"),
 ]
 
