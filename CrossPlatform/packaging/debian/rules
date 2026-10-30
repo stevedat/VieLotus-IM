@@ -30,7 +30,7 @@ override_dh_auto_install:
 	DESTDIR=$(CURDIR)/debian/libvielotus0 cmake --install build-core
 	mkdir -p $(CURDIR)/debian/libvielotus0/usr/lib
 	ln -sf $(DEB_HOST_MULTIARCH)/libVieLotusCAPI.so.0 $(CURDIR)/debian/libvielotus0/usr/lib/libVieLotusCAPI.so
-	install -Dm644 Resources/typing-modes.yml \
+	install -Dm644 Sources/VieLotusCore/Resources/typing-modes.yml \
 		$(CURDIR)/debian/libvielotus0/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml
 	DESTDIR=$(CURDIR)/debian/fcitx5-vielotus cmake --install build-fcitx5
 	DESTDIR=$(CURDIR)/debian/ibus-vielotus cmake --install build-ibus

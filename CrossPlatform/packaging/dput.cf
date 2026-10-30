@@ -1,0 +1,15 @@
+[vielotus-ppa]
+fqdn = ppa.launchpad.net
+method = ftp
+incoming = ~stevedat/vielotus/ubuntu/
+login = anonymous
+allow_unsigned_uploads = 0
+
+[mentors]
+fqdn = mentors.debian.net
+incoming = /upload
+method = https
+allow_unsigned_uploads = 0
+progress_indicator = 2
+# Needs to be set to 1 to upload to mentors
+check_version = 1

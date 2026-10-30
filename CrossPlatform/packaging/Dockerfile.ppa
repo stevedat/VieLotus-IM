@@ -1,0 +1,38 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Ho_Chi_Minh
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    devscripts \
+    debhelper \
+    dh-make \
+    dpkg-dev \
+    fakeroot \
+    lintian \
+    dput \
+    gnupg \
+    extra-cmake-modules \
+    fcitx5-modules-dev \
+    libfcitx5config-dev \
+    libfcitx5core-dev \
+    libfcitx5utils-dev \
+    libibus-1.0-dev \
+    libglib2.0-dev \
+    python3 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create dput config for PPA
+RUN mkdir -p /root && echo '[vielotus-ppa]\n\
+fqdn = ppa.launchpad.net\n\
+method = ftp\n\
+incoming = ~stevedat/vielotus/ubuntu/\n\
+login = anonymous\n\
+allow_unsigned_uploads = 0' > /root/.dput.cf
+
+WORKDIR /build
