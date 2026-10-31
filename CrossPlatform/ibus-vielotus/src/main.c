@@ -32,7 +32,6 @@ struct _IBusVieLotusEngine {
     gboolean developer_mode;
     gboolean preedit_underline;
     gboolean is_password_field;
-    char last_committed_word[64];
     time_t config_mtime;
     IBusPropList *prop_list;
 };
@@ -222,36 +221,12 @@ static void ibus_vielotus_engine_reset_internal(IBusVieLotusEngine *vl_engine) {
     ibus_vielotus_clear_preedit((IBusEngine *)vl_engine);
 }
 
-static inline char vl_tolower_fast(char c) {
-    return (c >= 'A' && c <= 'Z') ? (char)(c + ('a' - 'A')) : c;
-}
-
-static gboolean ibus_vielotus_is_turn_english_default(IBusVieLotusEngine *vl_engine, const char *raw) {
-    if (vl_engine->is_vni || !raw || strlen(raw) != 4) {
-        return FALSE;
-    }
-    if (vl_tolower_fast(raw[0]) == 't' && vl_tolower_fast(raw[1]) == 'u' &&
-        vl_tolower_fast(raw[2]) == 'r' && vl_tolower_fast(raw[3]) == 'n') {
-        if (strcmp(vl_engine->last_committed_word, "lùn") != 0 &&
-            strcmp(vl_engine->last_committed_word, "nhỏ") != 0) {
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
 static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const char *trailing_ascii) {
     IBusEngine *engine = (IBusEngine *)vl_engine;
     char buf[1024];
-    char raw_snapshot[64];
     buf[0] = '\0';
-    raw_snapshot[0] = '\0';
 
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
-        const char *raw_before = vielotus_get_raw_text(vl_engine->session);
-        if (raw_before) {
-            snprintf(raw_snapshot, sizeof(raw_snapshot), "%s", raw_before);
-        }
         if (trailing_ascii && trailing_ascii[0] != '\0' && trailing_ascii[1] == '\0') {
             uint32_t cp = (uint32_t)(unsigned char)trailing_ascii[0];
             vielotus_feed_char(vl_engine->session, cp);
@@ -259,13 +234,8 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
             vielotus_commit_word(vl_engine->session);
         }
         const char *committed = vielotus_get_last_text(vl_engine->session);
-        if (ibus_vielotus_is_turn_english_default(vl_engine, raw_snapshot)) {
-            snprintf(buf, sizeof(buf), "%s", raw_snapshot);
-            snprintf(vl_engine->last_committed_word, sizeof(vl_engine->last_committed_word), "%s", raw_snapshot);
-            vielotus_append_context(vl_engine->session, "turn");
-        } else if (committed && committed[0] != '\0') {
+        if (committed && committed[0] != '\0') {
             snprintf(buf, sizeof(buf), "%s", committed);
-            snprintf(vl_engine->last_committed_word, sizeof(vl_engine->last_committed_word), "%s", committed);
         }
     }
 
@@ -288,10 +258,8 @@ static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
     IBusEngine *engine = (IBusEngine *)vl_engine;
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
         const char *composing = vielotus_get_composing_text(vl_engine->session);
-        const char *raw = vielotus_get_raw_text(vl_engine->session);
-        const char *display_str = ibus_vielotus_is_turn_english_default(vl_engine, raw) ? raw : composing;
-        if (display_str && display_str[0] != '\0') {
-            IBusText *text = ibus_text_new_from_string(display_str);
+        if (composing && composing[0] != '\0') {
+            IBusText *text = ibus_text_new_from_string(composing);
             guint char_len = ibus_text_get_length(text);
             guint ul_mode = vl_engine->preedit_underline ? IBUS_ATTR_UNDERLINE_SINGLE : IBUS_ATTR_UNDERLINE_NONE;
             ibus_text_append_attribute(text, IBUS_ATTR_TYPE_UNDERLINE, ul_mode, 0, (gint)char_len);
