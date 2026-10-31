@@ -133,11 +133,49 @@ void vielotus_append_context(vielotus_session_t session, const char* context_wor
 void vielotus_sync_armed_word(vielotus_session_t session, const char* before_context_utf8);
 
 // ============================================================================
+// Context-Aware Word Suggestion Engine
+// ============================================================================
+
+/// Loads or updates the shared compound word suggestion dictionary from a JSON string (`TuDienTuGhep.json`).
+bool vielotus_load_suggestion_dictionary(const char* json_utf8);
+
+/// Queries top-K context-aware suggestions. Returns newline-separated records `displayText\tinsertionText\treplacementMode\tisPrimary`.
+const char* vielotus_get_suggestions(
+    vielotus_session_t session,
+    const char* before_context_utf8,
+    int32_t limit
+);
+
+/// Records a selected candidate in the ephemeral personalization store and updates session context & post-commit arming.
+void vielotus_record_candidate_selection(
+    vielotus_session_t session,
+    const char* before_context_utf8,
+    const char* insertion_text_utf8,
+    bool trailing_space
+);
+
+// ============================================================================
 // Version & Metadata
 // ============================================================================
 
 /// Returns the SemVer string of the VieLotus Core engine (e.g. "1.0.0").
 const char* vielotus_get_version(void);
+
+// ============================================================================
+// EDU-TYPE Local Loopback Bridge (127.0.0.1:2811 — LOCK-IME-VIELOTUS-001)
+// ============================================================================
+
+/// Starts the local loopback HTTP bridge daemon on the specified port (default: 2811).
+bool vielotus_start_loopback_bridge(uint16_t port);
+
+/// Stops the local loopback HTTP bridge daemon.
+void vielotus_stop_loopback_bridge(void);
+
+/// Returns true if the local loopback HTTP bridge daemon is currently running.
+bool vielotus_is_loopback_bridge_running(void);
+
+/// Processes a raw HTTP request string through the bridge and returns the HTTP response string.
+const char* vielotus_process_bridge_http(const char* raw_request);
 
 #ifdef __cplusplus
 }

@@ -104,8 +104,50 @@ static std::wstring Utf8ToWide(const char *utf8Str) {
     return result;
 }
 
+static std::wstring GetCurrentHostExeLowerName() {
+    WCHAR exePath[MAX_PATH] = {0};
+    if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) == 0) {
+        return L"";
+    }
+    const WCHAR *base = exePath;
+    for (const WCHAR *p = exePath; *p; ++p) {
+        if (*p == L'\\' || *p == L'/') {
+            base = p + 1;
+        }
+    }
+    std::wstring lowerName(base);
+    for (WCHAR &ch : lowerName) {
+        if (ch >= L'A' && ch <= L'Z') {
+            ch = static_cast<WCHAR>(ch + (L'a' - L'A'));
+        }
+    }
+    return lowerName;
+}
+
+static bool IsKnownRemoteDesktopExecutable(const std::wstring &lowerExe) {
+    static const LPCWSTR kRemoteExes[] = {
+        L"mstsc.exe",
+        L"msrdc.exe",
+        L"anydesk.exe",
+        L"teamviewer.exe",
+        L"rustdesk.exe",
+        L"vmware-remotemks.exe",
+        L"vmware-view.exe",
+        L"parsec.exe",
+        L"wfica32.exe"
+    };
+    for (LPCWSTR item : kRemoteExes) {
+        if (lowerExe == item) {
+            return true;
+        }
+    }
+    return false;
+}
+
 CVieLotusTIP::CVieLotusTIP() {
     DllAddRef();
+    m_currentExeName = GetCurrentHostExeLowerName();
+    m_isRemoteProcess = IsKnownRemoteDesktopExecutable(m_currentExeName);
 }
 
 CVieLotusTIP::~CVieLotusTIP() {
@@ -177,7 +219,18 @@ void CVieLotusTIP::ReloadUserPreferences() {
     VieLotusWindowsPrefs prefs{};
     LoadVieLotusPrefs(prefs);
     m_isVniMode = prefs.isVni;
-    m_isVietnameseMode = prefs.vietnameseEnabled;
+
+    bool perAppBypass = false;
+    bool hasPerAppPref = LoadPerAppBypassPreference(m_currentExeName.c_str(), perAppBypass);
+    if (m_hasManualProcessOverride) {
+        m_isVietnameseMode = m_manualProcessVietnameseMode;
+    } else if (hasPerAppPref) {
+        m_isVietnameseMode = perAppBypass ? false : prefs.vietnameseEnabled;
+    } else if (m_isRemoteProcess && prefs.autoBypassRemoteApps) {
+        m_isVietnameseMode = false;
+    } else {
+        m_isVietnameseMode = prefs.vietnameseEnabled;
+    }
 
 #if defined(VIELOTUS_EMBEDDED_ENGINE)
     m_nativeEngine.setInputMethod(m_isVniMode ? vielotus_win::InputMethod::VNI : vielotus_win::InputMethod::Telex);
@@ -542,10 +595,17 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
     // Hotkey toggle: Ctrl + Space / Shift + Space
     if (wParam == VK_SPACE && ((GetKeyState(VK_CONTROL) & 0x8000) || (GetKeyState(VK_SHIFT) & 0x8000))) {
         m_isVietnameseMode = !m_isVietnameseMode;
+        m_hasManualProcessOverride = true;
+        m_manualProcessVietnameseMode = m_isVietnameseMode;
         VieLotusWindowsPrefs prefs{};
         LoadVieLotusPrefs(prefs);
-        prefs.vietnameseEnabled = m_isVietnameseMode;
-        SaveVieLotusPrefs(prefs);
+        bool existingPerAppBypass = false;
+        if (m_isRemoteProcess || LoadPerAppBypassPreference(m_currentExeName.c_str(), existingPerAppBypass)) {
+            SavePerAppBypassPreference(m_currentExeName.c_str(), !m_isVietnameseMode);
+        } else {
+            prefs.vietnameseEnabled = m_isVietnameseMode;
+            SaveVieLotusPrefs(prefs);
+        }
         ResetComposingSession();
         *pfEaten = TRUE;
         return S_OK;

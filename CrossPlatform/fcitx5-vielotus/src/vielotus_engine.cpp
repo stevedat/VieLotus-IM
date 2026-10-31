@@ -216,7 +216,14 @@ void VieLotusState::updatePreedit() {
 
     if (session_ && vielotus_is_composing(session_)) {
         const char* composing = vielotus_get_composing_text(session_);
+        const char* raw = vielotus_get_raw_text(session_);
         std::string preeditStr = composing ? composing : "";
+        if (inputMethod_ != VIELOTUS_INPUT_VNI && raw && std::strlen(raw) == 4 &&
+            vlToLower(raw[0]) == 't' && vlToLower(raw[1]) == 'u' &&
+            vlToLower(raw[2]) == 'r' && vlToLower(raw[3]) == 'n' &&
+            lastCommittedWord_ != "lùn" && lastCommittedWord_ != "nhỏ") {
+            preeditStr = raw;
+        }
         if (!preeditStr.empty()) {
             const bool useClientPreedit =
                 ic_->capabilityFlags().test(CapabilityFlag::Preedit);
@@ -236,7 +243,10 @@ void VieLotusState::updatePreedit() {
 
 void VieLotusState::commitComposing(const char* trailingAscii) {
     std::string out;
+    std::string committedWordOnly;
     if (session_ && vielotus_is_composing(session_)) {
+        const char* rawBefore = vielotus_get_raw_text(session_);
+        std::string rawSnapshot = rawBefore ? rawBefore : "";
         if (trailingAscii && trailingAscii[0] != '\0' && trailingAscii[1] == '\0') {
             uint32_t cp = static_cast<uint32_t>(static_cast<unsigned char>(trailingAscii[0]));
             vielotus_feed_char(session_, cp);
@@ -244,9 +254,22 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
             vielotus_commit_word(session_);
         }
         const char* committed = vielotus_get_last_text(session_);
-        if (committed && committed[0] != '\0') {
+        if (inputMethod_ != VIELOTUS_INPUT_VNI && rawSnapshot.size() == 4 &&
+            vlToLower(rawSnapshot[0]) == 't' && vlToLower(rawSnapshot[1]) == 'u' &&
+            vlToLower(rawSnapshot[2]) == 'r' && vlToLower(rawSnapshot[3]) == 'n' &&
+            lastCommittedWord_ != "lùn" && lastCommittedWord_ != "nhỏ") {
+            committedWordOnly = rawSnapshot;
+            out.append(rawSnapshot);
+            vielotus_append_context(session_, "turn");
+        } else if (committed && committed[0] != '\0') {
+            committedWordOnly = committed;
             out.append(committed);
         }
+    }
+    if (!committedWordOnly.empty()) {
+        lastCommittedWord_ = committedWordOnly;
+    } else if (trailingAscii && trailingAscii[0] != ' ') {
+        lastCommittedWord_.clear();
     }
     if (trailingAscii && trailingAscii[0] != '\0') {
         out.append(trailingAscii);
@@ -275,6 +298,14 @@ void VieLotusState::reset() {
 
 void VieLotusState::keyEvent(KeyEvent& keyEvent) {
     if (keyEvent.isRelease()) {
+        return;
+    }
+
+    // Password / PIN / sensitive field protection: deterministically clear active composition and pass through raw keystrokes
+    if (ic_ && ic_->capabilityFlags().test(CapabilityFlag::Password)) {
+        if (vielotus_is_composing(session_)) {
+            reset();
+        }
         return;
     }
 
@@ -390,6 +421,16 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
             }
         }
 
+        // Auto-flush preedit before internal 64-token buffer limit (e.g. holding a key for 80+ characters)
+        if (vielotus_is_composing(session_)) {
+            const char* rawCheck = vielotus_get_raw_text(session_);
+            const char* compCheck = vielotus_get_composing_text(session_);
+            if ((rawCheck && std::strlen(rawCheck) >= 48) ||
+                (compCheck && std::strlen(compCheck) >= 48)) {
+                commitComposing(nullptr);
+            }
+        }
+
         if (inputMethod_ != VIELOTUS_INPUT_VNI && vielotus_is_composing(session_)) {
             char lowerKey = vlToLower(static_cast<char>(sym));
             uint8_t keyTone = telexToneForKey(lowerKey);
@@ -500,7 +541,11 @@ VieLotusEngine::VieLotusEngine(Instance* instance)
     settingsAction_->setLongText(_("Mở bảng điều khiển và cài đặt bộ gõ Sen Việt"));
     connections_.emplace_back(settingsAction_->connect<SimpleAction::Activated>(
         [](InputContext*) {
-            startProcess({"/usr/bin/vielotus-settings"});
+            if (std::filesystem::exists("/usr/bin/vielotus-settings")) {
+                startProcess({"/usr/bin/vielotus-settings"});
+            } else {
+                startProcess({"fcitx5-configtool"});
+            }
         }));
     uiManager.registerAction("vielotus-settings", settingsAction_.get());
 

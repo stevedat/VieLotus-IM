@@ -37,6 +37,7 @@ if(EXISTS "${CORE_CPP_SRC}")
 
     install(TARGETS VieLotusCAPI
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        NAMELINK_SKIP
     )
 else()
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
@@ -69,11 +70,12 @@ else()
     install(FILES
         "${OUT_SO}"
         "${CMAKE_CURRENT_BINARY_DIR}/libVieLotusCAPI.so.0"
-        "${CMAKE_CURRENT_BINARY_DIR}/libVieLotusCAPI.so"
         DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     )
 endif()
 
-install(FILES "${REPO_ROOT}/Sources/VieLotusCAPI/include/vielotus.h"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-)
+if(VIELOTUS_INSTALL_DEV)
+    install(FILES "${REPO_ROOT}/Sources/VieLotusCAPI/include/vielotus.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+endif()
