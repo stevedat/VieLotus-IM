@@ -25,7 +25,7 @@ Mỗi GitHub Release tag (ví dụ `v2.0.0`) **CHỈ ĐƯỢC** chứa đúng **
 
 | Loại tệp | Lý do cấm |
 |-----------|-----------|
-| `*.orig.tar.xz` | **CHỨA MÃ NGUỒN ENGINE (WindowsNativeEngine.cpp)** — lộ IP |
+| `*.orig.tar.xz` | **Debian source tarball** — chỉ phân phối qua Mentors/PPA, không dành cho GitHub Release |
 | `*.debian.tar.xz` | Packaging internals, không dành cho end-user |
 | `*.dsc` | Debian source control file, không dành cho end-user |
 | `*.snap` | Chưa publish chính thức, gây nhầm lẫn |
@@ -85,14 +85,14 @@ files: |
 
 ---
 
-## 4. Debian Source Packages — Kênh Phân Phối
+## 4. Debian Source Packages (`*.orig.tar.xz`, `*.debian.tar.xz`, `*.dsc`) — Kênh Phân Phối
 
-| Kênh | Chứa source? | Công khai? | Cho phép? |
-|------|-------------|-----------|----------|
-| `mentors.debian.net` | ✅ `orig.tar.xz` | Có (nhưng cần tài khoản DD) | ✅ Đúng kênh |
-| `ppa.launchpad.net` | ✅ `orig.tar.xz` | Có (ký số GPG) | ✅ Đúng kênh |
-| GitHub Releases | ❌ KHÔNG ĐƯỢC | Hoàn toàn công khai | ⛔ CẤM |
-| GitHub repo commits | ❌ KHÔNG ĐƯỢC | Hoàn toàn công khai | ⛔ CẤM |
+| Kênh | Chứa `*.orig.tar.xz` / `.dsc`? | Công khai? | Cho phép? |
+|------|-------------------------------|-----------|----------|
+| `mentors.debian.net` | ✅ `orig.tar.xz` + `.dsc` | Có (kênh review Debian) | ✅ Đúng kênh |
+| `ppa.launchpad.net` | ✅ `orig.tar.xz` + `.dsc` | Có (ký số GPG) | ✅ Đúng kênh |
+| GitHub Releases | ❌ KHÔNG ĐƯỢC upload `*.orig.tar.xz` / `.dsc` | Hoàn toàn công khai | ⛔ CẤM |
+| GitHub repo (`VieLotus-IM`) | ✅ Chứa source tree khớp `debian/watch` (`uscan`), nhưng ❌ KHÔNG commit file nén `.orig.tar.xz` / `.dsc` | Hoàn toàn công khai | ✅ Đúng chuẩn DFSG |
 
 ---
 
