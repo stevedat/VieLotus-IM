@@ -1,0 +1,2 @@
+# The shared C-ABI runtime library is named libVieLotusCAPI.so.0 while the Debian binary package follows the lowercase source package prefix libvielotus0.
+libvielotus0: package-name-doesnt-match-sonames libVieLotusCAPI0

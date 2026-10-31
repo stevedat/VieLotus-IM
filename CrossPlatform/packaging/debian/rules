@@ -16,24 +16,22 @@ override_dh_auto_build:
 	cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
 		-DCMAKE_SKIP_RPATH=ON \
 		-DVIELOTUS_LIB_PATH=$(CURDIR)/build-core/libVieLotusCAPI.so
 	cmake --build build-fcitx5
 	cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_INSTALL_PREFIX=/usr \
-		-DCMAKE_INSTALL_LIBEXECDIR=/usr/lib/ibus \
-		-DLIBEXECDIR=/usr/lib/ibus \
+		-DCMAKE_INSTALL_LIBDIR=lib/$(DEB_HOST_MULTIARCH) \
+		-DCMAKE_INSTALL_LIBEXECDIR=libexec \
+		-DLIBEXECDIR=/usr/libexec \
 		-DCMAKE_SKIP_RPATH=ON \
 		-DVIELOTUS_LIB_PATH=$(CURDIR)/build-core/libVieLotusCAPI.so
 	cmake --build build-ibus
 
 override_dh_auto_install:
 	DESTDIR=$(CURDIR)/debian/libvielotus0 cmake --install build-core
-	mkdir -p $(CURDIR)/debian/libvielotus0/usr/lib
-	ln -sf $(DEB_HOST_MULTIARCH)/libVieLotusCAPI.so.0 $(CURDIR)/debian/libvielotus0/usr/lib/libVieLotusCAPI.so
-	install -Dm644 Resources/typing-modes.yml \
-		$(CURDIR)/debian/libvielotus0/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml
 	DESTDIR=$(CURDIR)/debian/fcitx5-vielotus cmake --install build-fcitx5
 	DESTDIR=$(CURDIR)/debian/ibus-vielotus cmake --install build-ibus
 	install -Dm755 CrossPlatform/packaging/linux/vielotus-settings \
@@ -42,6 +40,14 @@ override_dh_auto_install:
 		$(CURDIR)/debian/ibus-vielotus/usr/share/applications/vielotus.desktop
 	install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml \
 		$(CURDIR)/debian/ibus-vielotus/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml
+	install -Dm644 CrossPlatform/packaging/linux/vielotus-settings.1 \
+		$(CURDIR)/debian/ibus-vielotus/usr/share/man/man1/vielotus-settings.1
+	for sz in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do \
+		if [ -f CrossPlatform/linux-icons/hicolor_$${sz}_apps/vielotus.png ]; then \
+			install -Dm644 CrossPlatform/linux-icons/hicolor_$${sz}_apps/vielotus.png \
+				$(CURDIR)/debian/ibus-vielotus/usr/share/icons/hicolor/$${sz}/apps/vielotus.png; \
+		fi; \
+	done
 
 override_dh_auto_clean:
 	rm -rf build-core build-fcitx5 build-ibus

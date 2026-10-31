@@ -31,6 +31,8 @@ struct _IBusVieLotusEngine {
     gboolean macro_enabled;
     gboolean developer_mode;
     gboolean preedit_underline;
+    gboolean is_password_field;
+    char last_committed_word[64];
     time_t config_mtime;
     IBusPropList *prop_list;
 };
@@ -220,12 +222,36 @@ static void ibus_vielotus_engine_reset_internal(IBusVieLotusEngine *vl_engine) {
     ibus_vielotus_clear_preedit((IBusEngine *)vl_engine);
 }
 
+static inline char vl_tolower_fast(char c) {
+    return (c >= 'A' && c <= 'Z') ? (char)(c + ('a' - 'A')) : c;
+}
+
+static gboolean ibus_vielotus_is_turn_english_default(IBusVieLotusEngine *vl_engine, const char *raw) {
+    if (vl_engine->is_vni || !raw || strlen(raw) != 4) {
+        return FALSE;
+    }
+    if (vl_tolower_fast(raw[0]) == 't' && vl_tolower_fast(raw[1]) == 'u' &&
+        vl_tolower_fast(raw[2]) == 'r' && vl_tolower_fast(raw[3]) == 'n') {
+        if (strcmp(vl_engine->last_committed_word, "lùn") != 0 &&
+            strcmp(vl_engine->last_committed_word, "nhỏ") != 0) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const char *trailing_ascii) {
     IBusEngine *engine = (IBusEngine *)vl_engine;
     char buf[1024];
+    char raw_snapshot[64];
     buf[0] = '\0';
+    raw_snapshot[0] = '\0';
 
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
+        const char *raw_before = vielotus_get_raw_text(vl_engine->session);
+        if (raw_before) {
+            snprintf(raw_snapshot, sizeof(raw_snapshot), "%s", raw_before);
+        }
         if (trailing_ascii && trailing_ascii[0] != '\0' && trailing_ascii[1] == '\0') {
             uint32_t cp = (uint32_t)(unsigned char)trailing_ascii[0];
             vielotus_feed_char(vl_engine->session, cp);
@@ -233,8 +259,13 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
             vielotus_commit_word(vl_engine->session);
         }
         const char *committed = vielotus_get_last_text(vl_engine->session);
-        if (committed && committed[0] != '\0') {
+        if (ibus_vielotus_is_turn_english_default(vl_engine, raw_snapshot)) {
+            snprintf(buf, sizeof(buf), "%s", raw_snapshot);
+            snprintf(vl_engine->last_committed_word, sizeof(vl_engine->last_committed_word), "%s", raw_snapshot);
+            vielotus_append_context(vl_engine->session, "turn");
+        } else if (committed && committed[0] != '\0') {
             snprintf(buf, sizeof(buf), "%s", committed);
+            snprintf(vl_engine->last_committed_word, sizeof(vl_engine->last_committed_word), "%s", committed);
         }
     }
 
@@ -257,8 +288,10 @@ static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
     IBusEngine *engine = (IBusEngine *)vl_engine;
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
         const char *composing = vielotus_get_composing_text(vl_engine->session);
-        if (composing && composing[0] != '\0') {
-            IBusText *text = ibus_text_new_from_string(composing);
+        const char *raw = vielotus_get_raw_text(vl_engine->session);
+        const char *display_str = ibus_vielotus_is_turn_english_default(vl_engine, raw) ? raw : composing;
+        if (display_str && display_str[0] != '\0') {
+            IBusText *text = ibus_text_new_from_string(display_str);
             guint char_len = ibus_text_get_length(text);
             guint ul_mode = vl_engine->preedit_underline ? IBUS_ATTR_UNDERLINE_SINGLE : IBUS_ATTR_UNDERLINE_NONE;
             ibus_text_append_attribute(text, IBUS_ATTR_TYPE_UNDERLINE, ul_mode, 0, (gint)char_len);
@@ -471,6 +504,7 @@ static void ibus_vielotus_engine_init(IBusVieLotusEngine *vl_engine) {
     vl_engine->macro_enabled = TRUE;
     vl_engine->developer_mode = FALSE;
     vl_engine->preedit_underline = FALSE;
+    vl_engine->is_password_field = FALSE;
     vl_engine->prop_list = NULL;
 
     vielotus_set_input_method(vl_engine->session, VIELOTUS_INPUT_TELEX);
@@ -513,8 +547,31 @@ static void ibus_vielotus_engine_enable(IBusEngine *engine) {
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->enable(engine);
 }
 
+static gboolean ibus_vielotus_is_sensitive_content_type(guint purpose, guint hints) {
+    (void)hints;
+    return (purpose == IBUS_INPUT_PURPOSE_PASSWORD) ||
+           (purpose == IBUS_INPUT_PURPOSE_PIN);
+}
+
+static void ibus_vielotus_engine_set_content_type(
+    IBusEngine *engine,
+    guint purpose,
+    guint hints
+) {
+    IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
+    gboolean is_sensitive = ibus_vielotus_is_sensitive_content_type(purpose, hints);
+    vl_engine->is_password_field = is_sensitive;
+    if (is_sensitive && vielotus_is_composing(vl_engine->session)) {
+        ibus_vielotus_engine_reset_internal(vl_engine);
+    }
+    if (IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->set_content_type) {
+        IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->set_content_type(engine, purpose, hints);
+    }
+}
+
 static void ibus_vielotus_engine_disable(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
+    vl_engine->is_password_field = FALSE;
     if (vielotus_is_composing(vl_engine->session)) {
         ibus_vielotus_commit_composing(vl_engine, NULL);
     } else {
@@ -525,6 +582,10 @@ static void ibus_vielotus_engine_disable(IBusEngine *engine) {
 
 static void ibus_vielotus_engine_focus_in(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
+    guint purpose = IBUS_INPUT_PURPOSE_FREE_FORM;
+    guint hints = IBUS_INPUT_HINT_NONE;
+    ibus_engine_get_content_type(engine, &purpose, &hints);
+    vl_engine->is_password_field = ibus_vielotus_is_sensitive_content_type(purpose, hints);
     ibus_vielotus_load_user_config(vl_engine);
     ibus_vielotus_build_prop_list(vl_engine);
     ibus_engine_register_properties(engine, vl_engine->prop_list);
@@ -533,6 +594,7 @@ static void ibus_vielotus_engine_focus_in(IBusEngine *engine) {
 
 static void ibus_vielotus_engine_focus_out(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
+    vl_engine->is_password_field = FALSE;
     if (vielotus_is_composing(vl_engine->session)) {
         ibus_vielotus_commit_composing(vl_engine, NULL);
     } else {
@@ -612,6 +674,14 @@ static gboolean ibus_vielotus_engine_process_key_event(
         return FALSE;
     }
 
+    // Password / PIN / hidden-text field protection: deterministically clear active composition and pass through raw keystrokes
+    if (vl_engine->is_password_field) {
+        if (vielotus_is_composing(vl_engine->session)) {
+            ibus_vielotus_engine_reset_internal(vl_engine);
+        }
+        return FALSE;
+    }
+
     if (!vielotus_is_composing(vl_engine->session)) {
         ibus_vielotus_reload_config_if_changed(vl_engine);
     }
@@ -667,6 +737,16 @@ static gboolean ibus_vielotus_engine_process_key_event(
             } else {
                 vielotus_feed_char(vl_engine->session, keyval);
                 return FALSE;
+            }
+        }
+
+        /* Auto-flush preedit before internal 64-token buffer limit (e.g. holding a key for 80+ characters) */
+        if (vielotus_is_composing(vl_engine->session)) {
+            const char *raw_check = vielotus_get_raw_text(vl_engine->session);
+            const char *comp_check = vielotus_get_composing_text(vl_engine->session);
+            if ((raw_check && strlen(raw_check) >= 48) ||
+                (comp_check && strlen(comp_check) >= 48)) {
+                ibus_vielotus_commit_composing(vl_engine, NULL);
             }
         }
 
@@ -780,6 +860,7 @@ static void ibus_vielotus_engine_class_init(IBusVieLotusEngineClass *klass) {
     engine_class->disable = ibus_vielotus_engine_disable;
     engine_class->focus_in = ibus_vielotus_engine_focus_in;
     engine_class->focus_out = ibus_vielotus_engine_focus_out;
+    engine_class->set_content_type = ibus_vielotus_engine_set_content_type;
     engine_class->property_activate = ibus_vielotus_engine_property_activate;
     engine_class->process_key_event = ibus_vielotus_engine_process_key_event;
 }

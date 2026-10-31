@@ -48,6 +48,8 @@ static const WCHAR c_szPrefsMacroEnabledVal[] = L"MacroEnabled";
 static const WCHAR c_szPrefsDeveloperModeVal[] = L"DeveloperMode";
 static const WCHAR c_szPrefsQuickTelexVal[] = L"QuickTelex";
 static const WCHAR c_szPrefsRelaxedCodaVal[] = L"RelaxedCoda";
+static const WCHAR c_szPrefsAutoBypassRemoteVal[] = L"AutoBypassRemoteApps";
+static const WCHAR c_szPrefsAppBypassSubKey[] = L"Software\\VieLotusIM\\AppBypass";
 static const WCHAR c_szPrefsUpdatedBySettingsVal[] = L"PrefsUpdatedBySettings";
 
 // LayoutOrTip strings for input.dll!InstallLayoutOrTip
@@ -160,6 +162,9 @@ void LoadVieLotusPrefs(VieLotusWindowsPrefs &outPrefs) {
     if (ReadRegDword(hKey, c_szPrefsRelaxedCodaVal, dwVal)) {
         outPrefs.relaxedCoda = (dwVal != 0);
     }
+    if (ReadRegDword(hKey, c_szPrefsAutoBypassRemoteVal, dwVal)) {
+        outPrefs.autoBypassRemoteApps = (dwVal != 0);
+    }
     RegCloseKey(hKey);
 }
 
@@ -174,7 +179,32 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs) {
         WriteRegDword(hKey, c_szPrefsDeveloperModeVal, prefs.developerMode ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsQuickTelexVal, prefs.quickTelex ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsRelaxedCodaVal, prefs.relaxedCoda ? 1u : 0u);
+        WriteRegDword(hKey, c_szPrefsAutoBypassRemoteVal, prefs.autoBypassRemoteApps ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsUpdatedBySettingsVal, 1u);
+        RegCloseKey(hKey);
+    }
+}
+
+bool LoadPerAppBypassPreference(const wchar_t *exeName, bool &outBypass) {
+    if (!exeName || exeName[0] == L'\0') return false;
+    HKEY hKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, c_szPrefsAppBypassSubKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
+        return false;
+    }
+    DWORD dwVal = 0;
+    bool ok = ReadRegDword(hKey, exeName, dwVal);
+    RegCloseKey(hKey);
+    if (ok) {
+        outBypass = (dwVal != 0);
+    }
+    return ok;
+}
+
+void SavePerAppBypassPreference(const wchar_t *exeName, bool bypass) {
+    if (!exeName || exeName[0] == L'\0') return;
+    HKEY hKey = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, c_szPrefsAppBypassSubKey, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
+        WriteRegDword(hKey, exeName, bypass ? 1u : 0u);
         RegCloseKey(hKey);
     }
 }

@@ -11,6 +11,7 @@ struct VieLotusWindowsPrefs {
     bool developerMode{false};
     bool quickTelex{false};
     bool relaxedCoda{false};
+    bool autoBypassRemoteApps{false};
 };
 
 HRESULT RegisterServer();
@@ -28,6 +29,8 @@ void SavePersistedVniPreference(bool isVni);
 bool ConsumeSettingsVniOverride(bool &outIsVni);
 void LoadVieLotusPrefs(VieLotusWindowsPrefs &outPrefs);
 void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs);
+bool LoadPerAppBypassPreference(const wchar_t *exeName, bool &outBypass);
+void SavePerAppBypassPreference(const wchar_t *exeName, bool bypass);
 
 // Native Win32 Settings Dialog ("Cài đặt Sen Việt")
 void ShowVieLotusSettingsDialog(HWND hwndParent);
