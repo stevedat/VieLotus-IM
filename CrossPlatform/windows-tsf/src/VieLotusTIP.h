@@ -63,6 +63,10 @@ private:
 
     bool m_isVietnameseMode{true};
     bool m_isVniMode{false};
+    bool m_isRemoteProcess{false};
+    bool m_hasManualProcessOverride{false};
+    bool m_manualProcessVietnameseMode{true};
+    std::wstring m_currentExeName{};
 
     void InitSession();
     void CleanSession();

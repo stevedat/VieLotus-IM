@@ -1,0 +1,31 @@
+.TH VIELOTUS-SETTINGS 1 "October 2026" "VieLotusIM 2.0.0" "User Commands"
+.SH NAME
+vielotus-settings \- configuration utility for Sen Viet (VieLotusIM) Vietnamese input method
+.SH SYNOPSIS
+.B vielotus-settings
+[\fIOPTION\fR]
+.SH DESCRIPTION
+\fBvielotus-settings\fR opens the graphical settings window for Sen Viet (VieLotusIM),
+allowing users to configure input method preferences (Telex or VNI, free-tone SEN Flex
+composition, Smart Bilingual restoration, consonant abbreviations, and macro expansion)
+for IBus and Fcitx5.
+.SH OPTIONS
+.TP
+\fB\-\-telex\fR
+Switch the active input method mode to Telex.
+.TP
+\fB\-\-vni\fR
+Switch the active input method mode to VNI.
+.TP
+\fB\-\-activate\fR
+Save and apply the current input method configuration to the active session.
+.TP
+\fB\-\-status\fR
+Print the current configuration values to standard output.
+.SH FILES
+.I ~/.config/vielotus/config.env
+.RS
+User configuration file for VieLotusIM.
+.RE
+.SH AUTHOR
+Tran Phat Dat (Steve Dat) <ttd1232004@gmail.com>

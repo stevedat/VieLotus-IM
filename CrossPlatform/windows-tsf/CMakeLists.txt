@@ -23,14 +23,20 @@ set(SOURCES
     src/dllmain.cpp
 )
 
-if(CMAKE_VS_PLATFORM_NAME STREQUAL "ARM64" OR CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
-    set(PREBUILT_ENGINE_OBJ "${CMAKE_CURRENT_SOURCE_DIR}/../../Binaries/windows/VieLotusCoreWindows-arm64.obj")
-else()
-    set(PREBUILT_ENGINE_OBJ "${CMAKE_CURRENT_SOURCE_DIR}/../../Binaries/windows/VieLotusCoreWindows-x64.obj")
-endif()
-if(EXISTS "${PREBUILT_ENGINE_OBJ}")
-    list(APPEND SOURCES "${PREBUILT_ENGINE_OBJ}")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/VieLotusCoreWindows/WindowsNativeEngine.cpp")
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/VieLotusCoreWindows)
+    list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/VieLotusCoreWindows/WindowsNativeEngine.cpp")
     add_compile_definitions(VIELOTUS_EMBEDDED_ENGINE=1)
+else()
+    if(CMAKE_VS_PLATFORM_NAME STREQUAL "ARM64" OR CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
+        set(PREBUILT_ENGINE_OBJ "${CMAKE_CURRENT_SOURCE_DIR}/../../Binaries/windows/VieLotusCoreWindows-arm64.obj")
+    else()
+        set(PREBUILT_ENGINE_OBJ "${CMAKE_CURRENT_SOURCE_DIR}/../../Binaries/windows/VieLotusCoreWindows-x64.obj")
+    endif()
+    if(EXISTS "${PREBUILT_ENGINE_OBJ}")
+        list(APPEND SOURCES "${PREBUILT_ENGINE_OBJ}")
+        add_compile_definitions(VIELOTUS_EMBEDDED_ENGINE=1)
+    endif()
 endif()
 
 add_library(VieLotusTIP SHARED

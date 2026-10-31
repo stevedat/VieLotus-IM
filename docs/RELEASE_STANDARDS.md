@@ -40,25 +40,22 @@ Mỗi GitHub Release tag (ví dụ `v2.0.0`) **CHỈ ĐƯỢC** chứa đúng **
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  PROPRIETARY (Private Repo Only)                            │
-│  ├─ Sources/VieLotusCore/**  (Swift engine)                 │
-│  ├─ CrossPlatform/WindowsNativeEngine.cpp  (C++20 engine)   │
-│  ├─ Binaries/linux/libvielotus0_*.deb (shared library)      │
-│  ├─ Binaries/linux/ibus-vielotus_*.deb                      │
-│  └─ Binaries/linux/fcitx5-vielotus_*.deb                    │
+│  ├─ Sources/VieLotusCore/**  (Swift 6 canonical engine)     │
+│  ├─ Sources/VieLotusCLI/**, Sources/VieLotusLab/**          │
+│  └─ Tests/** (Internal test harness & dataset)              │
 ├─────────────────────────────────────────────────────────────┤
 │  PUBLIC (Open-Core Repo — github.com/stevedat/VieLotus-IM)  │
-│  ├─ CrossPlatform/WindowsNativeEngine.h  (header only, OK)  │
-│  ├─ Scripts, packaging specs, CI workflows                   │
-│  ├─ Prebuilt binaries (*.xcframework, *.dll, *.so)           │
-│  └─ Documentation, README, LICENSE (MIT for shell/packaging) │
+│  ├─ Sources/VieLotusCoreWindows/WindowsNativeEngine.{h,cpp} │
+│  │    (Obfuscated C++20 engine for Debian/Ubuntu uscan/DFSG)│
+│  ├─ CrossPlatform/** (IBus, Fcitx5, Windows TSF, packaging) │
+│  ├─ Prebuilt binaries (*.xcframework, *.dll, *.so)          │
+│  └─ Documentation, README, LICENSE (MIT / Expat)            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Quy tắc vàng:** `WindowsNativeEngine.cpp` và toàn bộ `Sources/VieLotusCore/`
-KHÔNG BAO GIỜ xuất hiện trong:
-- Public git history (bất kỳ commit nào)
-- GitHub Release assets
-- Bất kỳ URL công khai nào
+**Quy tắc vàng:** Toàn bộ `Sources/VieLotusCore/` (mã nguồn Swift 6 gốc)
+KHÔNG BAO GIỜ xuất hiện trong public git history hay GitHub Release assets.
+Bản `Sources/VieLotusCoreWindows/WindowsNativeEngine.{h,cpp}` trên repo public luôn phải là bản C++20 đã obfuscate để khớp 100% với `debian/watch` (`uscan`) và `orig.tar.xz`.
 
 ---
 

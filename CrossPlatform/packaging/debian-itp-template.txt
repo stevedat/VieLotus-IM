@@ -7,7 +7,7 @@ Owner: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
   Version         : 2.0.0
   Upstream Author : Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
 * URL             : https://github.com/stevedat/VieLotus-IM
-* License         : GPL-3.0-or-later
+* License         : MIT
   Programming Lang: C++20
   Description     : Next-Gen Vietnamese Input Method for IBus & Fcitx5
 

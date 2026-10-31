@@ -1,11 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(ibus-vielotus VERSION 2.0.0 LANGUAGES C)
 
-if(NOT CMAKE_SKIP_RPATH)
-    set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-    set(CMAKE_INSTALL_RPATH "/usr/lib:/usr/lib/vielotus")
-endif()
-
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(IBUS REQUIRED ibus-1.0>=1.5.0)
 pkg_check_modules(GLIB REQUIRED glib-2.0 gobject-2.0 gio-2.0)
@@ -63,9 +58,9 @@ target_compile_options(ibus-engine-vielotus PRIVATE
     -Wextra
 )
 
-# Configure component XML (default to /usr/lib/ibus to match Debian/Ubuntu package layout)
+# Configure component XML (default to CMAKE_INSTALL_FULL_LIBEXECDIR, e.g. /usr/libexec)
 if(NOT DEFINED LIBEXECDIR)
-    set(LIBEXECDIR "/usr/lib/ibus")
+    set(LIBEXECDIR "${CMAKE_INSTALL_FULL_LIBEXECDIR}")
 endif()
 configure_file(
     vielotus.xml.in

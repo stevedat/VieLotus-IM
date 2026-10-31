@@ -1,10 +1,9 @@
 #!/bin/sh
 # ==============================================================================
-# Sen Việt (VieLotusIM) — Linux Desktop Settings & Auto-Activation Utility
+# Sen Việt (VieLotusIM) — Linux Desktop Settings Utility
 # Supports both Fcitx5 (fcitx5-configtool) and IBus (GNOME Input Sources)
 # ==============================================================================
 
-export LD_LIBRARY_PATH="/usr/lib:/usr/lib/vielotus:${LD_LIBRARY_PATH:-}"
 UID_CUR="$(id -u 2>/dev/null || echo 1000)"
 CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
 DATA_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}"
@@ -98,57 +97,9 @@ load_config() {
 
 load_config
 
-sync_fcitx5_metadata() {
-    USER_FCITX_DIR="${DATA_ROOT}/fcitx5"
-    # If system-wide Fcitx5 metadata is installed via .deb, remove any redundant user copies
-    if [ -f /usr/share/fcitx5/addon/vielotus.conf ] && [ -f /usr/share/fcitx5/inputmethod/vielotus-telex.conf ]; then
-        rm -f "${USER_FCITX_DIR}/addon/vielotus.conf" \
-              "${USER_FCITX_DIR}/inputmethod/vielotus-telex.conf" \
-              "${USER_FCITX_DIR}/inputmethod/vielotus-vni.conf" 2>/dev/null || true
-        return 0
-    fi
-
-    mkdir -p "${USER_FCITX_DIR}/addon" "${USER_FCITX_DIR}/inputmethod"
-    cat <<'ADDON_EOF' > "${USER_FCITX_DIR}/addon/vielotus.conf"
-[Addon]
-Name[vi]=Bộ gõ tiếng Việt Sen Việt (VieLotus)
-Name=Sen Việt (VieLotus)
-Comment=Next-Gen Pure Vietnamese Input Engine for Fcitx5
-Category=InputMethod
-Version=2.0.0
-Enabled=True
-Library=vielotus
-Type=SharedLibrary
-OnDemand=True
-Configurable=True
-
-[Dependencies]
-0=core:5.0.0
-ADDON_EOF
-
-    cat <<'TELEX_EOF' > "${USER_FCITX_DIR}/inputmethod/vielotus-telex.conf"
-[InputMethod]
-Name=Sen Việt (Telex)
-Icon=vielotus
-Label=VN
-LangCode=vi
-Addon=vielotus
-Configurable=True
-TELEX_EOF
-
-    cat <<'VNI_EOF' > "${USER_FCITX_DIR}/inputmethod/vielotus-vni.conf"
-[InputMethod]
-Name=Sen Việt (VNI)
-Icon=vielotus
-Label=VNI
-LangCode=vi
-Addon=vielotus
-Configurable=True
-VNI_EOF
-}
-
 configure_fcitx5_profile() {
     FCITX_IM="$1"
+    ACTIVATE_PROFILE="${2:-0}"
     FCITX_PROFILE_DIR="${CONFIG_ROOT}/fcitx5"
     FCITX_PROFILE="${FCITX_PROFILE_DIR}/profile"
     mkdir -p "${FCITX_PROFILE_DIR}/conf"
@@ -175,25 +126,7 @@ ModernOrthography=${FCITX_MOD}
 QuickTelex=${FCITX_QT}
 FCITX_CONF_EOF
 
-    if [ ! -f "${FCITX_PROFILE}" ]; then
-        cat <<PROFILE_EOF > "${FCITX_PROFILE}"
-[Groups/0]
-Name=Default
-Default Layout=us
-DefaultIM=${FCITX_IM}
-
-[Groups/0/Items/0]
-Name=keyboard-us
-Layout=
-
-[Groups/0/Items/1]
-Name=${FCITX_IM}
-Layout=
-
-[GroupOrder]
-0=Default
-PROFILE_EOF
-    elif command -v python3 >/dev/null 2>&1; then
+    if [ "${ACTIVATE_PROFILE}" = "1" ] && [ -f "${FCITX_PROFILE}" ] && command -v python3 >/dev/null 2>&1; then
         python3 - "${FCITX_PROFILE}" "${FCITX_IM}" <<'PYEOF' 2>/dev/null || true
 import re, sys
 
@@ -201,28 +134,17 @@ profile_path, im_name = sys.argv[1], sys.argv[2]
 with open(profile_path, "r", encoding="utf-8", errors="ignore") as f:
     text = f.read()
 
-if "DefaultIM=" in text:
-    text = re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", text, count=1, flags=re.M)
-
 if re.search(r"^Name=vielotus-(telex|vni)$", text, flags=re.M):
     text = re.sub(r"^Name=vielotus-(telex|vni)$", f"Name={im_name}", text, count=1, flags=re.M)
-elif f"Name={im_name}" not in text:
-    indices = [int(m) for m in re.findall(r"^\[Groups/0/Items/(\d+)\]", text, flags=re.M)]
-    next_idx = (max(indices) + 1) if indices else 1
-    new_item = f"\n[Groups/0/Items/{next_idx}]\nName={im_name}\nLayout=\n"
-    if "[GroupOrder]" in text:
-        text = text.replace("[GroupOrder]", new_item.lstrip("\n") + "\n[GroupOrder]", 1)
-    else:
-        text = text.rstrip() + "\n" + new_item
-
-with open(profile_path, "w", encoding="utf-8") as f:
-    f.write(text)
+    with open(profile_path, "w", encoding="utf-8") as f:
+        f.write(text)
 PYEOF
     fi
 }
 
 save_and_apply() {
     MODE="${1:-$INPUT_METHOD}"
+    ACTIVATE_SOURCES="${2:-0}"
     case "${MODE}" in
         vni|VNI) INPUT_METHOD="vni" ;;
         *) INPUT_METHOD="telex" ;;
@@ -247,149 +169,30 @@ ENV_EOF
         FCITX_IM_ID="vielotus-vni"
     fi
 
-    # 1. Sync Fcitx5 metadata & update Fcitx5 profile
-    sync_fcitx5_metadata || true
-    configure_fcitx5_profile "${FCITX_IM_ID}" || true
+    # 1. Update Fcitx5 addon config file
+    configure_fcitx5_profile "${FCITX_IM_ID}" "${ACTIVATE_SOURCES}" || true
 
     # Reload/switch Fcitx5 if running
     if command -v fcitx5 >/dev/null 2>&1; then
         if pgrep -x fcitx5 >/dev/null 2>&1 || [ "${XMODIFIERS:-}" = "@im=fcitx" ] || [ "${GTK_IM_MODULE:-}" = "fcitx" ]; then
             if command -v fcitx5-remote >/dev/null 2>&1; then
-                fcitx5-remote -r >/dev/null 2>&1 || fcitx5 -r -d >/dev/null 2>&1 || true
-                fcitx5-remote -s "${FCITX_IM_ID}" >/dev/null 2>&1 || true
-            else
-                fcitx5 -r -d >/dev/null 2>&1 || true
+                fcitx5-remote -r >/dev/null 2>&1 || true
+                if [ "${ACTIVATE_SOURCES}" = "1" ]; then
+                    fcitx5-remote -s "${FCITX_IM_ID}" >/dev/null 2>&1 || true
+                fi
             fi
         fi
     fi
 
-    # 2. Refresh IBus cache & switch active engine non-blockingly if IBus daemon is reachable
-    if command -v ibus >/dev/null 2>&1; then
-        (ibus write-cache >/dev/null 2>&1 || true) &
+    # 2. Switch active IBus engine if IBus daemon is reachable and user explicitly changed mode
+    if [ "${ACTIVATE_SOURCES}" = "1" ] && command -v ibus >/dev/null 2>&1; then
         if pgrep -x ibus-daemon >/dev/null 2>&1; then
             (ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true) &
         fi
     fi
 
-    # Refresh user & Snap Store fontconfig + local font links so Vietnamese glyphs (U+1EA0..U+1EF9: ệ, ộ, ậ, ử...) render cleanly everywhere
-    FONTCONF_DIR="${CONFIG_ROOT}/fontconfig/conf.d"
-    FONTCONF_FILE="${FONTCONF_DIR}/99-vielotus-vietnamese.conf"
-    mkdir -p "${FONTCONF_DIR}" 2>/dev/null || true
-    cat <<'FC_EOF' > "${FONTCONF_FILE}" 2>/dev/null || true
-<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
-<fontconfig>
-  <selectfont>
-    <rejectfont>
-      <glob>/usr/share/fonts/truetype/ubuntu/*</glob>
-      <glob>/var/lib/snapd/hostfs/usr/share/fonts/truetype/ubuntu/*</glob>
-      <glob>/snap/*/usr/share/fonts/truetype/ubuntu/*</glob>
-    </rejectfont>
-  </selectfont>
-  <match target="pattern">
-    <test qual="any" name="family">
-      <string>Ubuntu</string>
-    </test>
-    <edit name="family" mode="assign" binding="same">
-      <string>DejaVu Sans</string>
-    </edit>
-  </match>
-  <match target="pattern">
-    <test qual="any" name="family">
-      <string>Ubuntu Sans</string>
-    </test>
-    <edit name="family" mode="assign" binding="same">
-      <string>DejaVu Sans</string>
-    </edit>
-  </match>
-  <match target="pattern">
-    <test qual="any" name="family">
-      <string>Ubuntu Mono</string>
-    </test>
-    <edit name="family" mode="assign" binding="same">
-      <string>DejaVu Sans Mono</string>
-    </edit>
-  </match>
-  <match target="pattern">
-    <test qual="any" name="family">
-      <string>Ubuntu Sans Mono</string>
-    </test>
-    <edit name="family" mode="assign" binding="same">
-      <string>DejaVu Sans Mono</string>
-    </edit>
-  </match>
-  <alias>
-    <family>sans-serif</family>
-    <prefer>
-      <family>DejaVu Sans</family>
-      <family>Noto Sans</family>
-    </prefer>
-  </alias>
-  <alias>
-    <family>system-ui</family>
-    <prefer>
-      <family>DejaVu Sans</family>
-      <family>Noto Sans</family>
-    </prefer>
-  </alias>
-</fontconfig>
-FC_EOF
-    cp -f "${FONTCONF_FILE}" "${CONFIG_ROOT}/fontconfig/fonts.conf" 2>/dev/null || true
-    USER_FONTS_DIR="${DATA_ROOT}/fonts/vielotus"
-    mkdir -p "${USER_FONTS_DIR}" 2>/dev/null || true
-    for sys_font in \
-        /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf \
-        /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf \
-        /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf \
-        /usr/share/fonts/truetype/noto/NotoSans-Regular.ttf \
-        /usr/share/fonts/truetype/noto/NotoSans-Bold.ttf; do
-        if [ -f "${sys_font}" ]; then
-            cp -f "${sys_font}" "${USER_FONTS_DIR}/" 2>/dev/null || true
-        fi
-    done
-    # Switch GNOME interface font away from buggy Ubuntu Sans variable font if needed
-    if command -v gsettings >/dev/null 2>&1; then
-        CUR_FONT=$(gsettings get org.gnome.desktop.interface font-name 2>/dev/null || true)
-        case "${CUR_FONT}" in
-            *Ubuntu*)
-                if [ -f /usr/share/fonts/truetype/noto/NotoSans-Regular.ttf ]; then
-                    gsettings set org.gnome.desktop.interface font-name 'Noto Sans 11' 2>/dev/null || true
-                elif [ -f /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf ]; then
-                    gsettings set org.gnome.desktop.interface font-name 'DejaVu Sans 11' 2>/dev/null || true
-                fi
-                ;;
-        esac
-    fi
-    # Propagate fontconfig & fallback fonts into Snap sandboxes (especially snap-store / App Center)
-    mkdir -p "${HOME}/snap/snap-store/current" "${HOME}/snap/snap-store/common" 2>/dev/null || true
-    for snap_app_dir in "${HOME}"/snap/*; do
-        [ -d "${snap_app_dir}" ] || continue
-        for sub in current common; do
-            if [ -d "${snap_app_dir}/${sub}" ]; then
-                mkdir -p "${snap_app_dir}/${sub}/.config/fontconfig/conf.d" 2>/dev/null || true
-                cp -f "${FONTCONF_FILE}" "${snap_app_dir}/${sub}/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf" 2>/dev/null || true
-                cp -f "${FONTCONF_FILE}" "${snap_app_dir}/${sub}/.config/fontconfig/fonts.conf" 2>/dev/null || true
-                cp -f "${FONTCONF_FILE}" "${snap_app_dir}/${sub}/.fonts.conf" 2>/dev/null || true
-            fi
-        done
-        if [ -d "${snap_app_dir}/current" ]; then
-            mkdir -p "${snap_app_dir}/current/.local/share/fonts" 2>/dev/null || true
-            cp -f "${USER_FONTS_DIR}/"*.ttf "${snap_app_dir}/current/.local/share/fonts/" 2>/dev/null || true
-        fi
-    done
-    rm -rf "${HOME}/.cache/fontconfig" \
-           "${HOME}"/snap/*/common/.cache/fontconfig \
-           "${HOME}"/snap/*/current/.cache/fontconfig \
-           "${HOME}"/snap/*/*/.cache/fontconfig 2>/dev/null || true
-    if command -v fc-cache >/dev/null 2>&1; then
-        fc-cache -f >/dev/null 2>&1 || true
-    fi
-    if command -v pkill >/dev/null 2>&1; then
-        pkill -f "[s]nap-store" >/dev/null 2>&1 || true
-    fi
-
-    # 3. Register and activate in GNOME / Ubuntu Input Sources (org.gnome.desktop.input-sources)
-    if command -v gsettings >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    # 3. If user explicitly switched Telex/VNI or activated, update existing vielotus entry in GNOME Input Sources without touching other input sources
+    if [ "${ACTIVATE_SOURCES}" = "1" ] && command -v gsettings >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
         python3 - "${ENGINE_ID}" <<'PYEOF' 2>/dev/null || true
 import ast, subprocess, sys
 engine_id = sys.argv[1]
@@ -406,36 +209,15 @@ def get_sources_list(key):
     except Exception:
         return []
 
-legacy_vn = ("vielotus", "vielotus-vni", "Unikey", "unikey", "bamboo", "Bamboo", "BambooUs")
 sources = get_sources_list("sources")
-sources = [s for s in sources if not (s[0] == "ibus" and s[1] in legacy_vn) and not (s[0] == "xkb" and s[1] == "vn")]
-if not sources:
-    sources = [("xkb", "us")]
-sources.insert(0, ("ibus", engine_id))
-formatted_sources = "[" + ", ".join(f"('{k}', '{v}')" for k, v in sources) + "]"
-subprocess.call(
-    ["gsettings", "set", "org.gnome.desktop.input-sources", "sources", formatted_sources],
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-)
-
-mru = get_sources_list("mru-sources")
-mru = [s for s in mru if not (s[0] == "ibus" and s[1] in legacy_vn) and not (s[0] == "xkb" and s[1] == "vn")]
-mru.insert(0, ("ibus", engine_id))
-for s in sources:
-    if s not in mru:
-        mru.append(s)
-formatted_mru = "[" + ", ".join(f"('{k}', '{v}')" for k, v in mru) + "]"
-subprocess.call(
-    ["gsettings", "set", "org.gnome.desktop.input-sources", "mru-sources", formatted_mru],
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-)
-subprocess.call(
-    ["gsettings", "set", "org.gnome.desktop.input-sources", "current", "0"],
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-)
+if any(s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni") for s in sources):
+    sources = [("ibus", engine_id) if (s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni")) else s for s in sources]
+    formatted_sources = "[" + ", ".join(f"('{k}', '{v}')" for k, v in sources) + "]"
+    subprocess.call(
+        ["gsettings", "set", "org.gnome.desktop.input-sources", "sources", formatted_sources],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 PYEOF
     fi
 }
@@ -988,19 +770,19 @@ GTK_PYEOF
 case "${1:-}" in
     --activate)
         load_config
-        save_and_apply "${INPUT_METHOD}"
+        save_and_apply "${INPUT_METHOD}" "1"
         echo "✅ Đã kích hoạt bộ gõ Sen Việt (${INPUT_METHOD}) cho cả Fcitx5 và IBus."
         exit 0
         ;;
     --telex)
         load_config
-        save_and_apply "telex"
+        save_and_apply "telex" "1"
         echo "✅ Đã chuyển Sen Việt sang kiểu gõ Telex (Fcitx5 & IBus)."
         exit 0
         ;;
     --vni)
         load_config
-        save_and_apply "vni"
+        save_and_apply "vni" "1"
         echo "✅ Đã chuyển Sen Việt sang kiểu gõ VNI (Fcitx5 & IBus)."
         exit 0
         ;;
@@ -1019,7 +801,6 @@ case "${1:-}" in
         ;;
     --smoke-test-gui)
         load_config
-        save_and_apply "${INPUT_METHOD}"
         run_gtk_settings "1"
         echo "✅ GTK3 Settings GUI smoke test PASSED."
         exit 0
@@ -1041,9 +822,8 @@ if [ -z "${DISPLAY:-}" ] && [ -S "/tmp/.X11-unix/X0" ]; then
     export DISPLAY=":0"
 fi
 
-# Ensure the input source is registered in background so GUI opens immediately
+# Load current configuration without mutating any system or user files on startup
 load_config
-(save_and_apply "${INPUT_METHOD}" >/dev/null 2>&1 || true) &
 
 # Launch Native GTK3 Desktop Settings Window if graphical session is available
 if command -v python3 >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
