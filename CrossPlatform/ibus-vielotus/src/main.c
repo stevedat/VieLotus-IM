@@ -496,6 +496,9 @@ static void ibus_vielotus_engine_finalize(GObject *object) {
 static void ibus_vielotus_engine_reset(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
     ibus_vielotus_engine_reset_internal(vl_engine);
+    if (vl_engine->session) {
+        vielotus_append_context(vl_engine->session, "");
+    }
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->reset(engine);
 }
 
@@ -512,6 +515,9 @@ static void ibus_vielotus_engine_enable(IBusEngine *engine) {
     ibus_vielotus_load_user_config(vl_engine);
     ibus_vielotus_build_prop_list(vl_engine);
     ibus_vielotus_engine_reset_internal(vl_engine);
+    if (vl_engine->session) {
+        vielotus_append_context(vl_engine->session, "");
+    }
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->enable(engine);
 }
 
@@ -529,8 +535,13 @@ static void ibus_vielotus_engine_set_content_type(
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
     gboolean is_sensitive = ibus_vielotus_is_sensitive_content_type(purpose, hints);
     vl_engine->is_password_field = is_sensitive;
-    if (is_sensitive && vielotus_is_composing(vl_engine->session)) {
-        ibus_vielotus_engine_reset_internal(vl_engine);
+    if (is_sensitive) {
+        if (vielotus_is_composing(vl_engine->session)) {
+            ibus_vielotus_engine_reset_internal(vl_engine);
+        }
+        if (vl_engine->session) {
+            vielotus_append_context(vl_engine->session, "");
+        }
     }
     if (IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->set_content_type) {
         IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->set_content_type(engine, purpose, hints);
@@ -545,6 +556,9 @@ static void ibus_vielotus_engine_disable(IBusEngine *engine) {
     } else {
         ibus_vielotus_engine_reset_internal(vl_engine);
     }
+    if (vl_engine->session) {
+        vielotus_append_context(vl_engine->session, "");
+    }
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->disable(engine);
 }
 
@@ -554,6 +568,9 @@ static void ibus_vielotus_engine_focus_in(IBusEngine *engine) {
     guint hints = IBUS_INPUT_HINT_NONE;
     ibus_engine_get_content_type(engine, &purpose, &hints);
     vl_engine->is_password_field = ibus_vielotus_is_sensitive_content_type(purpose, hints);
+    if (vl_engine->session) {
+        vielotus_append_context(vl_engine->session, "");
+    }
     ibus_vielotus_load_user_config(vl_engine);
     ibus_vielotus_build_prop_list(vl_engine);
     ibus_engine_register_properties(engine, vl_engine->prop_list);
@@ -567,6 +584,9 @@ static void ibus_vielotus_engine_focus_out(IBusEngine *engine) {
         ibus_vielotus_commit_composing(vl_engine, NULL);
     } else {
         ibus_vielotus_engine_reset_internal(vl_engine);
+    }
+    if (vl_engine->session) {
+        vielotus_append_context(vl_engine->session, "");
     }
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->focus_out(engine);
 }
@@ -647,6 +667,9 @@ static gboolean ibus_vielotus_engine_process_key_event(
         if (vielotus_is_composing(vl_engine->session)) {
             ibus_vielotus_engine_reset_internal(vl_engine);
         }
+        if (vl_engine->session) {
+            vielotus_append_context(vl_engine->session, "");
+        }
         return FALSE;
     }
 
@@ -665,6 +688,24 @@ static gboolean ibus_vielotus_engine_process_key_event(
     if (state & (IBUS_CONTROL_MASK | IBUS_MOD1_MASK | IBUS_SUPER_MASK)) {
         if (vielotus_is_composing(vl_engine->session)) {
             ibus_vielotus_commit_composing(vl_engine, NULL);
+        }
+        return FALSE;
+    }
+
+    // Navigation & action keys (Enter, Tab, Delete, Escape, Arrows, Home/End/PgUp/PgDn):
+    // commit active word first so it never disappears, clear sentence context, then pass the key through
+    if (keyval == IBUS_KEY_Return || keyval == IBUS_KEY_KP_Enter || keyval == IBUS_KEY_Linefeed ||
+        keyval == IBUS_KEY_Tab || keyval == IBUS_KEY_ISO_Left_Tab || keyval == IBUS_KEY_KP_Tab ||
+        keyval == IBUS_KEY_Delete || keyval == IBUS_KEY_KP_Delete ||
+        keyval == IBUS_KEY_Escape ||
+        keyval == '\r' || keyval == '\n' || keyval == '\t' || keyval == 0x1b ||
+        (keyval >= IBUS_KEY_Home && keyval <= IBUS_KEY_Insert) ||
+        (keyval >= IBUS_KEY_KP_Home && keyval <= IBUS_KEY_KP_Delete)) {
+        if (vielotus_is_composing(vl_engine->session)) {
+            ibus_vielotus_commit_composing(vl_engine, NULL);
+        }
+        if (vl_engine->session) {
+            vielotus_append_context(vl_engine->session, "");
         }
         return FALSE;
     }
