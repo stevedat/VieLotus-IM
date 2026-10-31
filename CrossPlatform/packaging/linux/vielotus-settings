@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # ==============================================================================
 # Sen Việt (VieLotusIM) — Linux Desktop Settings Utility
 # Supports both Fcitx5 (fcitx5-configtool) and IBus (GNOME Input Sources)
