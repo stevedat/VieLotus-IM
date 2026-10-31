@@ -131,11 +131,34 @@ echo "✅ Tất cả thư viện và binary (.so / engine) liên kết hoàn h�
 echo ""
 echo "▶ [4/7] Kiểm tra công cụ cấu hình & chuyển đổi Telex / VNI (vielotus-settings)..."
 /usr/bin/vielotus-settings --activate
+if [ -e "${HOME}/.config/fcitx5/profile" ] || [ -e "${HOME}/.config/fontconfig/fonts.conf" ]; then
+    echo "❌ LỖI: vielotus-settings tự ý tạo/ghi đè fcitx5/profile hoặc fontconfig/fonts.conf khi chưa có sẵn!"
+    exit 1
+fi
+
+mkdir -p "${HOME}/.config/fcitx5"
+cat <<'FCITX_SEED_EOF' > "${HOME}/.config/fcitx5/profile"
+[Groups/0]
+Name=Default
+Default Layout=us
+DefaultIM=vielotus-telex
+
+[Groups/0/Items/0]
+Name=keyboard-us
+Layout=
+
+[Groups/0/Items/1]
+Name=vielotus-telex
+Layout=
+
+[GroupOrder]
+0=Default
+FCITX_SEED_EOF
+
 /usr/bin/vielotus-settings --vni
 STATUS_VNI="$(/usr/bin/vielotus-settings --status)"
 echo "${STATUS_VNI}"
 grep -Fx "INPUT_METHOD=vni" <<<"${STATUS_VNI}" >/dev/null
-grep -Fx "DefaultIM=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
 grep -Fx "Name=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
 grep -Fx "GrammarProfile=SenFlex" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/dev/null
 
@@ -143,7 +166,6 @@ grep -Fx "GrammarProfile=SenFlex" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/
 STATUS_TELEX="$(/usr/bin/vielotus-settings --status)"
 echo "${STATUS_TELEX}"
 grep -Fx "INPUT_METHOD=telex" <<<"${STATUS_TELEX}" >/dev/null
-grep -Fx "DefaultIM=vielotus-telex" "${HOME}/.config/fcitx5/profile" >/dev/null
 grep -Fx "Name=vielotus-telex" "${HOME}/.config/fcitx5/profile" >/dev/null
 
 # Ensure no redundant duplicate addon files were written to ~/.local/share/fcitx5

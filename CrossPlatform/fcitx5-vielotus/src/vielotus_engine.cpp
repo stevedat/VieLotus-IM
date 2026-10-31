@@ -256,6 +256,10 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
         ic_->commitString(out);
     }
 
+    resetWord();
+}
+
+void VieLotusState::resetWord() {
     if (session_) {
         vielotus_reset_session(session_);
     }
@@ -265,12 +269,10 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
 }
 
 void VieLotusState::reset() {
+    resetWord();
     if (session_) {
-        vielotus_reset_session(session_);
+        vielotus_append_context(session_, "");
     }
-    ic_->inputPanel().reset();
-    ic_->updatePreedit();
-    ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
 }
 
 void VieLotusState::keyEvent(KeyEvent& keyEvent) {
@@ -306,15 +308,19 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
     }
 
     // Navigation & action keys (Enter, Tab, Delete, Escape, Arrows, Home/End/PgUp/PgDn):
-    // commit active word first so it never disappears, then let the app handle the key
-    if (sym == FcitxKey_Return || sym == FcitxKey_KP_Enter ||
-        sym == FcitxKey_Tab || sym == FcitxKey_ISO_Left_Tab ||
+    // commit active word first so it never disappears, clear sentence context, then let the app handle the key
+    if (sym == FcitxKey_Return || sym == FcitxKey_KP_Enter || sym == FcitxKey_Linefeed ||
+        sym == FcitxKey_Tab || sym == FcitxKey_ISO_Left_Tab || sym == FcitxKey_KP_Tab ||
         sym == FcitxKey_Delete || sym == FcitxKey_KP_Delete ||
         sym == FcitxKey_Escape ||
+        sym == '\r' || sym == '\n' || sym == '\t' || sym == 0x1b ||
         (sym >= FcitxKey_Home && sym <= FcitxKey_Insert) ||
         (sym >= FcitxKey_KP_Home && sym <= FcitxKey_KP_Delete)) {
         if (vielotus_is_composing(session_)) {
             commitComposing(nullptr);
+        }
+        if (session_) {
+            vielotus_append_context(session_, "");
         }
         return;
     }
@@ -325,13 +331,13 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         if (vielotus_is_composing(session_)) {
             const char* composing = vielotus_get_composing_text(session_);
             if (!composing || composing[0] == '\0') {
-                reset();
+                resetWord();
                 keyEvent.filterAndAccept();
                 return;
             }
             size_t len = std::strlen(composing);
             if (len >= 512) {
-                reset();
+                resetWord();
                 keyEvent.filterAndAccept();
                 return;
             }
@@ -346,7 +352,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
             }
             prefix[cut] = '\0';
             if (cut == 0) {
-                reset();
+                resetWord();
                 keyEvent.filterAndAccept();
                 return;
             }
@@ -354,7 +360,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
             rawKeysForUtf8(prefix, inputMethod_ == VIELOTUS_INPUT_VNI, rawKeys, sizeof(rawKeys));
             replayRawKeys(session_, rawKeys);
             if (!vielotus_is_composing(session_)) {
-                reset();
+                resetWord();
             } else {
                 updatePreedit();
             }
@@ -383,7 +389,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                     std::string out = committed ? committed : "";
                     out.push_back(static_cast<char>(sym));
                     ic_->commitString(out);
-                    reset();
+                    resetWord();
                     keyEvent.filterAndAccept();
                     return;
                 }
@@ -483,7 +489,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
             if (!out.empty()) {
                 ic_->commitString(out);
             }
-            reset();
+            resetWord();
             keyEvent.filterAndAccept();
             return;
         } else if (vielotus_is_composing(session_) ||
@@ -649,6 +655,9 @@ void VieLotusEngine::activate(const InputMethodEntry& entry,
     auto* state = ic->propertyFor(&factory_);
     if (state) {
         state->applyConfig(config_);
+        if (state->session()) {
+            vielotus_append_context(state->session(), "");
+        }
     }
 }
 

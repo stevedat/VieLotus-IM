@@ -62,6 +62,7 @@ public:
     void applyConfig(const VieLotusConfig& config);
     void updatePreedit();
     void commitComposing(const char* trailingAscii = nullptr);
+    void resetWord();
     void reset();
 
     vielotus_session_t session() const { return session_; }
