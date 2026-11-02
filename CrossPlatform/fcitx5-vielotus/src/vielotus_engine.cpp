@@ -50,6 +50,17 @@ inline size_t utf8CharLen(unsigned char b) {
     return 1;
 }
 
+inline size_t utf8CodepointCount(const char* utf8Str) {
+    if (!utf8Str) return 0;
+    size_t count = 0;
+    for (const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8Str); *p; p++) {
+        if ((*p & 0xC0) != 0x80) {
+            count++;
+        }
+    }
+    return count;
+}
+
 inline char vlToLower(char c) {
     return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + ('a' - 'A')) : c;
 }
@@ -260,6 +271,7 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
 }
 
 void VieLotusState::resetWord() {
+    replayedAfterBackspace_ = false;
     if (session_) {
         vielotus_reset_session(session_);
     }
@@ -325,8 +337,11 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         return;
     }
 
-    // Handle BackSpace: whole-character UTF-8 deletion with canonical raw-key replay
-    // so deleting inside "việt" -> "việ" -> "vi" -> "v" never reverts to raw ASCII "vieet".
+    // Handle BackSpace:
+    // 1. First delegate to `vielotus_feed_backspace(session_)` so explicit semantic escapes (`turrus -> turus -> turu -> tur -> tu`),
+    //    literal tails (`hôngfus -> hôngfu`, `tủu -> tủ`), and VNI escapes (`tu33us -> tu3u`) preserve full engine state.
+    // 2. When `vielotus_feed_backspace` only strips a tone or vowel diacritic without reducing the displayed UTF-8
+    //    character count ("việt" -> "viêt"), fall back to whole-character UTF-8 deletion ("việt" -> "việ" -> "vi" -> "v" -> "").
     if (keyEvent.key().check(FcitxKey_BackSpace)) {
         if (vielotus_is_composing(session_)) {
             const char* composing = vielotus_get_composing_text(session_);
@@ -341,6 +356,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                 keyEvent.filterAndAccept();
                 return;
             }
+            const size_t beforeCp = utf8CodepointCount(composing);
             char prefix[512];
             std::memcpy(prefix, composing, len + 1);
             size_t cut = len;
@@ -351,6 +367,21 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                 cut--;
             }
             prefix[cut] = '\0';
+
+            vielotus_feed_backspace(session_);
+            if (!vielotus_is_composing(session_)) {
+                resetWord();
+                keyEvent.filterAndAccept();
+                return;
+            }
+            const char* after = vielotus_get_composing_text(session_);
+            if (after && after[0] != '\0' && utf8CodepointCount(after) < beforeCp) {
+                replayedAfterBackspace_ = false;
+                updatePreedit();
+                keyEvent.filterAndAccept();
+                return;
+            }
+
             if (cut == 0) {
                 resetWord();
                 keyEvent.filterAndAccept();
@@ -359,6 +390,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
             char rawKeys[1024];
             rawKeysForUtf8(prefix, inputMethod_ == VIELOTUS_INPUT_VNI, rawKeys, sizeof(rawKeys));
             replayRawKeys(session_, rawKeys);
+            replayedAfterBackspace_ = true;
             if (!vielotus_is_composing(session_)) {
                 resetWord();
             } else {
@@ -367,6 +399,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
             keyEvent.filterAndAccept();
             return;
         }
+        replayedAfterBackspace_ = false;
         vielotus_reset_session(session_);
         return;
     }
@@ -423,7 +456,8 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                 size_t rlen = std::strlen(rawBefore);
                 size_t clen = std::strlen(compBefore);
                 uint8_t activeTone = activeToneOfUtf8(compBefore);
-                if (activeTone == keyTone && rlen > 0 && vlToLower(rawBefore[rlen - 1]) != lowerKey) {
+                if (replayedAfterBackspace_ &&
+                    activeTone == keyTone && rlen > 0 && vlToLower(rawBefore[rlen - 1]) != lowerKey) {
                     char canonRaw[1024];
                     rawKeysForUtf8(compBefore, false, canonRaw, sizeof(canonRaw));
                     replayRawKeys(session_, canonRaw);

@@ -72,6 +72,7 @@ private:
     InputContext* ic_;
     vielotus_session_t session_;
     int32_t inputMethod_{VIELOTUS_INPUT_TELEX};
+    bool replayedAfterBackspace_{false};
 };
 
 class VieLotusEngine : public InputMethodEngineV2 {

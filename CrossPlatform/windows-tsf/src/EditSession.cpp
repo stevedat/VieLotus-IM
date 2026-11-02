@@ -15,9 +15,19 @@ CEditSession::CEditSession(
 }
 
 CEditSession::~CEditSession() {
+    if (m_pResultCaretRange) {
+        m_pResultCaretRange->Release();
+        m_pResultCaretRange = nullptr;
+    }
     if (m_pContext) {
         m_pContext->Release();
     }
+}
+
+ITfRange *CEditSession::DetachResultCaretRange() {
+    ITfRange *pRange = m_pResultCaretRange;
+    m_pResultCaretRange = nullptr;
+    return pRange;
 }
 
 STDMETHODIMP CEditSession::QueryInterface(REFIID riid, void **ppvObj) {
@@ -58,6 +68,9 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
     ITfRange *pRange = sel.range;
     if (!pRange) return E_FAIL;
 
+    BOOL fWasEmpty = TRUE;
+    pRange->IsEmpty(ec, &fWasEmpty);
+
     // If backspaces > 0, expand range backwards
     if (m_backspaces > 0) {
         LONG cchShifted = 0;
@@ -67,13 +80,19 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
     // Set new text (replaces the selected range)
     if (!m_insertText.empty()) {
         pRange->SetText(ec, 0, m_insertText.c_str(), static_cast<LONG>(m_insertText.length()));
-    } else if (m_backspaces > 0) {
-        // Pure backspace delete
+    } else if (m_backspaces > 0 || !fWasEmpty) {
+        // Pure backspace or active selection delete
         pRange->SetText(ec, 0, L"", 0);
     }
 
     // Move caret to end of modified text
     pRange->Collapse(ec, TF_ANCHOR_END);
+    if (m_pResultCaretRange) {
+        m_pResultCaretRange->Release();
+        m_pResultCaretRange = nullptr;
+    }
+    pRange->Clone(&m_pResultCaretRange);
+
     sel.style.ase = TF_AE_NONE;
     sel.style.fInterimChar = FALSE;
     m_pContext->SetSelection(ec, 1, &sel);

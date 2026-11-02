@@ -60,20 +60,33 @@ private:
     vielotus_win::WindowsNativeEngine m_nativeEngine{};
 #endif
     ITfComposition *m_pComposition{nullptr};
+    ITfRange *m_pLastEditEndRange{nullptr};
 
     bool m_isVietnameseMode{true};
     bool m_isVniMode{false};
     bool m_isRemoteProcess{false};
     bool m_hasManualProcessOverride{false};
     bool m_manualProcessVietnameseMode{true};
+    bool m_suppressNextOnsetAdoption{false};
     std::wstring m_currentExeName{};
 
     void InitSession();
     void CleanSession();
+    void ReleaseLastEditEndRange();
+    void InspectContextSelection(
+        ITfContext *pic,
+        bool readSurroundingText,
+        bool &outQuerySucceeded,
+        bool &outHasSelection,
+        bool &outCaretMovedFromLastEdit,
+        std::wstring &outPrecedingText,
+        WCHAR &outCharAfterCaret
+    );
     void ApplyVniMode(bool isVni, bool persistToRegistry);
     void ReloadUserPreferences();
     void SyncActiveLanguageProfile();
     void ResetComposingSession();
+    void ClearWordStateSession();
     bool IsComposingSession() const;
     int32_t FeedCharSession(uint32_t codePoint);
     int32_t FeedBackspaceSession();
