@@ -26,10 +26,7 @@ var targets: [Target] = [
     .target(
         name: "VieLotusTrace",
         dependencies: [],
-        swiftSettings: [.swiftLanguageMode(.v5)],
-        linkerSettings: [
-            .linkedFramework("Carbon", .when(platforms: [.macOS])),
-        ]
+        swiftSettings: [.swiftLanguageMode(.v5)]
     ),
 ]
 
