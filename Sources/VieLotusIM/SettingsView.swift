@@ -1,5 +1,4 @@
 import VieLotusCore
-import VieLotusTrace
 import SwiftUI
 import AppKit
 
@@ -23,7 +22,6 @@ struct SettingsView: View {
     @State private var showingMacroEditor = false
     @State private var showingAdaptiveSheet = false
     @State private var macroCount: Int = MacroEngine.shared.getMacroEntries().count
-    @State private var tisStatus: InputSourceStatus = InputSourceDoctor.inspect()
     @State private var showVietQR: Bool = false
     @State private var copiedAccount: Bool = false
 
@@ -92,7 +90,7 @@ struct SettingsView: View {
             HStack {
                 HStack(spacing: 5) {
                     Circle()
-                        .fill(tisStatusColor)
+                        .fill(Color.green)
                         .frame(width: 6, height: 6)
                     Text("Song ngữ • Gợi ý • Chuẩn mới • Gen Z tự động bật")
                         .font(.system(size: 10, weight: .medium))
@@ -141,19 +139,9 @@ struct SettingsView: View {
             if !prefs.passthroughRemoteApps { prefs.passthroughRemoteApps = true }
             if !prefs.enforceABCBaseLayout { prefs.enforceABCBaseLayout = true }
             macroCount = MacroEngine.shared.getMacroEntries().count
-            tisStatus = InputSourceDoctor.inspect()
         }
         .onReceive(NotificationCenter.default.publisher(for: MacroEngine.macrosDidChangeNotification)) { _ in
             macroCount = MacroEngine.shared.getMacroEntries().count
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            tisStatus = InputSourceDoctor.inspect()
-        }
-        .onReceive(DistributedNotificationCenter.default().publisher(for: InputSourceDoctor.selectedInputSourceChangedNotification)) { _ in
-            tisStatus = InputSourceDoctor.inspect()
-        }
-        .onReceive(DistributedNotificationCenter.default().publisher(for: InputSourceDoctor.enabledInputSourcesChangedNotification)) { _ in
-            tisStatus = InputSourceDoctor.inspect()
         }
     }
 
@@ -430,60 +418,20 @@ struct SettingsView: View {
         )
     }
 
-    private var tisStatusColor: Color {
-        switch tisStatus.state {
-        case .active:
-            return .green
-        case .enabledAppleVietnameseActive:
-            return .orange
-        case .enabledNotSelected:
-            return .blue
-        case .registeredNotEnabled, .notRegistered:
-            return .red
-        }
-    }
-
-    private var tisStatusIcon: String {
-        switch tisStatus.state {
-        case .active:
-            return "checkmark.seal.fill"
-        case .enabledAppleVietnameseActive:
-            return "exclamationmark.triangle.fill"
-        case .enabledNotSelected:
-            return "globe"
-        case .registeredNotEnabled, .notRegistered:
-            return "xmark.octagon.fill"
-        }
-    }
-
     private var bentoSystemShortcutCard: some View {
-        let borderColor: Color = {
-            switch tisStatus.state {
-            case .active:
-                return Color.green.opacity(0.42)
-            case .enabledAppleVietnameseActive:
-                return Color.orange.opacity(0.55)
-            case .registeredNotEnabled, .notRegistered:
-                return Color.red.opacity(0.45)
-            case .enabledNotSelected:
-                return Color.primary.opacity(0.08)
-            }
-        }()
-
-        return VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(tisStatusColor.opacity(0.16))
+                        .fill(Color.blue.opacity(0.15))
                         .frame(width: 26, height: 26)
-                    Image(systemName: tisStatusIcon)
+                    Image(systemName: "globe")
                         .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundColor(tisStatusColor)
+                        .foregroundColor(.blue)
                 }
-                Text(tisStatus.summaryTitle)
-                    .font(.system(size: 12.0, weight: .bold))
-                    .lineLimit(1)
-                Spacer(minLength: 4)
+                Text("Phím tắt Đổi bộ gõ")
+                    .font(.system(size: 12.5, weight: .bold))
+                Spacer()
                 Button("Mở cài đặt ↗") {
                     openSystemKeyboardSettings()
                 }
@@ -491,9 +439,9 @@ struct SettingsView: View {
                 .controlSize(.mini)
             }
 
-            Text(tisStatus.summarySubtitle)
+            Text("Fn / 🌐 hoặc Ctrl + Space để chuyển nhanh")
                 .font(.system(size: 10.5))
-                .foregroundColor(tisStatus.isConflictingAppleVietnameseActive ? .orange : .secondary)
+                .foregroundColor(.secondary)
                 .lineLimit(1)
         }
         .padding(11)
@@ -504,7 +452,7 @@ struct SettingsView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(borderColor, lineWidth: 1.0)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1.0)
         )
     }
 
