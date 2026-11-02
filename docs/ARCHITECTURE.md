@@ -31,7 +31,8 @@ To enable full security auditability of all OS-facing code while protecting prop
   - `Sources/VieLotusIM/`: Complete macOS `IMKInputController` implementation, preferences UI, and `DiagnosticLogger`.
   - `Sources/VieLotusTrace/`: Sanitized diagnostic event contracts.
   - `Sources/VieLotusCAPI/include/vielotus.h`: Stable C-ABI contract for Windows and Linux shells.
-  - `CrossPlatform/`: Complete C/C++ source code for Windows TSF, Linux Fcitx5, and Linux IBus adapters.
+  - `Sources/VieLotusCoreWindows/`: Unobfuscated C++20 desktop/Linux engine (`WindowsNativeEngine.{h,cpp}`), canonical UTF-8 (Unicode NFC) wordlists (`lexicon/*.txt`), and deterministic offline FNV-1a generator (`scripts/generate_lexicon_hashes.py`).
+  - `CrossPlatform/`: Complete C/C++ source code for `capi-native` (`libVieLotusCAPI.so`), Windows TSF, Linux Fcitx5, Linux IBus adapters, and Debian/RPM/Arch packaging.
 - **Prebuilt Core & Desktop Installers (`Frameworks/VieLotusCore.xcframework` & `Binaries/`)**:
   - Compiled universal framework (`arm64` + `x86_64`) providing `InputSessionManager`, `EngineBridge`, `SmartBilingualDetector`, `MacroEngine`, `ClientAdapter`, and `PresentationRules`, plus final installers (`VieLotusIM.pkg`, `VieLotus-Setup-x64.exe`, and `*.deb`).
   - Verified against the 9,091-case regression matrix (**100.00% (9,091 / 9,091)** overall alongside symmetric collision survival `vn_survives_collision` / `ambiguous_both_sides` **97.33% (365 / 375)** and `whitelist_safe = never` **100.00% (182 / 182)**).

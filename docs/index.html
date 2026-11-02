@@ -1085,6 +1085,1132 @@
         gap: 16px;
       }
     }
+
+    /* =========================================================
+       SEN VIET LIVE 3-ACT INTERACTIVE SHOWCASE STAGE
+       ========================================================= */
+    .sv-theater {
+      background: var(--porcelain-sheet);
+      border: 1px solid var(--ink-primary);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 18px;
+      box-shadow: 0 12px 32px rgba(17, 30, 24, 0.06);
+    }
+
+    .sv-theater-bar {
+      position: relative;
+      background: var(--keycap-putty);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-hairline);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .sv-act-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .sv-act-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 44px;
+      padding: 6px 13px;
+      border-radius: 8px;
+      border: 1px solid var(--border-bezel);
+      background: var(--porcelain-sheet);
+      color: var(--ink-secondary);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+    }
+
+    .sv-act-tab:hover {
+      color: var(--ink-primary);
+      border-color: var(--ink-primary);
+    }
+
+    .sv-act-tab:focus-visible,
+    .sv-ctrl-btn:focus-visible,
+    .sv-subphrase-chip:focus-visible,
+    .sv-fisheye-mode-btn:focus-visible {
+      outline: 2px solid var(--lotus-forest);
+      outline-offset: 2px;
+    }
+
+    .sv-act-tab.active {
+      background: var(--lotus-forest);
+      border-color: var(--lotus-forest);
+      color: #FFFFFF;
+    }
+
+    .sv-act-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--border-bezel);
+      flex-shrink: 0;
+    }
+
+    .sv-act-tab.active .sv-act-dot {
+      background: #A7F3D0;
+      box-shadow: 0 0 0 3px rgba(167, 243, 208, 0.24);
+    }
+
+    .sv-theater-ctrls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+
+    .sv-ctrl-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      min-height: 40px;
+      padding: 5px 11px;
+      border-radius: 7px;
+      border: 1px solid var(--border-bezel);
+      background: var(--porcelain-sheet);
+      color: var(--ink-primary);
+      font-family: var(--font-body);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .sv-ctrl-btn:hover {
+      background: var(--paper-canvas);
+      border-color: var(--ink-primary);
+    }
+
+    .sv-ctrl-btn.cinema-link {
+      color: var(--lotus-teal);
+    }
+
+    .sv-progress-track {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 2.5px;
+      background: rgba(17, 30, 24, 0.07);
+      overflow: hidden;
+    }
+
+    .sv-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--lotus-forest);
+      transition: width 0.12s linear;
+    }
+
+    /* Tactile Keystroke Tape (Acts 1 & 2) */
+    .sv-desktop-scene {
+      display: block;
+    }
+
+    .sv-desktop-scene[hidden],
+    .sv-mobile-scene[hidden] {
+      display: none !important;
+    }
+
+    .sv-tape-strip {
+      padding: 14px 16px;
+      background: var(--paper-canvas);
+      border-bottom: 1px solid var(--border-hairline);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .sv-tape-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .sv-tape-caption {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ink-secondary);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .sv-mode-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--lotus-forest);
+      background: var(--lotus-tint);
+      border: 1px solid rgba(27, 94, 58, 0.24);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .sv-subphrase-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .sv-subphrase-bar[hidden] {
+      display: none !important;
+    }
+
+    .sv-subphrase-chip {
+      min-height: 34px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-bezel);
+      background: var(--porcelain-sheet);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink-secondary);
+      cursor: pointer;
+    }
+
+    .sv-subphrase-chip.active {
+      border-color: var(--lotus-forest);
+      background: var(--lotus-tint);
+      color: var(--lotus-forest);
+    }
+
+    .sv-keystream {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+      min-height: 38px;
+    }
+
+    kbd.sv-key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      min-width: 31px;
+      height: 33px;
+      padding: 0 7px;
+      background: var(--porcelain-sheet);
+      border: 1px solid var(--border-bezel);
+      border-bottom: 3px solid var(--border-bezel);
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ink-muted);
+      opacity: 0.58;
+      user-select: none;
+      transition: transform 0.09s ease, background-color 0.09s ease, color 0.09s ease, border-color 0.09s ease, opacity 0.09s ease;
+    }
+
+    kbd.sv-key.is-typed {
+      opacity: 1;
+      color: var(--ink-primary);
+    }
+
+    kbd.sv-key.is-tone {
+      border-color: rgba(27, 94, 58, 0.5);
+      border-bottom-color: rgba(27, 94, 58, 0.65);
+    }
+
+    kbd.sv-key.is-tone.is-typed {
+      background: var(--lotus-tint);
+      color: var(--lotus-forest);
+    }
+
+    kbd.sv-key.is-pressing {
+      opacity: 1;
+      transform: translateY(2px);
+      border-bottom-width: 1px;
+      background: var(--lotus-forest) !important;
+      border-color: var(--lotus-forest) !important;
+      color: #FFFFFF !important;
+      box-shadow: 0 2px 8px rgba(27, 94, 58, 0.28);
+    }
+
+    kbd.sv-key.is-space {
+      min-width: 42px;
+      font-size: 11px;
+    }
+
+    .sv-key-hint {
+      font-family: var(--font-body);
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 0 3px;
+      border-radius: 3px;
+      background: rgba(27, 94, 58, 0.12);
+      color: var(--lotus-forest);
+    }
+
+    kbd.sv-key.is-pressing .sv-key-hint {
+      background: rgba(255, 255, 255, 0.22);
+      color: #FFFFFF;
+    }
+
+    /* Native Dual Messaging Window (Acts 1 & 2) */
+    .sv-msg-window {
+      padding: 16px;
+      background: linear-gradient(180deg, #FAFCFA 0%, #F2F6F3 100%);
+    }
+
+    .sv-win-card {
+      background: var(--porcelain-sheet);
+      border: 1px solid var(--border-bezel);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 6px 20px rgba(17, 30, 24, 0.05);
+    }
+
+    .sv-win-titlebar {
+      padding: 9px 14px;
+      background: #F5F8F6;
+      border-bottom: 1px solid var(--border-hairline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .sv-win-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sv-traffic-dots {
+      display: inline-flex;
+      gap: 6px;
+    }
+
+    .sv-traffic-dots span {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #CBD5D0;
+      border: 1px solid rgba(17, 30, 24, 0.08);
+    }
+
+    .sv-traffic-dots span:nth-child(1) { background: #E3A19F; }
+    .sv-traffic-dots span:nth-child(2) { background: #E6CA8A; }
+    .sv-traffic-dots span:nth-child(3) { background: #8EC9A3; }
+
+    .sv-win-title {
+      font-family: var(--font-display);
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--ink-primary);
+    }
+
+    .sv-win-proto {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-muted);
+    }
+
+    .sv-compare-rows {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .sv-cmp-row {
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--border-hairline);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sv-cmp-row:last-child {
+      border-bottom: 0;
+    }
+
+    .sv-cmp-row.is-senviet {
+      background: #F6FBF8;
+    }
+
+    .sv-cmp-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .sv-ime-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--ink-secondary);
+    }
+
+    .sv-cmp-row.is-senviet .sv-ime-badge {
+      color: var(--lotus-forest);
+    }
+
+    .sv-v-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 21px;
+      height: 21px;
+      border-radius: 5px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 700;
+      background: var(--keycap-putty);
+      color: var(--ink-secondary);
+    }
+
+    .sv-cmp-row.is-senviet .sv-v-icon {
+      background: var(--lotus-forest);
+      color: #FFFFFF;
+    }
+
+    .sv-event-tag {
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--paper-canvas);
+      color: var(--ink-muted);
+      transition: background-color 0.18s ease, color 0.18s ease;
+    }
+
+    .sv-event-tag.is-err {
+      background: var(--crimson-tint);
+      color: var(--crimson-ink);
+    }
+
+    .sv-event-tag.is-ok {
+      background: var(--lotus-tint);
+      color: var(--lotus-forest);
+    }
+
+    .sv-live-bubble {
+      min-height: 84px;
+      padding: 11px 14px;
+      border-radius: 10px;
+      background: var(--paper-canvas);
+      border: 1px solid var(--border-hairline);
+      font-family: var(--font-body);
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.55;
+      color: var(--ink-primary);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .sv-cmp-row.is-senviet .sv-live-bubble {
+      background: #FFFFFF;
+      border-color: rgba(27, 94, 58, 0.36);
+      box-shadow: inset 3px 0 0 var(--lotus-forest);
+    }
+
+    .sv-line-item {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .sv-line-keyhint {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--ink-muted);
+      margin-left: 10px;
+    }
+
+    .sv-wavy-err {
+      color: var(--crimson-ink);
+      text-decoration-line: underline;
+      text-decoration-style: wavy;
+      text-decoration-color: #D93848;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 4px;
+      background: rgba(217, 56, 72, 0.08);
+      padding: 0 3px;
+      border-radius: 4px;
+    }
+
+    .sv-healed-word {
+      color: var(--lotus-forest);
+      background: var(--lotus-tint);
+      padding: 1px 6px;
+      border-radius: 6px;
+      box-shadow: inset 0 0 0 1px rgba(27, 94, 58, 0.22);
+      animation: svPulseHeal 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    @keyframes svPulseHeal {
+      0% { transform: scale(0.96); background: #BBF7D0; }
+      100% { transform: scale(1); background: var(--lotus-tint); }
+    }
+
+    .sv-caret {
+      display: inline-block;
+      width: 2px;
+      height: 1.12em;
+      background: var(--ink-muted);
+      vertical-align: text-bottom;
+      margin-left: 1px;
+      animation: svBlink 0.95s steps(2, start) infinite;
+    }
+
+    .sv-cmp-row.is-senviet .sv-caret {
+      background: var(--lotus-forest);
+    }
+
+    @keyframes svBlink {
+      to { visibility: hidden; }
+    }
+
+    .sv-scene-foot {
+      padding: 11px 16px;
+      background: var(--paper-canvas);
+      border-top: 1px solid var(--border-hairline);
+      font-size: 13px;
+      color: var(--ink-secondary);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    /* =========================================================
+       ACT 3: MOBILE LIQUID GLASS & APPLE WATCH FISHEYE DOME
+       ========================================================= */
+    .sv-mobile-scene {
+      padding: 18px 16px;
+      background: linear-gradient(180deg, #F5F8F6 0%, #E9F0EC 100%);
+    }
+
+    .sv-mobile-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    /* Authentic iPhone Bottom Viewport */
+    .sv-iphone-wrap {
+      display: flex;
+      justify-content: center;
+    }
+
+    .sv-iphone-device {
+      position: relative;
+      width: 100%;
+      max-width: 386px;
+      background: #F2F4F7;
+      border-radius: 34px;
+      border: 6px solid #222B27;
+      box-shadow:
+        0 16px 38px rgba(17, 30, 24, 0.16),
+        inset 0 0 0 1.5px rgba(255, 255, 255, 0.55);
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .sv-iphone-statusbar {
+      padding: 9px 18px 5px;
+      background: #FFFFFF;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--ink-primary);
+    }
+
+    .sv-dynamic-island {
+      width: 78px;
+      height: 20px;
+      border-radius: 999px;
+      background: #151C19;
+    }
+
+    .sv-iphone-status-right {
+      text-align: right;
+      font-size: 11px;
+    }
+
+    .sv-chat-navbar {
+      padding: 3px 14px 7px;
+      background: rgba(255, 255, 255, 0.94);
+      border-bottom: 1px solid rgba(17, 30, 24, 0.07);
+      text-align: center;
+    }
+
+    .sv-chat-header-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink-secondary);
+    }
+
+    .sv-chat-screen {
+      padding: 10px 12px 8px;
+      background: #FFFFFF;
+      min-height: 112px;
+      max-height: 124px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .sv-chat-msg {
+      max-width: 85%;
+      padding: 7px 11px;
+      border-radius: 15px;
+      font-size: 13px;
+      line-height: 1.38;
+      font-weight: 500;
+      animation: svBubbleIn 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    @keyframes svBubbleIn {
+      0% { opacity: 0; transform: translateY(6px) scale(0.96); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .sv-chat-msg.incoming {
+      align-self: flex-start;
+      background: #E9ECEF;
+      color: #111E18;
+      border-bottom-left-radius: 5px;
+    }
+
+    .sv-chat-msg.outgoing {
+      align-self: flex-end;
+      background: var(--lotus-forest);
+      color: #FFFFFF;
+      border-bottom-right-radius: 5px;
+    }
+
+    .sv-composer-row {
+      padding: 6px 10px;
+      background: #F7F9F8;
+      border-top: 1px solid rgba(17, 30, 24, 0.08);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .sv-composer-pill {
+      flex: 1;
+      min-height: 30px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: #FFFFFF;
+      border: 1px solid #CFDAD5;
+      font-size: 12.5px;
+      color: var(--ink-primary);
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .sv-composer-pill.is-placeholder {
+      color: var(--ink-muted);
+    }
+
+    /* iOS 26 Liquid Glass Keyboard Container */
+    .sv-ios-kb {
+      position: relative;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.85), rgba(223, 231, 227, 0.92));
+      backdrop-filter: blur(22px) saturate(160%);
+      -webkit-backdrop-filter: blur(22px) saturate(160%);
+      border-top: 1px solid rgba(255, 255, 255, 0.85);
+      padding: 5px 5px 12px;
+    }
+
+    /* 45pt Apple Watch Magnification Wave Candidate Bar */
+    .sv-cand-bar {
+      position: relative;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 3px;
+      margin-bottom: 5px;
+      z-index: 25;
+    }
+
+    .sv-bar-menu-btn {
+      width: 38px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid rgba(17, 30, 24, 0.1);
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--ink-primary);
+      font-size: 17px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      box-shadow: 0 1px 2px rgba(17, 30, 24, 0.08);
+      transition: background-color 0.14s ease, color 0.14s ease, transform 0.12s ease;
+    }
+
+    .sv-bar-menu-btn.active {
+      background: var(--lotus-forest);
+      border-color: var(--lotus-forest);
+      color: #FFFFFF;
+    }
+
+    .sv-cand-slots {
+      flex: 1;
+      height: 38px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-items: center;
+      position: relative;
+      touch-action: none;
+    }
+
+    .sv-cand-slot {
+      position: relative;
+      height: 34px;
+      border: 0;
+      background: transparent;
+      border-radius: 10px;
+      font-family: var(--font-body);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ink-primary);
+      padding: 0 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      transform-origin: center center;
+      will-change: transform;
+      transition: background-color 0.08s ease;
+    }
+
+    .sv-cand-slot:not(:first-child)::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 1px;
+      background: rgba(17, 30, 24, 0.14);
+    }
+
+    .sv-cand-slot.is-wave-peak {
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--lotus-forest);
+      box-shadow:
+        0 4px 12px rgba(27, 94, 58, 0.16),
+        inset 0 0 0 1px rgba(27, 94, 58, 0.28);
+      z-index: 10;
+    }
+
+    .sv-cand-slot.is-wave-peak::before {
+      opacity: 0;
+    }
+
+    .sv-bar-abc {
+      height: 24px;
+      padding: 0 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(17, 30, 24, 0.16);
+      background: rgba(255, 255, 255, 0.65);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--ink-secondary);
+      display: inline-flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    /* Main Keyboard Deck (212px native iPhone keyboard height) */
+    .sv-kb-deck {
+      position: relative;
+      height: 212px;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    /* 2D Omni-Directional Spherical Fisheye Honeycomb Cloud */
+    .sv-honeycomb-cloud {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      cursor: grab;
+      touch-action: none;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.62) 0%, rgba(226, 236, 230, 0.35) 68%, rgba(210, 222, 215, 0.5) 100%);
+      border-radius: 14px;
+    }
+
+    .sv-honeycomb-cloud:active {
+      cursor: grabbing;
+    }
+
+    .sv-honeycomb-cloud[hidden],
+    .sv-qwerty-deck[hidden] {
+      display: none !important;
+    }
+
+    /* Subtle center optical light bloom (no dashed ring clutter) */
+    .sv-fisheye-lens-ring {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 260px;
+      height: 76px;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0) 74%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .sv-phrase-pill {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 17px;
+      border: 1px solid rgba(17, 30, 24, 0.16);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      color: #13221B;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(17, 30, 24, 0.1);
+      will-change: transform, opacity;
+      transform-origin: center center;
+    }
+
+    .sv-phrase-pill.is-focused {
+      border-width: 1.6px;
+      box-shadow:
+        0 6px 16px rgba(27, 94, 58, 0.2),
+        0 0 0 3px rgba(255, 255, 255, 0.65);
+    }
+
+    /* Floating glass corner pills matching KeyboardLayoutView.swift */
+    .sv-cloud-corner-pill {
+      position: absolute;
+      bottom: 6px;
+      height: 32px;
+      min-width: 34px;
+      padding: 0 9px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(27, 94, 58, 0.28);
+      box-shadow: 0 2px 6px rgba(17, 30, 24, 0.14);
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 140;
+      pointer-events: none;
+    }
+
+    .sv-cloud-corner-pill.left-gear { left: 6px; }
+    .sv-cloud-corner-pill.left-emoji { left: 46px; }
+    .sv-cloud-corner-pill.right-del { right: 6px; font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--ink-primary); }
+
+    /* iOS 26 Liquid Glass QWERTY Deck */
+    .sv-qwerty-deck {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 3px 2px 2px;
+    }
+
+    .sv-q-row {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .sv-q-key {
+      flex: 1;
+      max-width: 32px;
+      height: 42px;
+      border-radius: 8.5px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 1px 1.5px rgba(17, 30, 24, 0.2);
+      font-family: var(--font-body);
+      font-size: 16px;
+      font-weight: 500;
+      color: #111E18;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sv-q-key.sys {
+      max-width: 42px;
+      background: rgba(196, 206, 201, 0.78);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .sv-q-key.space {
+      max-width: none;
+      flex: 4.2;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .sv-q-key.return {
+      max-width: 68px;
+      flex: 1.6;
+      background: var(--lotus-forest);
+      border-color: var(--lotus-forest);
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* Choreographed Virtual Touch Indicator */
+    .sv-touch-dot {
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      margin-left: -17px;
+      margin-top: -17px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(27, 94, 58, 0.42) 0%, rgba(27, 94, 58, 0.16) 65%, transparent 100%);
+      border: 2px solid rgba(255, 255, 255, 0.92);
+      box-shadow: 0 3px 10px rgba(17, 30, 24, 0.22);
+      pointer-events: none;
+      z-index: 200;
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.12s ease;
+    }
+
+    .sv-touch-dot.is-visible {
+      opacity: 1;
+    }
+
+    .sv-touch-dot.is-tapping {
+      transform: scale(0.76);
+      background: radial-gradient(circle, rgba(27, 94, 58, 0.72) 0%, rgba(27, 94, 58, 0.28) 70%, transparent 100%);
+    }
+
+    .sv-home-indicator {
+      width: 112px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(17, 30, 24, 0.24);
+      margin: 8px auto 0;
+    }
+
+    /* Right Telemetry & Interactive Controls Card for Act 3 */
+    .sv-optics-card {
+      background: var(--porcelain-sheet);
+      border: 1px solid var(--border-bezel);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+    }
+
+    .sv-optics-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--ink-primary);
+      line-height: 1.28;
+    }
+
+    .sv-optics-desc {
+      font-size: 13.75px;
+      color: var(--ink-secondary);
+      line-height: 1.62;
+    }
+
+    .sv-fisheye-modes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .sv-fisheye-mode-btn {
+      min-height: 40px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-bezel);
+      background: var(--paper-canvas);
+      color: var(--ink-primary);
+      font-family: var(--font-body);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .sv-fisheye-mode-btn.active {
+      background: var(--lotus-tint);
+      border-color: var(--lotus-forest);
+      color: var(--lotus-forest);
+    }
+
+    .sv-telemetry-box {
+      padding: 11px 13px;
+      border-radius: 9px;
+      background: var(--paper-canvas);
+      border: 1px solid var(--border-hairline);
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .sv-telemetry-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--ink-muted);
+    }
+
+    .sv-telemetry-scale {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--lotus-forest);
+    }
+
+    .sv-telemetry-phrase {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sv-optics-hint {
+      font-size: 12.5px;
+      color: var(--lotus-teal);
+      font-weight: 600;
+    }
+
+    /* Compact Secondary Bench Heading */
+    .sv-bench-details {
+      border: 1px solid var(--border-bezel);
+      border-radius: 10px;
+      background: var(--porcelain-sheet);
+      overflow: hidden;
+    }
+
+    .sv-bench-summary {
+      padding: 12px 16px;
+      background: var(--keycap-putty);
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink-primary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      list-style: none;
+    }
+
+    .sv-bench-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .sv-bench-chevron {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--lotus-forest);
+    }
+
+    .sv-bench-details[open] .sv-bench-summary {
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .sv-bench-details .specimen-stage {
+      border: 0;
+      border-radius: 0;
+    }
+
+    @media (min-width: 780px) {
+      .sv-act-tab {
+        min-height: 38px;
+      }
+
+      .sv-mobile-grid {
+        grid-template-columns: 386px 1fr;
+        gap: 24px;
+      }
+
+      .sv-live-bubble {
+        font-size: 19.5px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sv-caret,
+      .sv-healed-word,
+      .sv-chat-msg {
+        animation: none !important;
+      }
+      .sv-progress-fill,
+      kbd.sv-key {
+        transition: none !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1144,63 +2270,257 @@
     </section>
 
     <main>
-      <!-- SECTION 1: Hero Abstract & Interactive Specimen Stage -->
+      <!-- SECTION 1: Hero Abstract & Live 3-Act Interactive Showcase -->
       <section id="sec-sim" class="hero-editorial">
-        <div class="sec-num" style="margin-bottom: 6px;">§1 / 06 · EMPIRICAL SPECIMEN</div>
+        <div class="sec-num" style="margin-bottom: 6px;" data-i18n="hero.eyebrow">§1 / 06 · Trình diễn thực nghiệm trực tiếp</div>
         <h1 data-i18n="hero.title">Nghiên cứu và thiết kế bộ gõ tiếng Việt theo giao thức bàn phím gốc đa nền tảng</h1>
         <p class="hero-prose" data-i18n="hero.lead">
           Sen Việt (VieLotusIM) lấy hệ sinh thái Apple (macOS, iOS, iPadOS) làm kiến trúc tham chiếu trọng tâm bằng ngôn ngữ Pure Swift 6, đồng thời vận hành đồng nhất cùng một lõi ngôn ngữ trên Windows, Linux và Android. Dự án tập trung giải quyết hai bài toán kỹ thuật: (1) thay thế cơ chế bẫy phím ngầm đòi quyền nhạy cảm bằng kênh nhập liệu chính thống của từng hệ điều hành, và (2) xử lý điểm mù từ vựng khi các từ tiếng Anh thông dụng như turn bị biến thành âm vô nghĩa "tủn", hoặc last thành "lát".
         </p>
 
-        <!-- Interactive Keycap & Editor Stage -->
-        <div class="specimen-stage">
-          <div class="specimen-header">
-            <span class="specimen-title" data-i18n="sim.title">Mô phỏng đối chiếu 4 ca biên ngôn ngữ &amp; bộ đệm</span>
-            <div class="scenario-selector" role="tablist">
-              <button type="button" class="scenario-btn active" onclick="selectScenario(0)" data-i18n="sim.tab0">1. Gõ "turn" (không ra "tủn")</button>
-              <button type="button" class="scenario-btn" onclick="selectScenario(1)" data-i18n="sim.tab1">2. Gõ "last" vs. "lát"</button>
-              <button type="button" class="scenario-btn" onclick="selectScenario(2)" data-i18n="sim.tab2">3. Từ trùng khít (rest / rét)</button>
-              <button type="button" class="scenario-btn" onclick="selectScenario(3)" data-i18n="sim.tab3">4. Xóa lùi sửa dấu</button>
+        <!-- LIVE 3-ACT INTERACTIVE SHOWCASE STAGE -->
+        <div id="sv-live-theater" class="sv-theater" aria-label="Sân khấu mô phỏng trực tiếp Sen Việt">
+          <div class="sv-theater-bar">
+            <div class="sv-act-tabs" role="tablist" aria-label="Ba tính năng đặc trưng">
+              <button type="button" id="sv-tab-0" class="sv-act-tab active" role="tab" aria-selected="true" onclick="svSelectAct(0)">
+                <span class="sv-act-dot"></span>
+                <span data-i18n="live.tab0">Song ngữ tự động</span>
+              </button>
+              <button type="button" id="sv-tab-1" class="sv-act-tab" role="tab" aria-selected="false" onclick="svSelectAct(1)">
+                <span class="sv-act-dot"></span>
+                <span data-i18n="live.tab1">Gõ dấu tự do đầu từ</span>
+              </button>
+              <button type="button" id="sv-tab-2" class="sv-act-tab" role="tab" aria-selected="false" onclick="svSelectAct(2)">
+                <span class="sv-act-dot"></span>
+                <span data-i18n="live.tab2">Fisheye gợi ý di động</span>
+              </button>
+            </div>
+
+            <div class="sv-theater-ctrls">
+              <button type="button" id="sv-btn-play" class="sv-ctrl-btn" onclick="svTogglePlay()">
+                <span id="sv-play-icon" aria-hidden="true">⏸</span>
+                <span id="sv-play-label" data-i18n="live.pause">Tạm dừng</span>
+              </button>
+              <button type="button" class="sv-ctrl-btn" onclick="svReplayAct()">
+                <span aria-hidden="true">↺</span>
+                <span data-i18n="live.replay">Phát lại</span>
+              </button>
+              <a href="showcase.html" class="sv-ctrl-btn cinema-link" data-i18n="live.cinema">Trình chiếu</a>
+            </div>
+
+            <div class="sv-progress-track" aria-hidden="true">
+              <div id="sv-progress-fill" class="sv-progress-fill"></div>
             </div>
           </div>
 
-          <div class="keycap-tray">
-            <div class="keycap-meta">
-              <span data-i18n="sim.typed_label">Chuỗi phím vật lý đầu vào:</span>
-              <span id="sim-context" class="keycap-context">Từ tiếng Anh bị biến thành âm vô nghĩa (turn → tủn)</span>
-            </div>
-            <div id="sim-keycaps" class="keycap-row" aria-live="polite"></div>
-          </div>
-
-          <div class="specimen-panes">
-            <div class="editor-pane">
-              <div class="pane-label">
-                <span data-i18n="sim.old_head">Bộ lọc chỉ kiểm tra khuôn ghép vần (Phonotactic-only)</span>
+          <!-- ACTS 1 & 2: LIVE KEYSTROKE TAPE + NATIVE MESSAGING COMPARISON -->
+          <div id="sv-desktop-scene" class="sv-desktop-scene">
+            <div class="sv-tape-strip">
+              <div class="sv-tape-top">
+                <div class="sv-tape-caption">
+                  <span data-i18n="live.tape_label">Luồng phím gõ thực tế:</span>
+                  <span id="sv-mode-chip" class="sv-mode-chip">Telex · Không bấm phím chuyển Anh/Việt</span>
+                </div>
+                <div id="sv-subphrase-bar" class="sv-subphrase-bar" hidden>
+                  <button type="button" id="sv-sub-0" class="sv-subphrase-chip active" onclick="svFocusFreePhrase(0)">r r u n g _ r r i n h → rủng rỉnh</button>
+                  <button type="button" id="sv-sub-1" class="sv-subphrase-chip" onclick="svFocusFreePhrase(1)">s s o o n g _ s s o t → sống sót</button>
+                </div>
               </div>
-              <div id="sim-old-out" class="pane-output">tủn</div>
-              <p id="sim-old-exp" class="pane-note">
-                Các bộ gõ hiện nay khôi phục được từ sai cấu trúc vần (như window), nhưng với "turn", tổ hợp t-u-n đúng khuôn phụ âm – nguyên âm nên bị biến thành âm vô nghĩa "tủn".
-              </p>
+              <div id="sv-keystream" class="sv-keystream" aria-live="off"></div>
             </div>
 
-            <div class="editor-pane sen-viet">
-              <div class="pane-label">
-                <span data-i18n="sim.new_head">Trọng tài từ vựng &amp; ngữ cảnh (Sen Việt)</span>
+            <div class="sv-msg-window">
+              <div class="sv-win-card">
+                <div class="sv-win-titlebar">
+                  <div class="sv-win-left">
+                    <span class="sv-traffic-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+                    <span class="sv-win-title" data-i18n="live.win_title">Tin nhắn — Đối chiếu trực tiếp từng nhịp phím</span>
+                  </div>
+                  <span class="sv-win-proto">InputMethodKit · 0 Accessibility</span>
+                </div>
+
+                <div class="sv-compare-rows">
+                  <!-- Top Pane: Standard Telex -->
+                  <div class="sv-cmp-row">
+                    <div class="sv-cmp-head">
+                      <span class="sv-ime-badge">
+                        <span class="sv-v-icon">V</span>
+                        <span data-i18n="live.old_ime">Bộ gõ Telex thông thường</span>
+                      </span>
+                      <span id="sv-old-tag" class="sv-event-tag">Telex mặc định</span>
+                    </div>
+                    <div id="sv-old-bubble" class="sv-live-bubble"></div>
+                  </div>
+
+                  <!-- Bottom Pane: Sen Việt -->
+                  <div class="sv-cmp-row is-senviet">
+                    <div class="sv-cmp-head">
+                      <span class="sv-ime-badge">
+                        <span class="sv-v-icon">V</span>
+                        <span data-i18n="live.new_ime">Sen Việt (VieLotusIM)</span>
+                      </span>
+                      <span id="sv-new-tag" class="sv-event-tag is-ok">Giữ nguyên chế độ V · Tự phân giải</span>
+                    </div>
+                    <div id="sv-new-bubble" class="sv-live-bubble"></div>
+                  </div>
+                </div>
               </div>
-              <div id="sim-new-out" class="pane-output">turn </div>
-              <p id="sim-new-exp" class="pane-note">
-                Đối chiếu từ điển âm tiết thực tế thay vì chỉ ghép vần cơ học: nhận diện "tủn" không phải từ tiếng Việt có nghĩa độc lập nên tự trả về ngay "turn".
-              </p>
+            </div>
+
+            <div class="sv-scene-foot">
+              <span id="sv-scene-summary">Gõ liền mạch câu chào Việt – Anh trong cùng một phiên Telex mà không cần tắt bộ gõ.</span>
             </div>
           </div>
 
-          <div class="specimen-cite">
-            <span data-i18n="sim.cite_prefix">Nguồn đối chiếu:</span>
-            <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/BENCHMARK_REPORT.md" target="_blank" rel="noopener noreferrer">BENCHMARK_REPORT.md</a>
-            · <span data-i18n="sim.cite_corpus">Ca kiểm thử đơn vị: SmartBilingualDetectorTests.swift (turn, last, list, best, cost, rest)</span>
-            · <span data-i18n="sim.cite_cmd">Tự kiểm chứng:</span> <code>./Binaries/VieLotusCLI --benchmark</code>
+          <!-- ACT 3: MOBILE LIQUID GLASS & APPLE WATCH FISHEYE QUICK-PHRASES DOME -->
+          <div id="sv-mobile-scene" class="sv-mobile-scene" hidden>
+            <div class="sv-mobile-grid">
+              <div class="sv-iphone-wrap">
+                <div id="sv-iphone-device" class="sv-iphone-device">
+                  <div class="sv-iphone-statusbar">
+                    <span>9:41</span>
+                    <span class="sv-dynamic-island" aria-hidden="true"></span>
+                    <span class="sv-iphone-status-right">5G · 100%</span>
+                  </div>
+                  <div class="sv-chat-navbar">
+                    <span class="sv-chat-header-title" data-i18n="live.chat_title">Tin nhắn · Sen Việt iOS</span>
+                  </div>
+
+                  <div id="sv-chat-screen" class="sv-chat-screen">
+                    <div class="sv-chat-msg incoming">Chào buổi sáng! Good morning! ☀️</div>
+                    <div class="sv-chat-msg outgoing">Sáng nay trời mát rủng rỉnh thật!</div>
+                  </div>
+
+                  <div class="sv-composer-row">
+                    <div id="sv-composer-pill" class="sv-composer-pill is-placeholder" data-i18n="live.composer_ph">Chạm câu gợi ý để gửi nhanh...</div>
+                  </div>
+
+                  <div id="sv-ios-kb" class="sv-ios-kb">
+                    <!-- 45pt Candidate Bar with Apple Watch Dock Magnification Wave -->
+                    <div class="sv-cand-bar">
+                      <button type="button" id="sv-bar-menu-btn" class="sv-bar-menu-btn active" onclick="svToggleMobileDeck()" title="Mở đám mây mẫu câu Fisheye">≡</button>
+                      <div id="sv-cand-slots" class="sv-cand-slots">
+                        <button type="button" class="sv-cand-slot" data-slot="0" onclick="svPickCandidateSlot(0)">buổi sáng</button>
+                        <button type="button" class="sv-cand-slot" data-slot="1" onclick="svPickCandidateSlot(1)">rủng rỉnh</button>
+                        <button type="button" class="sv-cand-slot" data-slot="2" onclick="svPickCandidateSlot(2)">sống sót</button>
+                      </div>
+                      <span class="sv-bar-abc">ABC</span>
+                    </div>
+
+                    <!-- Main Keyboard Deck: Switches between 2D Toroidal Fisheye Cloud & Liquid Glass QWERTY -->
+                    <div class="sv-kb-deck">
+                      <div id="sv-honeycomb-cloud" class="sv-honeycomb-cloud">
+                        <div class="sv-fisheye-lens-ring"></div>
+                        <div id="sv-cloud-canvas"></div>
+                        <span class="sv-cloud-corner-pill left-gear" aria-hidden="true">⚙</span>
+                        <span class="sv-cloud-corner-pill left-emoji" aria-hidden="true">☺</span>
+                        <span class="sv-cloud-corner-pill right-del" aria-hidden="true">⌫</span>
+                      </div>
+
+                      <div id="sv-qwerty-deck" class="sv-qwerty-deck" hidden>
+                        <div class="sv-q-row">
+                          <span class="sv-q-key">q</span><span class="sv-q-key">w</span><span class="sv-q-key">e</span><span class="sv-q-key">r</span><span class="sv-q-key">t</span><span class="sv-q-key">y</span><span class="sv-q-key">u</span><span class="sv-q-key">i</span><span class="sv-q-key">o</span><span class="sv-q-key">p</span>
+                        </div>
+                        <div class="sv-q-row" style="padding: 0 14px;">
+                          <span class="sv-q-key">a</span><span class="sv-q-key">s</span><span class="sv-q-key">d</span><span class="sv-q-key">f</span><span class="sv-q-key">g</span><span class="sv-q-key">h</span><span class="sv-q-key">j</span><span class="sv-q-key">k</span><span class="sv-q-key">l</span>
+                        </div>
+                        <div class="sv-q-row">
+                          <span class="sv-q-key sys">⇧</span><span class="sv-q-key">z</span><span class="sv-q-key">x</span><span class="sv-q-key">c</span><span class="sv-q-key">v</span><span class="sv-q-key">b</span><span class="sv-q-key">n</span><span class="sv-q-key">m</span><span class="sv-q-key sys">⌫</span>
+                        </div>
+                        <div class="sv-q-row">
+                          <span class="sv-q-key sys">123</span><span class="sv-q-key sys">🌐</span><span class="sv-q-key space" data-i18n="live.kb_space">dấu cách</span><span class="sv-q-key return" data-i18n="live.kb_return">Nhập</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div id="sv-touch-dot" class="sv-touch-dot" aria-hidden="true"></div>
+                    <div class="sv-home-indicator" aria-hidden="true"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Side Explanation & Live Fisheye Telemetry -->
+              <div class="sv-optics-card">
+                <div class="sv-optics-title" data-i18n="live.mob_title">Đám mây mẫu câu Fisheye 360° &amp; sóng gợi ý kiểu Apple Watch</div>
+                <p class="sv-optics-desc" data-i18n="live.mob_desc">
+                  Trên iOS và iPadOS (Liquid Glass, 0 Full Access), chạm nút (≡) mở đám mây mẫu câu Pastel cuộn vô tận 360°. Thuật toán thấu kính cầu 120Hz phóng đại câu ở tâm lên 1.16× và nén cong vùng rìa về 0.58× theo hàm Gaussian + tanh, giúp ngón cái lướt chọn và gửi câu dài chỉ bằng một chạm.
+                </p>
+
+                <div class="sv-fisheye-modes">
+                  <button type="button" id="sv-fmode-cloud" class="sv-fisheye-mode-btn active" onclick="svSetMobileDeck(true)" data-i18n="live.fmode_cloud">Đám mây Fisheye (≡)</button>
+                  <button type="button" id="sv-fmode-wave" class="sv-fisheye-mode-btn" onclick="svSetMobileDeck(false)" data-i18n="live.fmode_wave">Bàn phím &amp; Sóng gợi ý 3 ô</button>
+                </div>
+
+                <div class="sv-telemetry-box">
+                  <div class="sv-telemetry-row">
+                    <span data-i18n="live.tele_label">Câu đang hội tụ dưới thấu kính:</span>
+                    <span id="sv-tele-scale" class="sv-telemetry-scale">1.16× · Gaussian Dome</span>
+                  </div>
+                  <div id="sv-tele-phrase" class="sv-telemetry-phrase">Chúc bạn ngày mới tốt lành!</div>
+                </div>
+
+                <div class="sv-optics-hint" data-i18n="live.mob_hint">
+                  Tương tác trực tiếp: Kéo chuột hoặc vuốt ngón tay trên đám mây câu Pastel để xoay cầu Fisheye, chạm vào câu bất kỳ để bắn vào khung chat.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        <!-- Collapsible Secondary 4-Case Academic Lexical Bench -->
+        <details class="sv-bench-details">
+          <summary class="sv-bench-summary">
+            <span data-i18n="sim.title">Mô phỏng đối chiếu 4 ca biên ngôn ngữ &amp; bộ đệm (turn · last · rest/rét · xóa lùi sửa dấu)</span>
+            <span class="sv-bench-chevron" data-i18n="sim.expand_hint">Mở bảng ca biên ▾</span>
+          </summary>
+          <div class="specimen-stage">
+            <div class="specimen-header">
+              <div class="scenario-selector" role="tablist">
+                <button type="button" class="scenario-btn active" onclick="selectScenario(0)" data-i18n="sim.tab0">1. Gõ "turn" (không ra "tủn")</button>
+                <button type="button" class="scenario-btn" onclick="selectScenario(1)" data-i18n="sim.tab1">2. Gõ "last" vs. "lát"</button>
+                <button type="button" class="scenario-btn" onclick="selectScenario(2)" data-i18n="sim.tab2">3. Từ trùng khít (rest / rét)</button>
+                <button type="button" class="scenario-btn" onclick="selectScenario(3)" data-i18n="sim.tab3">4. Xóa lùi sửa dấu</button>
+              </div>
+            </div>
+
+            <div class="keycap-tray">
+              <div class="keycap-meta">
+                <span data-i18n="sim.typed_label">Chuỗi phím vật lý đầu vào:</span>
+                <span id="sim-context" class="keycap-context">Từ tiếng Anh bị biến thành âm vô nghĩa (turn → tủn)</span>
+              </div>
+              <div id="sim-keycaps" class="keycap-row" aria-live="polite"></div>
+            </div>
+
+            <div class="specimen-panes">
+              <div class="editor-pane">
+                <div class="pane-label">
+                  <span data-i18n="sim.old_head">Bộ lọc chỉ kiểm tra khuôn ghép vần (Phonotactic-only)</span>
+                </div>
+                <div id="sim-old-out" class="pane-output">tủn</div>
+                <p id="sim-old-exp" class="pane-note">
+                  Các bộ gõ hiện nay khôi phục được từ sai cấu trúc vần (như window), nhưng với "turn", tổ hợp t-u-n đúng khuôn phụ âm – nguyên âm nên bị biến thành âm vô nghĩa "tủn".
+                </p>
+              </div>
+
+              <div class="editor-pane sen-viet">
+                <div class="pane-label">
+                  <span data-i18n="sim.new_head">Trọng tài từ vựng &amp; ngữ cảnh (Sen Việt)</span>
+                </div>
+                <div id="sim-new-out" class="pane-output">turn </div>
+                <p id="sim-new-exp" class="pane-note">
+                  Đối chiếu từ điển âm tiết thực tế thay vì chỉ ghép vần cơ học: nhận diện "tủn" không phải từ tiếng Việt có nghĩa độc lập nên tự trả về ngay "turn".
+                </p>
+              </div>
+            </div>
+
+            <div class="specimen-cite">
+              <span data-i18n="sim.cite_prefix">Nguồn đối chiếu:</span>
+              <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/BENCHMARK_REPORT.md" target="_blank" rel="noopener noreferrer">BENCHMARK_REPORT.md</a>
+              · <span data-i18n="sim.cite_corpus">Ca kiểm thử đơn vị: SmartBilingualDetectorTests.swift (turn, last, list, best, cost, rest)</span>
+              · <span data-i18n="sim.cite_cmd">Tự kiểm chứng:</span> <code>./Binaries/VieLotusCLI --benchmark</code>
+            </div>
+          </div>
+        </details>
       </section>
 
       <!-- SECTION 2: Published Platforms, Store URLs & Verified Hardware/OS Matrix -->
@@ -1893,10 +3213,33 @@
         'led.c2': 'Độ chính xác bộ kiểm thử chính có ngữ cảnh (Telex & VNI)',
         'led.c3': 'Đối xứng hai chiều (365/375) & bảo toàn 100% đường gõ Việt duy nhất',
         'led.c4': 'Độ trễ xử lý qua 250.000 phím liên tục (lõi Swift 6 đa nền tảng)',
+        'hero.eyebrow': '§1 / 06 · Trình diễn thực nghiệm trực tiếp',
         'hero.title': 'Nghiên cứu và thiết kế bộ gõ tiếng Việt theo giao thức bàn phím gốc đa nền tảng',
         'hero.lead': 'Sen Việt (VieLotusIM) lấy hệ sinh thái Apple (macOS, iOS, iPadOS) làm kiến trúc tham chiếu trọng tâm bằng ngôn ngữ Pure Swift 6, đồng thời vận hành đồng nhất cùng một lõi ngôn ngữ trên Windows, Linux và Android. Dự án tập trung giải quyết hai bài toán kỹ thuật: (1) thay thế cơ chế bẫy phím ngầm đòi quyền nhạy cảm bằng kênh nhập liệu chính thống của từng hệ điều hành, và (2) xử lý điểm mù từ vựng khi các từ tiếng Anh thông dụng như turn bị biến thành âm vô nghĩa "tủn", hoặc last thành "lát".',
+        'live.tab0': 'Song ngữ tự động',
+        'live.tab1': 'Gõ dấu tự do đầu từ',
+        'live.tab2': 'Fisheye gợi ý di động',
+        'live.pause': 'Tạm dừng',
+        'live.play': 'Tiếp tục',
+        'live.replay': 'Phát lại',
+        'live.cinema': 'Trình chiếu',
+        'live.tape_label': 'Luồng phím gõ thực tế:',
+        'live.win_title': 'Tin nhắn — Đối chiếu trực tiếp từng nhịp phím',
+        'live.old_ime': 'Bộ gõ Telex thông thường',
+        'live.new_ime': 'Sen Việt (VieLotusIM)',
+        'live.chat_title': 'Tin nhắn · Sen Việt iOS',
+        'live.composer_ph': 'Chạm câu gợi ý để gửi nhanh...',
+        'live.kb_space': 'dấu cách',
+        'live.kb_return': 'Nhập',
+        'live.mob_title': 'Đám mây mẫu câu Fisheye 360° & sóng gợi ý kiểu Apple Watch',
+        'live.mob_desc': 'Trên iOS và iPadOS (Liquid Glass, 0 Full Access), chạm nút (≡) mở đám mây mẫu câu Pastel cuộn vô tận 360°. Thuật toán thấu kính cầu 120Hz phóng đại câu ở tâm lên 1.16× và nén cong vùng rìa về 0.58× theo hàm Gaussian + tanh, giúp ngón cái lướt chọn và gửi câu dài chỉ bằng một chạm.',
+        'live.fmode_cloud': 'Đám mây Fisheye (≡)',
+        'live.fmode_wave': 'Bàn phím & Sóng gợi ý 3 ô',
+        'live.tele_label': 'Câu đang hội tụ dưới thấu kính:',
+        'live.mob_hint': 'Tương tác trực tiếp: Kéo chuột hoặc vuốt ngón tay trên đám mây câu Pastel để xoay cầu Fisheye, chạm vào câu bất kỳ để bắn vào khung chat.',
         'cta.copy': 'Chép',
-        'sim.title': 'Mô phỏng đối chiếu 4 ca biên ngôn ngữ & bộ đệm',
+        'sim.title': 'Mô phỏng đối chiếu 4 ca biên ngôn ngữ & bộ đệm (turn · last · rest/rét · xóa lùi sửa dấu)',
+        'sim.expand_hint': 'Mở bảng ca biên ▾',
         'sim.tab0': '1. Gõ "turn" (không ra "tủn")',
         'sim.tab1': '2. Gõ "last" vs. "lát"',
         'sim.tab2': '3. Từ trùng khít (rest / rét)',
@@ -2032,10 +3375,33 @@
         'led.c2': 'Context-isolated primary regression suite (Telex & VNI)',
         'led.c3': 'Two-sided symmetry (365/375) & 100% unique Vietnamese paths',
         'led.c4': 'p99 keystroke latency across 250,000 continuous keys (cross-platform Swift 6 core)',
+        'hero.eyebrow': '§1 / 06 · Live interactive empirical stage',
         'hero.title': 'Researching and architecting Vietnamese input across native OS keyboard protocols',
         'hero.lead': 'Sen Việt (VieLotusIM) takes the Apple ecosystem (macOS, iOS, iPadOS) as its primary Pure Swift 6 reference architecture while compiling and running the exact same linguistic core across Windows, Linux, and Android. It addresses two foundational problems: (1) replacing invasive global keyboard hooks with each operating system’s official text input protocol, and (2) resolving lexical collisions where everyday English words like turn are mangled into the meaningless syllable "tủn", or last into "lát".',
+        'live.tab0': 'Auto-bilingual Telex',
+        'live.tab1': 'Free-order tone first',
+        'live.tab2': 'Mobile Fisheye phrases',
+        'live.pause': 'Pause',
+        'live.play': 'Resume',
+        'live.replay': 'Replay',
+        'live.cinema': 'Cinema view',
+        'live.tape_label': 'Live physical keystrokes:',
+        'live.win_title': 'Messages — Real-time keystroke comparison',
+        'live.old_ime': 'Standard Telex IME',
+        'live.new_ime': 'Sen Việt (VieLotusIM)',
+        'live.chat_title': 'Messages · Sen Việt iOS',
+        'live.composer_ph': 'Tap a phrase bubble to send...',
+        'live.kb_space': 'space',
+        'live.kb_return': 'return',
+        'live.mob_title': '360° Fisheye quick-phrase dome & Apple Watch suggestion wave',
+        'live.mob_desc': 'On iOS and iPadOS (Liquid Glass, 0 Full Access), tapping (≡) blooms an infinite 360° pastel quick-phrase cloud. A 120Hz spherical projection magnifies the center phrase to 1.16× while curving peripheral pills to 0.58× via Gaussian + tanh optics for effortless one-thumb selection.',
+        'live.fmode_cloud': 'Fisheye dome (≡)',
+        'live.fmode_wave': 'Keyboard & 3-slot wave',
+        'live.tele_label': 'Phrase under focal lens:',
+        'live.mob_hint': 'Try it live: Drag anywhere across the pastel phrase cloud to spin the 360° Fisheye dome, and tap any bubble to send it into the chat.',
         'cta.copy': 'Copy',
-        'sim.title': 'Interactive comparison of 4 linguistic & composition boundary cases',
+        'sim.title': 'Interactive comparison of 4 lexical & buffer boundary cases (turn · last · rest/rét · backspace)',
+        'sim.expand_hint': 'Expand edge cases ▾',
         'sim.tab0': '1. "turn" (never "tủn")',
         'sim.tab1': '2. "last" vs. "lát"',
         'sim.tab2': '3. Exact collision (rest / rét)',
@@ -2174,6 +3540,7 @@
       });
 
       renderScenario();
+      if (typeof svRefreshLanguage === 'function') svRefreshLanguage();
       try { localStorage.setItem('vielotus_lang', currentLang); } catch (_) {}
     }
 
@@ -2191,12 +3558,1126 @@
       if (box) box.classList.toggle('open');
     }
 
+    /* =========================================================================
+       SEN VIET LIVE 3-ACT THEATER & 120HZ APPLE WATCH FISHEYE ENGINE
+       ========================================================================= */
+    const svReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function svEsc(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function svRenderSegments(segs, showCaret) {
+      let html = '';
+      for (let i = 0; i < segs.length; i++) {
+        const seg = segs[i];
+        if (!seg || !seg.t) continue;
+        if (seg.k === 'err') {
+          html += '<span class="sv-wavy-err">' + svEsc(seg.t) + '</span>';
+        } else if (seg.k === 'ok') {
+          html += '<span class="sv-healed-word">' + svEsc(seg.t) + '</span>';
+        } else {
+          html += svEsc(seg.t);
+        }
+      }
+      if (showCaret) html += '<span class="sv-caret" aria-hidden="true"></span>';
+      return html;
+    }
+
+    // ACT 0: "Chào buổi sáng! Good morning!" (33 physical Telex keystrokes, 0 mode switch)
+    const svAct0Steps = [
+      { k: 'C', old: [{ t: 'C' }], nw: [{ t: 'C' }] },
+      { k: 'h', old: [{ t: 'Ch' }], nw: [{ t: 'Ch' }] },
+      { k: 'a', old: [{ t: 'Cha' }], nw: [{ t: 'Cha' }] },
+      { k: 'o', old: [{ t: 'Chao' }], nw: [{ t: 'Chao' }] },
+      { k: 'f', tone: 'huyền', old: [{ t: 'Chào' }], nw: [{ t: 'Chào' }] },
+      { k: '␣', space: true, old: [{ t: 'Chào ' }], nw: [{ t: 'Chào ' }] },
+      { k: 'b', old: [{ t: 'Chào b' }], nw: [{ t: 'Chào b' }] },
+      { k: 'u', old: [{ t: 'Chào bu' }], nw: [{ t: 'Chào bu' }] },
+      { k: 'o', old: [{ t: 'Chào buo' }], nw: [{ t: 'Chào buo' }] },
+      { k: 'o', tone: 'mũ ô', old: [{ t: 'Chào buô' }], nw: [{ t: 'Chào buô' }] },
+      { k: 'i', old: [{ t: 'Chào buôi' }], nw: [{ t: 'Chào buôi' }] },
+      { k: 'r', tone: 'hỏi', old: [{ t: 'Chào buổi' }], nw: [{ t: 'Chào buổi' }] },
+      { k: '␣', space: true, old: [{ t: 'Chào buổi ' }], nw: [{ t: 'Chào buổi ' }] },
+      { k: 's', old: [{ t: 'Chào buổi s' }], nw: [{ t: 'Chào buổi s' }] },
+      { k: 'a', old: [{ t: 'Chào buổi sa' }], nw: [{ t: 'Chào buổi sa' }] },
+      { k: 'n', old: [{ t: 'Chào buổi san' }], nw: [{ t: 'Chào buổi san' }] },
+      { k: 'g', old: [{ t: 'Chào buổi sang' }], nw: [{ t: 'Chào buổi sang' }] },
+      { k: 's', tone: 'sắc', old: [{ t: 'Chào buổi sáng' }], nw: [{ t: 'Chào buổi sáng' }] },
+      { k: '!', old: [{ t: 'Chào buổi sáng!' }], nw: [{ t: 'Chào buổi sáng!' }] },
+      { k: '␣', space: true, old: [{ t: 'Chào buổi sáng! ' }], nw: [{ t: 'Chào buổi sáng! ' }] },
+      // Typing "Good " directly in Telex without switching mode:
+      { k: 'G', old: [{ t: 'Chào buổi sáng! G' }], nw: [{ t: 'Chào buổi sáng! G' }] },
+      { k: 'o', old: [{ t: 'Chào buổi sáng! Go' }], nw: [{ t: 'Chào buổi sáng! Go' }] },
+      { k: 'o', tone: 'oo', old: [{ t: 'Chào buổi sáng! Gô' }], nw: [{ t: 'Chào buổi sáng! Gô' }],
+        oldTag_vi: 'Telex biến oo → ô', oldTag_en: 'Telex turns oo → ô',
+        newTag_vi: 'Đang theo dõi âm tiết Gô...', newTag_en: 'Tracking syllable Gô...' },
+      { k: 'd', old: [{ t: 'Chào buổi sáng! ' }, { t: 'Gôd', k: 'err' }], nw: [{ t: 'Chào buổi sáng! Gôd' }],
+        oldErr: true,
+        oldTag_vi: 'Sai chính tả: Gôd', oldTag_en: 'Mangled: Gôd' },
+      { k: '␣', space: true,
+        old: [{ t: 'Chào buổi sáng! ' }, { t: 'Gôd', k: 'err' }, { t: ' ' }],
+        nw: [{ t: 'Chào buổi sáng! ' }, { t: 'Good', k: 'ok' }, { t: ' ' }],
+        oldErr: true,
+        oldTag_vi: 'Bị kẹt chữ Gôd', oldTag_en: 'Stuck as Gôd',
+        newTag_vi: 'Tự nhận diện tiếng Anh → Good', newTag_en: 'Auto-restored English → Good' },
+      // Typing "morning!" directly in Telex:
+      { k: 'm',
+        old: [{ t: 'Chào buổi sáng! ' }, { t: 'Gôd', k: 'err' }, { t: ' m' }],
+        nw: [{ t: 'Chào buổi sáng! ' }, { t: 'Good', k: 'ok' }, { t: ' m' }], oldErr: true },
+      { k: 'o',
+        old: [{ t: 'Chào buổi sáng! ' }, { t: 'Gôd', k: 'err' }, { t: ' mo' }],
+        nw: [{ t: 'Chào buổi sáng! ' }, { t: 'Good', k: 'ok' }, { t: ' mo' }], oldErr: true },
+      { k: 'r', tone: 'or',
+        old: [{ t: 'Chào buổi sáng! ' }, { t: 'Gôd', k: 'err' }, { t: ' mỏ' }],
+        nw: [{ t: 'Chào buổi sáng! ' }, { t: 'Good', k: 'ok' }, { t: ' mỏ' }], oldErr: true,
+        oldTag_vi: 'Telex biến or → ỏ', oldTag_en: 'Telex turns or → ỏ' },
+      { k: 'n',
+        old: [{ t: 'Chào buổi sáng! ' }, { t: 'Gôd', k: 'err' }, { t: ' mỏn' }],
+        nw: [{ t: 'Chào buổi sáng! ' }, { t: 'Good', k: 'ok' }, { t: ' mỏn' }], oldErr: true },
+      { k: 'i',
+        old: [{ t: 'Chào buổi sáng! ' }, { t: 'Gôd', k: 'err' }, { t: ' ' }, { t: 'mỏni', k: 'err' }],
+        nw: [{ t: 'Chào buổi sáng! ' }, { t: 'Good', k: 'ok' }, { t: ' ' }, { t: 'morni', k: 'ok' }],
+        oldErr: true,
+        oldTag_vi: 'Sai chính tả: mỏni...', oldTag_en: 'Mangled: mỏni...',
+        newTag_vi: 'Phá vỡ âm cuối Việt → khôi phục morni', newTag_en: 'Non-VN coda → restored morni' },
+      { k: 'n',
+        old: [{ t: 'Chào buổi sáng! ' }, { t: 'Gôd', k: 'err' }, { t: ' ' }, { t: 'mỏnin', k: 'err' }],
+        nw: [{ t: 'Chào buổi sáng! ' }, { t: 'Good', k: 'ok' }, { t: ' ' }, { t: 'mornin', k: 'ok' }], oldErr: true },
+      { k: 'g',
+        old: [{ t: 'Chào buổi sáng! ' }, { t: 'Gôd', k: 'err' }, { t: ' ' }, { t: 'mỏning', k: 'err' }],
+        nw: [{ t: 'Chào buổi sáng! ' }, { t: 'Good', k: 'ok' }, { t: ' ' }, { t: 'morning', k: 'ok' }], oldErr: true },
+      { k: '!',
+        old: [{ t: 'Chào buổi sáng! ' }, { t: 'Gôd', k: 'err' }, { t: ' ' }, { t: 'mỏning', k: 'err' }, { t: '!' }],
+        nw: [{ t: 'Chào buổi sáng! ' }, { t: 'Good morning!', k: 'ok' }],
+        oldErr: true,
+        oldTag_vi: 'Lỗi: Gôd mỏning!', oldTag_en: 'Broken: Gôd mỏning!',
+        newTag_vi: 'Song ngữ hoàn hảo · 0 phím chuyển', newTag_en: 'Seamless bilingual · 0 mode switch' }
+    ];
+
+    // ACT 1: Free-Order Tone-First Telex ("rủng rỉnh" via r r u n g _ r r i n h & "sống sót" via s s o o n g _ s s o t)
+    const svAct1Phrases = [
+      {
+        id: 0,
+        hint: 'r r u n g _ r r i n h',
+        steps: [
+          { k: 'r', old: [{ t: 'r' }], nw: [{ t: 'r' }] },
+          { k: 'r', tone: 'hỏi', old: [{ t: 'rr' }], nw: [{ t: 'rr' }],
+            oldTag_vi: 'Chưa có nguyên âm → trôi dấu r', oldTag_en: 'No vowel yet → drops tone r',
+            newTag_vi: 'Treo thanh Hỏi (r) ngay đầu từ', newTag_en: 'Queues Hỏi tone (r) before vowel' },
+          { k: 'u', old: [{ t: 'rru' }], nw: [{ t: 'rủ', k: 'ok' }],
+            newTag_vi: 'Nguyên âm u vừa tới → đậu ngay thành rủ', newTag_en: 'Vowel u arrives → latches into rủ' },
+          { k: 'n', old: [{ t: 'rrun' }], nw: [{ t: 'rủn' }] },
+          { k: 'g', old: [{ t: 'rrung', k: 'err' }], nw: [{ t: 'rủng', k: 'ok' }], oldErr: true },
+          { k: '␣', space: true, old: [{ t: 'rrung', k: 'err' }, { t: ' ' }], nw: [{ t: 'rủng', k: 'ok' }, { t: ' ' }], oldErr: true },
+          { k: 'r', old: [{ t: 'rrung', k: 'err' }, { t: ' r' }], nw: [{ t: 'rủng', k: 'ok' }, { t: ' r' }], oldErr: true },
+          { k: 'r', tone: 'hỏi', old: [{ t: 'rrung', k: 'err' }, { t: ' rr' }], nw: [{ t: 'rủng', k: 'ok' }, { t: ' rr' }], oldErr: true,
+            newTag_vi: 'Treo thanh Hỏi (r) ngay đầu từ thứ hai', newTag_en: 'Queues Hỏi tone (r) at word start' },
+          { k: 'i', old: [{ t: 'rrung', k: 'err' }, { t: ' rri' }], nw: [{ t: 'rủng', k: 'ok' }, { t: ' ' }, { t: 'rỉ', k: 'ok' }], oldErr: true },
+          { k: 'n', old: [{ t: 'rrung', k: 'err' }, { t: ' rrin' }], nw: [{ t: 'rủng', k: 'ok' }, { t: ' rỉn' }], oldErr: true },
+          { k: 'h',
+            old: [{ t: 'rrung', k: 'err' }, { t: ' ' }, { t: 'rrinh', k: 'err' }],
+            nw: [{ t: 'rủng rỉnh', k: 'ok' }],
+            oldErr: true,
+            oldTag_vi: 'Trượt dấu: rrung rrinh', oldTag_en: 'Failed: rrung rrinh',
+            newTag_vi: 'r r u n g _ r r i n h → rủng rỉnh', newTag_en: 'r r u n g _ r r i n h → rủng rỉnh' }
+        ]
+      },
+      {
+        id: 1,
+        hint: 's s o o n g _ s s o t',
+        steps: [
+          { k: 's', old: [{ t: 's' }], nw: [{ t: 's' }] },
+          { k: 's', tone: 'sắc', old: [{ t: 'ss' }], nw: [{ t: 'ss' }],
+            oldTag_vi: 'Chưa có nguyên âm → lặp chữ ss', oldTag_en: 'No vowel yet → literal ss',
+            newTag_vi: 'Treo thanh Sắc (s) ngay đầu từ', newTag_en: 'Queues Sắc tone (s) before vowel' },
+          { k: 'o', old: [{ t: 'sso' }], nw: [{ t: 'só', k: 'ok' }],
+            newTag_vi: 'Nguyên âm o vừa tới → đậu ngay thành só', newTag_en: 'Vowel o arrives → latches into só' },
+          { k: 'o', tone: 'mũ ô', old: [{ t: 'ssô' }], nw: [{ t: 'số', k: 'ok' }],
+            newTag_vi: 'Hợp nhất mũ ô + dấu sắc treo sẵn → số', newTag_en: 'Merges circumflex ô + queued sắc → số' },
+          { k: 'n', old: [{ t: 'ssôn' }], nw: [{ t: 'sốn' }] },
+          { k: 'g', old: [{ t: 'ssông', k: 'err' }], nw: [{ t: 'sống', k: 'ok' }], oldErr: true },
+          { k: '␣', space: true, old: [{ t: 'ssông', k: 'err' }, { t: ' ' }], nw: [{ t: 'sống', k: 'ok' }, { t: ' ' }], oldErr: true },
+          { k: 's', old: [{ t: 'ssông', k: 'err' }, { t: ' s' }], nw: [{ t: 'sống', k: 'ok' }, { t: ' s' }], oldErr: true },
+          { k: 's', tone: 'sắc', old: [{ t: 'ssông', k: 'err' }, { t: ' ss' }], nw: [{ t: 'sống', k: 'ok' }, { t: ' ss' }], oldErr: true,
+            newTag_vi: 'Treo thanh Sắc (s) đầu từ thứ hai', newTag_en: 'Queues Sắc tone (s) at word start' },
+          { k: 'o', old: [{ t: 'ssông', k: 'err' }, { t: ' sso' }], nw: [{ t: 'sống', k: 'ok' }, { t: ' ' }, { t: 'só', k: 'ok' }], oldErr: true },
+          { k: 't',
+            old: [{ t: 'ssông', k: 'err' }, { t: ' ' }, { t: 'ssot', k: 'err' }],
+            nw: [{ t: 'sống sót', k: 'ok' }],
+            oldErr: true,
+            oldTag_vi: 'Trượt dấu: ssông ssot', oldTag_en: 'Failed: ssông ssot',
+            newTag_vi: 's s o o n g _ s s o t → sống sót', newTag_en: 's s o o n g _ s s o t → sống sót' }
+        ]
+      }
+    ];
+
+    // ACT 2: Mobile Apple Watch Fisheye Pastel Phrases (exact QuickPhraseStore.swift RGB tokens)
+    const svPastelPalette = {
+      peach:    { bg: '#FCEFE6', bd: 'rgba(219, 148, 112, 0.42)', fbd: 'rgba(204, 110, 66, 0.90)' },
+      sage:     { bg: '#E8F7ED', bd: 'rgba(112, 181, 140, 0.42)', fbd: 'rgba(27, 94, 58, 0.88)' },
+      sky:      { bg: '#E8F2FC', bd: 'rgba(112, 166, 217, 0.42)', fbd: 'rgba(25, 100, 115, 0.88)' },
+      lavender: { bg: '#F2EDFC', bd: 'rgba(158, 135, 209, 0.42)', fbd: 'rgba(109, 82, 179, 0.88)' },
+      sand:     { bg: '#FAF5E3', bd: 'rgba(201, 173, 105, 0.44)', fbd: 'rgba(161, 124, 38, 0.88)' },
+      rose:     { bg: '#FCEBF2', bd: 'rgba(209, 135, 163, 0.42)', fbd: 'rgba(176, 78, 117, 0.88)' }
+    };
+
+    const svQuickPhraseRows = [
+      [
+        { text: 'Chào buổi sáng! Good morning!', tag: 'peach' },
+        { text: 'Chúc bạn ngày mới tốt lành!', tag: 'sage' },
+        { text: 'Cảm ơn bạn nhiều nhé!', tag: 'sky' },
+        { text: 'Xin chào bạn!', tag: 'sand' }
+      ],
+      [
+        { text: 'Mình đang trên đường tới nhé.', tag: 'lavender' },
+        { text: 'Đợi mình một chút nhé.', tag: 'rose' },
+        { text: 'Mình sắp tới nơi rồi nhé.', tag: 'sage' },
+        { text: 'Rất vui được hợp tác cùng bạn.', tag: 'peach' }
+      ],
+      [
+        { text: 'Đồng ý, cứ làm như vậy nhé!', tag: 'sky' },
+        { text: 'Để mình kiểm tra lại nhé.', tag: 'sand' },
+        { text: 'Mình đã hoàn thành xong rồi nhé.', tag: 'sage' },
+        { text: 'Gửi vị trí cho mình nhé.', tag: 'lavender' }
+      ],
+      [
+        { text: 'Khi nào rảnh đi cà phê nhé!', tag: 'rose' },
+        { text: 'Trưa nay đi ăn cùng mình không?', tag: 'peach' },
+        { text: 'Bạn đang ở đâu thế?', tag: 'sky' },
+        { text: 'Chúc bạn buổi tối vui vẻ nhé!', tag: 'lavender' }
+      ],
+      [
+        { text: 'Mình đã về đến nhà an toàn rồi.', tag: 'sage' },
+        { text: 'Xin lỗi, mình phản hồi trễ nhé.', tag: 'sand' },
+        { text: 'Nhờ bạn giúp mình việc này với ạ.', tag: 'sky' },
+        { text: 'Gọi lại cho mình khi rảnh nhé.', tag: 'rose' }
+      ]
+    ];
+
+    let svCurrentAct = 0;
+    let svPlaying = !svReducedMotion;
+    let svStepTimer = null;
+    let svAct0Idx = 0;
+    let svAct1PhraseIdx = 0;
+    let svAct1StepIdx = 0;
+
+    // Mobile Fisheye State (WatchHoneycombCloudView 1:1 port)
+    let svFisheyeNodes = [];
+    let svGridPeriodY = 184;
+    let svCamera = { x: 0, y: 0 };
+    let svVelocity = { x: 0, y: 0 };
+    let svSnapTarget = { x: 0, y: 0 };
+    let svIsSnapping = false;
+    let svIsDraggingCloud = false;
+    let svDragStartPt = { x: 0, y: 0 };
+    let svDragMoved = false;
+    let svFocusedNodeIdx = -1;
+    let svMobileCloudOpen = true;
+    let svPhysicsRaf = null;
+    let svLastPhysicsTs = 0;
+    let svMobileDemoTimers = [];
+    let svMobileDemoRaf = null;
+    let svUserInteractedMobile = false;
+
+    function svClearTimers() {
+      if (svStepTimer) {
+        clearTimeout(svStepTimer);
+        svStepTimer = null;
+      }
+      svMobileDemoTimers.forEach(t => clearTimeout(t));
+      svMobileDemoTimers = [];
+      if (svMobileDemoRaf) {
+        cancelAnimationFrame(svMobileDemoRaf);
+        svMobileDemoRaf = null;
+      }
+    }
+
+    function svSetProgress(pct) {
+      const bar = document.getElementById('sv-progress-fill');
+      if (bar) bar.style.width = Math.max(0, Math.min(100, pct)).toFixed(1) + '%';
+    }
+
+    function svUpdatePlayButtonUI() {
+      const icon = document.getElementById('sv-play-icon');
+      const lbl = document.getElementById('sv-play-label');
+      if (!icon || !lbl) return;
+      const dict = i18n[currentLang];
+      if (svPlaying) {
+        icon.textContent = '⏸';
+        lbl.setAttribute('data-i18n', 'live.pause');
+        lbl.textContent = dict['live.pause'];
+      } else {
+        icon.textContent = '▶';
+        lbl.setAttribute('data-i18n', 'live.play');
+        lbl.textContent = dict['live.play'];
+      }
+    }
+
+    function svBuildKeystreamDOM(steps, activeIdx) {
+      const box = document.getElementById('sv-keystream');
+      if (!box) return;
+      box.innerHTML = '';
+      steps.forEach((st, i) => {
+        const kbd = document.createElement('kbd');
+        let cls = 'sv-key';
+        if (st.tone) cls += ' is-tone';
+        if (st.space) cls += ' is-space';
+        if (i < activeIdx) cls += ' is-typed';
+        if (i === activeIdx) cls += ' is-typed is-pressing';
+        kbd.className = cls;
+        if (st.space) {
+          kbd.textContent = 'Space';
+        } else if (st.tone) {
+          kbd.innerHTML = svEsc(st.k) + '<span class="sv-key-hint">' + svEsc(st.tone) + '</span>';
+        } else {
+          kbd.textContent = st.k;
+        }
+        box.appendChild(kbd);
+      });
+    }
+
+    function svRenderAct0Frame(idx, isFinalHold) {
+      const isEn = currentLang === 'en';
+      const step = svAct0Steps[Math.min(idx, svAct0Steps.length - 1)];
+      svBuildKeystreamDOM(svAct0Steps, isFinalHold ? -1 : idx);
+      if (isFinalHold) {
+        document.querySelectorAll('#sv-keystream kbd.sv-key').forEach(el => el.classList.add('is-typed'));
+      }
+
+      const modeChip = document.getElementById('sv-mode-chip');
+      if (modeChip) {
+        modeChip.textContent = isEn
+          ? 'Telex · Zero VI/EN mode-switch shortcuts'
+          : 'Telex · Không bấm phím chuyển Anh/Việt';
+      }
+
+      const oldTag = document.getElementById('sv-old-tag');
+      const newTag = document.getElementById('sv-new-tag');
+      if (oldTag) {
+        oldTag.textContent = (isEn ? step.oldTag_en : step.oldTag_vi) || (isEn ? 'Default Telex' : 'Telex mặc định');
+        oldTag.className = 'sv-event-tag' + (step.oldErr ? ' is-err' : '');
+      }
+      if (newTag) {
+        newTag.textContent = (isEn ? step.newTag_en : step.newTag_vi) || (isEn ? 'Stays in V mode · Auto-resolves' : 'Giữ nguyên chế độ V · Tự phân giải');
+        newTag.className = 'sv-event-tag is-ok';
+      }
+
+      const oldBubble = document.getElementById('sv-old-bubble');
+      const newBubble = document.getElementById('sv-new-bubble');
+      if (oldBubble) {
+        oldBubble.innerHTML = '<div class="sv-line-item"><span>' + svRenderSegments(step.old, !isFinalHold) + '</span></div>';
+      }
+      if (newBubble) {
+        newBubble.innerHTML = '<div class="sv-line-item"><span>' + svRenderSegments(step.nw, !isFinalHold) + '</span></div>';
+      }
+
+      const foot = document.getElementById('sv-scene-summary');
+      if (foot) {
+        foot.textContent = isEn
+          ? 'Type "Chào buổi sáng! Good morning!" continuously in Telex: Sen Việt keeps Vietnamese accents crisp while automatically restoring "Good morning!" without flipping modes.'
+          : 'Gõ liền mạch "Chào buổi sáng! Good morning!" ngay trong chế độ Telex: Sen Việt giữ trọn dấu tiếng Việt và tự nhận diện, khôi phục nguyên vẹn "Good morning!" không cần tắt bộ gõ.';
+      }
+
+      svSetProgress(((idx + 1) / svAct0Steps.length) * 100);
+    }
+
+    function svStepAct0() {
+      if (svCurrentAct !== 0) return;
+      if (svAct0Idx < svAct0Steps.length) {
+        svRenderAct0Frame(svAct0Idx, false);
+        const cur = svAct0Steps[svAct0Idx];
+        svAct0Idx++;
+        if (svPlaying) {
+          const delay = cur.space ? 175 : (cur.k === '!' ? 220 : 105);
+          svStepTimer = setTimeout(svStepAct0, delay);
+        }
+      } else {
+        svRenderAct0Frame(svAct0Steps.length - 1, true);
+        if (svPlaying) {
+          svStepTimer = setTimeout(() => svSelectAct(1, true), 2300);
+        }
+      }
+    }
+
+    function svRenderAct1Frame(pIdx, sIdx, isFinalHold) {
+      const isEn = currentLang === 'en';
+      const phraseObj = svAct1Phrases[pIdx];
+      const step = phraseObj.steps[Math.min(sIdx, phraseObj.steps.length - 1)];
+
+      document.getElementById('sv-sub-0').classList.toggle('active', pIdx === 0);
+      document.getElementById('sv-sub-1').classList.toggle('active', pIdx === 1);
+
+      svBuildKeystreamDOM(phraseObj.steps, isFinalHold ? -1 : sIdx);
+      if (isFinalHold) {
+        document.querySelectorAll('#sv-keystream kbd.sv-key').forEach(el => el.classList.add('is-typed'));
+      }
+
+      const modeChip = document.getElementById('sv-mode-chip');
+      if (modeChip) {
+        modeChip.textContent = isEn
+          ? 'Free-Order Telex (senFlex) · Strike tone right after initial consonant'
+          : 'Kiểu gõ tự do mới (senFlex) · Bỏ dấu ngay đầu từ';
+      }
+
+      const oldTag = document.getElementById('sv-old-tag');
+      const newTag = document.getElementById('sv-new-tag');
+      if (oldTag) {
+        oldTag.textContent = (isEn ? step.oldTag_en : step.oldTag_vi) || (isEn ? 'Requires vowel before tone' : 'Phải chờ nguyên âm mới nhận dấu');
+        oldTag.className = 'sv-event-tag' + (step.oldErr ? ' is-err' : '');
+      }
+      if (newTag) {
+        newTag.textContent = (isEn ? step.newTag_en : step.newTag_vi) || (isEn ? 'Tone latched cleanly' : 'Treo & gắn dấu tự động');
+        newTag.className = 'sv-event-tag is-ok';
+      }
+
+      const oldBubble = document.getElementById('sv-old-bubble');
+      const newBubble = document.getElementById('sv-new-bubble');
+
+      let oldHtml = '';
+      let newHtml = '';
+
+      if (pIdx === 0) {
+        oldHtml = '<div class="sv-line-item"><span>' + svRenderSegments(step.old, !isFinalHold) + '</span><span class="sv-line-keyhint">(' + phraseObj.hint + ')</span></div>';
+        newHtml = '<div class="sv-line-item"><span>' + svRenderSegments(step.nw, !isFinalHold) + '</span><span class="sv-line-keyhint">(' + phraseObj.hint + ')</span></div>';
+      } else {
+        const done0Old = svAct1Phrases[0].steps[svAct1Phrases[0].steps.length - 1].old;
+        const done0New = svAct1Phrases[0].steps[svAct1Phrases[0].steps.length - 1].nw;
+        oldHtml =
+          '<div class="sv-line-item"><span>' + svRenderSegments(done0Old, false) + '</span><span class="sv-line-keyhint">(' + svAct1Phrases[0].hint + ')</span></div>' +
+          '<div class="sv-line-item"><span>' + svRenderSegments(step.old, !isFinalHold) + '</span><span class="sv-line-keyhint">(' + phraseObj.hint + ')</span></div>';
+        newHtml =
+          '<div class="sv-line-item"><span>' + svRenderSegments(done0New, false) + '</span><span class="sv-line-keyhint">(' + svAct1Phrases[0].hint + ')</span></div>' +
+          '<div class="sv-line-item"><span>' + svRenderSegments(step.nw, !isFinalHold) + '</span><span class="sv-line-keyhint">(' + phraseObj.hint + ')</span></div>';
+      }
+
+      if (oldBubble) oldBubble.innerHTML = oldHtml;
+      if (newBubble) newBubble.innerHTML = newHtml;
+
+      const foot = document.getElementById('sv-scene-summary');
+      if (foot) {
+        foot.textContent = isEn
+          ? 'Unified Free-Order Telex lets you strike tone keys right at the beginning of a syllable: r-r-u-n-g r-r-i-n-h → "rủng rỉnh" and s-s-o-o-n-g s-s-o-t → "sống sót".'
+          : 'Kiểu gõ tự do mới cho phép gõ phím dấu ngay sau phụ âm đầu trước cả nguyên âm: r-r-u-n-g r-r-i-n-h → "rủng rỉnh" và s-s-o-o-n-g s-s-o-t → "sống sót".';
+      }
+
+      const totalSteps = svAct1Phrases[0].steps.length + svAct1Phrases[1].steps.length;
+      const doneCount = (pIdx === 0 ? 0 : svAct1Phrases[0].steps.length) + sIdx + 1;
+      svSetProgress((doneCount / totalSteps) * 100);
+    }
+
+    function svStepAct1() {
+      if (svCurrentAct !== 1) return;
+      const phraseObj = svAct1Phrases[svAct1PhraseIdx];
+      if (svAct1StepIdx < phraseObj.steps.length) {
+        svRenderAct1Frame(svAct1PhraseIdx, svAct1StepIdx, false);
+        const cur = phraseObj.steps[svAct1StepIdx];
+        svAct1StepIdx++;
+        if (svPlaying) {
+          const delay = cur.space ? 240 : (cur.tone ? 210 : 155);
+          svStepTimer = setTimeout(svStepAct1, delay);
+        }
+      } else if (svAct1PhraseIdx === 0) {
+        svRenderAct1Frame(0, phraseObj.steps.length - 1, true);
+        if (svPlaying) {
+          svStepTimer = setTimeout(() => {
+            svAct1PhraseIdx = 1;
+            svAct1StepIdx = 0;
+            svStepAct1();
+          }, 900);
+        }
+      } else {
+        svRenderAct1Frame(1, phraseObj.steps.length - 1, true);
+        if (svPlaying) {
+          svStepTimer = setTimeout(() => svSelectAct(2, true), 2400);
+        }
+      }
+    }
+
+    function svFocusFreePhrase(pIdx) {
+      svClearTimers();
+      svCurrentAct = 1;
+      svAct1PhraseIdx = pIdx === 1 ? 1 : 0;
+      svAct1StepIdx = 0;
+      if (svReducedMotion) {
+        svRenderAct1Frame(svAct1PhraseIdx, svAct1Phrases[svAct1PhraseIdx].steps.length - 1, true);
+      } else {
+        svPlaying = true;
+        svUpdatePlayButtonUI();
+        svStepAct1();
+      }
+    }
+
+    /* =========================================================================
+       ACT 2 (SCENE 3): 120HZ TOROIDAL SPHERICAL FISHEYE & CANDIDATE WAVE
+       Exact mathematical port of WatchHoneycombCloudView & CandidateBarView
+       ========================================================================= */
+    function svIeeeRemainder(val, period) {
+      if (!period || period <= 0) return val;
+      return val - period * Math.round(val / period);
+    }
+
+    function svInitFisheyeDOM() {
+      const canvas = document.getElementById('sv-cloud-canvas');
+      if (!canvas || svFisheyeNodes.length > 0) return;
+      canvas.innerHTML = '';
+
+      svQuickPhraseRows.forEach((row, rIdx) => {
+        row.forEach((item, cIdx) => {
+          const pal = svPastelPalette[item.tag] || svPastelPalette.sage;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sv-phrase-pill';
+          btn.textContent = item.text;
+          btn.style.backgroundColor = pal.bg;
+          btn.style.borderColor = pal.bd;
+
+          const approxW = Math.max(96, Math.round(item.text.length * 7.15 + 30));
+          const node = {
+            el: btn,
+            text: item.text,
+            pal: pal,
+            row: rIdx,
+            col: cIdx,
+            width: approxW,
+            homeX: 0,
+            homeY: 0,
+            rowPeriodX: 680
+          };
+
+          btn.addEventListener('click', (e) => {
+            if (svDragMoved) {
+              e.preventDefault();
+              return;
+            }
+            svUserInteractedMobile = true;
+            svSnapToNode(node);
+            svSendChatPhrase(node.text);
+          });
+
+          canvas.appendChild(btn);
+          svFisheyeNodes.push(node);
+        });
+      });
+
+      svLayoutFisheyeCoordinates();
+      // Focus row 0, col 1 ("Chúc bạn ngày mới tốt lành!") initially
+      if (svFisheyeNodes[1]) {
+        svCamera.x = svFisheyeNodes[1].homeX;
+        svCamera.y = svFisheyeNodes[1].homeY;
+        svSnapTarget.x = svCamera.x;
+        svSnapTarget.y = svCamera.y;
+      }
+      svApplySphericalFisheye();
+      svAttachMobileInteractions();
+    }
+
+    function svLayoutFisheyeCoordinates() {
+      const cloud = document.getElementById('sv-honeycomb-cloud');
+      const vw = (cloud && cloud.clientWidth > 40) ? cloud.clientWidth : 364;
+      const vh = (cloud && cloud.clientHeight > 40) ? cloud.clientHeight : 212;
+
+      const pillHeight = 34;
+      const verticalSpacing = 12;
+      const horizontalSpacing = 12;
+      const oddRowStaggerX = 42;
+      const rowCount = svQuickPhraseRows.length;
+      const rowStepY = pillHeight + verticalSpacing;
+      svGridPeriodY = rowCount * rowStepY;
+
+      // Measure actual DOM widths if visible
+      svFisheyeNodes.forEach(n => {
+        if (n.el.offsetWidth > 40) {
+          n.width = n.el.offsetWidth;
+        }
+      });
+
+      for (let r = 0; r < rowCount; r++) {
+        const rowNodes = svFisheyeNodes.filter(n => n.row === r);
+        const sumW = rowNodes.reduce((acc, n) => acc + n.width, 0);
+        const rawPeriod = sumW + rowNodes.length * horizontalSpacing;
+        const effectivePeriod = Math.max(vw + 120, rawPeriod);
+        const extraGap = (effectivePeriod - sumW) / rowNodes.length;
+
+        let cursorX = (r % 2 === 1) ? oddRowStaggerX : 0;
+        const centerY = r * rowStepY;
+
+        rowNodes.forEach(n => {
+          n.homeX = cursorX + n.width * 0.5;
+          n.homeY = centerY;
+          n.rowPeriodX = effectivePeriod;
+          cursorX += n.width + extraGap;
+        });
+      }
+    }
+
+    function svApplySphericalFisheye() {
+      const cloud = document.getElementById('sv-honeycomb-cloud');
+      if (!cloud || svFisheyeNodes.length === 0) return;
+      const vw = cloud.clientWidth > 40 ? cloud.clientWidth : 364;
+      const vh = cloud.clientHeight > 40 ? cloud.clientHeight : 212;
+
+      const radiusX = Math.max(142.0, vw * 0.48);
+      const radiusY = Math.max(72.0, vh * 0.60);
+      const invRadiusX = 1.0 / radiusX;
+      const invRadiusY = 1.0 / radiusY;
+
+      const minScale = 0.58;
+      const scaleDelta = 0.58; // 0.58x periphery -> 1.16x focal dome
+
+      let closestIdx = 0;
+      let closestRSq = Infinity;
+      let peakScale = 1.16;
+
+      for (let i = 0; i < svFisheyeNodes.length; i++) {
+        const node = svFisheyeNodes[i];
+        const rawDx = svIeeeRemainder(node.homeX - svCamera.x, node.rowPeriodX);
+        const rawDy = svIeeeRemainder(node.homeY - svCamera.y, svGridPeriodY);
+
+        const nx = rawDx * invRadiusX;
+        const ny = rawDy * invRadiusY;
+        const rSq = nx * nx + ny * ny;
+
+        const clampedRSq = Math.min(2.40, rSq);
+        const gaussian = Math.exp(-1.55 * clampedRSq);
+        const scale = minScale + scaleDelta * gaussian;
+        const alpha = 0.44 + 0.56 * gaussian;
+
+        if (rSq < closestRSq) {
+          closestRSq = rSq;
+          closestIdx = i;
+          peakScale = scale;
+        }
+
+        // Radial inward tanh spherical pull matching KeyboardLayoutView.swift
+        const r = Math.sqrt(clampedRSq);
+        let pullFactor = 0;
+        if (r > 0.001) {
+          const k = 0.85 * r;
+          pullFactor = 1.0 - (Math.tanh(k) / k);
+        }
+
+        const finalX = rawDx * (1.0 - pullFactor * 0.42);
+        const finalY = rawDy * (1.0 - pullFactor * 0.36);
+
+        node.el.style.transform =
+          'translate3d(calc(-50% + ' + finalX.toFixed(2) + 'px), calc(-50% + ' + finalY.toFixed(2) + 'px), 0) scale(' + scale.toFixed(4) + ')';
+        node.el.style.opacity = alpha.toFixed(3);
+        node.el.style.zIndex = String(Math.round(gaussian * 100) + 10);
+      }
+
+      if (closestIdx !== svFocusedNodeIdx) {
+        if (svFocusedNodeIdx >= 0 && svFisheyeNodes[svFocusedNodeIdx]) {
+          const prev = svFisheyeNodes[svFocusedNodeIdx];
+          prev.el.classList.remove('is-focused');
+          prev.el.style.borderColor = prev.pal.bd;
+        }
+        const cur = svFisheyeNodes[closestIdx];
+        if (cur) {
+          cur.el.classList.add('is-focused');
+          cur.el.style.borderColor = cur.pal.fbd;
+        }
+        svFocusedNodeIdx = closestIdx;
+      }
+
+      const focused = svFisheyeNodes[closestIdx];
+      if (focused && svMobileCloudOpen) {
+        const telePhrase = document.getElementById('sv-tele-phrase');
+        const teleScale = document.getElementById('sv-tele-scale');
+        if (telePhrase) telePhrase.textContent = focused.text;
+        if (teleScale) teleScale.textContent = peakScale.toFixed(2) + '× · Spherical Fisheye';
+      }
+    }
+
+    function svSnapToNode(node) {
+      const dx = svIeeeRemainder(node.homeX - svCamera.x, node.rowPeriodX);
+      const dy = svIeeeRemainder(node.homeY - svCamera.y, svGridPeriodY);
+      svSnapTarget.x = svCamera.x + dx;
+      svSnapTarget.y = svCamera.y + dy;
+      svIsSnapping = true;
+      svStartFisheyeSpring();
+    }
+
+    function svBeginInertialMagneticSnap() {
+      if (svFisheyeNodes.length === 0) return;
+      const maxCoast = 200;
+      const coastX = Math.max(-maxCoast, Math.min(maxCoast, svVelocity.x * 0.15));
+      const coastY = Math.max(-maxCoast, Math.min(maxCoast, svVelocity.y * 0.15));
+      const projX = svCamera.x + coastX;
+      const projY = svCamera.y + coastY;
+
+      let bestDx = 0;
+      let bestDy = 0;
+      let bestDistSq = Infinity;
+
+      svFisheyeNodes.forEach(node => {
+        const dx = svIeeeRemainder(node.homeX - projX, node.rowPeriodX);
+        const dy = svIeeeRemainder(node.homeY - projY, svGridPeriodY);
+        const wDistSq = dx * dx + (dy * 1.25) * (dy * 1.25);
+        if (wDistSq < bestDistSq) {
+          bestDistSq = wDistSq;
+          bestDx = dx;
+          bestDy = dy;
+        }
+      });
+
+      svSnapTarget.x = projX + bestDx;
+      svSnapTarget.y = projY + bestDy;
+      svIsSnapping = true;
+      svStartFisheyeSpring();
+    }
+
+    function svStartFisheyeSpring() {
+      if (svPhysicsRaf) cancelAnimationFrame(svPhysicsRaf);
+      svLastPhysicsTs = performance.now();
+
+      function step(now) {
+        const dt = Math.min(0.033, Math.max(0.004, (now - svLastPhysicsTs) / 1000));
+        svLastPhysicsTs = now;
+
+        // Critically-damped 2D harmonic spring (omega = 17.5, zeta = 0.88)
+        const omega = 17.5;
+        const zeta = 0.88;
+        const dispX = svCamera.x - svSnapTarget.x;
+        const dispY = svCamera.y - svSnapTarget.y;
+
+        const accelX = -omega * omega * dispX - 2.0 * zeta * omega * svVelocity.x;
+        const accelY = -omega * omega * dispY - 2.0 * zeta * omega * svVelocity.y;
+
+        svVelocity.x += accelX * dt;
+        svVelocity.y += accelY * dt;
+        svCamera.x += svVelocity.x * dt;
+        svCamera.y += svVelocity.y * dt;
+
+        svApplySphericalFisheye();
+
+        const distSq = dispX * dispX + dispY * dispY;
+        const speedSq = svVelocity.x * svVelocity.x + svVelocity.y * svVelocity.y;
+        if (distSq < 0.2 && speedSq < 4.0) {
+          svCamera.x = svSnapTarget.x;
+          svCamera.y = svSnapTarget.y;
+          svVelocity.x = 0;
+          svVelocity.y = 0;
+          svIsSnapping = false;
+          svPhysicsRaf = null;
+          svApplySphericalFisheye();
+          return;
+        }
+        svPhysicsRaf = requestAnimationFrame(step);
+      }
+
+      svPhysicsRaf = requestAnimationFrame(step);
+    }
+
+    // Candidate Bar Apple Watch Dock Magnification Wave (CandidateBarView.swift lines 701-751)
+    function svApplyCandidateWave(touchXInSlots) {
+      const container = document.getElementById('sv-cand-slots');
+      if (!container) return;
+      const buttons = container.querySelectorAll('.sv-cand-slot');
+      if (touchXInSlots === null || touchXInSlots === undefined) {
+        buttons.forEach(btn => {
+          btn.style.transform = 'translate3d(0, 0, 0) scale(1)';
+          btn.classList.remove('is-wave-peak');
+        });
+        return;
+      }
+
+      const w = container.clientWidth || 260;
+      const slotW = w / 3;
+      const sigma = Math.max(54, slotW * 0.72);
+      let closestIdx = 0;
+      let minDist = Infinity;
+
+      buttons.forEach((btn, idx) => {
+        const center = (idx + 0.5) * slotW;
+        const dist = Math.abs(touchXInSlots - center);
+        if (dist < minDist) {
+          minDist = dist;
+          closestIdx = idx;
+        }
+        const norm = dist / sigma;
+        const gaussian = Math.exp(-2.2 * norm * norm);
+        const scale = 0.90 + 0.24 * gaussian; // 1.14x peak, 0.90x neighbors
+        const liftY = -2.5 * gaussian;
+        btn.style.transform = 'translate3d(0, ' + liftY.toFixed(2) + 'px, 0) scale(' + scale.toFixed(4) + ')';
+      });
+
+      buttons.forEach((btn, idx) => {
+        btn.classList.toggle('is-wave-peak', idx === closestIdx);
+      });
+
+      const peakBtn = buttons[closestIdx];
+      if (peakBtn) {
+        const telePhrase = document.getElementById('sv-tele-phrase');
+        const teleScale = document.getElementById('sv-tele-scale');
+        if (telePhrase) telePhrase.textContent = peakBtn.textContent;
+        if (teleScale) teleScale.textContent = '1.14× · Candidate Wave';
+      }
+    }
+
+    function svSendChatPhrase(text) {
+      const chat = document.getElementById('sv-chat-screen');
+      const comp = document.getElementById('sv-composer-pill');
+      if (comp) {
+        comp.textContent = text;
+        comp.classList.remove('is-placeholder');
+        setTimeout(() => {
+          const dict = i18n[currentLang];
+          comp.textContent = dict['live.composer_ph'];
+          comp.classList.add('is-placeholder');
+        }, 900);
+      }
+      if (!chat) return;
+      // Keep max 4 bubbles so chat stays crisp without overflowing endlessly
+      while (chat.children.length >= 4) {
+        chat.removeChild(chat.firstElementChild);
+      }
+      const msg = document.createElement('div');
+      msg.className = 'sv-chat-msg outgoing';
+      msg.textContent = text;
+      chat.appendChild(msg);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function svPickCandidateSlot(idx) {
+      svUserInteractedMobile = true;
+      const buttons = document.querySelectorAll('#sv-cand-slots .sv-cand-slot');
+      if (buttons[idx]) {
+        svSendChatPhrase(buttons[idx].textContent);
+      }
+    }
+
+    function svSetMobileDeck(openCloud, fromAuto) {
+      if (!fromAuto) {
+        svUserInteractedMobile = true;
+        document.getElementById('sv-touch-dot').classList.remove('is-visible');
+      }
+      svMobileCloudOpen = !!openCloud;
+      const cloud = document.getElementById('sv-honeycomb-cloud');
+      const qwerty = document.getElementById('sv-qwerty-deck');
+      const menuBtn = document.getElementById('sv-bar-menu-btn');
+      const fCloud = document.getElementById('sv-fmode-cloud');
+      const fWave = document.getElementById('sv-fmode-wave');
+
+      if (cloud) cloud.hidden = !svMobileCloudOpen;
+      if (qwerty) qwerty.hidden = svMobileCloudOpen;
+      if (menuBtn) menuBtn.classList.toggle('active', svMobileCloudOpen);
+      if (fCloud) fCloud.classList.toggle('active', svMobileCloudOpen);
+      if (fWave) fWave.classList.toggle('active', !svMobileCloudOpen);
+
+      if (svMobileCloudOpen) {
+        svApplyCandidateWave(null);
+        requestAnimationFrame(() => {
+          svLayoutFisheyeCoordinates();
+          svApplySphericalFisheye();
+        });
+      }
+    }
+
+    function svToggleMobileDeck() {
+      svSetMobileDeck(!svMobileCloudOpen, false);
+    }
+
+    function svAttachMobileInteractions() {
+      const cloud = document.getElementById('sv-honeycomb-cloud');
+      const slots = document.getElementById('sv-cand-slots');
+      const dot = document.getElementById('sv-touch-dot');
+
+      if (cloud) {
+        let lastPt = { x: 0, y: 0 };
+        let lastMoveTs = 0;
+
+        cloud.addEventListener('pointerdown', (e) => {
+          svUserInteractedMobile = true;
+          if (dot) dot.classList.remove('is-visible');
+          if (svPhysicsRaf) {
+            cancelAnimationFrame(svPhysicsRaf);
+            svPhysicsRaf = null;
+          }
+          svIsDraggingCloud = true;
+          svDragMoved = false;
+          svDragStartPt = { x: e.clientX, y: e.clientY };
+          lastPt = { x: e.clientX, y: e.clientY };
+          lastMoveTs = performance.now();
+          svVelocity = { x: 0, y: 0 };
+        });
+
+        window.addEventListener('pointermove', (e) => {
+          if (!svIsDraggingCloud) return;
+          const now = performance.now();
+          const dx = e.clientX - lastPt.x;
+          const dy = e.clientY - lastPt.y;
+          if (Math.hypot(e.clientX - svDragStartPt.x, e.clientY - svDragStartPt.y) > 5) {
+            svDragMoved = true;
+          }
+          const dt = Math.max(0.005, (now - lastMoveTs) / 1000);
+          svCamera.x -= dx;
+          svCamera.y -= dy;
+          svVelocity.x = -dx / dt;
+          svVelocity.y = -dy / dt;
+          lastPt = { x: e.clientX, y: e.clientY };
+          lastMoveTs = now;
+          svApplySphericalFisheye();
+        });
+
+        window.addEventListener('pointerup', () => {
+          if (!svIsDraggingCloud) return;
+          svIsDraggingCloud = false;
+          svBeginInertialMagneticSnap();
+          setTimeout(() => { svDragMoved = false; }, 40);
+        });
+      }
+
+      if (slots) {
+        slots.addEventListener('pointermove', (e) => {
+          svUserInteractedMobile = true;
+          if (dot) dot.classList.remove('is-visible');
+          const rect = slots.getBoundingClientRect();
+          svApplyCandidateWave(e.clientX - rect.left);
+        });
+        slots.addEventListener('pointerleave', () => {
+          svApplyCandidateWave(null);
+        });
+      }
+    }
+
+    // Choreographed Auto-Play for Act 2 (Mobile Candidate Wave -> Tap ≡ -> Swirl 360° Fisheye Dome -> Tap Phrase)
+    function svRunAct2Choreography() {
+      svUserInteractedMobile = false;
+      svInitFisheyeDOM();
+      const dot = document.getElementById('sv-touch-dot');
+      const kb = document.getElementById('sv-ios-kb');
+      const slots = document.getElementById('sv-cand-slots');
+
+      if (svReducedMotion) {
+        svSetMobileDeck(true, true);
+        if (svFisheyeNodes[1]) {
+          svCamera.x = svFisheyeNodes[1].homeX;
+          svCamera.y = svFisheyeNodes[1].homeY;
+          svApplySphericalFisheye();
+        }
+        svSetProgress(100);
+        return;
+      }
+
+      // Phase 1 (0.0s - 1.9s): Show QWERTY + Scrub Apple Watch Magnification Wave across 3 suggestion slots
+      svSetMobileDeck(false, true);
+      const totalDur = 7400;
+      const startTs = performance.now();
+
+      const startNode = svFisheyeNodes[5] || svFisheyeNodes[0]; // "Đợi mình một chút nhé."
+      const midNode = svFisheyeNodes[0];                        // "Chào buổi sáng! Good morning!"
+      const targetNode = svFisheyeNodes[1];                     // "Chúc bạn ngày mới tốt lành!"
+      let didOpenCloud = false;
+      let didTapSend = false;
+
+      function frame(now) {
+        if (svCurrentAct !== 2 || !svPlaying || svUserInteractedMobile) {
+          if (dot) dot.classList.remove('is-visible', 'is-tapping');
+          return;
+        }
+        const elapsed = now - startTs;
+        svSetProgress((elapsed / totalDur) * 100);
+
+        const kbW = (kb && kb.clientWidth) ? kb.clientWidth : 374;
+        const slotsW = (slots && slots.clientWidth) ? slots.clientWidth : 260;
+
+        if (elapsed < 1850) {
+          // Glide virtual touch across the 3-slot Candidate Bar
+          const t = elapsed / 1850;
+          const waveX = slotsW * (0.12 + 0.76 * Math.sin(t * Math.PI));
+          svApplyCandidateWave(waveX);
+          if (dot) {
+            dot.classList.add('is-visible');
+            dot.style.left = (48 + waveX) + 'px';
+            dot.style.top = '26px';
+          }
+        } else if (elapsed < 2250) {
+          // Move finger to left `≡` button and tap it
+          svApplyCandidateWave(null);
+          if (dot) {
+            dot.classList.add('is-visible');
+            dot.style.left = '24px';
+            dot.style.top = '25px';
+            if (elapsed > 2020) dot.classList.add('is-tapping');
+          }
+        } else if (elapsed < 5950) {
+          if (!didOpenCloud) {
+            didOpenCloud = true;
+            if (dot) dot.classList.remove('is-tapping');
+            svSetMobileDeck(true, true);
+            svLayoutFisheyeCoordinates();
+            if (startNode) {
+              svCamera.x = startNode.homeX;
+              svCamera.y = startNode.homeY;
+            }
+          }
+          // Smooth 2D orbital pan across the spherical pastel cloud toward targetNode
+          const p = (elapsed - 2250) / 3700;
+          const ease = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+          if (startNode && midNode && targetNode) {
+            // Curved path through midNode into targetNode
+            const oneMinus = 1 - ease;
+            svCamera.x = oneMinus * oneMinus * startNode.homeX + 2 * oneMinus * ease * (midNode.homeX - 30) + ease * ease * targetNode.homeX;
+            svCamera.y = oneMinus * oneMinus * startNode.homeY + 2 * oneMinus * ease * (midNode.homeY - 26) + ease * ease * targetNode.homeY;
+            svApplySphericalFisheye();
+          }
+          if (dot) {
+            dot.classList.add('is-visible');
+            const fingerX = kbW * 0.5 + Math.sin(p * Math.PI * 2) * 44 * (1 - ease);
+            const fingerY = 152 + Math.cos(p * Math.PI * 1.5) * 24 * (1 - ease);
+            dot.style.left = fingerX.toFixed(1) + 'px';
+            dot.style.top = fingerY.toFixed(1) + 'px';
+          }
+        } else if (elapsed < 6500) {
+          // Tap the magnified center bubble ("Chúc bạn ngày mới tốt lành!") to insert into chat!
+          if (dot) {
+            dot.style.left = (kbW * 0.5) + 'px';
+            dot.style.top = '154px';
+            dot.classList.add('is-tapping');
+          }
+          if (!didTapSend && elapsed > 6120) {
+            didTapSend = true;
+            if (targetNode) svSendChatPhrase(targetNode.text);
+          }
+        } else if (elapsed < totalDur) {
+          if (dot) dot.classList.remove('is-tapping', 'is-visible');
+        } else {
+          if (dot) dot.classList.remove('is-tapping', 'is-visible');
+          svSelectAct(0, true);
+          return;
+        }
+
+        svMobileDemoRaf = requestAnimationFrame(frame);
+      }
+
+      svMobileDemoRaf = requestAnimationFrame(frame);
+    }
+
+    function svSelectAct(actIdx, fromAutoAdvance) {
+      svClearTimers();
+      svCurrentAct = actIdx;
+
+      for (let i = 0; i < 3; i++) {
+        const tab = document.getElementById('sv-tab-' + i);
+        if (tab) {
+          const active = (i === actIdx);
+          tab.classList.toggle('active', active);
+          tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        }
+      }
+
+      const desk = document.getElementById('sv-desktop-scene');
+      const mob = document.getElementById('sv-mobile-scene');
+      const subBar = document.getElementById('sv-subphrase-bar');
+
+      if (actIdx === 2) {
+        if (desk) desk.hidden = true;
+        if (mob) mob.hidden = false;
+        svInitFisheyeDOM();
+        requestAnimationFrame(() => {
+          svLayoutFisheyeCoordinates();
+          svApplySphericalFisheye();
+          if (svPlaying && !svReducedMotion) {
+            svRunAct2Choreography();
+          } else {
+            svSetMobileDeck(true, true);
+            svSetProgress(100);
+          }
+        });
+      } else {
+        if (mob) mob.hidden = true;
+        if (desk) desk.hidden = false;
+        if (subBar) subBar.hidden = (actIdx !== 1);
+
+        if (actIdx === 0) {
+          svAct0Idx = 0;
+          if (svReducedMotion || !svPlaying) {
+            if (svReducedMotion) {
+              svRenderAct0Frame(svAct0Steps.length - 1, true);
+            } else {
+              svPlaying = true;
+              svUpdatePlayButtonUI();
+              svStepAct0();
+            }
+          } else {
+            svStepAct0();
+          }
+        } else if (actIdx === 1) {
+          svAct1PhraseIdx = 0;
+          svAct1StepIdx = 0;
+          if (svReducedMotion) {
+            svRenderAct1Frame(1, svAct1Phrases[1].steps.length - 1, true);
+          } else {
+            if (!fromAutoAdvance && !svPlaying) {
+              svPlaying = true;
+              svUpdatePlayButtonUI();
+            }
+            svStepAct1();
+          }
+        }
+      }
+    }
+
+    function svTogglePlay() {
+      svPlaying = !svPlaying;
+      svUpdatePlayButtonUI();
+      if (!svPlaying) {
+        svClearTimers();
+        const dot = document.getElementById('sv-touch-dot');
+        if (dot) dot.classList.remove('is-visible', 'is-tapping');
+      } else {
+        if (svCurrentAct === 0) {
+          if (svAct0Idx >= svAct0Steps.length) svAct0Idx = 0;
+          svStepAct0();
+        } else if (svCurrentAct === 1) {
+          if (svAct1PhraseIdx === 1 && svAct1StepIdx >= svAct1Phrases[1].steps.length) {
+            svAct1PhraseIdx = 0;
+            svAct1StepIdx = 0;
+          }
+          svStepAct1();
+        } else {
+          svRunAct2Choreography();
+        }
+      }
+    }
+
+    function svReplayAct() {
+      svPlaying = true;
+      svUpdatePlayButtonUI();
+      svSelectAct(svCurrentAct, true);
+    }
+
+    function svRefreshLanguage() {
+      svUpdatePlayButtonUI();
+      if (svCurrentAct === 0) {
+        const idx = Math.max(0, Math.min(svAct0Idx, svAct0Steps.length - 1));
+        svRenderAct0Frame(idx, svAct0Idx >= svAct0Steps.length);
+      } else if (svCurrentAct === 1) {
+        const steps = svAct1Phrases[svAct1PhraseIdx].steps;
+        const idx = Math.max(0, Math.min(svAct1StepIdx, steps.length - 1));
+        svRenderAct1Frame(svAct1PhraseIdx, idx, svAct1StepIdx >= steps.length);
+      }
+    }
+
+    window.addEventListener('resize', () => {
+      if (svCurrentAct === 2 && svMobileCloudOpen) {
+        svLayoutFisheyeCoordinates();
+        svApplySphericalFisheye();
+      }
+    });
+
     // Initialize interactive stage & language preference
     renderScenario();
     try {
       const saved = localStorage.getItem('vielotus_lang');
       if (saved === 'en' || saved === 'vi') setLang(saved);
     } catch (_) {}
+    svUpdatePlayButtonUI();
+    svSelectAct(0, true);
 
     // Resolve latest GitHub release asset download links dynamically
     (function resolveReleaseAssets() {

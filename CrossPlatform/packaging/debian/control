@@ -9,6 +9,7 @@ Build-Depends:
  g++ (>= 4:11),
  ninja-build,
  pkgconf,
+ python3:any,
  fcitx5-modules-dev,
  libfcitx5config-dev,
  libfcitx5core-dev,

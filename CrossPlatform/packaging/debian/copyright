@@ -7,6 +7,18 @@ Files: *
 Copyright: 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
 License: Expat
 
+Files: Sources/VieLotusCoreWindows/*
+Copyright: 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+License: Expat
+Comment:
+ Directly maintained unobfuscated C++20 desktop/Linux engine
+ (WindowsNativeEngine.{h,cpp}), canonical UTF-8 (Unicode NFC) Vietnamese
+ phonotactic and English collision-escape wordlists (lexicon/*.txt,
+ consolidated and bit-for-bit verified from upstream's pre-2.0.1 lookup tables
+ and now maintained directly as canonical upstream source — see
+ Sources/VieLotusCoreWindows/lexicon/README.md), and deterministic offline
+ 64-bit FNV-1a build-time table generator (scripts/generate_lexicon_hashes.py).
+
 Files: CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml
 Copyright: 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
 License: FSFAP

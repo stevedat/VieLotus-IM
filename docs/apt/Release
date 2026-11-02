@@ -1,0 +1,15 @@
+Origin: VieLotusIM (Sen Viet)
+Label: VieLotusIM Official APT Repository
+Suite: stable
+Codename: stable
+Version: 2.0.1
+Architectures: amd64 arm64
+Components: main
+Description: Official APT Repository for VieLotusIM (Sen Viet) Next-Gen Vietnamese Input Method
+Date: Mon, 02 Nov 2026 00:36:58 UTC
+MD5Sum:
+ 6d65891eb3231805dc884c4ce2d38a06             8186 Packages
+ 4ed2aad6d88b82b64bcab866a16b2c5a             1942 Packages.gz
+SHA256:
+ 43913cdf7aab624c7c79d59d672d7642bc0009f9a9d1daee492ba71e1e882f8a             8186 Packages
+ b5dbf14cdd6c3e244e930de69d51879271be709e615c09a58739c7e6984dc4a4             1942 Packages.gz

@@ -26,10 +26,10 @@ jobs:
         run: swift build --configuration release
 
       - name: Build universal App bundle (VieLotusIM.app)
-        run: ./scripts/build_imk.sh 2.0.0
+        run: ./scripts/build_imk.sh 2.0.1
 
       - name: Build installer package (VieLotusIM.pkg)
-        run: ./scripts/build_pkg.sh 2.0.0
+        run: ./scripts/build_pkg.sh 2.0.1
 
       - name: Upload macOS build artifacts
         uses: actions/upload-artifact@v4
@@ -65,7 +65,8 @@ jobs:
             libibus-1.0-dev \
             lintian \
             ninja-build \
-            pkg-config
+            pkg-config \
+            python3
 
       - name: Build Debian Split Packages via dpkg-buildpackage (Zero Swift Dependency)
         run: |
@@ -81,22 +82,23 @@ jobs:
       - name: Stage Linux distribution artifacts & build APT repository
         run: |
           mkdir -p dist/linux
-          dpkg-deb -x Binaries/linux/vielotus_2.0.0_amd64.deb /tmp/vielotus-core
-          cp /tmp/vielotus-core/usr/lib/libVieLotusCAPI.so Binaries/linux/libVieLotusCAPI.so
-          cp /tmp/vielotus-core/usr/lib/libVieLotusCAPI.so dist/linux/
-          cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/Binaries/linux/libVieLotusCAPI.so"
+          python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py --check
+          cmake -B build-core -S CrossPlatform/capi-native -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-core
+          cp "$(realpath build-core/libVieLotusCAPI.so)" dist/linux/libVieLotusCAPI.so
+          cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
           cmake --build build-fcitx5
-          cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/Binaries/linux/libVieLotusCAPI.so"
+          cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
           cmake --build build-ibus
           cp build-fcitx5/vielotus.so dist/linux/
           cp build-fcitx5/vielotus.conf dist/linux/
           cp build-ibus/ibus-engine-vielotus dist/linux/
           cp build-ibus/vielotus.xml dist/linux/
-          ./scripts/build_deb.sh 2.0.0 amd64
+          ./scripts/build_deb.sh 2.0.1 amd64
 
       - name: Verify .deb installation, split packages & E2E IBus/Fcitx5 typing on Ubuntu 24.04
         run: |
-          ./scripts/verify_ubuntu_deb.sh 2.0.0 amd64
+          ./scripts/verify_ubuntu_deb.sh 2.0.1 amd64
 
       - name: Upload Linux build artifacts
         uses: actions/upload-artifact@v4
@@ -130,7 +132,7 @@ jobs:
       - name: Build Windows TSF COM Shell, Inno Setup Installers & Microsoft Store MSIX (x64 & ARM64)
         shell: pwsh
         run: |
-          ./scripts/build_windows.ps1 -Version 2.0.0 -Arch all -SkipTests
+          ./scripts/build_windows.ps1 -Version 2.0.1 -Arch all -SkipTests
           Copy-Item dist/windows/VieLotus-Setup-x64.exe Binaries/windows/VieLotus-Setup-x64.exe -Force
           Copy-Item dist/windows/VieLotus-Setup-arm64.exe Binaries/windows/VieLotus-Setup-arm64.exe -Force
 

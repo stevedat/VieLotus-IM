@@ -1,0 +1,11 @@
+# VieLotusIM (Sen Việt) — Vietnamese Voiceless Stop Codas (kStopCodas)
+# Copyright (c) 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+# License: Expat (MIT) — First-party authored linguistic wordlist for VieLotusIM
+# Encoding: UTF-8 (Unicode NFC, lowercase, one entry per line)
+# Stop codas (-c, -ch, -p, -t) that phonotactically permit only Sac (acute) or Nang (underdot) tones.
+# Regenerate C++ hash table: python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py
+
+c
+ch
+p
+t

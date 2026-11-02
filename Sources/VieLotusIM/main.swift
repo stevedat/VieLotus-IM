@@ -1,6 +1,7 @@
 import Cocoa
 import InputMethodKit
 import VieLotusCore
+import VieLotusTrace
 
 final class VieLotusIMAppDelegate: NSObject, NSApplicationDelegate {
     private var server: IMKServer?
@@ -35,7 +36,25 @@ final class VieLotusIMAppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-let app = NSApplication.shared
-let delegate = VieLotusIMAppDelegate()
-app.delegate = delegate
-app.run()
+private func runVieLotusIMMain() -> Never {
+    if CommandLine.arguments.contains("--status") || CommandLine.arguments.contains("--doctor") {
+        let bundleID = Bundle.main.bundleIdentifier ?? InputSourceStatus.defaultBundleID
+        let status = InputSourceDoctor.inspect(bundleID: bundleID)
+        if CommandLine.arguments.contains("--json") {
+            print(status.jsonReport())
+        } else {
+            print(status.humanReadableReport())
+        }
+        exit(0)
+    }
+
+    let app = NSApplication.shared
+    let delegate = VieLotusIMAppDelegate()
+    app.delegate = delegate
+    withExtendedLifetime(delegate) {
+        app.run()
+    }
+    exit(0)
+}
+
+runVieLotusIMMain()

@@ -1,0 +1,31 @@
+# VieLotusIM (Sen Việt) — Preceding Collocation Heads for Loanword 'sex' (kSexLoanwordPrecedingHeads)
+# Copyright (c) 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+# License: Expat (MIT) — First-party authored linguistic wordlist for VieLotusIM
+# Encoding: UTF-8 (Unicode NFC, lowercase, one entry per line)
+# Vietnamese and English preceding heads (e.g. 'phim', 'clip', 'video', 'safe') before which raw 'sex'
+# is preserved as the loanword 'sex' rather than Vietnamese future marker 'sẽ'.
+# Regenerate C++ hash table: python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py
+
+about
+biological
+casual
+clip
+consensual
+cảnh
+had
+have
+having
+hình
+nghiện
+opposite
+oral
+phim
+premarital
+safe
+same
+scandal
+truyện
+unsafe
+video
+web
+ảnh

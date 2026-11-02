@@ -1,5 +1,5 @@
 Name:           vielotus
-Version:        2.0.0
+Version:        2.0.1
 Release:        1%{?dist}
 Summary:        VieLotusIM (Sen Viet) — Next-Gen Vietnamese Input Method for IBus & Fcitx5
 License:        MIT AND FSFAP
@@ -9,6 +9,7 @@ Source0:        https://github.com/stevedat/VieLotus-IM/archive/refs/tags/v%{ver
 BuildRequires:  cmake >= 3.16
 BuildRequires:  gcc-c++
 BuildRequires:  pkgconf-pkg-config
+BuildRequires:  python3
 BuildRequires:  ibus-devel
 BuildRequires:   glib2-devel
 BuildRequires:  fcitx5-devel

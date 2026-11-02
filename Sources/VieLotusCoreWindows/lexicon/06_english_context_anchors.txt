@@ -1,0 +1,57 @@
+# VieLotusIM (Sen Việt) — English Sentence Context Anchor Words (kEnglishContextAnchors)
+# Copyright (c) 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+# License: Expat (MIT) — First-party authored linguistic wordlist for VieLotusIM
+# Encoding: UTF-8 (Unicode NFC, lowercase, one entry per line)
+# High-frequency English function and anchor words that establish English sentence context for subsequent
+# ambiguous collision words.
+# Regenerate C++ hash table: python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py
+
+about
+and
+are
+at
+be
+been
+being
+but
+by
+can
+do
+for
+from
+get
+go
+had
+has
+have
+he
+her
+his
+in
+into
+is
+it
+make
+my
+not
+on
+our
+safe
+she
+state
+take
+that
+the
+their
+these
+they
+this
+those
+to
+was
+we
+were
+will
+with
+you
+your

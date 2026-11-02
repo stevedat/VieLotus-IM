@@ -1,0 +1,34 @@
+# VieLotusIM (Sen Việt) — Vietnamese Phonotactic Initial Consonant Onsets (kValidInitialOnsets)
+# Copyright (c) 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+# License: Expat (MIT) — First-party authored linguistic wordlist for VieLotusIM
+# Encoding: UTF-8 (Unicode NFC, lowercase, one entry per line)
+# Valid Vietnamese initial consonant clusters (plus <empty> for vowel-initial syllables).
+# Regenerate C++ hash table: python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py
+
+<empty>
+b
+c
+ch
+d
+g
+gh
+gi
+h
+k
+kh
+l
+m
+n
+ng
+ngh
+nh
+p
+ph
+qu
+r
+s
+t
+th
+tr
+v
+x

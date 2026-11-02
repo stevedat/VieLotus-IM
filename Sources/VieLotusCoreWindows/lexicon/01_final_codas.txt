@@ -1,0 +1,16 @@
+# VieLotusIM (Sen Việt) — Vietnamese Phonotactic Final Consonant Codas (kValidFinalCodas)
+# Copyright (c) 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+# License: Expat (MIT) — First-party authored linguistic wordlist for VieLotusIM
+# Encoding: UTF-8 (Unicode NFC, lowercase, one entry per line)
+# Valid Vietnamese syllable final consonant codas (plus <empty> for open syllables).
+# Regenerate C++ hash table: python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py
+
+<empty>
+c
+ch
+m
+n
+ng
+nh
+p
+t

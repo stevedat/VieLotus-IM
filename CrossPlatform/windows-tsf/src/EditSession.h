@@ -21,10 +21,13 @@ public:
     // ITfEditSession
     STDMETHODIMP DoEditSession(TfEditCookie ec) override;
 
+    ITfRange *DetachResultCaretRange();
+
 private:
     std::atomic<LONG> m_cRef{1};
     ITfContext *m_pContext;
     int32_t m_backspaces;
     std::wstring m_insertText;
     bool m_bCommit;
+    ITfRange *m_pResultCaretRange{nullptr};
 };

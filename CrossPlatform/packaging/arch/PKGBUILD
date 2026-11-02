@@ -16,8 +16,8 @@ provides=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
 conflicts=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
 source_x86_64=("${_pkgname}_${pkgver}_amd64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_amd64.deb")
 source_aarch64=("${_pkgname}_${pkgver}_arm64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_arm64.deb")
-sha256sums_x86_64=('2d8675ee01fe07dc8822a83d9786cf56b303769a71b9578e669a16db1df9028a')
-sha256sums_aarch64=('ff7e4b67507da7730aa27571b25ea41e9b2829d3638e2d7489fcb3c68a1f23cd')
+sha256sums_x86_64=('ce25790bbd80fbbe3409631e2b74e14dd633da61b02ddb6aa5e85620735bc30e')
+sha256sums_aarch64=('aa3bc21e16f038e4e5b9b403f418952a5b2dcf9a1691a529af39a236c8f25d9c')
 
 package() {
     bsdtar -xf "${srcdir}/data.tar.xz" -C "${pkgdir}/"
