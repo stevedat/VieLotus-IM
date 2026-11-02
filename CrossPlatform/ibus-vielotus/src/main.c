@@ -32,6 +32,7 @@ struct _IBusVieLotusEngine {
     gboolean developer_mode;
     gboolean preedit_underline;
     gboolean is_password_field;
+    gboolean replayed_after_backspace;
     time_t config_mtime;
     IBusPropList *prop_list;
 };
@@ -215,6 +216,7 @@ static void ibus_vielotus_clear_preedit(IBusEngine *engine) {
 }
 
 static void ibus_vielotus_engine_reset_internal(IBusVieLotusEngine *vl_engine) {
+    vl_engine->replayed_after_backspace = FALSE;
     if (vl_engine->session) {
         vielotus_reset_session(vl_engine->session);
     }
@@ -420,9 +422,22 @@ static void ibus_vielotus_replay_raw_keys(IBusVieLotusEngine *vl_engine, const c
     }
 }
 
-/* Whole-character Backspace while composing: deletes the last displayed UTF-8 character
- * ("việt" -> "việ" -> "vi" -> "v" -> "", "được" -> "đượ" -> "đư" -> "đ" -> "")
- * so Backspace never reverts a Vietnamese syllable to raw ASCII ("viêt"/"viet"). */
+static size_t ibus_vielotus_utf8_codepoint_count(const char *utf8_str) {
+    if (!utf8_str) return 0;
+    size_t count = 0;
+    for (const unsigned char *p = (const unsigned char *)utf8_str; *p; p++) {
+        if ((*p & 0xC0) != 0x80) {
+            count++;
+        }
+    }
+    return count;
+}
+
+/* Whole-character Backspace while composing:
+ * 1. First delegates to `vielotus_feed_backspace(session)` so explicit semantic escapes (`turrus -> turus -> turu -> tur -> tu`),
+ *    literal tails (`hôngfus -> hôngfu`, `tủu -> tủ`), and VNI escapes (`tu33us -> tu3u`) preserve full engine state.
+ * 2. When `vielotus_feed_backspace` only strips a tone or vowel diacritic without reducing the displayed UTF-8
+ *    character count ("việt" -> "viêt"), falls back to whole-character UTF-8 deletion ("việt" -> "việ" -> "vi" -> "v" -> ""). */
 static void ibus_vielotus_backspace_composing(IBusVieLotusEngine *vl_engine) {
     const char *composing = vielotus_get_composing_text(vl_engine->session);
     if (!composing || composing[0] == '\0') {
@@ -434,6 +449,7 @@ static void ibus_vielotus_backspace_composing(IBusVieLotusEngine *vl_engine) {
         ibus_vielotus_engine_reset_internal(vl_engine);
         return;
     }
+    const size_t before_cp = ibus_vielotus_utf8_codepoint_count(composing);
     char prefix[512];
     memcpy(prefix, composing, len + 1);
     size_t cut = len;
@@ -444,6 +460,19 @@ static void ibus_vielotus_backspace_composing(IBusVieLotusEngine *vl_engine) {
         cut--;
     }
     prefix[cut] = '\0';
+
+    vielotus_feed_backspace(vl_engine->session);
+    if (!vielotus_is_composing(vl_engine->session)) {
+        ibus_vielotus_engine_reset_internal(vl_engine);
+        return;
+    }
+    const char *after = vielotus_get_composing_text(vl_engine->session);
+    if (after && after[0] != '\0' && ibus_vielotus_utf8_codepoint_count(after) < before_cp) {
+        vl_engine->replayed_after_backspace = FALSE;
+        ibus_vielotus_update_preedit(vl_engine);
+        return;
+    }
+
     if (cut == 0) {
         ibus_vielotus_engine_reset_internal(vl_engine);
         return;
@@ -454,6 +483,7 @@ static void ibus_vielotus_backspace_composing(IBusVieLotusEngine *vl_engine) {
     for (size_t i = 0; raw_keys[i] != '\0'; i++) {
         vielotus_feed_char(vl_engine->session, (uint32_t)(unsigned char)raw_keys[i]);
     }
+    vl_engine->replayed_after_backspace = TRUE;
     if (!vielotus_is_composing(vl_engine->session)) {
         ibus_vielotus_engine_reset_internal(vl_engine);
     } else {
@@ -473,6 +503,7 @@ static void ibus_vielotus_engine_init(IBusVieLotusEngine *vl_engine) {
     vl_engine->developer_mode = FALSE;
     vl_engine->preedit_underline = FALSE;
     vl_engine->is_password_field = FALSE;
+    vl_engine->replayed_after_backspace = FALSE;
     vl_engine->prop_list = NULL;
 
     vielotus_set_input_method(vl_engine->session, VIELOTUS_INPUT_TELEX);
@@ -768,9 +799,11 @@ static gboolean ibus_vielotus_engine_process_key_event(
                 size_t rlen = strlen(raw_before);
                 size_t clen = strlen(comp_before);
                 uint8_t active_tone = ibus_vielotus_active_tone_of_utf8(comp_before);
-                /* 1. Non-adjacent duplicate tone key (e.g. "vieejt" + 'j' after Backspace on "việt" -> "việ" + 't'):
-                 * keep the tone on "việt" and canonicalize raw keys to "vieetj" instead of cancelling to "viêtj". */
-                if (active_tone == key_tone && rlen > 0 && vl_tolower(raw_before[rlen - 1]) != lower_key) {
+                /* 1. Non-adjacent duplicate tone key after whole-char Backspace replay (e.g. "vieejt" + 'j' after Backspace on "việt" -> "việ" + 't'):
+                 * keep the tone on "việt" and canonicalize raw keys to "vieetj" instead of cancelling to "viêtj",
+                 * while preserving explicit free-order Telex cancellation during normal typing ("cafnhfus" -> "canhfus"). */
+                if (vl_engine->replayed_after_backspace &&
+                    active_tone == key_tone && rlen > 0 && vl_tolower(raw_before[rlen - 1]) != lower_key) {
                     char canon_raw[1024];
                     ibus_vielotus_raw_keys_for_utf8(comp_before, FALSE, canon_raw, sizeof(canon_raw));
                     ibus_vielotus_replay_raw_keys(vl_engine, canon_raw);

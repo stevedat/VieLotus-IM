@@ -1,0 +1,37 @@
+# VieLotusIM (Sen Việt) — Vietnamese Sentence Context Reset Words (kVietnameseContextResets)
+# Copyright (c) 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+# License: Expat (MIT) — First-party authored linguistic wordlist for VieLotusIM
+# Encoding: UTF-8 (Unicode NFC, lowercase, one entry per line)
+# Common Vietnamese pronouns, preverbs, and particles (including ASCII-only Vietnamese syllables such as
+# 'anh', 'em', 'con', 'hai', 'mai', 'ta') that reset English sentence momentum back to Vietnamese.
+# Regenerate C++ hash table: python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py
+
+anh
+bạn
+bộ
+chưa
+chắc
+chị
+con
+cá
+các
+cũng
+em
+hai
+hẳn
+họ
+không
+liệu
+lùn
+mai
+mình
+một
+nhỏ
+nó
+sắp
+ta
+tôi
+vẫn
+đều
+ắt
+ở
