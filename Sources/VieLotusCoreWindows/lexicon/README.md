@@ -33,11 +33,11 @@ permanently retired from `WindowsNativeEngine.cpp`:
 
 Prior to `v2.0.1`, `WindowsNativeEngine.cpp` embedded precomputed sorted 64-bit
 FNV-1a lookup arrays (`D0..D10` totaling `1,189` entries in `v2.0.0` / commit
-`c9420e6`, plus `D11` with `819` entries added in the `v2.0.1` explicit Telex
-double-tap escape update, totaling **`2,008` entries**) without committing the
+`c9420e6`, plus `D11` with `822` entries added in the `v2.0.1` explicit Telex
+double-tap escape update, totaling **`2,011` entries**) without committing the
 separate plaintext wordlists alongside the C++ translation unit.
 
-For `v2.0.1`, all 12 tables (`2,008 / 2,008` entries, zero hash collisions,
+For `v2.0.1`, all 12 tables (`2,011 / 2,011` entries, zero hash collisions,
 100% bit-for-bit verified against the pre-refactor `D0..D11` arrays) were
 consolidated, audited, and committed as canonical UTF-8 (`Unicode NFC`)
 wordlists:
@@ -55,7 +55,7 @@ wordlists:
 | `08_vietnamese_context_resets.txt` | `kVietnameseContextResets` (`D8` in `c9420e6`) | 29 | Common Vietnamese words (including ASCII-only syllables) that reset English sentence momentum; `29/29` directly present in project bilingual phrase rules. |
 | `09_turn_phrasal_followers.txt` | `kTurnPhrasalFollowers` (`D9` in `c9420e6`) | 23 | English phrasal particles/nouns following `turn` for retroactive `tủn` → `turn` restoration; `22/23` in project tests + `1` standard English collocation noun. |
 | `10_sex_english_followers.txt` | `kSexEnglishFollowers` (`D10` in `c9420e6`) | 23 | English collocation followers after `sex` for retroactive `sẽ` → `sex` restoration; `17/23` in project tests + `6` standard English collocation followers. |
-| `11_extended_english_escapes.txt` | `kExtendedEnglishEscapeWords` (`D11` in `v2.0.1` escape update) | 819 | English words (plus stem `reser`) containing doubled Telex modifier letters (`ff`, `rr`, `ss`, `ww`) for explicit Telex escape preservation: `328` directly in project regression/escape tests + `490` standard English words + `1` prefix stem (`reser`), verified 100% bit-for-bit against `D11[819]`. |
+| `11_extended_english_escapes.txt` | `kExtendedEnglishEscapeWords` (`D11` in `v2.0.1` escape update) | 822 | English words (plus stem `reser`) containing doubled Telex modifier letters (`ff`, `rr`, `ss`, `ww`) for explicit Telex escape preservation: `331` directly in project regression/escape tests + `490` standard English words + `1` prefix stem (`reser`), verified 100% bit-for-bit against `D11[822]`. |
 
 All word selections consist solely of uncopyrightable individual lexical tokens
 and Vietnamese phonological clusters curated by upstream and licensed under

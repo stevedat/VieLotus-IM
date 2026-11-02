@@ -50,6 +50,7 @@ arrives
 arrow
 arrowed
 arrows
+ass
 assault
 assaulter
 assaults
@@ -300,6 +301,7 @@ deferred
 deferreds
 dens
 denses
+diff
 differ
 difference
 differences
@@ -348,6 +350,7 @@ efficiently
 efficientlys
 efficients
 efforts
+err
 error
 errors
 essay
