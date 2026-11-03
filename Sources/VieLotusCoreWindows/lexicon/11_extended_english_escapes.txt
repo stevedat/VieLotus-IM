@@ -6,10 +6,8 @@
 # cleanly to raw English under Smart Bilingual typing while preserving intentional Vietnamese Telex escapes.
 # Regenerate C++ hash table: python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py
 
-affa
 affair
 affairs
-affas
 affect
 affected
 affectedly
@@ -54,7 +52,6 @@ ass
 assault
 assaulter
 assaults
-asse
 assemble
 assembled
 assembles

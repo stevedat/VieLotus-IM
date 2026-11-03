@@ -40,6 +40,7 @@ public:
     int32_t feedChar(uint32_t codepoint);
     int32_t feedBackspace();
     int32_t commitWord();
+    void syncSurroundingContext(const char *beforeContextUtf8);
 
     int32_t getLastBackspaces() const { return m_lastBackspaces; }
     const char *getLastTextUtf8() const { return m_lastTextUtf8; }

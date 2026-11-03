@@ -69,7 +69,6 @@ Package: vielotus
 Section: metapackages
 Architecture: all
 Depends: ibus-vielotus (>= ${source:Version}) | fcitx5-vielotus (>= ${source:Version}), ${misc:Depends}
-Recommends: ibus-vielotus, fcitx5-vielotus
 Description: VieLotusIM (Sen Viet) - Next-Gen Vietnamese Input Method metapackage
  Convenience metapackage for VieLotusIM (Sen Viet) that installs the IBus
  and/or Fcitx5 Vietnamese input method engines alongside the shared C-ABI core.

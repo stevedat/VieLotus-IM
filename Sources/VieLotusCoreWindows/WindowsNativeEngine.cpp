@@ -180,12 +180,10 @@ bool isDefaultNoContextShortEnglishWord(const wchar_t *rawLower, int rawLen) {
                (rawLower[0] == L'u' && rawLower[1] == L's');   // us
     }
     if (rawLen == 3) {
-        return (rawLower[0] == L'm' && rawLower[1] == L'i' && rawLower[2] == L'x') || // mix
-               (rawLower[0] == L'o' && rawLower[1] == L'f' && rawLower[2] == L'f');   // off
+        return (rawLower[0] == L'o' && rawLower[1] == L'f' && rawLower[2] == L'f');   // off
     }
     if (rawLen == 4) {
-        return (rawLower[0] == L'a' && rawLower[1] == L'j' && rawLower[2] == L'a' && rawLower[3] == L'x') || // ajax
-               (rawLower[0] == L'm' && rawLower[1] == L'i' && rawLower[2] == L'x' && rawLower[3] == L'x');   // mixx
+        return (rawLower[0] == L'a' && rawLower[1] == L'j' && rawLower[2] == L'a' && rawLower[3] == L'x'); // ajax
     }
     return false;
 }
@@ -426,6 +424,8 @@ struct NativeEngineState {
     int32_t feedChar(uint32_t codepoint);
     int32_t feedBackspace();
     int32_t commitWord();
+    void appendContextWord(const char *contextWord);
+    void syncSurroundingContext(const char *beforeContextUtf8);
 };
 
 void NativeEngineState::saveUndoSnapshot() {
@@ -782,12 +782,36 @@ bool NativeEngineState::isValidVietnameseSyllable() const {
     return true;
 }
 
+bool isPostCodaCircumflexEnglishWord(const wchar_t *lower, int len) {
+    if (len < 4 || len > 7) return false;
+    static const wchar_t *const kWords[] = {
+        L"coco", L"cocos", L"como", L"data", L"dense", L"donor", L"donors",
+        L"gene", L"genes", L"genre", L"goto", L"honor", L"honors", L"lana",
+        L"mama", L"mana", L"meme", L"memes", L"mete", L"meter", L"meters",
+        L"metes", L"momo", L"momos", L"mono", L"monos", L"moto", L"motor",
+        L"motors", L"motos", L"nana", L"papa", L"pete", L"peter", L"petes",
+        L"photo", L"photos", L"scene", L"scenes", L"sense", L"senses",
+        L"tata", L"tense", L"tenses", L"theme", L"themed", L"themer",
+        L"themes", L"toto", L"xanax"
+    };
+    for (const wchar_t *w : kWords) {
+        int i = 0;
+        while (i < len && w[i] != 0 && lower[i] == w[i]) ++i;
+        if (i == len && w[i] == 0) return true;
+    }
+    return false;
+}
+
 bool NativeEngineState::shouldRestoreRawEnglish() const {
     if (!m_smartBilingual || !hasVietnameseTransformation()) return false;
 
     wchar_t rawLower[kMaxWordTokens]{};
     for (int i = 0; i < m_rawLen; ++i) {
         rawLower[i] = toLowerAscii(m_rawWord[i]);
+    }
+
+    if (m_nonAdjacentCircumflex && isPostCodaCircumflexEnglishWord(rawLower, m_rawLen)) {
+        return true;
     }
 
     if (!isValidVietnameseSyllable()) {
@@ -799,7 +823,7 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
         }
         if (m_telexToneEscape && !m_inVietnameseContext &&
             (isDefaultNoContextShortEnglishWord(rawLower, m_rawLen) ||
-             (m_rawLen == 4 && rawLower[0] == L'm' && rawLower[1] == L'i' && rawLower[2] == L'x' && rawLower[3] == L'x'))) {
+             (m_inEnglishContext && m_rawLen == 4 && rawLower[0] == L'm' && rawLower[1] == L'i' && rawLower[2] == L'x' && rawLower[3] == L'x'))) {
             return true;
         }
         if ((m_telexToneEscape || m_overflowLocked || isOpenSameVowelExtension() || isSingleModifiedVowelOverflow()) &&
@@ -839,7 +863,12 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
 }
 
 int NativeEngineState::composeOutputWord(wchar_t *outBuf, int maxLen) const {
-    if (m_smartBilingual && hasVietnameseTransformation() && shouldRestoreRawEnglish()) {
+    wchar_t rawLower[kMaxWordTokens]{};
+    for (int i = 0; i < m_rawLen; ++i) {
+        rawLower[i] = toLowerAscii(m_rawWord[i]);
+    }
+    if ((m_nonAdjacentCircumflex && isPostCodaCircumflexEnglishWord(rawLower, m_rawLen)) ||
+        (m_smartBilingual && hasVietnameseTransformation() && shouldRestoreRawEnglish())) {
         int n = (m_rawLen < maxLen - 1) ? m_rawLen : (maxLen - 1);
         for (int i = 0; i < n; ++i) outBuf[i] = m_rawWord[i];
         outBuf[n] = 0;
@@ -1961,6 +1990,7 @@ int32_t NativeEngineState::feedBackspace() {
     if (hadVowelShape) {
         m_lastShapeKey = 0;
         m_uHornFromOwnW = false;
+        m_nonAdjacentCircumflex = false;
         m_displayedLen = composeOutputWord(m_displayed, kMaxWordTokens);
         m_rawLen = m_displayedLen;
         for (int i = 0; i <= m_displayedLen; ++i) m_rawWord[i] = m_displayed[i];
@@ -2214,6 +2244,106 @@ int32_t WindowsNativeEngine::commitWord() {
     int32_t act = impl->commitWord();
     syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_composingFlag);
     return act;
+}
+
+void NativeEngineState::appendContextWord(const char *contextWord) {
+    if (!contextWord || contextWord[0] == '\0') {
+        m_inEnglishContext = false;
+        m_inVietnameseContext = false;
+        m_lastWordWasSexLoanwordHead = false;
+        m_precededByTechDelimiter = false;
+        m_afterDigit = false;
+        m_precededByLeadingSlash = false;
+        m_pendingBoundaryCp = 0;
+        m_prevCollisionDisplayedLen = 0;
+        m_prevCollisionRawLen = 0;
+        return;
+    }
+    bool hasNonAscii = false;
+    for (const unsigned char *p = reinterpret_cast<const unsigned char *>(contextWord); *p; ++p) {
+        if (*p >= 0x80) {
+            hasNonAscii = true;
+            break;
+        }
+    }
+    if (hasNonAscii) {
+        m_inVietnameseContext = true;
+        m_inEnglishContext = false;
+        m_lastWordWasSexLoanwordHead = false;
+        m_precededByTechDelimiter = false;
+        m_prevCollisionDisplayedLen = 0;
+        m_prevCollisionRawLen = 0;
+        return;
+    }
+    NativeEngineState temp = *this;
+    temp.clearWordState();
+    for (const unsigned char *p = reinterpret_cast<const unsigned char *>(contextWord); *p; ++p) {
+        temp.feedChar(static_cast<uint32_t>(*p));
+    }
+    temp.feedChar(static_cast<uint32_t>(' '));
+    m_inEnglishContext = temp.m_inEnglishContext;
+    m_inVietnameseContext = temp.m_inVietnameseContext;
+    m_lastWordWasSexLoanwordHead = temp.m_lastWordWasSexLoanwordHead;
+    m_precededByTechDelimiter = temp.m_precededByTechDelimiter;
+    m_prevCollisionDisplayedLen = 0;
+    m_prevCollisionRawLen = 0;
+}
+
+void NativeEngineState::syncSurroundingContext(const char *beforeContextUtf8) {
+    if (isComposing()) return;
+    if (!beforeContextUtf8 || beforeContextUtf8[0] == '\0') {
+        appendContextWord("");
+        return;
+    }
+    int endPos = 0;
+    while (beforeContextUtf8[endPos] != '\0') {
+        ++endPos;
+    }
+    // If trailing characters are ASCII letters (partial word before cursor), drop them before extracting context words
+    while (endPos > 0) {
+        unsigned char c = static_cast<unsigned char>(beforeContextUtf8[endPos - 1]);
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+            --endPos;
+        } else {
+            break;
+        }
+    }
+    while (endPos > 0) {
+        char ch = beforeContextUtf8[endPos - 1];
+        if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r') {
+            --endPos;
+        } else {
+            break;
+        }
+    }
+    if (endPos <= 0) {
+        return;
+    }
+    int startPos = endPos;
+    while (startPos > 0) {
+        char ch = beforeContextUtf8[startPos - 1];
+        if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r') {
+            break;
+        }
+        --startPos;
+    }
+    const int wordLen = endPos - startPos;
+    if (wordLen > 0 && wordLen <= 48) {
+        char lastWord[64]{};
+        for (int i = 0; i < wordLen; ++i) {
+            lastWord[i] = beforeContextUtf8[startPos + i];
+        }
+        lastWord[wordLen] = '\0';
+        appendContextWord(lastWord);
+    }
+}
+
+void WindowsNativeEngine::syncSurroundingContext(const char *beforeContextUtf8) {
+    auto *impl = getImpl(m_opaqueState);
+    impl->m_inputMethod = m_inputMethod;
+    impl->m_smartBilingual = m_smartBilingual;
+    impl->m_modernOrthography = m_modernOrthography;
+    impl->syncSurroundingContext(beforeContextUtf8);
 }
 
 } // namespace vielotus_win
@@ -2504,37 +2634,15 @@ VIELOTUS_CAPI_EXPORT const char *vielotus_get_raw_text(void *session) {
 VIELOTUS_CAPI_EXPORT void vielotus_append_context(void *session, const char *context_word) {
     auto *s = asSession(session);
     if (!s || !context_word) return;
-    if (context_word[0] == '\0') {
-        s->impl.m_inEnglishContext = false;
-        s->impl.m_inVietnameseContext = false;
-        s->impl.m_lastWordWasSexLoanwordHead = false;
-        s->impl.m_precededByTechDelimiter = false;
-        s->impl.m_afterDigit = false;
-        s->impl.m_precededByLeadingSlash = false;
-        s->impl.m_pendingBoundaryCp = 0;
-        s->impl.m_prevCollisionDisplayedLen = 0;
-        s->impl.m_prevCollisionRawLen = 0;
-        return;
-    }
-    vielotus_win::NativeEngineState temp = s->impl;
-    temp.clearWordState();
-    for (const unsigned char *p = reinterpret_cast<const unsigned char *>(context_word); *p; ++p) {
-        temp.feedChar(static_cast<uint32_t>(*p));
-    }
-    temp.feedChar(static_cast<uint32_t>(' '));
-    s->impl.m_inEnglishContext = temp.m_inEnglishContext;
-    s->impl.m_inVietnameseContext = temp.m_inVietnameseContext;
-    s->impl.m_lastWordWasSexLoanwordHead = temp.m_lastWordWasSexLoanwordHead;
-    s->impl.m_precededByTechDelimiter = temp.m_precededByTechDelimiter;
-    s->impl.m_prevCollisionDisplayedLen = 0;
-    s->impl.m_prevCollisionRawLen = 0;
+    s->impl.appendContextWord(context_word);
 }
 
 VIELOTUS_CAPI_EXPORT void vielotus_sync_armed_word(void *session, const char *before_context_utf8) {
-    (void)session;
-    (void)before_context_utf8;
+    auto *s = asSession(session);
+    if (!s) return;
+    s->impl.syncSurroundingContext(before_context_utf8);
 }
 
 VIELOTUS_CAPI_EXPORT const char *vielotus_get_version(void) {
-    return "2.0.1";
+    return "2.0.2";
 }

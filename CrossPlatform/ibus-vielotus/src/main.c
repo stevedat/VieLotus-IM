@@ -593,15 +593,51 @@ static void ibus_vielotus_engine_disable(IBusEngine *engine) {
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->disable(engine);
 }
 
+static void ibus_vielotus_sync_surrounding_context(IBusVieLotusEngine *vl_engine) {
+    IBusEngine *engine = (IBusEngine *)vl_engine;
+    if (!vl_engine || !vl_engine->session || vl_engine->is_password_field) {
+        return;
+    }
+    vielotus_append_context(vl_engine->session, "");
+    if (!(engine->client_capabilities & IBUS_CAP_SURROUNDING_TEXT)) {
+        return;
+    }
+    IBusText *surrounding_text = NULL;
+    guint cursor_pos = 0;
+    guint anchor_pos = 0;
+    ibus_engine_get_surrounding_text(engine, &surrounding_text, &cursor_pos, &anchor_pos);
+    if (!surrounding_text) {
+        return;
+    }
+    const gchar *text_str = ibus_text_get_text(surrounding_text);
+    if (text_str && text_str[0] != '\0' && cursor_pos > 0) {
+        const gchar *end_ptr = g_utf8_offset_to_pointer(text_str, (glong)cursor_pos);
+        size_t byte_len = (size_t)(end_ptr - text_str);
+        const size_t max_window = 256;
+        const gchar *win_start = text_str;
+        if (byte_len > max_window) {
+            win_start = end_ptr - max_window;
+            while (win_start < end_ptr && ((*win_start & 0xC0) == 0x80)) {
+                win_start++;
+            }
+            byte_len = (size_t)(end_ptr - win_start);
+        }
+        char prefix_buf[260];
+        if (byte_len < sizeof(prefix_buf)) {
+            memcpy(prefix_buf, win_start, byte_len);
+            prefix_buf[byte_len] = '\0';
+            vielotus_sync_armed_word(vl_engine->session, prefix_buf);
+        }
+    }
+}
+
 static void ibus_vielotus_engine_focus_in(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
     guint purpose = IBUS_INPUT_PURPOSE_FREE_FORM;
     guint hints = IBUS_INPUT_HINT_NONE;
     ibus_engine_get_content_type(engine, &purpose, &hints);
     vl_engine->is_password_field = ibus_vielotus_is_sensitive_content_type(purpose, hints);
-    if (vl_engine->session) {
-        vielotus_append_context(vl_engine->session, "");
-    }
+    ibus_vielotus_sync_surrounding_context(vl_engine);
     ibus_vielotus_load_user_config(vl_engine);
     ibus_vielotus_build_prop_list(vl_engine);
     ibus_engine_register_properties(engine, vl_engine->prop_list);
@@ -632,7 +668,7 @@ static void ibus_vielotus_engine_property_activate(
         if (g_file_test("/usr/bin/vielotus-settings", G_FILE_TEST_IS_EXECUTABLE)) {
             g_spawn_command_line_async("/usr/bin/vielotus-settings", NULL);
         } else {
-            g_spawn_command_line_async("vielotus", NULL);
+            g_spawn_command_line_async("vielotus-settings", NULL);
         }
         return;
     } else if (g_strcmp0(prop_name, "smart-bilingual") == 0) {

@@ -76,10 +76,10 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
   ```
 - **Cài gói `.deb` thủ công qua `apt` (Ubuntu / Debian / Mint / Pop!_OS)**:
   ```bash
-  sudo apt update && sudo apt install ./vielotus_2.0.0_amd64.deb   # hoặc ./vielotus_2.0.0_arm64.deb
+  sudo apt update && sudo apt install ./vielotus_2.0.2_amd64.deb   # hoặc ./vielotus_2.0.2_arm64.deb
   ```
 - **Arch Linux / Manjaro (`PKGBUILD`)**: `cd CrossPlatform/packaging/arch && makepkg -si`
-- **Lệnh điều khiển nhanh**: `vielotus-settings` (cửa sổ cài đặt GTK3) · `vielotus --telex` · `vielotus --vni` · `vielotus --status`.
+- **Lệnh điều khiển nhanh**: `vielotus-settings` (cửa sổ cài đặt GTK3) · `vielotus-settings --telex` · `vielotus-settings --vni` · `vielotus-settings --status`.
 
 ### 4. iOS / iPadOS & Android
 - **iOS & iPadOS**: Tải trên [App Store](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799) → **Cài đặt → Cài đặt chung → Bàn phím → Thêm bàn phím mới... → Sen Việt**.

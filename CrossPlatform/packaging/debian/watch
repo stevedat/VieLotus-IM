@@ -1,3 +1,6 @@
-version=4
-https://github.com/stevedat/VieLotus-IM/tags \
-(?:.*?/)?v?(\d[\d.]*)\.tar\.gz debian uupdate
+Version: 5
+
+Template: Github
+Dist: https://github.com/stevedat/VieLotus-IM
+Update-Script: uupdate
+

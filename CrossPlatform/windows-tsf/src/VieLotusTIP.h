@@ -87,6 +87,7 @@ private:
     void SyncActiveLanguageProfile();
     void ResetComposingSession();
     void ClearWordStateSession();
+    void SyncSurroundingContextSession(const std::wstring &precedingText);
     bool IsComposingSession() const;
     int32_t FeedCharSession(uint32_t codePoint);
     int32_t FeedBackspaceSession();
