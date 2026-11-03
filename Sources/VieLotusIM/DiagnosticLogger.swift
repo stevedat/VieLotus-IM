@@ -1,6 +1,9 @@
 import Foundation
 import os
 
+/// DEBUG-only metadata logger for `VieLotusIM`.
+/// Never accepts or emits typed characters, keycodes, raw buffers, or composed text —
+/// logs only compile-time event codes, lengths, presentation state, and range offsets.
 final class DiagnosticLogger {
     static let shared = DiagnosticLogger()
     
@@ -18,9 +21,15 @@ final class DiagnosticLogger {
         }
     }
     
-    func log(_ message: String) {
+    func logEvent(_ event: StaticString, app: @autoclosure () -> String? = nil, detail: @autoclosure () -> String = "") {
         #if DEBUG
-        logger.debug("\(message, privacy: .public)")
+        let appTag = app() ?? "?"
+        let meta = detail()
+        if meta.isEmpty {
+            logger.debug("\(event, privacy: .public) | app: \(appTag, privacy: .private)")
+        } else {
+            logger.debug("\(event, privacy: .public) | app: \(appTag, privacy: .private) | \(meta, privacy: .private)")
+        }
         #endif
     }
 }

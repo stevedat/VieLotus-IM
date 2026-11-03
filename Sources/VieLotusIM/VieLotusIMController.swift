@@ -28,10 +28,12 @@ final class VieLotusIMController: IMKInputController {
         set { session.context = newValue }
     }
     private var lastClientIdentifier: String?
+    private weak var lastActiveClientObject: AnyObject?
     private var virtualCursorLocation: Int = NSNotFound
     private var compositionStartLocation: Int = NSNotFound
     private var lastCommittedWordStartLocation: Int = NSNotFound
     private var lastCommittedWordLength: Int = 0
+    private var lastIdleBoundaryEndLocation: Int = NSNotFound
     private var didEditMarkedTextInComposition: Bool = false
     private var isEditingInTerminalOverlay: Bool = false
     private var lastNativeBackspaceReportedLocation: Int = NSNotFound
@@ -45,9 +47,29 @@ final class VieLotusIMController: IMKInputController {
     private var hasActiveMarkedText: Bool = false
     private var precededByTechnicalDelimiter: Bool = false
     private var machineTypingDetector = MachineTypingDetector()
+    private weak var cachedRawClientObject: AnyObject?
+    private var cachedNativeClientAdapter: NativeIMKClientAdapter?
+    var monotonicClockNanoseconds: () -> UInt64 = { DispatchTime.now().uptimeNanoseconds }
+    var secureInputCheck: () -> Bool = { SecureInputMonitor.shared.isSecureInputActive }
     private static var isBrowserOmniboxSession: Bool = false
     private static var lastOmniboxShortcutTime: UInt64 = 0
     private static var omniboxFocusTransitionsSinceShortcut: Int = 0
+
+    func resolveTextClient(_ sender: Any?) -> IMKClientProtocol? {
+        guard let sender else { return nil }
+        if let protocolClient = sender as? IMKClientProtocol {
+            return protocolClient
+        }
+        guard let rawClient = sender as? IMKTextInput else { return nil }
+        let senderObject = sender as AnyObject
+        if let cached = cachedNativeClientAdapter, cachedRawClientObject === senderObject {
+            return cached
+        }
+        let adapter = NativeIMKClientAdapter(rawClient: rawClient, rawSender: senderObject)
+        cachedRawClientObject = senderObject
+        cachedNativeClientAdapter = adapter
+        return adapter
+    }
 
     private func clearBrowserOmniboxSession() {
         Self.isBrowserOmniboxSession = false
@@ -61,7 +83,7 @@ final class VieLotusIMController: IMKInputController {
         char == "#" || char == "%" || char == "@" || char == "~" || char == "+"
     }
 
-    private func hasActiveOmniboxAutocompleteTail(client: IMKTextInput, bundleID: String?, rawSelection: NSRange) -> Bool {
+    private func hasActiveOmniboxAutocompleteTail(client: IMKClientProtocol, bundleID: String?, rawSelection: NSRange) -> Bool {
         guard ClientAdapter.isBrowserApp(bundleIdentifier: bundleID),
               rawSelection.location != NSNotFound,
               rawSelection.length > 0 else {
@@ -77,6 +99,42 @@ final class VieLotusIMController: IMKInputController {
         accumulatedSelectionDrift = 0
         lastBackspaceDidNotMoveSelection = false
         lastDirectReplacementDelta = 0
+        lastIdleBoundaryEndLocation = NSNotFound
+    }
+
+    private func isActiveMarkedClauseSelection(
+        client: IMKClientProtocol,
+        presentationMode: PresentationMode,
+        rawSelection: NSRange
+    ) -> Bool {
+        guard presentationMode == .markedText,
+              engine.isComposing,
+              hasActiveMarkedText,
+              rawSelection.location != NSNotFound,
+              rawSelection.length > 0 else {
+            return false
+        }
+        let marked = client.markedRange()
+        return marked.location != NSNotFound && marked == rawSelection
+    }
+
+    private func recordPostBoundaryCaretLocation(
+        wasComposingBeforeBoundary: Bool,
+        selectionBeforeBoundary: NSRange,
+        boundaryChar: Character
+    ) {
+        let boundaryLen = String(boundaryChar).utf16.count
+        if wasComposingBeforeBoundary {
+            if lastCommittedWordStartLocation != NSNotFound && lastCommittedWordLength > 0 {
+                lastIdleBoundaryEndLocation = lastCommittedWordStartLocation + lastCommittedWordLength + boundaryLen
+            } else {
+                lastIdleBoundaryEndLocation = NSNotFound
+            }
+        } else if selectionBeforeBoundary.location != NSNotFound && selectionBeforeBoundary.length == 0 {
+            lastIdleBoundaryEndLocation = selectionBeforeBoundary.location + boundaryLen
+        } else {
+            lastIdleBoundaryEndLocation = NSNotFound
+        }
     }
 
     private func effectiveSelection(for rawSelection: NSRange) -> NSRange {
@@ -104,7 +162,7 @@ final class VieLotusIMController: IMKInputController {
     }
 
     private func isSecureFieldActive() -> Bool {
-        SecureInputMonitor.shared.isSecureInputActive
+        secureInputCheck()
     }
 
     private func isCursorMovementKey(_ keyCode: UInt16) -> Bool {
@@ -121,7 +179,7 @@ final class VieLotusIMController: IMKInputController {
     }
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
-        super.init(server: server, delegate: delegate, client: inputClient)
+        super.init(server: server, delegate: delegate, client: (inputClient is IMKClientProtocol) ? nil : inputClient)
         applyPreferences()
         LabTraceSpool.cleanupStaleTraces()
 
@@ -186,8 +244,13 @@ final class VieLotusIMController: IMKInputController {
               !LabTraceSpool.isProtectedBundleID(clientID),
               !SecureInputMonitor.shared.isSecureInputActive else { return }
         let targetID = activeSession?.targetBundleID ?? labTraceTargetBundleID
-        guard clientID.hasPrefix(Self.labBundlePrefix) ||
-              (targetID != nil && clientID == targetID) else { return }
+        let matchesTarget: Bool = {
+            if clientID.hasPrefix(Self.labBundlePrefix) { return true }
+            guard let t = targetID, !t.isEmpty else { return false }
+            if t == "*" { return true }
+            return t.split(separator: ",").contains { $0.trimmingCharacters(in: .whitespaces) == clientID }
+        }()
+        guard matchesTarget else { return }
         let selectionDetail = selection().map { " selection=\($0.location),\($0.length)" } ?? ""
         let methodTag = engine.inputMethod == .vni ? "vni" : "telex"
         let record = LabTraceEvent(traceID: traceID, event: event, key: key(), raw: rawWord,
@@ -242,7 +305,7 @@ final class VieLotusIMController: IMKInputController {
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, event.type == .keyDown else { return false }
-        guard let client = sender as? IMKTextInput else { return false }
+        guard let client = resolveTextClient(sender) else { return false }
 
         // If Vietnamese is toggled off, pass through all events
         guard Preferences.shared.vietnameseEnabled else { return false }
@@ -269,11 +332,22 @@ final class VieLotusIMController: IMKInputController {
         }
         traceLab("keyDown", bundleID: bundleID, key: event.charactersIgnoringModifiers ?? "",
                  detail: "keyCode=\(event.keyCode)", selection: client.selectedRange())
-        let clientUID = "\(bundleID ?? ""):\(ObjectIdentifier(sender as AnyObject).debugDescription)"
+        let clientUID = "\(bundleID ?? ""):\(client.clientIdentityToken.debugDescription)"
         if let lastUID = lastClientIdentifier, lastUID != clientUID {
-            engine.reset()
-            composingWord = ""
-            rawWord = ""
+            traceLab("clientSwitch", bundleID: bundleID, detail: "from=\(lastUID) to=\(clientUID) hadMarked=\(hasActiveMarkedText)")
+            if hasActiveMarkedText, let priorClient = resolveTextClient(lastActiveClientObject) {
+                let pendingText = composingWord.isEmpty ? session.currentOutput() : composingWord
+                if !pendingText.isEmpty {
+                    priorClient.insertText(pendingText, replacementRange: NSRange(location: NSNotFound, length: 0))
+                } else {
+                    priorClient.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+                }
+            }
+            session.reset()
+            session.clearContext()
+            hasActiveMarkedText = false
+            isEditingInTerminalOverlay = false
+            precededByTechnicalDelimiter = false
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
             compositionStartLocation = NSNotFound
@@ -286,7 +360,7 @@ final class VieLotusIMController: IMKInputController {
             if !ClientAdapter.isBrowserApp(bundleIdentifier: bundleID) {
                 clearBrowserOmniboxSession()
             } else if Self.isBrowserOmniboxSession {
-                let now = DispatchTime.now().uptimeNanoseconds
+                let now = monotonicClockNanoseconds()
                 Self.omniboxFocusTransitionsSinceShortcut += 1
                 if Self.omniboxFocusTransitionsSinceShortcut > 3 || (now - Self.lastOmniboxShortcutTime) > 10_000_000_000 {
                     clearBrowserOmniboxSession()
@@ -296,6 +370,7 @@ final class VieLotusIMController: IMKInputController {
             clearBrowserOmniboxSession()
         }
         lastClientIdentifier = clientUID
+        lastActiveClientObject = sender as AnyObject
 
         let appCategory = ClientAdapter.classify(bundleIdentifier: bundleID)
         let preferences = Preferences.shared
@@ -469,11 +544,11 @@ final class VieLotusIMController: IMKInputController {
                     compositionStartLocation = NSNotFound
                     lastDirectReplacementDelta = 0
                 }
-                DiagnosticLogger.shared.log("FALLBACK_TO_MARKED_TEXT | app: \(bundleID ?? "?") | selection: NSNotFound | pinApp: \(shouldPinBundleToMarkedText)")
+                DiagnosticLogger.shared.logEvent("FALLBACK_TO_MARKED_TEXT", app: bundleID, detail: "selection=NSNotFound pinApp=\(shouldPinBundleToMarkedText)")
             } else if detectedDirectReplacementDesync {
                 shouldFallback = true
                 shouldPinBundleToMarkedText = true
-                DiagnosticLogger.shared.log("FALLBACK_TO_MARKED_TEXT_RANGE_DESYNC | app: \(bundleID ?? "?") | actual: \(selection.location)")
+                DiagnosticLogger.shared.logEvent("FALLBACK_TO_MARKED_TEXT_RANGE_DESYNC", app: bundleID, detail: "actual=\(selection.location)")
             }
 
             if shouldFallback {
@@ -481,6 +556,31 @@ final class VieLotusIMController: IMKInputController {
                     ClientAdapter.forceMarkedText(for: id)
                 }
                 presentationMode = .markedText
+            }
+        } else if !Self.isBrowserOmniboxSession,
+                  presentationMode == .markedText,
+                  engine.isComposing,
+                  !isEditingInTerminalOverlay,
+                  rawSelection.location != NSNotFound,
+                  rawSelection.length == 0,
+                  virtualCursorLocation != NSNotFound,
+                  selection.location != virtualCursorLocation {
+            let markedClearedExternally = !hasActiveMarkedText || client.markedRange().location == NSNotFound
+            if markedClearedExternally {
+                traceLab("markedTextCaretDesyncReset", bundleID: bundleID,
+                         detail: "expected=\(virtualCursorLocation) actual=\(selection.location)",
+                         selection: selection)
+                engine.reset()
+                engine.clearHistory()
+                composingWord = ""
+                rawWord = ""
+                hasActiveMarkedText = false
+                editCaretBack = Self.caretDisarmed
+                virtualCursorLocation = NSNotFound
+                compositionStartLocation = NSNotFound
+                lastCommittedWordStartLocation = NSNotFound
+                lastCommittedWordLength = 0
+                resetSelectionDrift()
             }
         }
 
@@ -589,7 +689,7 @@ final class VieLotusIMController: IMKInputController {
                 }
                 if isBrowserOmniboxShortcut {
                     Self.isBrowserOmniboxSession = true
-                    Self.lastOmniboxShortcutTime = DispatchTime.now().uptimeNanoseconds
+                    Self.lastOmniboxShortcutTime = monotonicClockNanoseconds()
                     Self.omniboxFocusTransitionsSinceShortcut = 0
                     traceLab("omniboxShortcut", bundleID: bundleID, key: event.charactersIgnoringModifiers ?? "",
                              detail: "keyCode=\(keyCode)", selection: rawSelection)
@@ -796,16 +896,43 @@ final class VieLotusIMController: IMKInputController {
         // Space key: commit current word and pass through
         if firstChar == " " {
             clearBrowserOmniboxSession()
+            let isSpaceOverUserSelection = selection.location != NSNotFound &&
+                selection.length > 0 &&
+                !hasActiveOmniboxAutocompleteTail(client: client, bundleID: bundleID, rawSelection: rawSelection) &&
+                !isActiveMarkedClauseSelection(client: client, presentationMode: presentationMode, rawSelection: rawSelection)
+            if isSpaceOverUserSelection {
+                engine.reset()
+                engine.clearHistory()
+                composingWord = ""
+                rawWord = ""
+                hasActiveMarkedText = false
+                editCaretBack = Self.caretDisarmed
+                virtualCursorLocation = NSNotFound
+                compositionStartLocation = NSNotFound
+                lastCommittedWordStartLocation = NSNotFound
+                lastCommittedWordLength = 0
+                precededByTechnicalDelimiter = false
+                session.precededByLeadingSlash = false
+                resetSelectionDrift()
+                lastIdleBoundaryEndLocation = selection.location + 1
+                return false
+            }
             let wasComposingBeforeSpace = engine.isComposing
-            DiagnosticLogger.shared.log("SPACE | app: \(bundleID ?? "?") | wasComposing: \(wasComposingBeforeSpace) | output: '\(engine.currentOutput())'")
+            DiagnosticLogger.shared.logEvent("SPACE", app: bundleID, detail: "wasComposing=\(wasComposingBeforeSpace) outUTF16=\(engine.currentOutput().utf16.count)")
             var restored = false
             if wasComposingBeforeSpace {
                 restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: " ")
             }
             precededByTechnicalDelimiter = false
+            session.precededByLeadingSlash = false
             traceLab("space", bundleID: bundleID, key: "Space", detail: "restored=\(restored)",
                      selection: client.selectedRange())
             editCaretBack = wasComposingBeforeSpace ? -1 : Self.caretDisarmed
+            recordPostBoundaryCaretLocation(
+                wasComposingBeforeBoundary: wasComposingBeforeSpace,
+                selectionBeforeBoundary: selection,
+                boundaryChar: " "
+            )
             if restored {
                 return true
             }
@@ -814,7 +941,7 @@ final class VieLotusIMController: IMKInputController {
 
         // Punctuation and symbols: commit current word and pass through
         if firstChar.isPunctuation || firstChar.isSymbol {
-            DiagnosticLogger.shared.log("PUNCT '\(firstChar)' | app: \(bundleID ?? "?") | wasComposing: \(engine.isComposing)")
+            DiagnosticLogger.shared.logEvent("PUNCT", app: bundleID, detail: "wasComposing=\(engine.isComposing)")
             if Self.isBrowserOmniboxSession && isURLContinuationPunctuation(firstChar) {
                 engine.reset()
                 composingWord = ""
@@ -825,17 +952,26 @@ final class VieLotusIMController: IMKInputController {
                 lastCommittedWordStartLocation = NSNotFound
                 hasActiveMarkedText = false
                 precededByTechnicalDelimiter = MacroEngine.isTechnicalDelimiter(firstChar)
+                session.precededByLeadingSlash = (firstChar == "/")
                 traceLab("omniboxURLPunct", bundleID: bundleID, key: String(firstChar),
                          detail: "continue omnibox URL session", selection: rawSelection)
                 return false
             }
             clearBrowserOmniboxSession()
             editCaretBack = Self.caretDisarmed
+            let wasComposingBeforePunct = engine.isComposing
+            let wasInLeadingSlash = session.precededByLeadingSlash
             var restored = false
-            if engine.isComposing {
+            if wasComposingBeforePunct {
                 restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: firstChar)
             }
             precededByTechnicalDelimiter = MacroEngine.isTechnicalDelimiter(firstChar)
+            session.precededByLeadingSlash = wasComposingBeforePunct ? (firstChar == "/" && wasInLeadingSlash) : (firstChar == "/")
+            recordPostBoundaryCaretLocation(
+                wasComposingBeforeBoundary: wasComposingBeforePunct,
+                selectionBeforeBoundary: selection,
+                boundaryChar: firstChar
+            )
             if restored {
                 return true
             }
@@ -846,7 +982,7 @@ final class VieLotusIMController: IMKInputController {
         // Commit current composing word so the digit does not corrupt the word into raw English or cause caret jumps.
         let isDigitInTelex = firstChar.isNumber && Preferences.shared.inputMethod != .vni
         if isDigitInTelex {
-            DiagnosticLogger.shared.log("DIGIT '\(firstChar)' | app: \(bundleID ?? "?") | wasComposing: \(engine.isComposing)")
+            DiagnosticLogger.shared.logEvent("DIGIT", app: bundleID, detail: "wasComposing=\(engine.isComposing)")
             if Self.isBrowserOmniboxSession {
                 engine.reset()
                 composingWord = ""
@@ -860,18 +996,24 @@ final class VieLotusIMController: IMKInputController {
                 return false
             }
             editCaretBack = Self.caretDisarmed
+            let wasComposingBeforeDigit = engine.isComposing
             var restored = false
-            if engine.isComposing {
+            if wasComposingBeforeDigit {
                 restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: firstChar)
             }
             precededByTechnicalDelimiter = true
+            recordPostBoundaryCaretLocation(
+                wasComposingBeforeBoundary: wasComposingBeforeDigit,
+                selectionBeforeBoundary: selection,
+                boundaryChar: firstChar
+            )
             if restored {
                 return true
             }
             return false
         }
 
-        DiagnosticLogger.shared.log("CHAR '\(firstChar)' (\(keyCode)) | app: \(bundleID ?? "?") | mode: \(presentationMode) | sel: \(selection.location),\(selection.length)")
+        DiagnosticLogger.shared.logEvent("KEY_EVENT", app: bundleID, detail: "mode=\(presentationMode) wasComposing=\(engine.isComposing) sel=\(selection.location),\(selection.length)")
 
         // Synthetic Machine-Typing Guard (AI Computer-Use Agents, Barcode Scanners, Text Expanders):
         // Bypass composition when 6+ consecutive non-repeat keystrokes arrive at < 12ms on both
@@ -879,7 +1021,7 @@ final class VieLotusIMController: IMKInputController {
         let isLabSession = labTraceID != nil || (bundleID?.lowercased().hasPrefix(Self.labBundlePrefix) ?? false)
         if !isLabSession && machineTypingDetector.observe(
             eventTimestampSeconds: event.timestamp,
-            arrivalNanoseconds: DispatchTime.now().uptimeNanoseconds,
+            arrivalNanoseconds: monotonicClockNanoseconds(),
             isRepeat: event.isARepeat
         ) {
             if engine.isComposing {
@@ -955,12 +1097,13 @@ final class VieLotusIMController: IMKInputController {
         let isUserSelection = !isOmniboxAutocompleteSelection &&
             !isBrowserInlineTailSelection &&
             selection.location != NSNotFound && selection.length > 0 &&
-            !(presentationMode == .markedText && engine.isComposing)
+            !isActiveMarkedClauseSelection(client: client, presentationMode: presentationMode, rawSelection: rawSelection)
         if isUserSelection {
             engine.reset()
             engine.clearHistory()
             composingWord = ""
             rawWord = ""
+            hasActiveMarkedText = false
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
             compositionStartLocation = NSNotFound
@@ -1009,10 +1152,77 @@ final class VieLotusIMController: IMKInputController {
             }
         }
 
+        // Partial-word selection / external caret replacement (e.g. "cùng" -> select "ùng" -> type "uoois" -> "cuối",
+        // or "chúng" -> select "úng" -> type "ojn" -> "chọn"):
+        // Adopt an immediately preceding pure-ASCII Vietnamese consonant onset when starting a new composition
+        // over a user selection or at a non-boundary caret position, with zero IPC during normal sequential typing.
+        if !engine.isComposing && editCaretBack < 0 {
+            let expectedPostBoundaryLoc: Int = (editCaretBack == -1 && lastCommittedWordStartLocation != NSNotFound && lastCommittedWordLength > 0)
+                ? (lastCommittedWordStartLocation + lastCommittedWordLength + 1)
+                : lastIdleBoundaryEndLocation
+            if !Self.isBrowserOmniboxSession,
+               presentationMode != .terminalDirect,
+               !isExcelApp,
+               !precededByTechnicalDelimiter,
+               selection.location != NSNotFound,
+               selection.location > 0,
+               (isUserSelection || expectedPostBoundaryLoc == NSNotFound || selection.location != expectedPostBoundaryLoc) {
+                let lookbackLen = min(selection.location, 64)
+                let beforeRange = NSRange(location: selection.location - lookbackLen, length: lookbackLen)
+                if let precedingText = client.attributedSubstring(from: beforeRange)?.string,
+                   !precedingText.isEmpty {
+                    if session.context.isEmpty {
+                        let contextSlice: Substring
+                        if precedingText.last?.isLetter == true {
+                            let trailingLetters = precedingText.reversed().prefix(while: { $0.isLetter }).count
+                            contextSlice = precedingText.dropLast(trailingLetters)
+                        } else {
+                            contextSlice = precedingText[...]
+                        }
+                        let words = contextSlice
+                            .components(separatedBy: .whitespacesAndNewlines)
+                            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+                            .filter { !$0.isEmpty && $0.contains(where: { $0.isLetter }) }
+                        if !words.isEmpty {
+                            session.context = words.suffix(3).joined(separator: " ")
+                        }
+                    }
+                    if precedingText.last?.isASCII == true,
+                       precedingText.last?.isLetter == true {
+                        let onsetWindow = String(precedingText.suffix(8))
+                        let charAfterCaret: Character? = isUserSelection
+                            ? nil
+                            : client.attributedSubstring(from: NSRange(location: selection.location, length: 1))?.string.first
+                        if let onset = DirectReplacementGuard.extractAdoptableOnsetPrefix(
+                            beforeCaret: onsetWindow,
+                            nextChar: firstChar,
+                            hasActiveSelection: isUserSelection,
+                            charAfterCaret: charAfterCaret,
+                            isVNI: engine.inputMethod == .vni
+                        ) {
+                            let onsetUTF16 = (onset as NSString).length
+                            if selection.location >= onsetUTF16 {
+                                session.setCompositionPrefix(onset)
+                                editCaretBack = Self.caretDisarmed
+                                compositionStartLocation = selection.location - onsetUTF16
+                                virtualCursorLocation = selection.location
+                                traceLab("adoptOnsetPrefix", bundleID: bundleID, key: String(firstChar),
+                                         detail: "onset='\(onset)' start=\(compositionStartLocation)",
+                                         selection: selection)
+                            }
+                        }
+                    }
+                }
+            }
+            lastIdleBoundaryEndLocation = NSNotFound
+        }
+
         let wasComposing = engine.isComposing
         let priorOnScreenWord: String? = (!wasComposing && editCaretBack == 0)
             ? engine.lastCommittedWord
             : (wasComposing && !composingWord.isEmpty ? composingWord : nil)
+        let priorRawWordSnapshot: String = wasComposing ? rawWord : ""
+        let priorProvenanceSnapshot: CompositionCandidateProvenance = wasComposing ? session.candidateProvenance : .empty
 
         // Post-commit editing (LabanKey-style)
         // ONLY armed if caret was stepped back to committed text (editCaretBack >= 0)
@@ -1142,30 +1352,24 @@ final class VieLotusIMController: IMKInputController {
                 return false
             }
 
-            var wasLiteralLockedStep = false
-            if let priorWord = priorOnScreenWord,
-               !priorWord.isEmpty,
-               priorWord.count >= 3,
-               priorWord.lowercased() != "gree",
-               output.lowercased() == priorWord.lowercased(),
-               rawWord.count == priorWord.count + 1,
-               SmartBilingualDetector.isKnownEnglishWord(priorWord) {
-                output = rawWord
-                engine.forceLiteralOutput(rawWord)
-                wasLiteralLockedStep = true
-            }
-
-            if session.shouldSelectRawEnglishInline(
+            let resolved = session.resolvePostFeedCandidate(
+                priorRawWord: isEditing ? "" : priorRawWordSnapshot,
+                priorOnScreenWord: isEditing ? "" : (priorOnScreenWord ?? ""),
+                priorProvenance: isEditing ? .empty : priorProvenanceSnapshot,
                 rawWord: rawWord,
-                rendered: output,
+                engineOutput: output,
                 smartBilingualEnabled: prefs.smartBilingual,
                 forceInlineEvaluation: true,
                 genZMode: prefs.genZMode
-            ) {
+            )
+            let wasLiteralLockedStep = resolved.wasLiteralLockedStep
+            if resolved.selectedCandidate != output {
+                output = resolved.selectedCandidate
+            }
+            if output == rawWord && rawWord.lowercased() != engine.currentOutput().lowercased() {
                 // Inline Latin Passthrough:
                 // An English word (or English phonotactic pattern) was recognized inline!
                 // Bypass/restore diacritics immediately so the user never sees flickering ("pót" -> "post").
-                output = rawWord
                 isInlineEnglish = true
                 traceLab("inlineEnglish", bundleID: bundleID, detail: "raw=\(rawWord)", selection: client.selectedRange(), composingOverride: rawWord)
             } else if !isEditing, wasComposing, let priorWord = priorOnScreenWord, !priorWord.isEmpty {
@@ -1194,16 +1398,17 @@ final class VieLotusIMController: IMKInputController {
                 if isEditing || (wasComposing && !hasActiveMarkedText && !composingWord.isEmpty) {
                     let currentLoc = selection.location != NSNotFound ? selection.location : virtualCursorLocation
                     let safeBackspaces = isEditing ? diff.backspaces : (composingWord as NSString).length
+                    let extraSelectedLen = isUserSelection ? selection.length : 0
                     let range: NSRange
                     if compositionStartLocation != NSNotFound {
-                        range = NSRange(location: compositionStartLocation, length: safeBackspaces)
+                        range = NSRange(location: compositionStartLocation, length: safeBackspaces + extraSelectedLen)
                     } else if currentLoc != NSNotFound && currentLoc >= safeBackspaces {
-                        range = NSRange(location: currentLoc - safeBackspaces, length: safeBackspaces)
+                        range = NSRange(location: currentLoc - safeBackspaces, length: safeBackspaces + extraSelectedLen)
                     } else {
                         range = NSRange(location: NSNotFound, length: 0)
                     }
                     didEditMarkedTextInComposition = true
-                    DiagnosticLogger.shared.log("-> EDITING_MARKED_TEXT '\(output)' range:\(range.location),\(range.length) (consumed)")
+                    DiagnosticLogger.shared.logEvent("EDITING_MARKED_TEXT", app: bundleID, detail: "lenUTF16=\(output.utf16.count) range=\(range.location),\(range.length) consumed=true")
                     let editStrategy: String
                     if !hasActiveMarkedText && isPureAppendToOnScreenWord {
                         // The existing word on screen is already identical to the prefix of `output`,
@@ -1258,7 +1463,7 @@ final class VieLotusIMController: IMKInputController {
                     return true
                 } else {
                     // Stealth Composition Mode: delivers zero-underline composition session
-                    DiagnosticLogger.shared.log("-> STEALTH_MARKED_TEXT '\(output)' (consumed)")
+                    DiagnosticLogger.shared.logEvent("STEALTH_MARKED_TEXT", app: bundleID, detail: "lenUTF16=\(output.utf16.count) consumed=true")
                     let postMarkedSelection = setCompositionMarkedText(output, client: client, resolvedBundleID: bundleID)
                     composingWord = output
                     traceLab("setMarkedText", bundleID: bundleID, detail: "output=\(output)",
@@ -1292,7 +1497,7 @@ final class VieLotusIMController: IMKInputController {
                     let maxBackspaces = isEditing ? Int.max : composingWord.count
                     let safeBackspaces = isEditing ? diff.backspaces : min(diff.backspaces, maxBackspaces)
                     let deleteChars = String(repeating: "\u{7F}", count: safeBackspaces)
-                    DiagnosticLogger.shared.log("-> TERMINAL_REPLACE del:\(safeBackspaces) suffix:'\(diff.suffix)' (consumed)")
+                    DiagnosticLogger.shared.logEvent("TERMINAL_REPLACE", app: bundleID, detail: "del=\(safeBackspaces) insUTF16=\(diff.suffix.utf16.count) consumed=true")
                     client.insertText(deleteChars + diff.suffix, replacementRange: NSRange(location: NSNotFound, length: 0))
                     traceLab("terminalReplace", bundleID: bundleID,
                              detail: "delete=\(safeBackspaces) suffix=\(diff.suffix)",
@@ -1304,7 +1509,7 @@ final class VieLotusIMController: IMKInputController {
                     return true
                 } else {
                     composingWord = engine.currentOutput()
-                    DiagnosticLogger.shared.log("-> TERMINAL_PASSTHROUGH '\(firstChar)'")
+                    DiagnosticLogger.shared.logEvent("TERMINAL_PASSTHROUGH", app: bundleID)
                     if virtualCursorLocation != NSNotFound {
                         virtualCursorLocation += String(firstChar).utf16.count
                     }
@@ -1322,9 +1527,9 @@ final class VieLotusIMController: IMKInputController {
                         startLoc = currentLoc != NSNotFound && currentLoc >= previousCount ? currentLoc - previousCount : NSNotFound
                     }
                     let range = startLoc != NSNotFound && previousCount > 0
-                        ? NSRange(location: startLoc, length: previousCount + (isBrowserInlineTailSelection ? selection.length : 0))
+                        ? NSRange(location: startLoc, length: previousCount + ((isBrowserInlineTailSelection || isUserSelection) ? selection.length : 0))
                         : NSRange(location: NSNotFound, length: 0)
-                    if !isEditing && !isBrowserInlineTailSelection && range.location != NSNotFound && range.length > 0,
+                    if !isEditing && !isBrowserInlineTailSelection && !isUserSelection && range.location != NSNotFound && range.length > 0,
                        let hostSub = client.attributedSubstring(from: range)?.string,
                        !hostSub.isEmpty,
                        !hostSub.contains("\u{FFFC}"),
@@ -1383,8 +1588,8 @@ final class VieLotusIMController: IMKInputController {
                     if isEditing && compositionStartLocation != NSNotFound {
                         range = NSRange(location: compositionStartLocation, length: safeBackspaces)
                     } else if currentLoc != NSNotFound {
-                        if hasSelection && (virtualCursorLocation == NSNotFound || isBrowserInlineTailSelection) {
-                            // Only use selection length if we just started tracking or browser inline autocomplete tail is selected
+                        if hasSelection && (virtualCursorLocation == NSNotFound || isBrowserInlineTailSelection || isUserSelection) {
+                            // Only use selection length if we just started tracking, replacing a user selection, or browser inline autocomplete tail is selected
                             let startLoc = max(0, currentLoc - safeBackspaces)
                             let totalLen = (currentLoc - startLoc) + selection.length
                             range = NSRange(location: startLoc, length: totalLen)
@@ -1400,7 +1605,7 @@ final class VieLotusIMController: IMKInputController {
                         range = NSRange(location: NSNotFound, length: 0)
                     }
 
-                    DiagnosticLogger.shared.log("-> DIRECT_REPLACE del:\(safeBackspaces) suffix:'\(diff.suffix)' range:\(range.location),\(range.length) (consumed)")
+                    DiagnosticLogger.shared.logEvent("DIRECT_REPLACE", app: bundleID, detail: "del=\(safeBackspaces) insUTF16=\(diff.suffix.utf16.count) range=\(range.location),\(range.length) consumed=true")
                     let previousComposingUTF16 = composingWord.utf16.count
                     let hostSubstringForCheck: String? = (appCategory == .standardAppKit && !Self.isBrowserOmniboxSession && !isExcelApp && !isEditing && range.location != NSNotFound && range.length > 0)
                         ? client.attributedSubstring(from: range).flatMap { (!$0.string.isEmpty && !$0.string.contains("\u{FFFC}")) ? $0.string : nil }
@@ -1412,7 +1617,7 @@ final class VieLotusIMController: IMKInputController {
                         virtualCursorLocation: virtualCursorLocation,
                         hostSubstring: hostSubstringForCheck,
                         isEditingCommittedWord: isEditing,
-                        extraAutocompleteLength: isBrowserInlineTailSelection ? selection.length : 0
+                        extraAutocompleteLength: (isBrowserInlineTailSelection || isUserSelection) ? selection.length : 0
                     )
                     if ownership == .hostTextDiverged {
                         traceLab("hostComposingMismatch", bundleID: bundleID, key: String(firstChar),
@@ -1427,7 +1632,7 @@ final class VieLotusIMController: IMKInputController {
                         return false
                     }
                     let validatedRange: NSRange
-                    if ownership == .owned || (hasSelection && virtualCursorLocation == NSNotFound) {
+                    if ownership == .owned || (hasSelection && (virtualCursorLocation == NSNotFound || isBrowserInlineTailSelection || isUserSelection)) {
                         validatedRange = range
                     } else if currentLoc != NSNotFound && previousComposingUTF16 > 0 && currentLoc >= previousComposingUTF16 {
                         validatedRange = NSRange(location: currentLoc - min(safeBackspaces, previousComposingUTF16), length: min(safeBackspaces, previousComposingUTF16))
@@ -1481,7 +1686,7 @@ final class VieLotusIMController: IMKInputController {
                                  selection: postSel)
                         return true
                     }
-                    DiagnosticLogger.shared.log("-> DIRECT_PASSTHROUGH '\(firstChar)'")
+                    DiagnosticLogger.shared.logEvent("DIRECT_PASSTHROUGH", app: bundleID)
                     
                     let currentLoc = selection.location != NSNotFound ? selection.location : virtualCursorLocation
                     if currentLoc != NSNotFound {
@@ -1501,7 +1706,7 @@ final class VieLotusIMController: IMKInputController {
     // MARK: - Keybinding & Command Handling (Apple InputMethodKit)
 
     override func didCommand(by aSelector: Selector!, client sender: Any!) -> Bool {
-        guard let aSelector, let client = sender as? IMKTextInput else { return false }
+        guard let aSelector, let client = resolveTextClient(sender) else { return false }
         let selectorName = NSStringFromSelector(aSelector)
         let bundleID = ClientAdapter.resolveBundleIdentifier(client.bundleIdentifier())
         let rawSelection = client.selectedRange()
@@ -1676,7 +1881,7 @@ final class VieLotusIMController: IMKInputController {
     }
 
     @discardableResult
-    private func handleBackspace(client: IMKTextInput, selection: NSRange, rawSelection: NSRange, bundleID: String?, presentationMode: PresentationMode) -> Bool {
+    private func handleBackspace(client: IMKClientProtocol, selection: NSRange, rawSelection: NSRange, bundleID: String?, presentationMode: PresentationMode) -> Bool {
         if ClientAdapter.isBrowserApp(bundleIdentifier: bundleID),
            rawSelection.location == 0,
            rawSelection.length > 0,
@@ -1736,7 +1941,7 @@ final class VieLotusIMController: IMKInputController {
             }
         }
         let isUserSelection = selection.location != NSNotFound && selection.length > 0 &&
-            !(presentationMode == .markedText && engine.isComposing)
+            !isActiveMarkedClauseSelection(client: client, presentationMode: presentationMode, rawSelection: rawSelection)
         if isUserSelection {
             resetSelectionDrift()
         }
@@ -1747,8 +1952,8 @@ final class VieLotusIMController: IMKInputController {
         return consumed
     }
 
-    private func handleBackspaceCore(client: IMKTextInput, selection: NSRange, isUserSelection: Bool, bundleID: String?, presentationMode: PresentationMode) -> Bool {
-        let now = DispatchTime.now().uptimeNanoseconds
+    private func handleBackspaceCore(client: IMKClientProtocol, selection: NSRange, isUserSelection: Bool, bundleID: String?, presentationMode: PresentationMode) -> Bool {
+        let now = monotonicClockNanoseconds()
         if now - lastBackspaceTime < 25_000_000 {
             return true
         }
@@ -1763,7 +1968,9 @@ final class VieLotusIMController: IMKInputController {
             compositionStartLocation = NSNotFound
             lastCommittedWordStartLocation = NSNotFound
             if presentationMode == .markedText {
-                client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+                if hasActiveMarkedText && client.markedRange().location != NSNotFound {
+                    client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+                }
                 hasActiveMarkedText = false
             }
             return false // Let macOS delete the highlighted text natively
@@ -1789,7 +1996,7 @@ final class VieLotusIMController: IMKInputController {
                     rawWord: rawWord,
                     engineOutput: engine.currentOutput(),
                     selectedCandidate: effectiveOutput,
-                    wasLiteralLockedStep: wasDisplayingRaw
+                    wasLiteralLockedStep: engine.literalOverrideEnabled
                 )
                 traceLab("backspace", bundleID: bundleID, key: "Backspace",
                          detail: "rawBefore=\(rawBefore) rawAfter=\(rawWord) diff=\(diff.backspaces),\(diff.suffix)",
@@ -1804,6 +2011,7 @@ final class VieLotusIMController: IMKInputController {
                     if composingWord.isEmpty {
                         engine.reset()
                         rawWord = ""
+                        session.recordExternalCompositionProvenance(rawWord: "", engineOutput: "", selectedCandidate: "")
                         editCaretBack = Self.caretDisarmed
                         virtualCursorLocation = NSNotFound
                         compositionStartLocation = NSNotFound
@@ -2099,7 +2307,7 @@ final class VieLotusIMController: IMKInputController {
         }
     }
 
-    private func commitWordWithBilingualCheck(client: IMKTextInput, presentationMode: PresentationMode, selection: NSRange, suffixChar: Character? = nil) -> Bool {
+    private func commitWordWithBilingualCheck(client: IMKClientProtocol, presentationMode: PresentationMode, selection: NSRange, suffixChar: Character? = nil) -> Bool {
         guard engine.isComposing else { return false }
         let output = engine.currentOutput()
         let prefs = Preferences.shared
@@ -2206,7 +2414,8 @@ final class VieLotusIMController: IMKInputController {
         }
 
         let isCodeBoundary = prefs.smartBilingual && suffixChar != nil && "([{".contains(suffixChar!) &&
-            !SmartBilingualDetector.isExplicitTelexEscape(raw: rawWord, rendered: output)
+            !SmartBilingualDetector.isExplicitTelexEscape(raw: rawWord, rendered: output) &&
+            !session.hasConfirmedNonEnglishSemanticEscape(rawWord: rawWord, rendered: output)
         if !rawWord.isEmpty && rawWord.lowercased() != output.lowercased() &&
            (isCodeBoundary || session.shouldSelectRawEnglishOnCommit(
                rawWord: rawWord,
@@ -2383,7 +2592,7 @@ final class VieLotusIMController: IMKInputController {
     @discardableResult
     private func setCompositionMarkedText(
         _ text: String,
-        client: IMKTextInput,
+        client: IMKClientProtocol,
         replacementRange: NSRange = NSRange(location: NSNotFound, length: 0),
         resolvedBundleID: String? = nil
     ) -> NSRange {
@@ -2447,7 +2656,7 @@ final class VieLotusIMController: IMKInputController {
     }
 
     override func commitComposition(_ sender: Any!) {
-        guard let client = sender as? IMKTextInput else { return }
+        guard let client = resolveTextClient(sender) else { return }
         if engine.isComposing {
             if Self.isBrowserOmniboxSession && !hasActiveMarkedText {
                 cancelComposition()
@@ -2488,7 +2697,9 @@ final class VieLotusIMController: IMKInputController {
     }
 
     override func activateServer(_ sender: Any!) {
-        super.activateServer(sender)
+        if !(sender is IMKClientProtocol) {
+            super.activateServer(sender)
+        }
         // A focus change is the right moment to pick up an edited typing-modes.yml:
         // one stat, off the keystroke path, so a new per-app rule applies without a
         // rebuild or a relaunch.
@@ -2497,6 +2708,8 @@ final class VieLotusIMController: IMKInputController {
         applyPreferences()
         session.reset()
         session.clearContext()
+        hasActiveMarkedText = false
+        precededByTechnicalDelimiter = false
         editCaretBack = Self.caretDisarmed
         virtualCursorLocation = NSNotFound
         compositionStartLocation = NSNotFound
@@ -2505,23 +2718,42 @@ final class VieLotusIMController: IMKInputController {
         isEditingInTerminalOverlay = false
         resetSelectionDrift()
         lastClientIdentifier = nil
+        lastActiveClientObject = sender as AnyObject
 
-        if Preferences.shared.enforceABCBaseLayout, let client = sender as? IMKTextInput {
+        if Preferences.shared.enforceABCBaseLayout, let client = resolveTextClient(sender) {
             client.overrideKeyboard(withKeyboardNamed: "com.apple.keylayout.ABC")
+        }
+        if let client = resolveTextClient(sender) {
+            let bundleID = ClientAdapter.resolveBundleIdentifier(client.bundleIdentifier())
+            traceLab("activateServer", bundleID: bundleID, detail: "activated")
         }
 
         NSLog("VieLotusIMController: Activated")
     }
 
     override func deactivateServer(_ sender: Any!) {
+        if let client = resolveTextClient(sender ?? lastActiveClientObject) {
+            let bundleID = ClientAdapter.resolveBundleIdentifier(client.bundleIdentifier())
+            traceLab("deactivateServer", bundleID: bundleID, detail: "hadMarked=\(hasActiveMarkedText)")
+        }
+        if hasActiveMarkedText, let client = resolveTextClient(sender ?? lastActiveClientObject) {
+            let pendingText = composingWord.isEmpty ? session.currentOutput() : composingWord
+            if !pendingText.isEmpty {
+                client.insertText(pendingText, replacementRange: NSRange(location: NSNotFound, length: 0))
+            } else {
+                client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+        }
         if Self.isBrowserOmniboxSession {
-            let now = DispatchTime.now().uptimeNanoseconds
+            let now = monotonicClockNanoseconds()
             if (now - Self.lastOmniboxShortcutTime) > 10_000_000_000 || Self.omniboxFocusTransitionsSinceShortcut > 1 {
                 clearBrowserOmniboxSession()
             }
         }
         session.reset()
         session.clearContext()
+        hasActiveMarkedText = false
+        precededByTechnicalDelimiter = false
         editCaretBack = Self.caretDisarmed
         virtualCursorLocation = NSNotFound
         compositionStartLocation = NSNotFound
@@ -2530,7 +2762,10 @@ final class VieLotusIMController: IMKInputController {
         isEditingInTerminalOverlay = false
         resetSelectionDrift()
         lastClientIdentifier = nil
-        super.deactivateServer(sender)
+        lastActiveClientObject = nil
+        if !(sender is IMKClientProtocol) {
+            super.deactivateServer(sender)
+        }
         NSLog("VieLotusIMController: Deactivated")
     }
 
@@ -2543,7 +2778,7 @@ final class VieLotusIMController: IMKInputController {
         isEditingInTerminalOverlay = false
         resetSelectionDrift()
         if engine.isComposing {
-            if let client = sender as? IMKTextInput {
+            if let client = resolveTextClient(sender) {
                 let bundleID = ClientAdapter.resolveBundleIdentifier(client.bundleIdentifier())
                 let appCategory = ClientAdapter.classify(bundleIdentifier: bundleID)
                 let prefs = Preferences.shared
@@ -2599,6 +2834,27 @@ final class VieLotusIMController: IMKInputController {
 
         menu.addItem(.separator())
 
+        let clipboardItem = NSMenuItem(
+            title: "Chuẩn hóa Clipboard",
+            action: nil,
+            keyEquivalent: ""
+        )
+        let clipboardSubmenu = NSMenu(title: "Chuẩn hóa Clipboard")
+        for mode in ClipboardCharsetMode.allCases {
+            let subItem = NSMenuItem(
+                title: mode.menuTitle,
+                action: #selector(convertClipboardCharset(_:)),
+                keyEquivalent: ""
+            )
+            subItem.target = self
+            subItem.representedObject = mode.rawValue
+            clipboardSubmenu.addItem(subItem)
+        }
+        clipboardItem.submenu = clipboardSubmenu
+        menu.addItem(clipboardItem)
+
+        menu.addItem(.separator())
+
         let settingsItem = NSMenuItem(
             title: "Cài đặt Sen Việt...",
             action: #selector(openSettings),
@@ -2611,6 +2867,24 @@ final class VieLotusIMController: IMKInputController {
     }
 
     // MARK: - Menu Actions
+
+    @objc private func convertClipboardCharset(_ sender: NSMenuItem) {
+        guard let rawMode = sender.representedObject as? String,
+              let mode = ClipboardCharsetMode(rawValue: rawMode) else {
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        guard let currentText = pasteboard.string(forType: .string),
+              !currentText.isEmpty else {
+            return
+        }
+        let converted = ClipboardCharsetConverter.convert(currentText, mode: mode)
+        guard !converted.utf16.elementsEqual(currentText.utf16) else {
+            return
+        }
+        pasteboard.clearContents()
+        pasteboard.setString(converted, forType: .string)
+    }
 
     @objc private func selectTelexInputMethod() {
         Preferences.shared.inputMethod = .telex
@@ -2633,7 +2907,7 @@ final class VieLotusIMController: IMKInputController {
         expectedWord: String,
         cursorLocation: Int,
         presentationMode: PresentationMode,
-        client: IMKTextInput
+        client: IMKClientProtocol
     ) -> Bool {
         guard !expectedWord.isEmpty,
               presentationMode != .terminalDirect,

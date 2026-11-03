@@ -246,7 +246,7 @@ fi
 
 # 7. Also update /Applications/VieLotusLab.app if installed locally
 LAB_TARGET="/Applications/VieLotusLab.app"
-if [ -d "$LAB_TARGET" ] || [ "${DEPLOY_LAB:-1}" = "1" ]; then
+if [ "${DEPLOY_LAB:-1}" = "1" ]; then
     echo "→ Building & updating local VieLotusLab.app at $LAB_TARGET..."
     if ./scripts/build_lab.sh "$@"; then
         pkill -9 -f VieLotusLab 2>/dev/null || true

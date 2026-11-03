@@ -160,6 +160,20 @@ public enum ExplicitEscapeKind : Swift.String, Swift.Sendable, Swift.Equatable, 
     get
   }
 }
+public enum CandidateSelectionStability : Swift.String, Swift.Sendable, Swift.Equatable, Swift.CaseIterable {
+  case provisional
+  case explicitEscape
+  case explicitSelection
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [VieLotusCore.CandidateSelectionStability]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [VieLotusCore.CandidateSelectionStability] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
 public struct CompositionCandidateProvenance : Swift.Sendable, Swift.Equatable {
   public let rawCandidate: Swift.String
   public let vietnameseCandidate: Swift.String
@@ -167,6 +181,8 @@ public struct CompositionCandidateProvenance : Swift.Sendable, Swift.Equatable {
   public let selectedKind: VieLotusCore.BilingualCandidateKind
   public let selectionReason: VieLotusCore.CandidateSelectionReason
   public let explicitEscapeState: VieLotusCore.ExplicitEscapeKind
+  public let selectionStability: VieLotusCore.CandidateSelectionStability
+  public let toneSemanticEvent: VieLotusCore.ToneModifierSemanticEvent?
   public let semanticTransformations: [Swift.String]
   public let literalSuffix: Swift.String
   public let flipCount: Swift.Int
@@ -175,7 +191,7 @@ public struct CompositionCandidateProvenance : Swift.Sendable, Swift.Equatable {
   public let sentenceLanguageState: VieLotusCore.SentenceLanguageState
   public let transitionReason: Swift.String
   public static let empty: VieLotusCore.CompositionCandidateProvenance
-  public init(rawCandidate: Swift.String, vietnameseCandidate: Swift.String, selectedCandidate: Swift.String, selectedKind: VieLotusCore.BilingualCandidateKind, selectionReason: VieLotusCore.CandidateSelectionReason, explicitEscapeState: VieLotusCore.ExplicitEscapeKind, semanticTransformations: [Swift.String], literalSuffix: Swift.String, flipCount: Swift.Int = 0, stabilityMargin: Swift.Double = 0.0, context: Swift.String = "", sentenceLanguageState: VieLotusCore.SentenceLanguageState = .empty, transitionReason: Swift.String = "initial")
+  public init(rawCandidate: Swift.String, vietnameseCandidate: Swift.String, selectedCandidate: Swift.String, selectedKind: VieLotusCore.BilingualCandidateKind, selectionReason: VieLotusCore.CandidateSelectionReason, explicitEscapeState: VieLotusCore.ExplicitEscapeKind, selectionStability: VieLotusCore.CandidateSelectionStability = .provisional, toneSemanticEvent: VieLotusCore.ToneModifierSemanticEvent? = nil, semanticTransformations: [Swift.String], literalSuffix: Swift.String, flipCount: Swift.Int = 0, stabilityMargin: Swift.Double = 0.0, context: Swift.String = "", sentenceLanguageState: VieLotusCore.SentenceLanguageState = .empty, transitionReason: Swift.String = "initial")
   public static func == (a: VieLotusCore.CompositionCandidateProvenance, b: VieLotusCore.CompositionCandidateProvenance) -> Swift.Bool
 }
 public struct BilingualCandidateEvaluation : Swift.Sendable, Swift.Equatable {
@@ -267,7 +283,9 @@ public struct BilingualIntentArbiter : Swift.Sendable {
   public static let vietnameseCollisionLogFrequencies: [Swift.String : Swift.Double]
   public static let englishCollisionLogFrequencies: [Swift.String : Swift.Double]
   public static let hysteresisMarginThreshold: Swift.Double
+  public static func continuousVietnameseNoContextPrior(vnFreq: Swift.Double) -> Swift.Double
   public static func prefersEnglishInDefaultNoContext(lowerRaw: Swift.String, lowerRendered: Swift.String) -> Swift.Bool
+  public static func prefersEnglishByOrthographicCase(raw: Swift.String, rendered: Swift.String, context: Swift.String = "") -> Swift.Bool
   public static func isVietnameseContextForTonePrimitive(_ context: Swift.String, lowerRaw: Swift.String) -> Swift.Bool
   public static func isVietnameseClauseStarter(rendered: Swift.String, lowerRaw: Swift.String) -> Swift.Bool
   public static func evaluateSentenceLanguageState(_ context: Swift.String) -> VieLotusCore.SentenceLanguageState
@@ -407,6 +425,7 @@ public struct ClientAdapter {
 public enum DirectReplacementGuard {
   public static func verifyRangeOwnership(replacementRange: Foundation.NSRange, composingWord: Swift.String, compositionStartLocation: Swift.Int = NSNotFound, virtualCursorLocation: Swift.Int = NSNotFound, hostSubstring: Swift.String? = nil, isEditingCommittedWord: Swift.Bool = false, extraAutocompleteLength: Swift.Int = 0) -> VieLotusCore.DirectReplacementOwnership
   public static func evaluateCursorState(selection: Foundation.NSRange, virtualCursorLocation: Swift.Int, compositionStartLocation: Swift.Int, composingWordUTF16Length: Swift.Int, lastReplacementLength: Swift.Int = 0, hostWindowSubstring: Swift.String? = nil, expectedIgnoredWindowText: Swift.String? = nil) -> VieLotusCore.DirectReplacementCursorEvaluation
+  public static func extractAdoptableOnsetPrefix(beforeCaret precedingText: Swift.String, nextChar: Swift.Character, hasActiveSelection: Swift.Bool, charAfterCaret: Swift.Character? = nil, isVNI: Swift.Bool = false) -> Swift.String?
 }
 final public class ClientStallBreaker : @unchecked Swift.Sendable {
   public static let shared: VieLotusCore.ClientStallBreaker
@@ -507,6 +526,12 @@ final public class EngineBridge {
   final public var lastFeedWasRejectedNoOp: Swift.Bool {
     get
   }
+  final public var lastToneSemanticEvent: VieLotusCore.ToneModifierSemanticEvent? {
+    get
+  }
+  final public var hasConfirmedSemanticEscapeInComposition: Swift.Bool {
+    get
+  }
   final public func feedLiteral(_ ch: Swift.Character) -> (backspaces: Swift.Int, suffix: Swift.String)?
   final public func forceLiteralOutput(_ text: Swift.String)
   final public func reset()
@@ -554,6 +579,9 @@ public class InputSessionManager {
   public var bilingualNoContextPolicy: VieLotusCore.BilingualNoContextPolicy
   public var genZMode: Swift.Bool
   public var hasExplicitAccentSelection: Swift.Bool
+  public var explicitBilingualSelection: VieLotusCore.BilingualCandidateKind? {
+    get
+  }
   public var candidateProvenance: VieLotusCore.CompositionCandidateProvenance {
     get
   }
@@ -566,6 +594,7 @@ public class InputSessionManager {
   public var sessionGeneration: Swift.UInt64 {
     get
   }
+  public var precededByLeadingSlash: Swift.Bool
   public var isComposing: Swift.Bool {
     get
   }
@@ -578,6 +607,7 @@ public class InputSessionManager {
   public func stepCaretForward()
   public func resetCaret()
   public func setCompositionPrefix(_ text: Swift.String)
+  public func selectCompositionCandidate(_ candidate: Swift.String) -> VieLotusCore.SessionAction
   public func currentOutput() -> Swift.String
   public var inputMethod: VieLotusCore.InputMethodType {
     get
@@ -617,6 +647,8 @@ public class InputSessionManager {
   public func appendContext(_ word: Swift.String)
   public func isWordBoundary(_ char: Swift.Character) -> Swift.Bool
   public func handleCharacter(_ char: Swift.Character) -> VieLotusCore.SessionAction
+  public func resolvePostFeedCandidate(priorRawWord: Swift.String, priorOnScreenWord: Swift.String, priorProvenance: VieLotusCore.CompositionCandidateProvenance, rawWord: Swift.String, engineOutput: Swift.String, smartBilingualEnabled: Swift.Bool? = nil, forceInlineEvaluation: Swift.Bool = false, genZMode: Swift.Bool? = nil) -> (selectedCandidate: Swift.String, wasLiteralLockedStep: Swift.Bool)
+  public func hasConfirmedNonEnglishSemanticEscape(rawWord: Swift.String, rendered: Swift.String) -> Swift.Bool
   public func shouldSelectRawEnglishInline(rawWord: Swift.String, rendered: Swift.String, smartBilingualEnabled: Swift.Bool? = nil, forceInlineEvaluation: Swift.Bool = false, genZMode: Swift.Bool? = nil) -> Swift.Bool
   public func shouldSelectRawEnglishOnCommit(rawWord: Swift.String, rendered: Swift.String, smartBilingualEnabled: Swift.Bool? = nil, genZMode: Swift.Bool? = nil, wasPrecededByTechnicalDelimiter: Swift.Bool? = nil, boundaryChar: Swift.Character? = nil) -> Swift.Bool
   public func recordExternalCompositionProvenance(rawWord: Swift.String, engineOutput: Swift.String, selectedCandidate: Swift.String, wasLiteralLockedStep: Swift.Bool = false)
@@ -745,7 +777,11 @@ final public class SecureInputMonitor : @unchecked Swift.Sendable {
   @objc deinit
 }
 public struct SmartBilingualDetector {
-  public static var spellCheckerProvider: (any VieLotusCore.SpellCheckerProvider)?
+  public static var spellCheckerProvider: (any VieLotusCore.SpellCheckerProvider)? {
+    get
+    set
+  }
+  public static func isLeadingSlashCommandOrPathToken(_ lowerRaw: Swift.String) -> Swift.Bool
   public static func isInlineEnglishWord(raw: Swift.String, rendered: Swift.String, context: Swift.String = "", genZMode: Swift.Bool = false) -> Swift.Bool
   public static func isVNIDigitTransformationOrEscape(raw: Swift.String, rendered: Swift.String) -> Swift.Bool
   public static func isExplicitTelexEscape(raw: Swift.String, rendered: Swift.String) -> Swift.Bool
@@ -794,6 +830,8 @@ extension VieLotusCore.CandidateSelectionReason : Swift.Hashable {}
 extension VieLotusCore.CandidateSelectionReason : Swift.RawRepresentable {}
 extension VieLotusCore.ExplicitEscapeKind : Swift.Hashable {}
 extension VieLotusCore.ExplicitEscapeKind : Swift.RawRepresentable {}
+extension VieLotusCore.CandidateSelectionStability : Swift.Hashable {}
+extension VieLotusCore.CandidateSelectionStability : Swift.RawRepresentable {}
 extension VieLotusCore.BilingualCollisionCategory : Swift.Hashable {}
 extension VieLotusCore.BilingualCollisionCategory : Swift.RawRepresentable {}
 extension VieLotusCore.AppCategory : Swift.Hashable {}

@@ -44,6 +44,7 @@ struct VieLotusCApi {
     const char *(*get_last_text)(vielotus_session_t){nullptr};
     bool (*is_composing)(vielotus_session_t){nullptr};
     void (*append_context)(vielotus_session_t, const char *){nullptr};
+    void (*sync_armed_word)(vielotus_session_t, const char *){nullptr};
 
     VieLotusCApi() {
         WCHAR dllPath[MAX_PATH] = {0};
@@ -88,6 +89,7 @@ struct VieLotusCApi {
         get_last_text = reinterpret_cast<decltype(get_last_text)>(GetProcAddress(hModule, "vielotus_get_last_text"));
         is_composing = reinterpret_cast<decltype(is_composing)>(GetProcAddress(hModule, "vielotus_is_composing"));
         append_context = reinterpret_cast<decltype(append_context)>(GetProcAddress(hModule, "vielotus_append_context"));
+        sync_armed_word = reinterpret_cast<decltype(sync_armed_word)>(GetProcAddress(hModule, "vielotus_sync_armed_word"));
 
         isValid = create_session && destroy_session && reset_session &&
                   set_input_method && set_grammar_profile && set_smart_bilingual &&
@@ -727,6 +729,25 @@ void CVieLotusTIP::ClearWordStateSession() {
     }
 }
 
+void CVieLotusTIP::SyncSurroundingContextSession(const std::wstring &precedingText) {
+    if (precedingText.empty()) {
+        return;
+    }
+    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, precedingText.data(), static_cast<int>(precedingText.size()), nullptr, 0, nullptr, nullptr);
+    if (utf8Len <= 0) {
+        return;
+    }
+    std::string utf8Buf(static_cast<size_t>(utf8Len), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, precedingText.data(), static_cast<int>(precedingText.size()), &utf8Buf[0], utf8Len, nullptr, nullptr);
+#if defined(VIELOTUS_EMBEDDED_ENGINE)
+    m_nativeEngine.syncSurroundingContext(utf8Buf.c_str());
+#endif
+    const auto &api = GetCApi();
+    if (m_session && api.isValid && api.sync_armed_word) {
+        api.sync_armed_word(m_session, utf8Buf.c_str());
+    }
+}
+
 bool CVieLotusTIP::IsComposingSession() const {
     const auto &api = GetCApi();
     if (m_session && api.isValid) {
@@ -1142,6 +1163,9 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
             InspectContextSelection(pic, isAsciiLetter, queryOk, hasSel, caretMoved, precedingText, charAfterCaret);
             if (IsComposingSession() && queryOk && (hasSel || (m_pLastEditEndRange != nullptr && caretMoved))) {
                 ClearWordStateSession();
+            }
+            if (!IsComposingSession() && isAsciiLetter && queryOk && !precedingText.empty()) {
+                SyncSurroundingContextSession(precedingText);
             }
             if (!IsComposingSession() && isAsciiLetter && !suppressAdoption && queryOk) {
                 std::wstring onset = ExtractAdoptableOnsetPrefix(precedingText, chBuf[0], hasSel, charAfterCaret);

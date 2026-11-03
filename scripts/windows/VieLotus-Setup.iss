@@ -7,7 +7,7 @@
 
 #define MyAppName "Sen Việt (VieLotusIM)"
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.0"
+  #define MyAppVersion "2.0.2"
 #endif
 #ifndef MyAppArch
   #define MyAppArch "x64"

@@ -1,6 +1,6 @@
 #!/bin/sh
 # ==============================================================================
-# Sen Việt (VieLotusIM) v2.0.0 — Universal Linux (Multi-Distro & Multi-Arch)
+# Sen Việt (VieLotusIM) v2.0.2 — Universal Linux (Multi-Distro & Multi-Arch)
 # & macOS One-Line Installer
 #
 # Supported Linux Distros:
@@ -18,7 +18,15 @@
 set -e
 
 main() {
-VERSION="${VIELOTUS_VERSION:-2.0.0}"
+if [ -n "${VIELOTUS_VERSION:-}" ]; then
+    VERSION="${VIELOTUS_VERSION#v}"
+else
+    LATEST_TAG=""
+    if command -v curl >/dev/null 2>&1; then
+        LATEST_TAG="$(curl -fsSL --max-time 4 https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest 2>/dev/null | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' | head -n 1 || true)"
+    fi
+    VERSION="${LATEST_TAG:-2.0.2}"
+fi
 OS_NAME="$(uname -s)"
 ARCH_RAW="$(uname -m)"
 
@@ -202,8 +210,8 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
             printf "\n# Sen Việt (VieLotusIM) Vietnamese Input Method\nim:vi::vielotus\nim:vi:fcitx5:fcitx5-vielotus\nim:vi:ibus:ibus-vielotus\n" | ${SUDO} tee -a "${PKG_DEPENDS}" >/dev/null || true
         fi
     fi
-    if [ -d /etc/apt/sources.list.d ]; then
-        echo "deb [trusted=yes] https://github.com/stevedat/VieLotus-IM/releases/latest/download ./" | ${SUDO} tee /etc/apt/sources.list.d/vielotus.list >/dev/null || true
+    if [ -f /etc/apt/sources.list.d/vielotus.list ]; then
+        ${SUDO} rm -f /etc/apt/sources.list.d/vielotus.list 2>/dev/null || true
     fi
     ${SUDO} rm -f /var/cache/apt/archives/vielotus* 2>/dev/null || true
     ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
