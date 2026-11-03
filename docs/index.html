@@ -2223,7 +2223,7 @@
           <img src="assets/app-icon-512x512.png" alt="Sen Việt">
           <span>Sen Việt (VieLotusIM)</span>
         </a>
-        <span class="doc-type-badge" data-i18n="hdr.badge">Hồ sơ Kỹ thuật &amp; Thực nghiệm v2.0.0</span>
+        <span class="doc-type-badge" data-i18n="hdr.badge">Hồ sơ Kỹ thuật &amp; Thực nghiệm v2.0.2</span>
       </div>
 
       <div class="header-utility">
@@ -2560,7 +2560,7 @@
                 <td>
                   <div class="channel-pills">
                     <a id="link-mac-pkg" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg" class="channel-pill">VieLotusIM.pkg (Notarized)</a>
-                    <a id="link-mac-zip" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.app.zip" class="channel-pill secondary">.app.zip</a>
+                    <a id="link-mac-releases" href="https://github.com/stevedat/VieLotus-IM/releases/latest" target="_blank" rel="noopener noreferrer" class="channel-pill secondary">GitHub Releases</a>
                   </div>
                   <div class="cli-inline-box">
                     <code>brew install stevedat/tap/vielotus</code>
@@ -2608,8 +2608,8 @@
                 <td>
                   <div class="channel-pills">
                     <a href="https://snapcraft.io/vielotus" target="_blank" rel="noopener noreferrer" class="channel-pill">Snap Store (vielotus)</a>
-                    <a id="link-lin-deb" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_2.0.0_amd64.deb" class="channel-pill secondary">.deb (amd64)</a>
-                    <a id="link-lin-release" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_2.0.0_arm64.deb" class="channel-pill secondary">.deb (arm64)</a>
+                    <a id="link-lin-deb" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_2.0.2_amd64.deb" class="channel-pill secondary">.deb (amd64)</a>
+                    <a id="link-lin-release" href="https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus_2.0.2_arm64.deb" class="channel-pill secondary">.deb (arm64)</a>
                   </div>
                   <div class="cli-inline-box">
                     <code>curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh</code>
@@ -3200,7 +3200,7 @@
 
     const i18n = {
       vi: {
-        'hdr.badge': 'Hồ sơ Kỹ thuật & Thực nghiệm v2.0.0',
+        'hdr.badge': 'Hồ sơ Kỹ thuật & Thực nghiệm v2.0.2',
         'nav.paper': 'Chuyên khảo Kiến trúc',
         'nav.support': 'Hướng dẫn Kích hoạt',
         'toc.s1': 'Mô phỏng thực nghiệm',
@@ -3362,7 +3362,7 @@
         'qr.memo_label': 'Nội dung:'
       },
       en: {
-        'hdr.badge': 'Technical & Empirical Dossier v2.0.0',
+        'hdr.badge': 'Technical & Empirical Dossier v2.0.2',
         'nav.paper': 'Architecture Monograph',
         'nav.support': 'Activation Guide',
         'toc.s1': 'Empirical Specimen',
@@ -4690,9 +4690,6 @@
             if (asset.name === 'VieLotusIM.pkg') {
               const rowPkg = document.getElementById('link-mac-pkg');
               if (rowPkg) rowPkg.href = asset.browser_download_url;
-            } else if (asset.name === 'VieLotusIM.app.zip') {
-              const rowZip = document.getElementById('link-mac-zip');
-              if (rowZip) rowZip.href = asset.browser_download_url;
             } else if (asset.name === 'VieLotus-Store-Setup.exe') {
               const rowWinStoreExe = document.getElementById('link-win-store-exe');
               if (rowWinStoreExe) rowWinStoreExe.href = asset.browser_download_url;

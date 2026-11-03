@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ibus-vielotus VERSION 2.0.1 LANGUAGES C)
+project(ibus-vielotus VERSION 2.0.2 LANGUAGES C)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(IBUS REQUIRED ibus-1.0>=1.5.0)

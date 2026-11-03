@@ -691,6 +691,22 @@ void VieLotusEngine::activate(const InputMethodEntry& entry,
         state->applyConfig(config_);
         if (state->session()) {
             vielotus_append_context(state->session(), "");
+            if (!ic->capabilityFlags().test(CapabilityFlag::Password) &&
+                ic->capabilityFlags().test(CapabilityFlag::SurroundingText) &&
+                ic->surroundingText().isValid()) {
+                const auto& text = ic->surroundingText().text();
+                const auto cursor = ic->surroundingText().cursor();
+                if (!text.empty() && cursor > 0) {
+                    const size_t bytePos = fcitx::utf8::ncharByteLength(text.begin(), cursor);
+                    if (bytePos <= text.size()) {
+                        std::string prefix = text.substr(0, bytePos);
+                        if (prefix.size() > 256) {
+                            prefix = prefix.substr(prefix.size() - 256);
+                        }
+                        vielotus_sync_armed_word(state->session(), prefix.c_str());
+                    }
+                }
+            }
         }
     }
 }

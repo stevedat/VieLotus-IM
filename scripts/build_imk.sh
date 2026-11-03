@@ -24,15 +24,18 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
 echo "-> Compiling arm64 target..."
-swift build --configuration release --product VieLotusIM --triple arm64-apple-macosx --scratch-path .build/scratch-arm64
+swift build --configuration release --product VieLotusIM --triple arm64-apple-macosx
+ARM64_SRC="$(swift build --configuration release --product VieLotusIM --triple arm64-apple-macosx --show-bin-path)/VieLotusIM"
+cp "$ARM64_SRC" "$DIST_DIR/VieLotusIM.arm64"
 
 echo "-> Compiling x86_64 target..."
-swift build --configuration release --product VieLotusIM --triple x86_64-apple-macosx --scratch-path .build/scratch-x86_64
+swift build --configuration release --product VieLotusIM --triple x86_64-apple-macosx
+X86_SRC="$(swift build --configuration release --product VieLotusIM --triple x86_64-apple-macosx --show-bin-path)/VieLotusIM"
+cp "$X86_SRC" "$DIST_DIR/VieLotusIM.x86_64"
 
 echo "-> Combining architectures into Universal Binary..."
-ARM64_BIN="$(find .build/scratch-arm64 -name "VieLotusIM" -type f ! -path "*.dSYM*" | head -n 1)"
-X86_BIN="$(find .build/scratch-x86_64 -name "VieLotusIM" -type f ! -path "*.dSYM*" | head -n 1)"
-lipo -create -output "$APP_DIR/Contents/MacOS/VieLotusIM" "$ARM64_BIN" "$X86_BIN"
+lipo -create -output "$APP_DIR/Contents/MacOS/VieLotusIM" "$DIST_DIR/VieLotusIM.arm64" "$DIST_DIR/VieLotusIM.x86_64"
+rm -f "$DIST_DIR/VieLotusIM.arm64" "$DIST_DIR/VieLotusIM.x86_64"
 strip -x "$APP_DIR/Contents/MacOS/VieLotusIM"
 
 cp "Sources/VieLotusIM/Info.plist" "$APP_DIR/Contents/Info.plist"

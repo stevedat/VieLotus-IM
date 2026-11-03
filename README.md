@@ -76,10 +76,10 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
   ```
 - **Manual `.deb` install via `apt` (Ubuntu / Debian / Mint / Pop!_OS)**:
   ```bash
-  sudo apt update && sudo apt install ./vielotus_2.0.0_amd64.deb   # or ./vielotus_2.0.0_arm64.deb
+  sudo apt update && sudo apt install ./vielotus_2.0.2_amd64.deb   # or ./vielotus_2.0.2_arm64.deb
   ```
 - **Arch Linux / Manjaro (`PKGBUILD`)**: `cd CrossPlatform/packaging/arch && makepkg -si`
-- **Quick CLI controls**: `vielotus-settings` (GTK3 GUI) · `vielotus --telex` · `vielotus --vni` · `vielotus --status`.
+- **Quick CLI controls**: `vielotus-settings` (GTK3 GUI) · `vielotus-settings --telex` · `vielotus-settings --vni` · `vielotus-settings --status`.
 
 ### 4. iOS / iPadOS & Android
 - **iOS & iPadOS**: Install from the [App Store](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799) → **Settings → General → Keyboard → Keyboards → Add New Keyboard... → Sen Việt**.

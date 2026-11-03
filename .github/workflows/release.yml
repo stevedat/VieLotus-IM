@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 2.0.1)'
+        description: 'Release version (e.g. 2.0.2)'
         required: false
         default: ''
 
@@ -33,7 +33,7 @@ jobs:
             VERSION="${TAG#v}"
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
-            VERSION="2.0.1"
+            VERSION="2.0.2"
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -85,8 +85,8 @@ jobs:
             VERSION="${TAG#v}"
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
-            VERSION="2.0.1"
-            TAG="v2.0.1"
+            VERSION="2.0.2"
+            TAG="v2.0.2"
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT

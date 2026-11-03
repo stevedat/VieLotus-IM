@@ -26,10 +26,10 @@ jobs:
         run: swift build --configuration release
 
       - name: Build universal App bundle (VieLotusIM.app)
-        run: ./scripts/build_imk.sh 2.0.1
+        run: ./scripts/build_imk.sh 2.0.2
 
       - name: Build installer package (VieLotusIM.pkg)
-        run: ./scripts/build_pkg.sh 2.0.1
+        run: ./scripts/build_pkg.sh 2.0.2
 
       - name: Upload macOS build artifacts
         uses: actions/upload-artifact@v4
@@ -94,11 +94,11 @@ jobs:
           cp build-fcitx5/vielotus.conf dist/linux/
           cp build-ibus/ibus-engine-vielotus dist/linux/
           cp build-ibus/vielotus.xml dist/linux/
-          ./scripts/build_deb.sh 2.0.1 amd64
+          ./scripts/build_deb.sh 2.0.2 amd64
 
       - name: Verify .deb installation, split packages & E2E IBus/Fcitx5 typing on Ubuntu 24.04
         run: |
-          ./scripts/verify_ubuntu_deb.sh 2.0.1 amd64
+          ./scripts/verify_ubuntu_deb.sh 2.0.2 amd64
 
       - name: Upload Linux build artifacts
         uses: actions/upload-artifact@v4
@@ -132,7 +132,7 @@ jobs:
       - name: Build Windows TSF COM Shell, Inno Setup Installers & Microsoft Store MSIX (x64 & ARM64)
         shell: pwsh
         run: |
-          ./scripts/build_windows.ps1 -Version 2.0.1 -Arch all -SkipTests
+          ./scripts/build_windows.ps1 -Version 2.0.2 -Arch all -SkipTests
           Copy-Item dist/windows/VieLotus-Setup-x64.exe Binaries/windows/VieLotus-Setup-x64.exe -Force
           Copy-Item dist/windows/VieLotus-Setup-arm64.exe Binaries/windows/VieLotus-Setup-arm64.exe -Force
 

@@ -5,13 +5,20 @@
 # ==============================================================================
 
 UID_CUR="$(id -u 2>/dev/null || echo 1000)"
-CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
-DATA_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}"
+HOME_DIR="${HOME:-}"
+if [ -z "${HOME_DIR}" ] && command -v getent >/dev/null 2>&1; then
+    HOME_DIR="$(getent passwd "${UID_CUR}" 2>/dev/null | cut -d: -f6 || true)"
+fi
+CONFIG_ROOT="${XDG_CONFIG_HOME:-${HOME_DIR}/.config}"
+DATA_ROOT="${XDG_DATA_HOME:-${HOME_DIR}/.local/share}"
 CONFIG_DIR="${CONFIG_ROOT}/vielotus"
-mkdir -p "${CONFIG_DIR}" 2>/dev/null || true
-if [ ! -w "${CONFIG_DIR}" ]; then
-    CONFIG_DIR="/tmp/vielotus-cfg-${UID_CUR}"
-    mkdir -p "${CONFIG_DIR}" 2>/dev/null || true
+TMP_CONFIG_DIR=""
+mkdir -p -m 0700 "${CONFIG_DIR}" 2>/dev/null || true
+if [ ! -d "${CONFIG_DIR}" ] || [ ! -w "${CONFIG_DIR}" ]; then
+    TMP_CONFIG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vielotus-cfg.XXXXXXXX")"
+    chmod 0700 "${TMP_CONFIG_DIR}"
+    CONFIG_DIR="${TMP_CONFIG_DIR}"
+    trap 'rm -rf "${TMP_CONFIG_DIR}"' EXIT HUP INT TERM
 fi
 CONFIG_FILE="${CONFIG_DIR}/config.env"
 LOG_FILE="${CONFIG_DIR}/settings.log"
@@ -309,7 +316,7 @@ brand_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
 title_lbl = Gtk.Label()
 title_lbl.set_markup(
     "<span size='large' weight='bold' foreground='#1c1c1e'>🌸 Sen Việt</span> "
-    "<span size='small' weight='bold' foreground='#007aff'>v2.0.1</span>"
+    "<span size='small' weight='bold' foreground='#007aff'>v2.0.2</span>"
 )
 title_lbl.set_xalign(0)
 sub_lbl = Gtk.Label()
@@ -856,7 +863,7 @@ if os.path.exists(config_path):
                 cfg[k.strip()] = v.strip().strip('"').strip("'")
 
 root = tk.Tk()
-root.title("Sen Việt (VieLotusIM v2.0.1) — Cài đặt")
+root.title("Sen Việt (VieLotusIM v2.0.2) — Cài đặt")
 root.geometry("460x320")
 root.resizable(False, False)
 
@@ -881,7 +888,7 @@ def apply_changes(*_):
 
 frm = ttk.Frame(root, padding=16)
 frm.pack(fill="both", expand=True)
-ttk.Label(frm, text="🌸 Sen Việt (VieLotusIM v2.0.1)", font=("Sans", 13, "bold")).pack(anchor="w")
+ttk.Label(frm, text="🌸 Sen Việt (VieLotusIM v2.0.2)", font=("Sans", 13, "bold")).pack(anchor="w")
 ttk.Label(frm, text="Kiểu gõ Tiếng Việt (tự động lưu & áp dụng):").pack(anchor="w", pady=(10, 4))
 ttk.Radiobutton(frm, text="Telex Tự Do (s f r x j w — vieetj → việt)", variable=im_var, value="telex", command=apply_changes).pack(anchor="w")
 ttk.Radiobutton(frm, text="VNI Chuẩn (phím số 1–9 — vie65t → việt)", variable=im_var, value="vni", command=apply_changes).pack(anchor="w")
@@ -920,7 +927,7 @@ fi
 
 echo "🌸 === Sen Việt (VieLotusIM) cho Linux (Fcitx5 & IBus) ==="
 echo "Trạng thái: Đã kích hoạt (${INPUT_METHOD})"
-echo "  • Chuyển sang Telex : vielotus --telex"
-echo "  • Chuyển sang VNI   : vielotus --vni"
-echo "  • Kiểm tra cấu hình : vielotus --status"
+echo "  • Chuyển sang Telex : vielotus-settings --telex"
+echo "  • Chuyển sang VNI   : vielotus-settings --vni"
+echo "  • Kiểm tra cấu hình : vielotus-settings --status"
 echo "  • Khởi động lại Fcitx5: fcitx5 -r -d"
