@@ -7,6 +7,7 @@
 #include <fcitx-utils/keysym.h>
 #include <fcitx-utils/misc.h>
 #include <fcitx-utils/textformatflags.h>
+#include <fcitx-utils/utf8.h>
 #include <fcitx/addonmanager.h>
 #include <fcitx/inputcontextmanager.h>
 #include <fcitx/inputpanel.h>
