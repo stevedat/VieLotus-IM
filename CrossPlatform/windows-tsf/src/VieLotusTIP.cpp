@@ -563,13 +563,16 @@ void CVieLotusTIP::ReloadUserPreferences() {
 
 #if defined(VIELOTUS_EMBEDDED_ENGINE)
     m_nativeEngine.setInputMethod(m_isVniMode ? vielotus_win::InputMethod::VNI : vielotus_win::InputMethod::Telex);
+    m_nativeEngine.setGrammarProfile(prefs.senFlex ? 1 : 0);
     m_nativeEngine.setSmartBilingual(prefs.smartBilingual);
     m_nativeEngine.setModernOrthography(prefs.modernOrthography);
+    m_nativeEngine.setQuickTelex(prefs.quickTelex);
 #endif
 
     const auto &api = GetCApi();
     if (api.isValid && m_session) {
         api.set_input_method(m_session, m_isVniMode ? VIELOTUS_INPUT_VNI : VIELOTUS_INPUT_TELEX);
+        api.set_grammar_profile(m_session, prefs.senFlex ? VIELOTUS_GRAMMAR_SEN_FLEX : VIELOTUS_GRAMMAR_CLASSIC);
         api.set_smart_bilingual(m_session, prefs.smartBilingual);
         api.set_modern_orthography(m_session, prefs.modernOrthography);
     }
@@ -585,7 +588,7 @@ void CVieLotusTIP::InitSession() {
             VieLotusWindowsPrefs prefs{};
             LoadVieLotusPrefs(prefs);
             api.set_input_method(m_session, m_isVniMode ? VIELOTUS_INPUT_VNI : VIELOTUS_INPUT_TELEX);
-            api.set_grammar_profile(m_session, VIELOTUS_GRAMMAR_SEN_FLEX);
+            api.set_grammar_profile(m_session, prefs.senFlex ? VIELOTUS_GRAMMAR_SEN_FLEX : VIELOTUS_GRAMMAR_CLASSIC);
             api.set_smart_bilingual(m_session, prefs.smartBilingual);
             api.set_modern_orthography(m_session, prefs.modernOrthography);
         }
@@ -999,10 +1002,9 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
     }
 
     // Eat candidate alphabetic typing keys
+    // Note: Profile synchronization runs on focus change (`OnSetFocus`) and taskbar switch (`OnActivated`),
+    // never on the keystroke path (`OnTestKeyDown`), avoiding Registry and COM overhead during typing.
     if (wParam >= 'A' && wParam <= 'Z') {
-        if (!isComposing) {
-            SyncActiveLanguageProfile();
-        }
         *pfEaten = TRUE;
         return S_OK;
     }
@@ -1013,9 +1015,6 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
         const PassiveKeyKind kind = TranslatePassiveKey(wParam, lParam, ch);
         if (kind == PassiveKeyKind::AsciiPrintable) {
             if ((ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z')) {
-                if (!isComposing) {
-                    SyncActiveLanguageProfile();
-                }
                 *pfEaten = TRUE;
                 return S_OK;
             }

@@ -7,6 +7,7 @@ struct VieLotusWindowsPrefs {
     bool vietnameseEnabled{true};
     bool smartBilingual{true};
     bool modernOrthography{true};
+    bool senFlex{false};
     bool macroEnabled{true};
     bool developerMode{false};
     bool quickTelex{false};

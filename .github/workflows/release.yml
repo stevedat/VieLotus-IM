@@ -50,9 +50,84 @@ jobs:
             dist/windows/VieLotus-Setup-x64.exe
             dist/windows/VieLotus-Setup-arm64.exe
 
+  linux-build:
+    name: Build Linux All-in-One .deb (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract release version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          fi
+          if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
+            VERSION="2.0.2"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Install build tools, Fcitx5, and IBus dev dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            debhelper \
+            dpkg-dev \
+            extra-cmake-modules \
+            fcitx5 \
+            fcitx5-modules-dev \
+            g++ \
+            libfcitx5config-dev \
+            libfcitx5core-dev \
+            libfcitx5utils-dev \
+            libglib2.0-dev \
+            libibus-1.0-dev \
+            ninja-build \
+            pkg-config \
+            python3
+
+      - name: Build All-in-One Linux .deb (${{ matrix.arch }})
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p dist/linux
+          python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py --check
+          cmake -B build-core -S CrossPlatform/capi-native -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-core
+          cp "$(realpath build-core/libVieLotusCAPI.so)" dist/linux/libVieLotusCAPI.so
+          cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
+          cmake --build build-fcitx5
+          cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
+          cmake --build build-ibus
+          cp build-fcitx5/vielotus.so dist/linux/
+          cp build-fcitx5/vielotus.conf dist/linux/
+          cp build-ibus/ibus-engine-vielotus dist/linux/
+          cp build-ibus/vielotus.xml dist/linux/
+          ./scripts/build_deb.sh "${VERSION}" "${{ matrix.arch }}"
+
+      - name: Upload Linux All-in-One .deb (${{ matrix.arch }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: VieLotus-Linux-${{ matrix.arch }}
+          path: |
+            dist/linux/vielotus_${{ steps.version.outputs.version }}_${{ matrix.arch }}.deb
+
   build-and-release:
     name: Build, Sign & Publish Desktop Release (macOS, Windows, Linux)
-    needs: [windows-build]
+    needs: [windows-build, linux-build]
     runs-on: macos-15
     env:
       MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
@@ -163,6 +238,13 @@ jobs:
           name: VieLotus-Windows-Installers
           path: .build/dist/
 
+      - name: Download freshly built Linux Release Installers (amd64 & arm64)
+        uses: actions/download-artifact@v4
+        with:
+          pattern: VieLotus-Linux-*
+          path: .build/dist/
+          merge-multiple: true
+
       - name: Stage Windows & Linux Release Installers and Generate Checksums
         run: |
           if [ ! -f .build/dist/VieLotus-Setup-x64.exe ]; then
@@ -172,7 +254,9 @@ jobs:
           if [ -f Binaries/windows/VieLotus-Store-Setup.exe ]; then
             cp Binaries/windows/VieLotus-Store-Setup.exe .build/dist/
           fi
-          cp Binaries/linux/vielotus_*.deb .build/dist/
+          if ! ls .build/dist/vielotus_*.deb >/dev/null 2>&1; then
+            cp Binaries/linux/vielotus_*.deb .build/dist/
+          fi
           cd .build/dist
           shasum -a 256 VieLotusIM.pkg VieLotus-Store-Setup.exe VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe vielotus_*.deb > checksums.sha256
           cat checksums.sha256

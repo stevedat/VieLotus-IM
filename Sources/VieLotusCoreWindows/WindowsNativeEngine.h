@@ -37,6 +37,12 @@ public:
     void setModernOrthography(bool enabled) { m_modernOrthography = enabled; }
     bool getModernOrthography() const { return m_modernOrthography; }
 
+    void setGrammarProfile(int32_t profile) { m_grammarProfile = (profile == 0) ? 0 : 1; }
+    int32_t getGrammarProfile() const { return m_grammarProfile; }
+
+    void setQuickTelex(bool enabled) { m_quickTelex = enabled; }
+    bool getQuickTelex() const { return m_quickTelex; }
+
     int32_t feedChar(uint32_t codepoint);
     int32_t feedBackspace();
     int32_t commitWord();
@@ -50,6 +56,8 @@ private:
     InputMethod m_inputMethod{InputMethod::Telex};
     bool m_smartBilingual{true};
     bool m_modernOrthography{true};
+    int32_t m_grammarProfile{1};
+    bool m_quickTelex{false};
     bool m_composingFlag{false};
     int32_t m_lastBackspaces{0};
     char m_lastTextUtf8[kMaxUtf8Bytes]{};

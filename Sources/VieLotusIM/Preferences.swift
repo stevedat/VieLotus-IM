@@ -56,8 +56,20 @@ final class Preferences: ObservableObject {
     
     @Published var grammarProfile: GrammarProfile {
         didSet {
+            guard !isReloading else { return }
             defaults.set(grammarProfile.rawValue, forKey: Key.grammarProfile)
+            CFPreferencesSetAppValue(
+                Key.grammarProfile as CFString,
+                grammarProfile.rawValue as CFString,
+                kCFPreferencesCurrentApplication
+            )
             flushDefaults()
+            DistributedNotificationCenter.default().postNotificationName(
+                Self.preferencesChangedNotification,
+                object: nil,
+                userInfo: nil,
+                deliverImmediately: true
+            )
         }
     }
     
@@ -194,8 +206,15 @@ final class Preferences: ObservableObject {
         self.genZMode = true
         self.developerMode = defaults.object(forKey: Key.developerMode) as? Bool ?? false
         
-        self.grammarProfile = .senFlex
-        defaults.set(GrammarProfile.senFlex.rawValue, forKey: Key.grammarProfile)
+        let rawGrammarProfile: String
+        if let cfStr = CFPreferencesCopyAppValue(Key.grammarProfile as CFString, kCFPreferencesCurrentApplication) as? String {
+            rawGrammarProfile = cfStr
+        } else {
+            rawGrammarProfile = defaults.string(forKey: Key.grammarProfile) ?? GrammarProfile.senFlex.rawValue
+        }
+        let initialProfile: GrammarProfile = (rawGrammarProfile == GrammarProfile.classic.rawValue) ? .classic : .senFlex
+        self.grammarProfile = initialProfile
+        defaults.set(initialProfile.rawValue, forKey: Key.grammarProfile)
         defaults.set(true, forKey: Key.smartBilingual)
         defaults.set(true, forKey: Key.modernOrthography)
         defaults.set(true, forKey: Key.genZMode)
@@ -232,7 +251,16 @@ final class Preferences: ObservableObject {
             self.inputMethod = resolvedMethod
         }
 
-        self.grammarProfile = .senFlex
+        let rawGrammarProfile: String
+        if let cfStr = CFPreferencesCopyAppValue(Key.grammarProfile as CFString, kCFPreferencesCurrentApplication) as? String {
+            rawGrammarProfile = cfStr
+        } else {
+            rawGrammarProfile = defaults.string(forKey: Key.grammarProfile) ?? GrammarProfile.senFlex.rawValue
+        }
+        let resolvedProfile: GrammarProfile = (rawGrammarProfile == GrammarProfile.classic.rawValue) ? .classic : .senFlex
+        if self.grammarProfile != resolvedProfile {
+            self.grammarProfile = resolvedProfile
+        }
 
         self.modernOrthography = true
         self.relaxedCoda = defaults.bool(forKey: Key.relaxedCoda)

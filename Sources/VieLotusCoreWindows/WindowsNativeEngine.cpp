@@ -127,7 +127,25 @@ bool isContextEnglishCollisionWord(const wchar_t *rawLower, int rawLen) {
 
 bool isEnglishContextAnchor(const wchar_t *rawLower, int rawLen) {
     if (rawLen <= 0) return false;
+    if (rawLen == 1 && (rawLower[0] == L'a' || rawLower[0] == L'i')) return true;
+    if (rawLen == 2 && rawLower[0] == L'a' && rawLower[1] == L'n') return true;
     return hasSortedHash(kEnglishContextAnchors, fnv1aHash(rawLower, rawLen));
+}
+
+bool isSyntheticInflectionTrapWord(const wchar_t *rawLower, int rawLen) {
+    if (rawLen < 3 || rawLen > 6) return false;
+    static const wchar_t *const kTraps[] = {
+        L"beest", L"deest", L"heer", L"heest", L"hoest", L"leer", L"leest",
+        L"loest", L"meest", L"neer", L"neest", L"oer", L"queest", L"reer",
+        L"reest", L"seer", L"teest", L"theer", L"theest", L"toer", L"toest",
+        L"vees", L"veest"
+    };
+    for (const wchar_t *w : kTraps) {
+        int i = 0;
+        while (i < rawLen && w[i] != L'\0' && rawLower[i] == w[i]) ++i;
+        if (i == rawLen && w[i] == L'\0') return true;
+    }
+    return false;
 }
 
 bool isSexLoanwordPrecedingHead(const wchar_t *w, int len) {
@@ -299,6 +317,8 @@ struct NativeEngineState {
     char m_lastTextUtf8[kMaxUtf8Bytes]{};
     bool m_inEnglishContext{false};
     bool m_inVietnameseContext{false};
+    bool m_hadVietnameseInSentence{false};
+    bool m_lastWordWasEnglishAnchor{false};
     bool m_lastWordWasSexLoanwordHead{false};
     bool m_precededByTechDelimiter{false};
     bool m_afterDigit{false};
@@ -764,6 +784,9 @@ bool NativeEngineState::isValidVietnameseSyllable() const {
             (second == L'i' && m_rawLen >= 3 && rawLower[2] != L'u')) {
             return false;
         }
+        if ((second == L'a' || second == L'u') && m_rawLen == 2) {
+            return false;
+        }
     }
 
     if (m_preVowelTone) {
@@ -774,7 +797,12 @@ bool NativeEngineState::isValidVietnameseSyllable() const {
                 break;
             }
         }
-        if (!hasVowelShape && !(m_rawLen == 3 && rawLower[0] == L'm' && rawLower[1] == L'x' && rawLower[2] == L'i')) {
+        const bool isFlexToneOnset =
+            (m_grammarProfile == 1 && m_rawLen >= 3 &&
+             !(m_rawLen == 3 && rawLower[0] == L'r' && rawLower[1] == L's' && rawLower[2] == L'a') &&
+             !(m_rawLen >= 4 && rawLower[0] == L't' && (rawLower[1] == L's' || rawLower[1] == L'z') && rawLower[2] == L'a' && rawLower[3] == L'r') &&
+             !(m_rawLen >= 4 && rawLower[0] == L'h' && rawLower[1] == L'r' && rawLower[2] == L'e' && rawLower[3] == L'f'));
+        if (!hasVowelShape && !isFlexToneOnset && !(m_rawLen == 3 && rawLower[0] == L'm' && rawLower[1] == L'x' && rawLower[2] == L'i')) {
             return false;
         }
     }
@@ -856,6 +884,9 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
         if (m_pendingBoundaryCp == '_' || m_pendingBoundaryCp == '/' || m_pendingBoundaryCp == '.') return true;
         if (m_rawLen == 3 && rawLower[0] == L's' && rawLower[1] == L'e' && rawLower[2] == L'x') {
             if (m_lastWordWasSexLoanwordHead) return true;
+        }
+        if (isSyntheticInflectionTrapWord(rawLower, m_rawLen)) {
+            return m_lastWordWasEnglishAnchor;
         }
         if (m_inEnglishContext) return true;
     }
@@ -1052,7 +1083,8 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
         bool hasPriorCircumflexOrBreve = false;
         if (vStart != -1) {
             for (int i = vStart; i <= vEnd; ++i) {
-                if (m_tokens[i].shape == 1 || m_tokens[i].shape == 3) {
+                if (m_tokens[i].shape == 1 || m_tokens[i].shape == 3 ||
+                    ((lowerCh == L'a' || lowerCh == L'e') && m_tokens[i].shape == 2)) {
                     hasPriorCircumflexOrBreve = true;
                     break;
                 }
@@ -1289,7 +1321,8 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
                 initStr[initLen++] = m_tokens[i].baseLower;
             }
             bool hasStrokeD = (m_tokenLen == 1 && m_tokens[0].baseLower == L'd' && m_tokens[0].shape == 4);
-            if (!hasStrokeD && isValidInitialOnset(initStr, initLen, false) && m_tokenLen < kMaxWordTokens) {
+            bool isSingleOnsetPreVowelToneBeforeW = (m_preVowelTone && m_tokenLen == 1 && m_lastToneKey == L's' && m_tokens[0].baseLower != L's');
+            if (!hasStrokeD && !isSingleOnsetPreVowelToneBeforeW && isValidInitialOnset(initStr, initLen, false) && m_tokenLen < kMaxWordTokens) {
                 m_tokens[m_tokenLen++] = SyllableToken{ L'u', isUpper, 2 };
                 m_lastShapeKey = L'w';
                 m_lastToneKey = 0;
@@ -1369,8 +1402,10 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
         return true;
     }
 
-    // SEN Flex pre-vowel tone (e.g. "tseet" -> "tết"): tone key typed right after initial consonant before vowel
-    if (m_grammarProfile == 1 && targetTone != 0 && lowerCh != L'r' && vStart == -1 && m_tokenLen > 0 && m_tone == 0) {
+    // SEN Flex pre-vowel tone (e.g. "tseet" -> "tết", "rrung rrinh" -> "rủng rỉnh"):
+    // tone key typed right after initial consonant before vowel
+    const bool allowPreVowelR = (lowerCh == L'r' && m_tokenLen == 1 && m_tokens[0].baseLower == L'r');
+    if (m_grammarProfile == 1 && targetTone != 0 && (lowerCh != L'r' || allowPreVowelR) && vStart == -1 && m_tokenLen > 0 && m_tone == 0) {
         wchar_t initStr[16]{};
         int initLen = 0;
         for (int i = 0; i < m_tokenLen && initLen < 15; ++i) {
@@ -1658,6 +1693,8 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
             }
             if (codepoint == '.' || codepoint == '!' || codepoint == '?' || codepoint == '\n' || codepoint == '\r') {
                 m_inVietnameseContext = false;
+                m_hadVietnameseInSentence = false;
+                m_lastWordWasEnglishAnchor = false;
             }
             return act;
         }
@@ -1672,6 +1709,8 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
         }
         if (codepoint == '.' || codepoint == '!' || codepoint == '?' || codepoint == '\n' || codepoint == '\r') {
             m_inVietnameseContext = false;
+            m_hadVietnameseInSentence = false;
+            m_lastWordWasEnglishAnchor = false;
         }
         m_lastBackspaces = 0;
         m_lastTextUtf8[0] = '\0';
@@ -1734,6 +1773,7 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
         // toned ê/ô, or a cancelled vowel shape, and appending lowerCh to m_tokens would violate Vietnamese phonotactics,
         // lock the syllable stem and append ch to m_literalTail so the Vietnamese syllable is never reverted to raw ASCII!
         bool lockOverflowToTail = false;
+        bool lockHornedDiphthongRepeat = false;
         const bool isSingleModifiedVowelStem =
             (m_tokenLen == 1 && rawWordStartsNonW() &&
              (m_tokens[0].shape == 1 || m_tokens[0].shape == 3) &&
@@ -1751,13 +1791,21 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
                     break;
                 }
             }
-            const bool isTonedOpenSameVowelRepeat =
+            const bool isHornedDiphthongSameVowelRepeat =
                 !hasCodaNow &&
-                m_tone != 0 &&
-                (vStartNow > 0 || (vStartNow == 0 && m_tokens[vEndNow].shape != 0)) &&
+                vStartNow >= 0 && vEndNow > vStartNow &&
+                m_tokens[vStartNow].shape == 2 &&
                 vEndNow == m_tokenLen - 1 &&
                 lowerCh == m_tokens[vEndNow].baseLower &&
                 rawWordStartsNonW();
+            const bool isTonedOpenSameVowelRepeat =
+                (!hasCodaNow &&
+                 m_tone != 0 &&
+                 (vStartNow > 0 || (vStartNow == 0 && m_tokens[vEndNow].shape != 0)) &&
+                 vEndNow == m_tokenLen - 1 &&
+                 lowerCh == m_tokens[vEndNow].baseLower &&
+                 rawWordStartsNonW()) ||
+                isHornedDiphthongSameVowelRepeat;
             if (!hasCodaNow && isAsciiBaseVowel(lowerCh) && !isTonedOpenSameVowelRepeat && !isSingleModifiedVowelStem) {
                 hasVnSpecific = false;
             }
@@ -1779,12 +1827,13 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
                 --m_tokenLen;
                 if (!validExtended) {
                     lockOverflowToTail = true;
+                    lockHornedDiphthongRepeat = isHornedDiphthongSameVowelRepeat;
                 }
             }
         }
 
         if (lockOverflowToTail) {
-            if (hasCompoundUoOrStrokeD()) {
+            if (hasCompoundUoOrStrokeD() || lockHornedDiphthongRepeat) {
                 m_overflowLocked = true;
             }
             if (m_literalTailLen < kMaxWordTokens - 1) {
@@ -2103,13 +2152,16 @@ int32_t NativeEngineState::commitWord() {
     }
     bool isTurnOrSex = (m_rawLen == 4 && rawLower[0] == L't' && rawLower[1] == L'u' && rawLower[2] == L'r' && rawLower[3] == L'n') ||
                        (m_rawLen == 3 && rawLower[0] == L's' && rawLower[1] == L'e' && rawLower[2] == L'x');
+    const bool isAnchor = isEnglishContextAnchor(rawLower, m_rawLen);
+    m_lastWordWasEnglishAnchor = isAnchor;
     m_lastWordWasSexLoanwordHead = isSexLoanwordPrecedingHead(finalLower, finalLen) || isSexLoanwordPrecedingHead(rawLower, m_rawLen);
     if (hasNonAscii || isVietnameseContextReset(finalLower, finalLen)) {
         m_inEnglishContext = false;
         if (!isTurnOrSex) {
             m_inVietnameseContext = true;
+            m_hadVietnameseInSentence = true;
         }
-    } else if (wasBilingualRestore || (!isValidVietnameseSyllable() && !m_classicOrVniEscape && !m_telexToneEscape && !m_overflowLocked && !isOpenSameVowelExtension() && !isSingleModifiedVowelOverflow() && finalLen >= 2) || isUnconditionalEnglishWord(rawLower, m_rawLen) || isEnglishContextAnchor(rawLower, m_rawLen)) {
+    } else if (wasBilingualRestore || (!isValidVietnameseSyllable() && !m_classicOrVniEscape && !m_telexToneEscape && !m_overflowLocked && !isOpenSameVowelExtension() && !isSingleModifiedVowelOverflow() && finalLen >= 2) || isUnconditionalEnglishWord(rawLower, m_rawLen) || isAnchor) {
         m_inEnglishContext = true;
         m_inVietnameseContext = false;
     }
@@ -2186,6 +2238,8 @@ void WindowsNativeEngine::reset() {
     auto *impl = getImpl(m_opaqueState);
     impl->m_inEnglishContext = false;
     impl->m_inVietnameseContext = false;
+    impl->m_hadVietnameseInSentence = false;
+    impl->m_lastWordWasEnglishAnchor = false;
     impl->m_lastWordWasSexLoanwordHead = false;
     impl->m_precededByTechDelimiter = false;
     impl->m_afterDigit = false;
@@ -2201,6 +2255,8 @@ void WindowsNativeEngine::clearWordState() {
     impl->m_inputMethod = m_inputMethod;
     impl->m_smartBilingual = m_smartBilingual;
     impl->m_modernOrthography = m_modernOrthography;
+    impl->m_grammarProfile = m_grammarProfile;
+    impl->m_quickTelex = m_quickTelex;
     impl->clearWordState();
     m_composingFlag = false;
     m_lastBackspaces = 0;
@@ -2221,6 +2277,8 @@ int32_t WindowsNativeEngine::feedChar(uint32_t codepoint) {
     impl->m_inputMethod = m_inputMethod;
     impl->m_smartBilingual = m_smartBilingual;
     impl->m_modernOrthography = m_modernOrthography;
+    impl->m_grammarProfile = m_grammarProfile;
+    impl->m_quickTelex = m_quickTelex;
     int32_t act = impl->feedChar(codepoint);
     syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_composingFlag);
     return act;
@@ -2231,6 +2289,8 @@ int32_t WindowsNativeEngine::feedBackspace() {
     impl->m_inputMethod = m_inputMethod;
     impl->m_smartBilingual = m_smartBilingual;
     impl->m_modernOrthography = m_modernOrthography;
+    impl->m_grammarProfile = m_grammarProfile;
+    impl->m_quickTelex = m_quickTelex;
     int32_t act = impl->feedBackspace();
     syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_composingFlag);
     return act;
@@ -2241,6 +2301,8 @@ int32_t WindowsNativeEngine::commitWord() {
     impl->m_inputMethod = m_inputMethod;
     impl->m_smartBilingual = m_smartBilingual;
     impl->m_modernOrthography = m_modernOrthography;
+    impl->m_grammarProfile = m_grammarProfile;
+    impl->m_quickTelex = m_quickTelex;
     int32_t act = impl->commitWord();
     syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_composingFlag);
     return act;
@@ -2250,6 +2312,8 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
     if (!contextWord || contextWord[0] == '\0') {
         m_inEnglishContext = false;
         m_inVietnameseContext = false;
+        m_hadVietnameseInSentence = false;
+        m_lastWordWasEnglishAnchor = false;
         m_lastWordWasSexLoanwordHead = false;
         m_precededByTechDelimiter = false;
         m_afterDigit = false;
@@ -2268,7 +2332,9 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
     }
     if (hasNonAscii) {
         m_inVietnameseContext = true;
+        m_hadVietnameseInSentence = true;
         m_inEnglishContext = false;
+        m_lastWordWasEnglishAnchor = false;
         m_lastWordWasSexLoanwordHead = false;
         m_precededByTechDelimiter = false;
         m_prevCollisionDisplayedLen = 0;
@@ -2283,6 +2349,8 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
     temp.feedChar(static_cast<uint32_t>(' '));
     m_inEnglishContext = temp.m_inEnglishContext;
     m_inVietnameseContext = temp.m_inVietnameseContext;
+    m_hadVietnameseInSentence = temp.m_hadVietnameseInSentence;
+    m_lastWordWasEnglishAnchor = temp.m_lastWordWasEnglishAnchor;
     m_lastWordWasSexLoanwordHead = temp.m_lastWordWasSexLoanwordHead;
     m_precededByTechDelimiter = temp.m_precededByTechDelimiter;
     m_prevCollisionDisplayedLen = 0;
@@ -2343,6 +2411,8 @@ void WindowsNativeEngine::syncSurroundingContext(const char *beforeContextUtf8) 
     impl->m_inputMethod = m_inputMethod;
     impl->m_smartBilingual = m_smartBilingual;
     impl->m_modernOrthography = m_modernOrthography;
+    impl->m_grammarProfile = m_grammarProfile;
+    impl->m_quickTelex = m_quickTelex;
     impl->syncSurroundingContext(beforeContextUtf8);
 }
 

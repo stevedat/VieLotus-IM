@@ -1,6 +1,7 @@
 import Foundation
 #if os(macOS)
 import Carbon.HIToolbox
+import AppKit
 #endif
 
 public enum InputSourceHealthState: String, Codable, Equatable, Sendable {
@@ -28,8 +29,35 @@ public struct InputSourceStatus: Codable, Equatable, Sendable {
     public let matchedInputSourceIDs: [String]
     public let activeInputSourceID: String?
     public let activeInputSourceName: String?
+    public let enabledAppleVietnameseNames: [String]
+    public let runningThirdPartyIMEs: [String]
     public let isConflictingAppleVietnameseActive: Bool
     public let state: InputSourceHealthState
+
+    public var hasEnabledAppleVietnameseInputSource: Bool {
+        isConflictingAppleVietnameseActive || !enabledAppleVietnameseNames.isEmpty
+    }
+
+    public var hasRunningThirdPartyIME: Bool {
+        !runningThirdPartyIMEs.isEmpty
+    }
+
+    public var hasAnyInputConflict: Bool {
+        isConflictingAppleVietnameseActive || hasEnabledAppleVietnameseInputSource || hasRunningThirdPartyIME
+    }
+
+    public var conflictWarningText: String? {
+        if !runningThirdPartyIMEs.isEmpty {
+            return "Phát hiện \(runningThirdPartyIMEs.joined(separator: ", ")) đang chạy ngầm — hãy thoát để tránh xung đột phím"
+        }
+        if isConflictingAppleVietnameseActive {
+            return "Chuyển sang Sen Việt trên thanh menu để tránh xung đột"
+        }
+        if !enabledAppleVietnameseNames.isEmpty {
+            return "Bộ gõ Apple (\(enabledAppleVietnameseNames.joined(separator: ", "))) đang bật cùng danh sách — nên tắt bớt"
+        }
+        return nil
+    }
 
     public init(
         bundleID: String = InputSourceStatus.defaultBundleID,
@@ -40,7 +68,9 @@ public struct InputSourceStatus: Codable, Equatable, Sendable {
         isActive: Bool,
         matchedInputSourceIDs: [String],
         activeInputSourceID: String?,
-        activeInputSourceName: String?
+        activeInputSourceName: String?,
+        enabledAppleVietnameseNames: [String] = [],
+        runningThirdPartyIMEs: [String] = []
     ) {
         self.bundleID = bundleID
         self.isInstalledOnDisk = isInstalledOnDisk
@@ -51,6 +81,8 @@ public struct InputSourceStatus: Codable, Equatable, Sendable {
         self.matchedInputSourceIDs = matchedInputSourceIDs
         self.activeInputSourceID = activeInputSourceID
         self.activeInputSourceName = activeInputSourceName
+        self.enabledAppleVietnameseNames = enabledAppleVietnameseNames
+        self.runningThirdPartyIMEs = runningThirdPartyIMEs
 
         let conflict = Self.isAppleBuiltInVietnameseInputSource(id: activeInputSourceID)
         self.isConflictingAppleVietnameseActive = !isActive && conflict
@@ -66,6 +98,30 @@ public struct InputSourceStatus: Codable, Equatable, Sendable {
         guard let lowered = id?.lowercased(), !lowered.isEmpty else { return false }
         return lowered.hasPrefix("com.apple.inputmethod.vietnameseim")
             || lowered.hasPrefix("com.apple.keylayout.vietnamese")
+    }
+
+    /// Known third-party macOS Vietnamese IME bundle identifiers and process names.
+    public static let knownThirdPartyVietnameseIMEs: [(bundlePrefix: String, executableLower: String, displayName: String)] = [
+        ("com.tuyenmai.openkey", "openkey", "OpenKey"),
+        ("com.lamquangminh.evkey", "evkey", "EVKey"),
+        ("com.trankynam.gotiengviet", "gotiengviet", "GoTiengViet"),
+        ("com.vikey.", "vikey", "Vikey"),
+        ("dev.vikey.", "vikey", "Vikey"),
+        ("com.xkey.", "xkey", "XKey"),
+        ("com.macvnkey.", "macvnkey", "MacVNKey")
+    ]
+
+    public static func matchThirdPartyVietnameseIME(bundleID: String?, processName: String?) -> String? {
+        let bLower = bundleID?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        let pLower = processName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        guard !bLower.hasPrefix("org.vielotus.") else { return nil }
+        for entry in knownThirdPartyVietnameseIMEs {
+            if (!bLower.isEmpty && bLower.hasPrefix(entry.bundlePrefix)) ||
+               (!pLower.isEmpty && pLower == entry.executableLower) {
+                return entry.displayName
+            }
+        }
+        return nil
     }
 
     public static func classifyState(
@@ -89,6 +145,12 @@ public struct InputSourceStatus: Codable, Equatable, Sendable {
     public var summaryTitle: String {
         switch state {
         case .active:
+            if !runningThirdPartyIMEs.isEmpty {
+                return "Đang dùng Sen Việt • Cảnh báo \(runningThirdPartyIMEs.joined(separator: ", "))"
+            }
+            if !enabledAppleVietnameseNames.isEmpty {
+                return "Đang dùng Sen Việt • Bộ gõ Apple đang bật"
+            }
             return "Đang dùng Sen Việt"
         case .enabledAppleVietnameseActive:
             let name = activeInputSourceName ?? "Tiếng Việt Apple"
@@ -104,6 +166,9 @@ public struct InputSourceStatus: Codable, Equatable, Sendable {
     }
 
     public var summarySubtitle: String {
+        if let warning = conflictWarningText {
+            return warning
+        }
         switch state {
         case .active:
             return "Fn / 🌐 hoặc Ctrl + Space để chuyển nhanh"
@@ -132,6 +197,11 @@ public struct InputSourceStatus: Codable, Equatable, Sendable {
         }
         if isConflictingAppleVietnameseActive {
             lines.append("  Warning          : Apple built-in Vietnamese IME is active instead of Sen Việt")
+        } else if !enabledAppleVietnameseNames.isEmpty {
+            lines.append("  Warning          : Apple built-in Vietnamese IME is also enabled (\(enabledAppleVietnameseNames.joined(separator: ", ")))")
+        }
+        if !runningThirdPartyIMEs.isEmpty {
+            lines.append("  Warning          : Third-party Vietnamese IME running (\(runningThirdPartyIMEs.joined(separator: ", ")))")
         }
         lines.append("  Health state     : \(state.rawValue) — \(summaryTitle)")
         return lines.joined(separator: "\n")
@@ -173,11 +243,21 @@ public enum InputSourceDoctor {
         var isRegistered = false
         var isEnabled = false
         var matchedIDs: [String] = []
+        var enabledAppleNames: [String] = []
 
         if let rawList = TISCreateInputSourceList(nil, true)?.takeRetainedValue() as? [TISInputSource] {
             for source in rawList {
                 let srcBundleID = stringProperty(source, key: kTISPropertyBundleID)
                 let srcID = stringProperty(source, key: kTISPropertyInputSourceID)
+                let sourceEnabled = boolProperty(source, key: kTISPropertyInputSourceIsEnabled)
+
+                if sourceEnabled && InputSourceStatus.isAppleBuiltInVietnameseInputSource(id: srcID) {
+                    let appleName = stringProperty(source, key: kTISPropertyLocalizedName) ?? srcID ?? "Tiếng Việt Apple"
+                    if !enabledAppleNames.contains(appleName) {
+                        enabledAppleNames.append(appleName)
+                    }
+                }
+
                 let matchesBundle = srcBundleID?.lowercased() == targetLower
                 let matchesID = srcID?.lowercased().hasPrefix(targetLower) == true
                 guard matchesBundle || matchesID else { continue }
@@ -186,7 +266,7 @@ public enum InputSourceDoctor {
                 if let srcID, !matchedIDs.contains(srcID) {
                     matchedIDs.append(srcID)
                 }
-                if boolProperty(source, key: kTISPropertyInputSourceIsEnabled) {
+                if sourceEnabled {
                     isEnabled = true
                 }
             }
@@ -209,6 +289,7 @@ public enum InputSourceDoctor {
         }
 
         matchedIDs.sort()
+        let runningThirdParty = detectRunningThirdPartyIMEs()
         return InputSourceStatus(
             bundleID: bundleID,
             isInstalledOnDisk: foundPath != nil,
@@ -218,8 +299,24 @@ public enum InputSourceDoctor {
             isActive: isActive,
             matchedInputSourceIDs: matchedIDs,
             activeInputSourceID: activeID,
-            activeInputSourceName: activeName
+            activeInputSourceName: activeName,
+            enabledAppleVietnameseNames: enabledAppleNames,
+            runningThirdPartyIMEs: runningThirdParty
         )
+    }
+
+    /// Detects running third-party macOS Vietnamese IME background applications (`OpenKey`, `EVKey`, `GoTiengViet`, `Vikey`, `XKey`, `MacVNKey`).
+    public static func detectRunningThirdPartyIMEs() -> [String] {
+        var found: [String] = []
+        for app in NSWorkspace.shared.runningApplications where !app.isTerminated {
+            if let match = InputSourceStatus.matchThirdPartyVietnameseIME(
+                bundleID: app.bundleIdentifier,
+                processName: app.localizedName ?? app.executableURL?.lastPathComponent
+            ), !found.contains(match) {
+                found.append(match)
+            }
+        }
+        return found.sorted()
     }
 
     private static func stringProperty(_ source: TISInputSource, key: CFString) -> String? {

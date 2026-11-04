@@ -48,7 +48,7 @@ final class VieLotusIMController: IMKInputController {
     private var precededByTechnicalDelimiter: Bool = false
     private var machineTypingDetector = MachineTypingDetector()
     private weak var cachedRawClientObject: AnyObject?
-    private var cachedNativeClientAdapter: NativeIMKClientAdapter?
+    private var cachedWatchdogClientAdapter: WatchdogIMKClientAdapter?
     var monotonicClockNanoseconds: () -> UInt64 = { DispatchTime.now().uptimeNanoseconds }
     var secureInputCheck: () -> Bool = { SecureInputMonitor.shared.isSecureInputActive }
     private static var isBrowserOmniboxSession: Bool = false
@@ -57,17 +57,26 @@ final class VieLotusIMController: IMKInputController {
 
     func resolveTextClient(_ sender: Any?) -> IMKClientProtocol? {
         guard let sender else { return nil }
-        if let protocolClient = sender as? IMKClientProtocol {
-            return protocolClient
-        }
-        guard let rawClient = sender as? IMKTextInput else { return nil }
         let senderObject = sender as AnyObject
-        if let cached = cachedNativeClientAdapter, cachedRawClientObject === senderObject {
+        if let cached = cachedWatchdogClientAdapter, cachedRawClientObject === senderObject {
             return cached
         }
-        let adapter = NativeIMKClientAdapter(rawClient: rawClient, rawSender: senderObject)
+        if let watchdogClient = sender as? WatchdogIMKClientAdapter {
+            cachedRawClientObject = senderObject
+            cachedWatchdogClientAdapter = watchdogClient
+            return watchdogClient
+        }
+        if let protocolClient = sender as? IMKClientProtocol {
+            let adapter = WatchdogIMKClientAdapter(base: protocolClient)
+            cachedRawClientObject = senderObject
+            cachedWatchdogClientAdapter = adapter
+            return adapter
+        }
+        guard let rawClient = sender as? IMKTextInput else { return nil }
+        let native = NativeIMKClientAdapter(rawClient: rawClient, rawSender: senderObject)
+        let adapter = WatchdogIMKClientAdapter(base: native)
         cachedRawClientObject = senderObject
-        cachedNativeClientAdapter = adapter
+        cachedWatchdogClientAdapter = adapter
         return adapter
     }
 
@@ -180,6 +189,9 @@ final class VieLotusIMController: IMKInputController {
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: (inputClient is IMKClientProtocol) ? nil : inputClient)
+        ClientAdapter.reloadPresentationRulesIfChanged()
+        MacroEngine.shared.reloadFromDiskIfChanged()
+        DiagnosticLogger.shared.cleanupLegacyLogFile()
         applyPreferences()
         LabTraceSpool.cleanupStaleTraces()
 
@@ -394,6 +406,13 @@ final class VieLotusIMController: IMKInputController {
         }
 
         let rawSelection = client.selectedRange()
+        if ClientStallBreaker.shared.isDegraded(bundleIdentifier: bundleID) {
+            if engine.isComposing {
+                cancelComposition()
+                rawWord = ""
+            }
+            return false
+        }
         let selection = effectiveSelection(for: rawSelection)
         var detectedDirectReplacementDesync = false
         let hadMidCompositionValidCursor = engine.isComposing && virtualCursorLocation != NSNotFound
@@ -1184,7 +1203,9 @@ final class VieLotusIMController: IMKInputController {
                             .map { $0.trimmingCharacters(in: .punctuationCharacters) }
                             .filter { !$0.isEmpty && $0.contains(where: { $0.isLetter }) }
                         if !words.isEmpty {
-                            session.context = words.suffix(3).joined(separator: " ")
+                            for word in words.suffix(12) {
+                                session.appendContext(word)
+                            }
                         }
                     }
                     if precedingText.last?.isASCII == true,
@@ -1245,6 +1266,7 @@ final class VieLotusIMController: IMKInputController {
                 isEditing = true
                 feedResult = diff
                 editCaretBack = Self.caretDisarmed
+                session.popLastContextWord()
                 if let tx = engine.lastPostCommitEditTransaction {
                     traceLab("postCommitEdit", bundleID: bundleID, key: String(firstChar),
                              detail: "decision=\(tx.decisionKind.rawValue) prior='\(tx.priorRenderedWord)'(\(tx.priorCanonicalRaw))->'\(tx.resultingRenderedWord)'(\(tx.resultingCanonicalRaw)) bs=\(tx.utf16Backspaces) lock=\(tx.isLiteralLockedAfterEdit)",
@@ -1710,6 +1732,13 @@ final class VieLotusIMController: IMKInputController {
         let selectorName = NSStringFromSelector(aSelector)
         let bundleID = ClientAdapter.resolveBundleIdentifier(client.bundleIdentifier())
         let rawSelection = client.selectedRange()
+        if ClientStallBreaker.shared.isDegraded(bundleIdentifier: bundleID) {
+            if engine.isComposing {
+                cancelComposition()
+                rawWord = ""
+            }
+            return false
+        }
         let selection = effectiveSelection(for: rawSelection)
 
         guard Preferences.shared.vietnameseEnabled else { return false }
@@ -2242,6 +2271,7 @@ final class VieLotusIMController: IMKInputController {
                     return false
                 }
                 if let _ = engine.editBackspaceAt(caretBack: editCaretBack) {
+                    session.popLastContextWord()
                     let output = engine.currentOutput()
                     let outLen = (output as NSString).length
                     composingWord = output
@@ -2705,6 +2735,7 @@ final class VieLotusIMController: IMKInputController {
         // rebuild or a relaunch.
         ClientAdapter.reloadPresentationRulesIfChanged()
         MacroEngine.shared.reloadFromDiskIfChanged()
+        LabTraceSpool.refreshActiveSessionFromDisk()
         applyPreferences()
         session.reset()
         session.clearContext()
@@ -2725,6 +2756,7 @@ final class VieLotusIMController: IMKInputController {
         }
         if let client = resolveTextClient(sender) {
             let bundleID = ClientAdapter.resolveBundleIdentifier(client.bundleIdentifier())
+            ClientAdapter.prewarmBundleClassification(bundleIdentifier: bundleID)
             traceLab("activateServer", bundleID: bundleID, detail: "activated")
         }
 
