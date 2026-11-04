@@ -44,6 +44,7 @@ static const WCHAR c_szPrefsInputMethodVal[] = L"InputMethod";
 static const WCHAR c_szPrefsVnEnabledVal[] = L"VietnameseEnabled";
 static const WCHAR c_szPrefsSmartBilingualVal[] = L"SmartBilingual";
 static const WCHAR c_szPrefsModernOrthoVal[] = L"ModernOrthography";
+static const WCHAR c_szPrefsGrammarProfileVal[] = L"GrammarProfile";
 static const WCHAR c_szPrefsMacroEnabledVal[] = L"MacroEnabled";
 static const WCHAR c_szPrefsDeveloperModeVal[] = L"DeveloperMode";
 static const WCHAR c_szPrefsQuickTelexVal[] = L"QuickTelex";
@@ -150,6 +151,9 @@ void LoadVieLotusPrefs(VieLotusWindowsPrefs &outPrefs) {
     if (ReadRegDword(hKey, c_szPrefsModernOrthoVal, dwVal)) {
         outPrefs.modernOrthography = (dwVal != 0);
     }
+    if (ReadRegDword(hKey, c_szPrefsGrammarProfileVal, dwVal)) {
+        outPrefs.senFlex = (dwVal != 0);
+    }
     if (ReadRegDword(hKey, c_szPrefsMacroEnabledVal, dwVal)) {
         outPrefs.macroEnabled = (dwVal != 0);
     }
@@ -175,6 +179,7 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs) {
         WriteRegDword(hKey, c_szPrefsVnEnabledVal, prefs.vietnameseEnabled ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsSmartBilingualVal, prefs.smartBilingual ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsModernOrthoVal, prefs.modernOrthography ? 1u : 0u);
+        WriteRegDword(hKey, c_szPrefsGrammarProfileVal, prefs.senFlex ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsMacroEnabledVal, prefs.macroEnabled ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsDeveloperModeVal, prefs.developerMode ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsQuickTelexVal, prefs.quickTelex ? 1u : 0u);

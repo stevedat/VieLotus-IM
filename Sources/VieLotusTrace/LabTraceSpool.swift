@@ -100,6 +100,9 @@ public enum LabTraceSpool {
     }
 
     public static func cleanupStaleTraces(maxAge: TimeInterval = 3600) {
+        defer {
+            _ = refreshActiveSessionFromDisk()
+        }
         guard FileManager.default.fileExists(atPath: directory.path) else { return }
         if let data = try? Data(contentsOf: activeSessionURL),
            let session = try? JSONDecoder().decode(ActiveSession.self, from: data) {
@@ -124,14 +127,30 @@ public enum LabTraceSpool {
 
     private static let activeSessionLock = NSLock()
     private static var cachedActiveSession: ActiveSession?
-    private static var lastActiveSessionCheckNs: UInt64 = 0
-    private static let activeSessionCacheTTLNs: UInt64 = 1_000_000_000 // 1 second
+    private static var hasLoadedActiveSession: Bool = false
+
+    /// Explicitly reloads the active trace session from disk (called on startup, `activateServer`,
+    /// or `DistributedNotificationCenter` trace start/stop notifications — never on the keystroke path).
+    @discardableResult
+    public static func refreshActiveSessionFromDisk() -> ActiveSession? {
+        let loaded: ActiveSession?
+        if let data = try? Data(contentsOf: activeSessionURL),
+           let session = try? JSONDecoder().decode(ActiveSession.self, from: data),
+           Date().timeIntervalSince(session.startedAt) < 1800 {
+            loaded = session
+        } else {
+            loaded = nil
+        }
+
+        activeSessionLock.lock()
+        cachedActiveSession = loaded
+        hasLoadedActiveSession = true
+        activeSessionLock.unlock()
+        return loaded
+    }
 
     public static func invalidateActiveSessionCache() {
-        activeSessionLock.lock()
-        cachedActiveSession = nil
-        lastActiveSessionCheckNs = 0
-        activeSessionLock.unlock()
+        _ = refreshActiveSessionFromDisk()
     }
 
     public static func activate(traceID: String, targetBundleID: String) throws {
@@ -151,43 +170,36 @@ public enum LabTraceSpool {
         #endif
         activeSessionLock.lock()
         cachedActiveSession = session
-        lastActiveSessionCheckNs = DispatchTime.now().uptimeNanoseconds
+        hasLoadedActiveSession = true
         activeSessionLock.unlock()
     }
 
+    /// Pure in-memory session lookup for the keystroke hot-path once initialized.
+    /// Does not poll the filesystem every second when trace recording is off.
     public static func activeSession() -> ActiveSession? {
-        let nowNs = DispatchTime.now().uptimeNanoseconds
         activeSessionLock.lock()
-        if lastActiveSessionCheckNs > 0 && nowNs >= lastActiveSessionCheckNs && (nowNs - lastActiveSessionCheckNs) < activeSessionCacheTTLNs {
-            let cached = cachedActiveSession
+        if hasLoadedActiveSession {
+            if let session = cachedActiveSession {
+                if Date().timeIntervalSince(session.startedAt) < 1800 {
+                    activeSessionLock.unlock()
+                    return session
+                }
+                cachedActiveSession = nil
+            }
             activeSessionLock.unlock()
-            return cached
+            return nil
         }
         activeSessionLock.unlock()
-
-        let loaded: ActiveSession?
-        if let data = try? Data(contentsOf: activeSessionURL),
-           let session = try? JSONDecoder().decode(ActiveSession.self, from: data),
-           Date().timeIntervalSince(session.startedAt) < 1800 {
-            loaded = session
-        } else {
-            loaded = nil
-        }
-
-        activeSessionLock.lock()
-        cachedActiveSession = loaded
-        lastActiveSessionCheckNs = nowNs
-        activeSessionLock.unlock()
-        return loaded
+        return refreshActiveSessionFromDisk()
     }
 
     public static func deactivate(traceID: String) {
-        invalidateActiveSessionCache()
-        guard activeSession()?.traceID == traceID else { return }
+        let current = refreshActiveSessionFromDisk()
+        guard current?.traceID == traceID else { return }
         try? FileManager.default.removeItem(at: activeSessionURL)
         activeSessionLock.lock()
         cachedActiveSession = nil
-        lastActiveSessionCheckNs = DispatchTime.now().uptimeNanoseconds
+        hasLoadedActiveSession = true
         activeSessionLock.unlock()
     }
 
