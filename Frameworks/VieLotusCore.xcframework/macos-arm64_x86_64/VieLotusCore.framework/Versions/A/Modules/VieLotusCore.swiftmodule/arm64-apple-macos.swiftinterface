@@ -381,6 +381,7 @@ extension Foundation.Bundle {
 public struct ClientAdapter {
   public static func resolveBundleIdentifier(_ bundleIdentifier: Swift.String?) -> Swift.String?
   public static func classify(bundleIdentifier: Swift.String?) -> VieLotusCore.AppCategory
+  public static func prewarmBundleClassification(bundleIdentifier: Swift.String?)
   public static var presentationRules: VieLotusCore.PresentationRuleSet {
     get
   }
@@ -503,6 +504,9 @@ final public class EngineBridge {
     get
   }
   final public func setInputMethod(_ method: VieLotusCore.InputMethodType)
+  final public var grammarProfile: VieLotusCore.GrammarProfile {
+    get
+  }
   final public func setGrammarProfile(_ profile: VieLotusCore.GrammarProfile)
   final public func setModernOrthography(_ enabled: Swift.Bool)
   final public func setRelaxedCoda(_ enabled: Swift.Bool)
@@ -613,6 +617,9 @@ public class InputSessionManager {
     get
   }
   public func setInputMethod(_ method: VieLotusCore.InputMethodType)
+  public var grammarProfile: VieLotusCore.GrammarProfile {
+    get
+  }
   public func setGrammarProfile(_ profile: VieLotusCore.GrammarProfile)
   public func setModernOrthography(_ enabled: Swift.Bool)
   public func setRelaxedCoda(_ enabled: Swift.Bool)
@@ -645,6 +652,7 @@ public class InputSessionManager {
   public var recentWords: [Swift.String]
   public func clearContext()
   public func appendContext(_ word: Swift.String)
+  public func popLastContextWord()
   public func isWordBoundary(_ char: Swift.Character) -> Swift.Bool
   public func handleCharacter(_ char: Swift.Character) -> VieLotusCore.SessionAction
   public func resolvePostFeedCandidate(priorRawWord: Swift.String, priorOnScreenWord: Swift.String, priorProvenance: VieLotusCore.CompositionCandidateProvenance, rawWord: Swift.String, engineOutput: Swift.String, smartBilingualEnabled: Swift.Bool? = nil, forceInlineEvaluation: Swift.Bool = false, genZMode: Swift.Bool? = nil) -> (selectedCandidate: Swift.String, wasLiteralLockedStep: Swift.Bool)
@@ -702,6 +710,7 @@ final public class MacroEngine : @unchecked Swift.Sendable {
   public static func isTechnicalDelimiter(_ char: Swift.Character) -> Swift.Bool
   public static func shouldSuppressMacroExpansion(precededByTechnicalDelimiter: Swift.Bool, boundaryChar: Swift.Character?) -> Swift.Bool
   final public func lookup(word: Swift.String) -> Swift.String?
+  final public func updateSupplementaryShortcuts(_ entries: [(userInput: Swift.String, documentText: Swift.String)])
   final public func setMacro(key: Swift.String, value: Swift.String)
   final public func removeMacro(key: Swift.String)
   final public func getAllMacros() -> [Swift.String : Swift.String]

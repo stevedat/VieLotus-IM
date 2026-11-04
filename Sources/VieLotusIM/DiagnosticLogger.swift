@@ -11,8 +11,10 @@ final class DiagnosticLogger {
     private let logger = Logger(subsystem: "org.vielotus.inputmethod", category: "Engine")
     #endif
 
-    private init() {
-        // Zero-logging posture: Automatically remove legacy log file from older test versions
+    private init() {}
+
+    /// One-time startup cleanup of legacy log files from older test versions (never called on the keystroke path).
+    func cleanupLegacyLogFile() {
         if let libraryDir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first {
             let legacyLog = libraryDir.appendingPathComponent("Logs/VieLotusIM.log")
             if FileManager.default.fileExists(atPath: legacyLog.path) {
@@ -20,7 +22,8 @@ final class DiagnosticLogger {
             }
         }
     }
-    
+
+    @inline(__always)
     func logEvent(_ event: StaticString, app: @autoclosure () -> String? = nil, detail: @autoclosure () -> String = "") {
         #if DEBUG
         let appTag = app() ?? "?"

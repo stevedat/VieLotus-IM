@@ -740,9 +740,8 @@ static gboolean ibus_vielotus_engine_process_key_event(
         return FALSE;
     }
 
-    if (!vielotus_is_composing(vl_engine->session)) {
-        ibus_vielotus_reload_config_if_changed(vl_engine);
-    }
+    // Note: User configuration is reloaded on window focus (`ibus_vielotus_engine_focus_in`) and
+    // engine activation (`ibus_vielotus_engine_enable`), never on the keystroke path.
 
     // Ignore pure modifier presses (Shift, CapsLock) so uppercase letters work mid-word
     if (keyval == IBUS_KEY_Shift_L || keyval == IBUS_KEY_Shift_R ||

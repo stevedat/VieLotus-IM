@@ -1,10 +1,12 @@
 import Cocoa
 import InputMethodKit
+import VieLotusCore
 
 /// Thin 1-to-1 protocol seam over the 7 `IMKTextInput` methods used by `VieLotusIMController`.
 ///
 /// In production, `NativeIMKClientAdapter` forwards directly to the Objective-C `IMKTextInput`
-/// XPC proxy with zero behavioral divergence and zero steady-state allocations (cached per client).
+/// XPC proxy with zero behavioral divergence and zero steady-state allocations (cached per client),
+/// wrapped by `WatchdogIMKClientAdapter` to measure synchronous IPC latency via `ClientStallBreaker`.
 /// In automated tests, a headless `IMKClientProtocol` mock can drive `VieLotusIMController`
 /// directly without launching `IMKServer` or mutating real user documents.
 protocol IMKClientProtocol: AnyObject {
@@ -16,6 +18,91 @@ protocol IMKClientProtocol: AnyObject {
     func insertText(_ string: Any!, replacementRange: NSRange)
     func setMarkedText(_ string: Any!, selectionRange: NSRange, replacementRange: NSRange)
     func overrideKeyboard(withKeyboardNamed keyboardUniqueName: String!)
+}
+
+final class WatchdogIMKClientAdapter: IMKClientProtocol {
+    let base: IMKClientProtocol
+    private var cachedBundleID: String?
+    private var didResolveBundleID = false
+
+    init(base: IMKClientProtocol) {
+        self.base = base
+    }
+
+    var clientIdentityToken: ObjectIdentifier {
+        base.clientIdentityToken
+    }
+
+    private var resolvedBundleID: String? {
+        if !didResolveBundleID {
+            didResolveBundleID = true
+            cachedBundleID = ClientAdapter.resolveBundleIdentifier(base.bundleIdentifier())
+        }
+        return cachedBundleID
+    }
+
+    func bundleIdentifier() -> String! {
+        let raw = base.bundleIdentifier()
+        if !didResolveBundleID {
+            didResolveBundleID = true
+            cachedBundleID = ClientAdapter.resolveBundleIdentifier(raw)
+        }
+        return raw
+    }
+
+    func selectedRange() -> NSRange {
+        ClientStallBreaker.shared.executeWithWatchdog(
+            bundleIdentifier: resolvedBundleID,
+            operation: "selectedRange"
+        ) {
+            base.selectedRange()
+        }
+    }
+
+    func markedRange() -> NSRange {
+        ClientStallBreaker.shared.executeWithWatchdog(
+            bundleIdentifier: resolvedBundleID,
+            operation: "markedRange"
+        ) {
+            base.markedRange()
+        }
+    }
+
+    func attributedSubstring(from range: NSRange) -> NSAttributedString! {
+        ClientStallBreaker.shared.executeWithWatchdog(
+            bundleIdentifier: resolvedBundleID,
+            operation: "attributedSubstring"
+        ) {
+            base.attributedSubstring(from: range)
+        }
+    }
+
+    func insertText(_ string: Any!, replacementRange: NSRange) {
+        ClientStallBreaker.shared.executeWithWatchdog(
+            bundleIdentifier: resolvedBundleID,
+            operation: "insertText"
+        ) {
+            base.insertText(string, replacementRange: replacementRange)
+        }
+    }
+
+    func setMarkedText(_ string: Any!, selectionRange: NSRange, replacementRange: NSRange) {
+        ClientStallBreaker.shared.executeWithWatchdog(
+            bundleIdentifier: resolvedBundleID,
+            operation: "setMarkedText"
+        ) {
+            base.setMarkedText(string, selectionRange: selectionRange, replacementRange: replacementRange)
+        }
+    }
+
+    func overrideKeyboard(withKeyboardNamed keyboardUniqueName: String!) {
+        ClientStallBreaker.shared.executeWithWatchdog(
+            bundleIdentifier: resolvedBundleID,
+            operation: "overrideKeyboard"
+        ) {
+            base.overrideKeyboard(withKeyboardNamed: keyboardUniqueName)
+        }
+    }
 }
 
 final class NativeIMKClientAdapter: IMKClientProtocol {

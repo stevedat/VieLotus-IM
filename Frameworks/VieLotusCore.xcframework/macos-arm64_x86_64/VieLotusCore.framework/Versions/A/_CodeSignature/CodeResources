@@ -6,7 +6,7 @@
 	<dict>
 		<key>Resources/Info.plist</key>
 		<data>
-		1pzzS8gmDH6Hg4DYnbA6pqrJtyM=
+		QCO0dXg9uzuPJ5dcgFiwaB3i3oo=
 		</data>
 		<key>Resources/VietLotusIM_VieLotusCore.bundle/Contents/Info.plist</key>
 		<data>
@@ -23,35 +23,35 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			mKuIowZfI/CGyJ/vFOISolHBkPjU4Y9g3M95zD+HpPI=
+			v1oETGnK0ItPJstYEtkM1xXHgnRtrK4+tt4aQu1Drko=
 			</data>
 		</dict>
 		<key>Modules/VieLotusCore.swiftmodule/arm64-apple-macos.swiftinterface</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			hv5KEbc91w4mN1jcBBDGZZKymOch9sYcrfr+Gv/Gvl0=
+			5GLA/F8jLVq4mdG5+RVoSdcZnB2LhL0V6KJfn3iyLhs=
 			</data>
 		</dict>
 		<key>Modules/VieLotusCore.swiftmodule/x86_64-apple-macos.swiftdoc</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			s1uS3jWcnkUFHMKp3cKDjua8ZH72u3EF59OPXIezCak=
+			FVt4dQNEfk98I1092WIze6Gv7i2fgv96gofPzsWdkAk=
 			</data>
 		</dict>
 		<key>Modules/VieLotusCore.swiftmodule/x86_64-apple-macos.swiftinterface</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			5XUcDkyYarjvMctwRdrXpUMTWZFWm36VQyPdRn8BTa4=
+			pC4RaEFaxn9f/Je8ehh09+I834Zb0tl8yKdF5cZX33w=
 			</data>
 		</dict>
 		<key>Resources/Info.plist</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			KBFudkCz7WpKfbeRX45DhSDxV231O0MbPaUTxQr5txU=
+			AhL3Nama2UoFMgNVn1vOw2nS3Lnm09379UfjZHkcyGo=
 			</data>
 		</dict>
 		<key>Resources/VietLotusIM_VieLotusCore.bundle/Contents/Info.plist</key>

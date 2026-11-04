@@ -189,6 +189,50 @@ struct SettingsView: View {
                             icon: "number.square.fill"
                         )
                     }
+
+                    // Single clean toggle for Pre-Vowel Tone (Flex)
+                    HStack(spacing: 10) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(prefs.grammarProfile == .senFlex ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12))
+                                .frame(width: 26, height: 26)
+                            Image(systemName: "wand.and.rays")
+                                .font(.system(size: 12.5, weight: .semibold))
+                                .foregroundColor(prefs.grammarProfile == .senFlex ? .accentColor : .secondary)
+                        }
+                        VStack(alignment: .leading, spacing: 1.5) {
+                            Text("Gõ dấu trước nguyên âm (rrung rrinh → rủng rỉnh)")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Mở để gõ dấu tự do ngay sau phụ âm đầu • Khuyên tắt nếu thường gõ lệnh Terminal / code")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 6)
+                        Toggle(
+                            "",
+                            isOn: Binding(
+                                get: { prefs.grammarProfile == .senFlex },
+                                set: { prefs.grammarProfile = $0 ? .senFlex : .classic }
+                            )
+                        )
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                    }
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(nsColor: .controlBackgroundColor))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(
+                                prefs.grammarProfile == .senFlex ? Color.accentColor.opacity(0.35) : Color.primary.opacity(0.08),
+                                lineWidth: 1.0
+                            )
+                    )
                 }
 
                 // 2. Bento Grid 2x2: Tiện ích & Chế độ thông minh
@@ -431,6 +475,9 @@ struct SettingsView: View {
     }
 
     private var tisStatusColor: Color {
+        if tisStatus.hasAnyInputConflict {
+            return .orange
+        }
         switch tisStatus.state {
         case .active:
             return .green
@@ -444,6 +491,9 @@ struct SettingsView: View {
     }
 
     private var tisStatusIcon: String {
+        if tisStatus.hasAnyInputConflict {
+            return "exclamationmark.triangle.fill"
+        }
         switch tisStatus.state {
         case .active:
             return "checkmark.seal.fill"
@@ -458,6 +508,9 @@ struct SettingsView: View {
 
     private var bentoSystemShortcutCard: some View {
         let borderColor: Color = {
+            if tisStatus.hasAnyInputConflict {
+                return Color.orange.opacity(0.55)
+            }
             switch tisStatus.state {
             case .active:
                 return Color.green.opacity(0.42)
@@ -493,7 +546,7 @@ struct SettingsView: View {
 
             Text(tisStatus.summarySubtitle)
                 .font(.system(size: 10.5))
-                .foregroundColor(tisStatus.isConflictingAppleVietnameseActive ? .orange : .secondary)
+                .foregroundColor(tisStatus.hasAnyInputConflict ? .orange : .secondary)
                 .lineLimit(1)
         }
         .padding(11)
