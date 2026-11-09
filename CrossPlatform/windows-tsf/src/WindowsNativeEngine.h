@@ -50,6 +50,8 @@ public:
 
     int32_t getLastBackspaces() const { return m_lastBackspaces; }
     const char *getLastTextUtf8() const { return m_lastTextUtf8; }
+    int32_t getLastCommitDiffBackspaces() const { return m_lastCommitDiffBackspaces; }
+    const char *getLastCommitDiffTextUtf8() const { return m_lastCommitDiffTextUtf8; }
     bool isComposing() const { return m_composingFlag; }
 
 private:
@@ -61,7 +63,9 @@ private:
     bool m_composingFlag{false};
     int32_t m_lastBackspaces{0};
     char m_lastTextUtf8[kMaxUtf8Bytes]{};
-    alignas(8) uint8_t m_opaqueState[4096]{};
+    int32_t m_lastCommitDiffBackspaces{0};
+    char m_lastCommitDiffTextUtf8[kMaxUtf8Bytes]{};
+    alignas(8) uint8_t m_opaqueState[4608]{};
 };
 
 } // namespace vielotus_win

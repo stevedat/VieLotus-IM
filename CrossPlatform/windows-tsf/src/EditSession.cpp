@@ -1,5 +1,21 @@
 #include "EditSession.h"
 
+namespace {
+
+bool IsWin32EditOrRichEditHwnd(HWND hwnd) {
+    if (!hwnd || !IsWindow(hwnd)) return false;
+    WCHAR clsName[64] = {0};
+    if (GetClassNameW(hwnd, clsName, 64) <= 0) return false;
+    for (WCHAR *p = clsName; *p; ++p) {
+        if (*p >= L'A' && *p <= L'Z') {
+            *p = static_cast<WCHAR>(*p + (L'a' - L'A'));
+        }
+    }
+    return wcsstr(clsName, L"edit") != nullptr;
+}
+
+} // namespace
+
 CEditSession::CEditSession(
     ITfContext *pContext,
     int32_t backspaces,
@@ -72,17 +88,59 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
     pRange->IsEmpty(ec, &fWasEmpty);
 
     // If backspaces > 0, expand range backwards
+    LONG cchShifted = 0;
     if (m_backspaces > 0) {
-        LONG cchShifted = 0;
         pRange->ShiftStart(ec, -m_backspaces, &cchShifted, nullptr);
     }
 
-    // Set new text (replaces the selected range)
-    if (!m_insertText.empty()) {
-        pRange->SetText(ec, 0, m_insertText.c_str(), static_cast<LONG>(m_insertText.length()));
-    } else if (m_backspaces > 0 || !fWasEmpty) {
-        // Pure backspace or active selection delete
-        pRange->SetText(ec, 0, L"", 0);
+    const int32_t actualShifted = (cchShifted < 0) ? static_cast<int32_t>(-cchShifted) : 0;
+    const int32_t missingBs = (m_backspaces > actualShifted) ? (m_backspaces - actualShifted) : 0;
+    bool handledByWin32Edit = false;
+
+    if (missingBs > 0) {
+        if (actualShifted > 0) {
+            pRange->SetText(ec, 0, L"", 0);
+        }
+        HWND hFocus = GetFocus();
+        if (IsWin32EditOrRichEditHwnd(hFocus)) {
+            DWORD dwStart = 0, dwEnd = 0;
+            SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+            if (dwStart >= static_cast<DWORD>(missingBs)) {
+                SendMessageW(
+                    hFocus,
+                    EM_SETSEL,
+                    static_cast<WPARAM>(dwStart - static_cast<DWORD>(missingBs)),
+                    static_cast<LPARAM>(dwEnd)
+                );
+                SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(m_insertText.c_str()));
+                handledByWin32Edit = true;
+            }
+        }
+        if (!handledByWin32Edit && hFocus && IsWindow(hFocus)) {
+            for (int32_t i = 0; i < missingBs; ++i) {
+                SendMessageW(hFocus, WM_CHAR, VK_BACK, 1);
+            }
+        }
+    } else if (fWasEmpty) {
+        HWND hFocus = GetFocus();
+        if (IsWin32EditOrRichEditHwnd(hFocus)) {
+            DWORD dwStart = 0, dwEnd = 0;
+            SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+            if (dwStart < dwEnd) {
+                SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(m_insertText.c_str()));
+                handledByWin32Edit = true;
+            }
+        }
+    }
+
+    // Set new text (replaces the selected range) when not already replaced via EM_REPLACESEL
+    if (!handledByWin32Edit) {
+        if (!m_insertText.empty()) {
+            pRange->SetText(ec, 0, m_insertText.c_str(), static_cast<LONG>(m_insertText.length()));
+        } else if (m_backspaces > 0 || !fWasEmpty) {
+            // Pure backspace or active selection delete
+            pRange->SetText(ec, 0, L"", 0);
+        }
     }
 
     // Move caret to end of modified text
@@ -95,7 +153,9 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
 
     sel.style.ase = TF_AE_NONE;
     sel.style.fInterimChar = FALSE;
-    m_pContext->SetSelection(ec, 1, &sel);
+    if (!handledByWin32Edit) {
+        m_pContext->SetSelection(ec, 1, &sel);
+    }
 
     pRange->Release();
     return S_OK;

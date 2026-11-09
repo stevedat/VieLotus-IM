@@ -68,6 +68,7 @@ private:
     bool m_hasManualProcessOverride{false};
     bool m_manualProcessVietnameseMode{true};
     bool m_suppressNextOnsetAdoption{false};
+    uint32_t m_lastPrefsRevision{0};
     std::wstring m_currentExeName{};
 
     void InitSession();
@@ -94,5 +95,7 @@ private:
     int32_t CommitWordSession();
     int32_t GetLastBackspacesSession() const;
     const char *GetLastTextSession() const;
+    int32_t GetLastCommitDiffBackspacesSession() const;
+    const char *GetLastCommitDiffTextSession() const;
     void ExecuteEditSession(ITfContext *pic, int32_t backspaces, const std::wstring &text, bool bCommit);
 };

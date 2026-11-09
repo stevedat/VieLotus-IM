@@ -413,6 +413,28 @@ public:
             m_caretMovedFromLastEdit = m_hasSelection;
         }
 
+        if (!m_hasSelection) {
+            HWND hFocusSel = GetFocus();
+            if (hFocusSel && IsWindow(hFocusSel)) {
+                WCHAR clsNameSel[64] = {0};
+                if (GetClassNameW(hFocusSel, clsNameSel, 64) > 0) {
+                    for (WCHAR *p = clsNameSel; *p; ++p) {
+                        if (*p >= L'A' && *p <= L'Z') {
+                            *p = static_cast<WCHAR>(*p + (L'a' - L'A'));
+                        }
+                    }
+                    if (wcsstr(clsNameSel, L"edit") != nullptr) {
+                        DWORD dwStart = 0, dwEnd = 0;
+                        SendMessageW(hFocusSel, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+                        if (dwStart < dwEnd) {
+                            m_hasSelection = true;
+                            m_caretMovedFromLastEdit = true;
+                        }
+                    }
+                }
+            }
+        }
+
         if (m_readSurroundingText) {
             ITfRange *pBefore = nullptr;
             if (SUCCEEDED(sel.range->Clone(&pBefore)) && pBefore) {
@@ -429,7 +451,40 @@ public:
                 pBefore->Release();
             }
 
-            if (!m_hasSelection && !m_precedingText.empty() && IsAsciiAlphaWide(m_precedingText.back())) {
+            if (m_precedingText.empty()) {
+                HWND hFocus = GetFocus();
+                if (hFocus && IsWindow(hFocus)) {
+                    WCHAR clsName[64] = {0};
+                    if (GetClassNameW(hFocus, clsName, 64) > 0) {
+                        for (WCHAR *p = clsName; *p; ++p) {
+                            if (*p >= L'A' && *p <= L'Z') {
+                                *p = static_cast<WCHAR>(*p + (L'a' - L'A'));
+                            }
+                        }
+                        if (wcsstr(clsName, L"edit") != nullptr) {
+                            DWORD dwStart = 0, dwEnd = 0;
+                            SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+                            if (dwStart < dwEnd) {
+                                m_hasSelection = true;
+                                m_caretMovedFromLastEdit = true;
+                            }
+                            if (dwStart > 0 && dwStart <= 4096) {
+                                WCHAR textBuf[4100] = {0};
+                                int copied = GetWindowTextW(hFocus, textBuf, 4098);
+                                if (copied > 0 && static_cast<DWORD>(copied) >= dwStart) {
+                                    DWORD sliceStart = (dwStart > 8) ? (dwStart - 8) : 0;
+                                    m_precedingText.assign(textBuf + sliceStart, dwStart - sliceStart);
+                                    if (!m_hasSelection && dwEnd < static_cast<DWORD>(copied)) {
+                                        m_charAfterCaret = textBuf[dwEnd];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!m_hasSelection && !m_precedingText.empty() && IsAsciiAlphaWide(m_precedingText.back()) && m_charAfterCaret == 0) {
                 ITfRange *pAfter = nullptr;
                 if (SUCCEEDED(sel.range->Clone(&pAfter)) && pAfter) {
                     pAfter->Collapse(ec, TF_ANCHOR_END);
@@ -545,6 +600,7 @@ void CVieLotusTIP::ApplyVniMode(bool isVni, bool persistToRegistry) {
 }
 
 void CVieLotusTIP::ReloadUserPreferences() {
+    m_lastPrefsRevision = GetLocalPrefsRevision();
     VieLotusWindowsPrefs prefs{};
     LoadVieLotusPrefs(prefs);
     m_isVniMode = prefs.isVni;
@@ -823,6 +879,30 @@ const char *CVieLotusTIP::GetLastTextSession() const {
 #endif
 }
 
+int32_t CVieLotusTIP::GetLastCommitDiffBackspacesSession() const {
+    const auto &api = GetCApi();
+    if (m_session && api.isValid) {
+        return api.get_last_backspaces(m_session);
+    }
+#if defined(VIELOTUS_EMBEDDED_ENGINE)
+    return m_nativeEngine.getLastCommitDiffBackspaces();
+#else
+    return 0;
+#endif
+}
+
+const char *CVieLotusTIP::GetLastCommitDiffTextSession() const {
+    const auto &api = GetCApi();
+    if (m_session && api.isValid) {
+        return api.get_last_text(m_session);
+    }
+#if defined(VIELOTUS_EMBEDDED_ENGINE)
+    return m_nativeEngine.getLastCommitDiffTextUtf8();
+#else
+    return "";
+#endif
+}
+
 void CVieLotusTIP::ExecuteEditSession(ITfContext *pic, int32_t backspaces, const std::wstring &text, bool bCommit) {
     if (!pic) return;
     CEditSession *pEdit = new (std::nothrow) CEditSession(pic, backspaces, text, bCommit);
@@ -1084,6 +1164,11 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
 
     if (!m_isVietnameseMode) return S_OK;
 
+    if (GetLocalPrefsRevision() != m_lastPrefsRevision) {
+        ReloadUserPreferences();
+        if (!m_isVietnameseMode) return S_OK;
+    }
+
     if (IsBareModifierOrToggleKey(wParam)) {
         return S_OK;
     }
@@ -1163,7 +1248,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
             if (IsComposingSession() && queryOk && (hasSel || (m_pLastEditEndRange != nullptr && caretMoved))) {
                 ClearWordStateSession();
             }
-            if (!IsComposingSession() && isAsciiLetter && queryOk && !precedingText.empty()) {
+            if (!IsComposingSession() && (m_pLastEditEndRange == nullptr || caretMoved) && isAsciiLetter && queryOk && !precedingText.empty()) {
                 SyncSurroundingContextSession(precedingText);
             }
             if (!IsComposingSession() && isAsciiLetter && !suppressAdoption && queryOk) {
@@ -1181,8 +1266,8 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
         int32_t action = FeedCharSession(codePoint);
 
         if (action == VIELOTUS_ACTION_COMMIT) {
-            const char *committed = GetLastTextSession();
-            int32_t bs = GetLastBackspacesSession();
+            const char *committed = GetLastCommitDiffTextSession();
+            int32_t bs = GetLastCommitDiffBackspacesSession();
             std::wstring wCommitted = Utf8ToWide(committed);
             wCommitted += chBuf[0]; // Append boundary key
             ExecuteEditSession(pic, bs, wCommitted, true);
