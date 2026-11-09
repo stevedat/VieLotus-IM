@@ -6,7 +6,7 @@
 param (
     [string]$Configuration = "Release",
     [string]$Version = "2.0.2",
-    [string]$MsixVersion = "2.0.2.0",
+    [string]$MsixVersion = "2.0.3.0",
     [ValidateSet("x64", "arm64", "all")]
     [string]$Arch = "all",
     [switch]$SkipTests = $false
