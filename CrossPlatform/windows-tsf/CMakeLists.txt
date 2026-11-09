@@ -104,6 +104,7 @@ set_target_properties(VieLotusTIP PROPERTIES
 add_executable(VieLotusSettings WIN32
     src/SettingsMain.cpp
     VieLotusSettings.rc
+    VieLotusSettings.manifest
 )
 
 target_link_libraries(VieLotusSettings PRIVATE

@@ -7,7 +7,7 @@ struct VieLotusWindowsPrefs {
     bool vietnameseEnabled{true};
     bool smartBilingual{true};
     bool modernOrthography{true};
-    bool senFlex{false};
+    bool senFlex{true};
     bool macroEnabled{true};
     bool developerMode{false};
     bool quickTelex{false};
@@ -32,6 +32,7 @@ void LoadVieLotusPrefs(VieLotusWindowsPrefs &outPrefs);
 void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs);
 bool LoadPerAppBypassPreference(const wchar_t *exeName, bool &outBypass);
 void SavePerAppBypassPreference(const wchar_t *exeName, bool bypass);
+uint32_t GetLocalPrefsRevision();
 
 // Native Win32 Settings Dialog ("Cài đặt Sen Việt")
 void ShowVieLotusSettingsDialog(HWND hwndParent);

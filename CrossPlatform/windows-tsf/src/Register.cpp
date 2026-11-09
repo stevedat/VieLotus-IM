@@ -44,7 +44,7 @@ static const WCHAR c_szPrefsInputMethodVal[] = L"InputMethod";
 static const WCHAR c_szPrefsVnEnabledVal[] = L"VietnameseEnabled";
 static const WCHAR c_szPrefsSmartBilingualVal[] = L"SmartBilingual";
 static const WCHAR c_szPrefsModernOrthoVal[] = L"ModernOrthography";
-static const WCHAR c_szPrefsGrammarProfileVal[] = L"GrammarProfile";
+static const WCHAR c_szPrefsGrammarProfileVal[] = L"SenFlexProfile";
 static const WCHAR c_szPrefsMacroEnabledVal[] = L"MacroEnabled";
 static const WCHAR c_szPrefsDeveloperModeVal[] = L"DeveloperMode";
 static const WCHAR c_szPrefsQuickTelexVal[] = L"QuickTelex";
@@ -172,6 +172,12 @@ void LoadVieLotusPrefs(VieLotusWindowsPrefs &outPrefs) {
     RegCloseKey(hKey);
 }
 
+static std::atomic<uint32_t> g_localPrefsRevision{1};
+
+uint32_t GetLocalPrefsRevision() {
+    return g_localPrefsRevision.load(std::memory_order_relaxed);
+}
+
 void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs) {
     HKEY hKey = nullptr;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, c_szPrefsSubKey, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
@@ -188,6 +194,7 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs) {
         WriteRegDword(hKey, c_szPrefsUpdatedBySettingsVal, 1u);
         RegCloseKey(hKey);
     }
+    g_localPrefsRevision.fetch_add(1, std::memory_order_relaxed);
 }
 
 bool LoadPerAppBypassPreference(const wchar_t *exeName, bool &outBypass) {
@@ -212,6 +219,7 @@ void SavePerAppBypassPreference(const wchar_t *exeName, bool bypass) {
         WriteRegDword(hKey, exeName, bypass ? 1u : 0u);
         RegCloseKey(hKey);
     }
+    g_localPrefsRevision.fetch_add(1, std::memory_order_relaxed);
 }
 
 HRESULT RegisterServer() {
