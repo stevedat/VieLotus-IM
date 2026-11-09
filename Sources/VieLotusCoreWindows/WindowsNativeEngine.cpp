@@ -10,6 +10,7 @@
 // =============================================================================
 
 #include "WindowsNativeEngine.h"
+#include <cwchar>
 
 namespace vielotus_win {
 
@@ -123,6 +124,16 @@ bool isUnconditionalEnglishWord(const wchar_t *rawLower, int rawLen) {
 bool isContextEnglishCollisionWord(const wchar_t *rawLower, int rawLen) {
     if (rawLen <= 0) return false;
     return hasSortedHash(kContextEnglishCollisionWords, fnv1aHash(rawLower, rawLen));
+}
+
+bool isMathFunctionAnchor(const wchar_t *word, int len) {
+    static const wchar_t *const anchors[] = {
+        L"sin", L"cos", L"tan", L"cot", L"sine", L"cosine", L"tangent", L"trig", L"trigonometry"
+    };
+    for (const auto *anchor : anchors) {
+        if (static_cast<int>(std::wcslen(anchor)) == len && std::wmemcmp(word, anchor, len) == 0) return true;
+    }
+    return false;
 }
 
 bool isEnglishContextAnchor(const wchar_t *rawLower, int rawLen) {
@@ -319,6 +330,7 @@ struct NativeEngineState {
     bool m_inVietnameseContext{false};
     bool m_hadVietnameseInSentence{false};
     bool m_lastWordWasEnglishAnchor{false};
+    int m_mathContextWordsRemaining{0};
     bool m_lastWordWasSexLoanwordHead{false};
     bool m_precededByTechDelimiter{false};
     bool m_afterDigit{false};
@@ -836,6 +848,11 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
     wchar_t rawLower[kMaxWordTokens]{};
     for (int i = 0; i < m_rawLen; ++i) {
         rawLower[i] = toLowerAscii(m_rawWord[i]);
+    }
+
+    if (m_rawLen == 3 && m_rawWord[0] == L'c' && m_rawWord[1] == L'o' && m_rawWord[2] == L's') {
+        return m_mathContextWordsRemaining > 0 || m_precededByTechDelimiter ||
+               m_pendingBoundaryCp == '(' || m_pendingBoundaryCp == '[';
     }
 
     if (m_nonAdjacentCircumflex && isPostCodaCircumflexEnglishWord(rawLower, m_rawLen)) {
@@ -1695,6 +1712,7 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
                 m_inVietnameseContext = false;
                 m_hadVietnameseInSentence = false;
                 m_lastWordWasEnglishAnchor = false;
+        m_mathContextWordsRemaining = 0;
             }
             return act;
         }
@@ -1711,6 +1729,7 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
             m_inVietnameseContext = false;
             m_hadVietnameseInSentence = false;
             m_lastWordWasEnglishAnchor = false;
+        m_mathContextWordsRemaining = 0;
         }
         m_lastBackspaces = 0;
         m_lastTextUtf8[0] = '\0';
@@ -2153,6 +2172,16 @@ int32_t NativeEngineState::commitWord() {
     bool isTurnOrSex = (m_rawLen == 4 && rawLower[0] == L't' && rawLower[1] == L'u' && rawLower[2] == L'r' && rawLower[3] == L'n') ||
                        (m_rawLen == 3 && rawLower[0] == L's' && rawLower[1] == L'e' && rawLower[2] == L'x');
     const bool isAnchor = isEnglishContextAnchor(rawLower, m_rawLen);
+    if (!hasNonAscii && isMathFunctionAnchor(rawLower, m_rawLen)) m_mathContextWordsRemaining = 4;
+    else if (hasNonAscii) m_mathContextWordsRemaining = 0;
+    else if (m_mathContextWordsRemaining > 0) {
+        const bool joiner = (m_rawLen == 3 && std::wmemcmp(rawLower, L"and", 3) == 0) ||
+                            (m_rawLen == 2 && std::wmemcmp(rawLower, L"or", 2) == 0) ||
+                            (m_rawLen == 4 && std::wmemcmp(rawLower, L"plus", 4) == 0) ||
+                            (m_rawLen == 5 && std::wmemcmp(rawLower, L"minus", 5) == 0);
+        if (joiner) --m_mathContextWordsRemaining;
+        else m_mathContextWordsRemaining = 0;
+    }
     m_lastWordWasEnglishAnchor = isAnchor;
     m_lastWordWasSexLoanwordHead = isSexLoanwordPrecedingHead(finalLower, finalLen) || isSexLoanwordPrecedingHead(rawLower, m_rawLen);
     if (hasNonAscii || isVietnameseContextReset(finalLower, finalLen)) {
@@ -2240,6 +2269,7 @@ void WindowsNativeEngine::reset() {
     impl->m_inVietnameseContext = false;
     impl->m_hadVietnameseInSentence = false;
     impl->m_lastWordWasEnglishAnchor = false;
+    impl->m_mathContextWordsRemaining = 0;
     impl->m_lastWordWasSexLoanwordHead = false;
     impl->m_precededByTechDelimiter = false;
     impl->m_afterDigit = false;
@@ -2314,6 +2344,7 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
         m_inVietnameseContext = false;
         m_hadVietnameseInSentence = false;
         m_lastWordWasEnglishAnchor = false;
+        m_mathContextWordsRemaining = 0;
         m_lastWordWasSexLoanwordHead = false;
         m_precededByTechDelimiter = false;
         m_afterDigit = false;
@@ -2335,6 +2366,7 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
         m_hadVietnameseInSentence = true;
         m_inEnglishContext = false;
         m_lastWordWasEnglishAnchor = false;
+        m_mathContextWordsRemaining = 0;
         m_lastWordWasSexLoanwordHead = false;
         m_precededByTechDelimiter = false;
         m_prevCollisionDisplayedLen = 0;
@@ -2351,6 +2383,7 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
     m_inVietnameseContext = temp.m_inVietnameseContext;
     m_hadVietnameseInSentence = temp.m_hadVietnameseInSentence;
     m_lastWordWasEnglishAnchor = temp.m_lastWordWasEnglishAnchor;
+    m_mathContextWordsRemaining = temp.m_mathContextWordsRemaining;
     m_lastWordWasSexLoanwordHead = temp.m_lastWordWasSexLoanwordHead;
     m_precededByTechDelimiter = temp.m_precededByTechDelimiter;
     m_prevCollisionDisplayedLen = 0;
