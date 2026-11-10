@@ -116,19 +116,30 @@ Filename: "{sys}\rundll32.exe"; Parameters: """{app}\VieLotusTIP.dll"",Deactivat
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   DllPath, OldDllPath: String;
-  ResultCode: Integer;
+  ResultCode, I: Integer;
 begin
   if CurStep = ssInstall then
   begin
     DllPath := ExpandConstant('{app}\VieLotusTIP.dll');
-    OldDllPath := ExpandConstant('{app}\VieLotusTIP.old.dll');
+    DeleteFile(ExpandConstant('{app}\VieLotusTIP.old.dll'));
+    for I := 1 to 99 do
+    begin
+      DeleteFile(ExpandConstant('{app}\VieLotusTIP.old.') + IntToStr(I) + '.dll');
+    end;
     if FileExists(DllPath) then
     begin
       Exec(ExpandConstant('{sys}\rundll32.exe'), '"' + DllPath + '",DeactivateUserProfilesW', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-      DeleteFile(OldDllPath);
       if not DeleteFile(DllPath) then
       begin
-        RenameFile(DllPath, OldDllPath);
+        for I := 1 to 99 do
+        begin
+          OldDllPath := ExpandConstant('{app}\VieLotusTIP.old.') + IntToStr(I) + '.dll';
+          DeleteFile(OldDllPath);
+          if RenameFile(DllPath, OldDllPath) then
+          begin
+            Break;
+          end;
+        end;
       end;
       Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM TextInputHost.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end;

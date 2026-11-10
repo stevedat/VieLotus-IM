@@ -10,6 +10,9 @@ EXPORTS
     ShowSettingsDialogW
     vielotus_create_session
     vielotus_destroy_session
+    vielotus_set_input_method
     vielotus_feed_char
+    vielotus_feed_backspace
     vielotus_get_last_backspaces
     vielotus_get_last_text
+    vielotus_get_build_stamp

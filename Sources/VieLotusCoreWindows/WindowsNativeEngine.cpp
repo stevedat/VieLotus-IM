@@ -3283,3 +3283,7 @@ VIELOTUS_CAPI_EXPORT void vielotus_sync_armed_word(void *session, const char *be
 VIELOTUS_CAPI_EXPORT const char *vielotus_get_version(void) {
     return "2.0.2";
 }
+
+VIELOTUS_CAPI_EXPORT const char *vielotus_get_build_stamp(void) {
+    return "2.0.2-r3 (PureTSF+CUAS+LabTrace)";
+}
