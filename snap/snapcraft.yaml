@@ -1,6 +1,6 @@
 name: vielotus
 base: core24
-version: '2.0.0'
+version: '2.0.2'
 title: Sen Việt (VieLotusIM)
 summary: Sen Việt (VieLotusIM) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
 description: |
@@ -71,18 +71,39 @@ parts:
   vielotus:
     plugin: dump
     source: .
+    build-packages:
+      - binutils
+      - xz-utils
     stage-packages:
-      - libibus-1.0-5t64
+      - libibus-1.0-5
       - libglib2.0-0t64
       - zenity
     override-build: |
-      DEB_FILE="$CRAFT_PART_SRC/dist/linux/vielotus_${CRAFT_PROJECT_VERSION}_${CRAFT_ARCH_BUILD_FOR}.deb"
-      if [ -f "$DEB_FILE" ]; then
+      DEB_FILE=""
+      for candidate in \
+        "$CRAFT_PART_SRC/Binaries/linux/vielotus_${CRAFT_PROJECT_VERSION}_${CRAFT_ARCH_BUILD_FOR}.deb" \
+        "$CRAFT_PART_SRC/dist/linux/vielotus_${CRAFT_PROJECT_VERSION}_${CRAFT_ARCH_BUILD_FOR}.deb" \
+        "$CRAFT_PART_SRC/Binaries/linux/"vielotus_*_"${CRAFT_ARCH_BUILD_FOR}.deb" \
+        "$CRAFT_PART_SRC/dist/linux/"vielotus_*_"${CRAFT_ARCH_BUILD_FOR}.deb"; do
+        if [ -f "$candidate" ]; then
+          DEB_FILE="$candidate"
+          break
+        fi
+      done
+      if [ -n "$DEB_FILE" ] && [ -f "$DEB_FILE" ]; then
+        echo "Extracting prebuilt deb: $DEB_FILE"
         ar p "$DEB_FILE" data.tar.xz | tar -xJf - -C "$CRAFT_PART_INSTALL"
+        rm -rf "$CRAFT_PART_INSTALL/etc"
       else
-        echo "Missing prebuilt deb: $DEB_FILE"
+        echo "Missing prebuilt deb for arch ${CRAFT_ARCH_BUILD_FOR}"
         exit 1
       fi
+      if [ -f "$CRAFT_PART_INSTALL/usr/share/applications/vielotus.desktop" ]; then
+        sed -i 's|^Icon=.*|Icon=/usr/share/icons/hicolor/512x512/apps/vielotus.png|' \
+          "$CRAFT_PART_INSTALL/usr/share/applications/vielotus.desktop"
+      fi
+      rm -f "$CRAFT_PART_INSTALL/usr/share/applications/ibus-setup-vielotus.desktop" \
+            "$CRAFT_PART_INSTALL/usr/share/applications/ibus-setup-vielotus-vni.desktop"
       cat << 'EOF' > "$CRAFT_PART_INSTALL/usr/bin/vielotus-snap-runner"
       #!/bin/sh
       set -e
