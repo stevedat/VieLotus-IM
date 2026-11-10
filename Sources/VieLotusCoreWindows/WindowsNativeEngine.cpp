@@ -217,11 +217,32 @@ bool isDefaultNoContextShortEnglishWord(const wchar_t *rawLower, int rawLen) {
     return false;
 }
 
-bool isAllCapsShortEnglishAbbreviation(const wchar_t *rawWord, const wchar_t *rawLower, int rawLen, int tone) {
-    if (tone == 0 || rawLen < 2 || rawLen > 3) return false;
+bool prefersEnglishByOrthographicCase(
+    const wchar_t *rawWord,
+    const wchar_t *rawLower,
+    int rawLen,
+    int tone,
+    bool isEscape
+) {
+    if (rawLen < 2) return false;
+    bool allCaps = true;
+    bool seenLower = false;
+    bool hasInternalUpperAfterLower = false;
     for (int i = 0; i < rawLen; ++i) {
-        if (!(rawWord[i] >= L'A' && rawWord[i] <= L'Z')) return false;
+        const bool isUpper = (rawWord[i] >= L'A' && rawWord[i] <= L'Z');
+        const bool isLower = (rawWord[i] >= L'a' && rawWord[i] <= L'z');
+        if (!isUpper) allCaps = false;
+        if (isLower) seenLower = true;
+        if (seenLower && isUpper) hasInternalUpperAfterLower = true;
     }
+    if (!isEscape && hasInternalUpperAfterLower) {
+        if (isContextEnglishCollisionWord(rawLower, rawLen) ||
+            isUnconditionalEnglishWord(rawLower, rawLen) ||
+            (rawLen >= 3 && rawLower[rawLen - 2] == L'o' && rawLower[rawLen - 1] == L's')) {
+            return true;
+        }
+    }
+    if (!allCaps || tone == 0 || rawLen > 3) return false;
     if (rawLen == 2) {
         return (rawLower[0] == L'o' && rawLower[1] == L's') || // OS
                (rawLower[0] == L'i' && rawLower[1] == L'r') || // IR
@@ -941,11 +962,21 @@ bool isSpacePrefixStarter(const wchar_t *lower, int len) {
         return std::wmemcmp(lower, L"his", 3) == 0 ||
                std::wmemcmp(lower, L"her", 3) == 0 ||
                std::wmemcmp(lower, L"was", 3) == 0 ||
+               std::wmemcmp(lower, L"has", 3) == 0 ||
                std::wmemcmp(lower, L"car", 3) == 0;
     }
     if (len == 4) {
         return std::wmemcmp(lower, L"this", 4) == 0 ||
-               std::wmemcmp(lower, L"here", 4) == 0;
+               std::wmemcmp(lower, L"here", 4) == 0 ||
+               std::wmemcmp(lower, L"test", 4) == 0 ||
+               std::wmemcmp(lower, L"best", 4) == 0 ||
+               std::wmemcmp(lower, L"last", 4) == 0 ||
+               std::wmemcmp(lower, L"list", 4) == 0 ||
+               std::wmemcmp(lower, L"cost", 4) == 0 ||
+               std::wmemcmp(lower, L"host", 4) == 0;
+    }
+    if (len == 5) {
+        return std::wmemcmp(lower, L"there", 5) == 0;
     }
     return false;
 }
@@ -972,12 +1003,39 @@ bool isVietnameseCompoundContinuationAfterStarter(
                eq(secondRawLower, secondRawLen, L"kichj", 5)  ||
                eq(secondRawLower, secondRawLen, L"mawts", 5);
     }
-    if (eq(starterLower, starterLen, L"was", 3)) {
+    if (eq(starterLower, starterLen, L"was", 3) || eq(starterLower, starterLen, L"has", 3)) {
         return eq(secondCompLower, secondCompLen, L"ra", 2)  || eq(secondRawLower, secondRawLen, L"ra", 2) ||
                eq(secondCompLower, secondCompLen, L"gan", 3) || eq(secondRawLower, secondRawLen, L"gan", 3) ||
                eq(secondRawLower, secondRawLen, L"leej", 4)  ||
                eq(secondRawLower, secondRawLen, L"maus", 4)  ||
-               eq(secondRawLower, secondRawLen, L"maatj", 5);
+               eq(secondRawLower, secondRawLen, L"maatj", 5) ||
+               eq(secondRawLower, secondRawLen, L"hoocs", 5) ||
+               eq(secondRawLower, secondRawLen, L"mieengj", 7) ||
+               eq(secondRawLower, secondRawLen, L"moofm", 5);
+    }
+    if (eq(starterLower, starterLen, L"there", 5)) {
+        return eq(secondCompLower, secondCompLen, L"thao", 4) || eq(secondRawLower, secondRawLen, L"thao", 4) ||
+               eq(secondRawLower, secondRawLen, L"ducj", 4) ||
+               eq(secondRawLower, secondRawLen, L"hieenj", 6) ||
+               eq(secondRawLower, secondRawLen, L"loaij", 5) ||
+               eq(secondRawLower, secondRawLen, L"chaats", 6) ||
+               eq(secondRawLower, secondRawLen, L"tichs", 5) ||
+               eq(secondRawLower, secondRawLen, L"trangj", 6) ||
+               eq(secondRawLower, secondRawLen, L"dieenj", 6) ||
+               eq(secondRawLower, secondRawLen, L"leej", 4) ||
+               eq(secondRawLower, secondRawLen, L"thuwcs", 6);
+    }
+    if (eq(starterLower, starterLen, L"last", 4)) {
+        return eq(secondCompLower, secondCompLen, L"sau", 3) || eq(secondRawLower, secondRawLen, L"sau", 3) ||
+               eq(secondRawLower, secondRawLen, L"nuwax", 5) ||
+               eq(secondRawLower, secondRawLen, L"cawts", 5);
+    }
+    if (eq(starterLower, starterLen, L"best", 4)) {
+        return eq(secondRawLower, secondRawLen, L"nhef", 4);
+    }
+    if (eq(starterLower, starterLen, L"test", 4)) {
+        return eq(secondRawLower, secondRawLen, L"moong", 5) ||
+               eq(secondRawLower, secondRawLen, L"ddits", 5);
     }
     if (eq(starterLower, starterLen, L"car", 3)) {
         return !(eq(secondRawLower, secondRawLen, L"is", 2) ||
@@ -1076,7 +1134,8 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
             return true;
         }
     }
-    if (!m_inVietnameseContext && isAllCapsShortEnglishAbbreviation(m_rawWord, rawLower, m_rawLen, m_tone)) {
+    if (!m_inVietnameseContext &&
+        prefersEnglishByOrthographicCase(m_rawWord, rawLower, m_rawLen, m_tone, m_classicOrVniEscape || m_telexToneEscape)) {
         return true;
     }
     if (isContextEnglishCollisionWord(rawLower, m_rawLen)) {
@@ -2885,15 +2944,85 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
 }
 
 void NativeEngineState::syncSurroundingContext(const char *beforeContextUtf8) {
-    if (isComposing()) return;
+    if (m_displayedLen > 0) return;
     if (!beforeContextUtf8 || beforeContextUtf8[0] == '\0') {
         appendContextWord("");
         return;
     }
-    int endPos = 0;
-    while (beforeContextUtf8[endPos] != '\0') {
-        ++endPos;
+    int rawEnd = 0;
+    while (beforeContextUtf8[rawEnd] != '\0') {
+        ++rawEnd;
     }
+
+    // 1. Preserve in-flight retroactive collocation state (e.g. "this ", "turn ", "sex ", "there ")
+    // when the surrounding text still ends with the exact word + space just committed by the engine.
+    if (m_prevCollisionDisplayedLen > 0 && rawEnd >= 2 && beforeContextUtf8[rawEnd - 1] == ' ') {
+        char expectedUtf8[64]{};
+        encodeWideToUtf8(m_prevCollisionDisplayed, m_prevCollisionDisplayedLen, expectedUtf8, sizeof(expectedUtf8));
+        int expLen = 0;
+        while (expectedUtf8[expLen] != '\0') ++expLen;
+        if (expLen > 0 && rawEnd >= expLen + 1) {
+            const int matchStart = rawEnd - 1 - expLen;
+            const bool cleanStart = (matchStart == 0) ||
+                                    beforeContextUtf8[matchStart - 1] == ' ' ||
+                                    beforeContextUtf8[matchStart - 1] == '\t' ||
+                                    beforeContextUtf8[matchStart - 1] == '\n' ||
+                                    beforeContextUtf8[matchStart - 1] == '\r';
+            bool matched = cleanStart;
+            for (int i = 0; matched && i < expLen; ++i) {
+                if (beforeContextUtf8[matchStart + i] != expectedUtf8[i]) {
+                    matched = false;
+                }
+            }
+            if (matched) {
+                return;
+            }
+        }
+    }
+
+    // 2. Preserve immediate non-whitespace prefix state (digit-prefix "100W"/"4K60W", leading slash "/aws", tech delimiters)
+    const unsigned char tailCh = static_cast<unsigned char>(beforeContextUtf8[rawEnd - 1]);
+    if (tailCh != ' ' && tailCh != '\t' && tailCh != '\n' && tailCh != '\r') {
+        int tokStart = rawEnd;
+        while (tokStart > 0) {
+            char c = beforeContextUtf8[tokStart - 1];
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') break;
+            --tokStart;
+        }
+        bool tokHasDigit = false;
+        for (int i = tokStart; i < rawEnd; ++i) {
+            if (beforeContextUtf8[i] >= '0' && beforeContextUtf8[i] <= '9') {
+                tokHasDigit = true;
+                break;
+            }
+        }
+        if ((tailCh >= '0' && tailCh <= '9') || (tokHasDigit && beforeContextUtf8[tokStart] >= '0' && beforeContextUtf8[tokStart] <= '9')) {
+            m_afterDigit = true;
+            m_precededByLeadingSlash = false;
+            m_prevCollisionDisplayedLen = 0;
+            m_prevCollisionRawLen = 0;
+            return;
+        }
+        if (tailCh == '/') {
+            const bool isLeadingSlash = (beforeContextUtf8[tokStart] == '/');
+            m_precededByLeadingSlash = isLeadingSlash;
+            m_precededByTechDelimiter = isLeadingSlash || !m_inVietnameseContext;
+            m_afterDigit = false;
+            m_prevCollisionDisplayedLen = 0;
+            m_prevCollisionRawLen = 0;
+            return;
+        }
+        if (tailCh == '_' || tailCh == '\\') {
+            m_precededByTechDelimiter = true;
+            m_precededByLeadingSlash = false;
+            m_afterDigit = false;
+            m_prevCollisionDisplayedLen = 0;
+            m_prevCollisionRawLen = 0;
+            return;
+        }
+    }
+
+    int endPos = rawEnd;
     // If trailing characters are ASCII letters (partial word before cursor), drop them before extracting context words
     while (endPos > 0) {
         unsigned char c = static_cast<unsigned char>(beforeContextUtf8[endPos - 1]);
@@ -2924,6 +3053,39 @@ void NativeEngineState::syncSurroundingContext(const char *beforeContextUtf8) {
     }
     const int wordLen = endPos - startPos;
     if (wordLen > 0 && wordLen <= 48) {
+        // Also extract the word immediately preceding `lastWord` (within the same sentence)
+        // so 2-word context chains such as "sin and cos" survive surrounding-text sync.
+        int prevEnd = startPos;
+        while (prevEnd > 0) {
+            char ch = beforeContextUtf8[prevEnd - 1];
+            if (ch == ' ' || ch == '\t') {
+                --prevEnd;
+            } else {
+                break;
+            }
+        }
+        int prevStart = prevEnd;
+        while (prevStart > 0) {
+            char ch = beforeContextUtf8[prevStart - 1];
+            if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' ||
+                ch == '.' || ch == '!' || ch == '?') {
+                break;
+            }
+            --prevStart;
+        }
+        const int prevLen = prevEnd - prevStart;
+        if (prevLen > 0 && prevLen <= 48 &&
+            (prevStart == 0 || (beforeContextUtf8[prevStart - 1] != '.' &&
+                                beforeContextUtf8[prevStart - 1] != '!' &&
+                                beforeContextUtf8[prevStart - 1] != '?'))) {
+            char prevWord[64]{};
+            for (int i = 0; i < prevLen; ++i) {
+                prevWord[i] = beforeContextUtf8[prevStart + i];
+            }
+            prevWord[prevLen] = '\0';
+            appendContextWord(prevWord);
+        }
+
         char lastWord[64]{};
         bool lastWordHasNonAscii = false;
         for (int i = 0; i < wordLen; ++i) {
@@ -3288,5 +3450,5 @@ VIELOTUS_CAPI_EXPORT const char *vielotus_get_version(void) {
 }
 
 VIELOTUS_CAPI_EXPORT const char *vielotus_get_build_stamp(void) {
-    return "2.0.2-r4 (PureTSF+CUAS+LabTrace)";
+    return "2.0.2-r5 (PureTSF+CUAS+LabTrace)";
 }

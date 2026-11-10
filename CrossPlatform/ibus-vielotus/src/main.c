@@ -10,6 +10,9 @@
 #include <sys/stat.h>
 #include <time.h>
 #include "vielotus.h"
+#ifdef VIELOTUS_ENABLE_LAB
+#include "vielotus_lab_trace.h"
+#endif
 
 #define IBUS_TYPE_VIELOTUS_ENGINE (ibus_vielotus_engine_get_type())
 #ifndef IBUS_ATTR_UNDERLINE_NONE
@@ -33,7 +36,10 @@ struct _IBusVieLotusEngine {
     gboolean preedit_underline;
     gboolean is_password_field;
     gboolean replayed_after_backspace;
+    gboolean engine_enabled;
+    gboolean preedit_visible;
     time_t config_mtime;
+    gchar *config_path;
     IBusPropList *prop_list;
 };
 
@@ -56,22 +62,30 @@ static gchar *ibus_vielotus_get_config_dir(void) {
     return g_build_filename(cfg_root, "vielotus", NULL);
 }
 
+static const gchar *ibus_vielotus_get_config_path(IBusVieLotusEngine *vl_engine) {
+    if (!vl_engine->config_path) {
+        gchar *dir_path = ibus_vielotus_get_config_dir();
+        if (dir_path) {
+            vl_engine->config_path = g_build_filename(dir_path, "config.env", NULL);
+            g_free(dir_path);
+        }
+    }
+    return vl_engine->config_path;
+}
+
 static void ibus_vielotus_load_user_config(IBusVieLotusEngine *vl_engine) {
     if (!vl_engine->session) {
         return;
     }
-    gchar *dir_path = ibus_vielotus_get_config_dir();
-    if (!dir_path) {
+    const gchar *path = ibus_vielotus_get_config_path(vl_engine);
+    if (!path) {
         return;
     }
-    gchar *path = g_build_filename(dir_path, "config.env", NULL);
-    g_free(dir_path);
     struct stat st;
     if (stat(path, &st) == 0) {
         vl_engine->config_mtime = st.st_mtime;
     }
     FILE *fp = fopen(path, "r");
-    g_free(path);
     if (!fp) {
         return;
     }
@@ -103,10 +117,12 @@ static void ibus_vielotus_load_user_config(IBusVieLotusEngine *vl_engine) {
     fclose(fp);
 
     const gchar *engine_name = ibus_engine_get_name((IBusEngine *)vl_engine);
-    if (engine_name && strstr(engine_name, "vni") != NULL) {
-        vl_engine->is_vni = TRUE;
-    } else if (has_input_method_override) {
+    if (has_input_method_override) {
         vl_engine->is_vni = config_is_vni;
+    } else if (engine_name && strstr(engine_name, "vni") != NULL) {
+        vl_engine->is_vni = TRUE;
+    } else {
+        vl_engine->is_vni = FALSE;
     }
     vielotus_set_input_method(
         vl_engine->session,
@@ -127,12 +143,14 @@ static void ibus_vielotus_save_user_config(IBusVieLotusEngine *vl_engine) {
         return;
     }
     g_mkdir_with_parents(dir_path, 0755);
-    gchar *path = g_build_filename(dir_path, "config.env", NULL);
     g_free(dir_path);
+    const gchar *path = ibus_vielotus_get_config_path(vl_engine);
+    if (!path) {
+        return;
+    }
 
     FILE *fp = fopen(path, "w");
     if (!fp) {
-        g_free(path);
         return;
     }
     fprintf(fp, "INPUT_METHOD=\"%s\"\n", vl_engine->is_vni ? "vni" : "telex");
@@ -149,7 +167,6 @@ static void ibus_vielotus_save_user_config(IBusVieLotusEngine *vl_engine) {
     if (stat(path, &st) == 0) {
         vl_engine->config_mtime = st.st_mtime;
     }
-    g_free(path);
 }
 
 static void ibus_vielotus_build_prop_list(IBusVieLotusEngine *vl_engine) {
@@ -161,6 +178,20 @@ static void ibus_vielotus_build_prop_list(IBusVieLotusEngine *vl_engine) {
 
     IBusProperty *prop;
     IBusText *label;
+
+    label = ibus_text_new_from_static_string("Kiểu gõ: Telex Tự Do (vieetj → việt)");
+    prop = ibus_property_new("im-telex", PROP_TYPE_TOGGLE, label, NULL, NULL,
+                             TRUE, TRUE,
+                             !vl_engine->is_vni ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
+                             NULL);
+    ibus_prop_list_append(vl_engine->prop_list, prop);
+
+    label = ibus_text_new_from_static_string("Kiểu gõ: VNI Chuẩn (viet65 → việt)");
+    prop = ibus_property_new("im-vni", PROP_TYPE_TOGGLE, label, NULL, NULL,
+                             TRUE, TRUE,
+                             vl_engine->is_vni ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
+                             NULL);
+    ibus_prop_list_append(vl_engine->prop_list, prop);
 
     label = ibus_text_new_from_static_string("Song ngữ thông minh Anh-Việt (Smart Bilingual)");
     prop = ibus_property_new("smart-bilingual", PROP_TYPE_TOGGLE, label, NULL, NULL,
@@ -190,12 +221,12 @@ static void ibus_vielotus_build_prop_list(IBusVieLotusEngine *vl_engine) {
                              NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
-    label = ibus_text_new_from_static_string("Gạch chân chữ đang gõ (Preedit Underline)");
-    prop = ibus_property_new("preedit-underline", PROP_TYPE_TOGGLE, label, NULL, NULL,
-                             TRUE, TRUE,
-                             vl_engine->preedit_underline ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
-                             NULL);
+#ifdef VIELOTUS_ENABLE_LAB
+    label = ibus_text_new_from_static_string("Mở Diagnostic Lab (Ghi Log)...");
+    prop = ibus_property_new("open-lab", PROP_TYPE_NORMAL, label, "utilities-terminal", NULL,
+                             TRUE, TRUE, PROP_STATE_UNCHECKED, NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
+#endif
 
     label = ibus_text_new_from_static_string("Bảng cài đặt Sen Việt (Settings)...");
     prop = ibus_property_new("more-settings", PROP_TYPE_NORMAL, label, "preferences-system", NULL,
@@ -204,6 +235,11 @@ static void ibus_vielotus_build_prop_list(IBusVieLotusEngine *vl_engine) {
 }
 
 static void ibus_vielotus_clear_preedit(IBusEngine *engine) {
+    IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
+    if (!vl_engine->preedit_visible) {
+        return;
+    }
+    vl_engine->preedit_visible = FALSE;
     IBusText *empty = ibus_text_new_from_static_string("");
     ibus_engine_update_preedit_text_with_mode(
         engine,
@@ -223,10 +259,53 @@ static void ibus_vielotus_engine_reset_internal(IBusVieLotusEngine *vl_engine) {
     ibus_vielotus_clear_preedit((IBusEngine *)vl_engine);
 }
 
+#ifdef VIELOTUS_ENABLE_LAB
+static void ibus_vielotus_lab_ctx_tag(IBusVieLotusEngine *vl_engine, char *buf, size_t cap) {
+    IBusEngine *engine = (IBusEngine *)vl_engine;
+    guint caps = engine ? engine->client_capabilities : 0;
+    const char *mode = (caps & IBUS_CAP_SURROUNDING_TEXT) ? "surr+pre" : "preedit";
+    snprintf(buf, cap, "cap=0x%02x/%s", caps, mode);
+}
+#endif
+
+static size_t ibus_vielotus_utf8_codepoint_count(const char *utf8_str) {
+    if (!utf8_str) return 0;
+    size_t count = 0;
+    for (const unsigned char *p = (const unsigned char *)utf8_str; *p; p++) {
+        if ((*p & 0xC0) != 0x80) {
+            count++;
+        }
+    }
+    return count;
+}
+
+static const char *ibus_vielotus_utf8_after_first_space(const char *utf8_str) {
+    if (!utf8_str) return "";
+    const char *sp = strchr(utf8_str, ' ');
+    return sp ? (sp + 1) : utf8_str;
+}
+
 static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const char *trailing_ascii) {
     IBusEngine *engine = (IBusEngine *)vl_engine;
     char buf[1024];
     buf[0] = '\0';
+    size_t comp_cp_before = 0;
+    int32_t surr_del = 0;
+    const gboolean has_surr_cap = (engine->client_capabilities & IBUS_CAP_SURROUNDING_TEXT) != 0;
+
+    if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
+        const char *comp_str = vielotus_get_composing_text(vl_engine->session);
+        comp_cp_before = ibus_vielotus_utf8_codepoint_count(comp_str);
+    }
+
+#ifdef VIELOTUS_ENABLE_LAB
+    char raw_before[256] = {0};
+    char comp_before[256] = {0};
+    if (vl_engine->session) {
+        vl_lab_escape_str(vielotus_get_raw_text(vl_engine->session), raw_before, sizeof(raw_before));
+        vl_lab_escape_str(vielotus_get_composing_text(vl_engine->session), comp_before, sizeof(comp_before));
+    }
+#endif
 
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
         if (trailing_ascii && trailing_ascii[0] != '\0' && trailing_ascii[1] == '\0') {
@@ -235,8 +314,15 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
         } else {
             vielotus_commit_word(vl_engine->session);
         }
+        int32_t total_bs = vielotus_get_last_backspaces(vl_engine->session);
+        if (total_bs > (int32_t)comp_cp_before && comp_cp_before > 0) {
+            surr_del = total_bs - (int32_t)comp_cp_before;
+        }
         const char *committed = vielotus_get_last_text(vl_engine->session);
         if (committed && committed[0] != '\0') {
+            if (surr_del > 0 && !has_surr_cap) {
+                committed = ibus_vielotus_utf8_after_first_space(committed);
+            }
             snprintf(buf, sizeof(buf), "%s", committed);
         }
     }
@@ -249,11 +335,40 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
     }
 
     if (buf[0] != '\0') {
+        if (surr_del > 0 && has_surr_cap) {
+            ibus_vielotus_clear_preedit(engine);
+            ibus_engine_delete_surrounding_text(engine, -surr_del, (guint)surr_del);
+        }
         IBusText *commit_text = ibus_text_new_from_string(buf);
         ibus_engine_commit_text(engine, commit_text);
+#ifdef VIELOTUS_ENABLE_LAB
+        char ctx_tag[48];
+        char esc_out[512];
+        char esc_trail[32];
+        ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+        vl_lab_escape_str(buf, esc_out, sizeof(esc_out));
+        vl_lab_escape_str(trailing_ascii ? trailing_ascii : "", esc_trail, sizeof(esc_trail));
+        vl_lab_write_event(
+            vl_engine->is_password_field,
+            "ibus-vielotus",
+            ctx_tag,
+            "COMMIT",
+            0,
+            "raw=\"%s\" comp=\"%s\" trail=\"%s\" out=\"%s\" retroDel=%d",
+            raw_before,
+            comp_before,
+            esc_trail,
+            esc_out,
+            (int)surr_del
+        );
+#endif
     }
 
-    ibus_vielotus_engine_reset_internal(vl_engine);
+    vl_engine->replayed_after_backspace = FALSE;
+    if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
+        vielotus_reset_session(vl_engine->session);
+    }
+    ibus_vielotus_clear_preedit(engine);
 }
 
 static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
@@ -261,6 +376,7 @@ static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
         const char *composing = vielotus_get_composing_text(vl_engine->session);
         if (composing && composing[0] != '\0') {
+            vl_engine->preedit_visible = TRUE;
             IBusText *text = ibus_text_new_from_string(composing);
             guint char_len = ibus_text_get_length(text);
             guint ul_mode = vl_engine->preedit_underline ? IBUS_ATTR_UNDERLINE_SINGLE : IBUS_ATTR_UNDERLINE_NONE;
@@ -272,6 +388,26 @@ static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
                 TRUE,
                 IBUS_ENGINE_PREEDIT_COMMIT
             );
+#ifdef VIELOTUS_ENABLE_LAB
+            char ctx_tag[48];
+            char esc_comp[512];
+            char esc_raw[512];
+            ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+            vl_lab_escape_str(composing, esc_comp, sizeof(esc_comp));
+            vl_lab_escape_str(vielotus_get_raw_text(vl_engine->session), esc_raw, sizeof(esc_raw));
+            vl_lab_write_event(
+                vl_engine->is_password_field,
+                "ibus-vielotus",
+                ctx_tag,
+                "PREEDIT",
+                0,
+                "visible=1 chars=%u ul=%d raw=\"%s\" text=\"%s\"",
+                char_len,
+                vl_engine->preedit_underline ? 1 : 0,
+                esc_raw,
+                esc_comp
+            );
+#endif
             return;
         }
     }
@@ -422,23 +558,21 @@ static void ibus_vielotus_replay_raw_keys(IBusVieLotusEngine *vl_engine, const c
     }
 }
 
-static size_t ibus_vielotus_utf8_codepoint_count(const char *utf8_str) {
-    if (!utf8_str) return 0;
-    size_t count = 0;
-    for (const unsigned char *p = (const unsigned char *)utf8_str; *p; p++) {
-        if ((*p & 0xC0) != 0x80) {
-            count++;
-        }
-    }
-    return count;
-}
-
 /* Whole-character Backspace while composing:
  * 1. First delegates to `vielotus_feed_backspace(session)` so explicit semantic escapes (`turrus -> turus -> turu -> tur -> tu`),
  *    literal tails (`hôngfus -> hôngfu`, `tủu -> tủ`), and VNI escapes (`tu33us -> tu3u`) preserve full engine state.
  * 2. When `vielotus_feed_backspace` only strips a tone or vowel diacritic without reducing the displayed UTF-8
  *    character count ("việt" -> "viêt"), falls back to whole-character UTF-8 deletion ("việt" -> "việ" -> "vi" -> "v" -> ""). */
 static void ibus_vielotus_backspace_composing(IBusVieLotusEngine *vl_engine) {
+#ifdef VIELOTUS_ENABLE_LAB
+    uint64_t t0_us = vl_lab_now_us();
+    char raw_before[256] = {0};
+    char comp_before[256] = {0};
+    if (vl_engine->session) {
+        vl_lab_escape_str(vielotus_get_raw_text(vl_engine->session), raw_before, sizeof(raw_before));
+        vl_lab_escape_str(vielotus_get_composing_text(vl_engine->session), comp_before, sizeof(comp_before));
+    }
+#endif
     const char *composing = vielotus_get_composing_text(vl_engine->session);
     if (!composing || composing[0] == '\0') {
         ibus_vielotus_engine_reset_internal(vl_engine);
@@ -464,17 +598,69 @@ static void ibus_vielotus_backspace_composing(IBusVieLotusEngine *vl_engine) {
     vielotus_feed_backspace(vl_engine->session);
     if (!vielotus_is_composing(vl_engine->session)) {
         ibus_vielotus_engine_reset_internal(vl_engine);
+#ifdef VIELOTUS_ENABLE_LAB
+        char ctx_tag[48];
+        ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+        vl_lab_write_event(
+            vl_engine->is_password_field,
+            "ibus-vielotus",
+            ctx_tag,
+            "BACKSPACE",
+            vl_lab_now_us() - t0_us,
+            "before_cp=%zu after_cp=0 replayed=0 raw=\"%s\"->\"\" word=\"%s\"->\"\"",
+            before_cp,
+            raw_before,
+            comp_before
+        );
+#endif
         return;
     }
     const char *after = vielotus_get_composing_text(vl_engine->session);
     if (after && after[0] != '\0' && ibus_vielotus_utf8_codepoint_count(after) < before_cp) {
         vl_engine->replayed_after_backspace = FALSE;
         ibus_vielotus_update_preedit(vl_engine);
+#ifdef VIELOTUS_ENABLE_LAB
+        char ctx_tag[48];
+        char raw_after[256] = {0};
+        char comp_after[256] = {0};
+        ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+        vl_lab_escape_str(vielotus_get_raw_text(vl_engine->session), raw_after, sizeof(raw_after));
+        vl_lab_escape_str(vielotus_get_composing_text(vl_engine->session), comp_after, sizeof(comp_after));
+        vl_lab_write_event(
+            vl_engine->is_password_field,
+            "ibus-vielotus",
+            ctx_tag,
+            "BACKSPACE",
+            vl_lab_now_us() - t0_us,
+            "before_cp=%zu after_cp=%zu replayed=0 raw=\"%s\"->\"%s\" word=\"%s\"->\"%s\"",
+            before_cp,
+            ibus_vielotus_utf8_codepoint_count(comp_after),
+            raw_before,
+            raw_after,
+            comp_before,
+            comp_after
+        );
+#endif
         return;
     }
 
     if (cut == 0) {
         ibus_vielotus_engine_reset_internal(vl_engine);
+#ifdef VIELOTUS_ENABLE_LAB
+        char ctx_tag[48];
+        ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+        vl_lab_write_event(
+            vl_engine->is_password_field,
+            "ibus-vielotus",
+            ctx_tag,
+            "BACKSPACE",
+            vl_lab_now_us() - t0_us,
+            "before_cp=%zu after_cp=0 replayed=1 raw=\"%s\"->\"\" word=\"%s\"->\"\"",
+            before_cp,
+            raw_before,
+            comp_before
+        );
+#endif
         return;
     }
     char raw_keys[1024];
@@ -489,6 +675,30 @@ static void ibus_vielotus_backspace_composing(IBusVieLotusEngine *vl_engine) {
     } else {
         ibus_vielotus_update_preedit(vl_engine);
     }
+#ifdef VIELOTUS_ENABLE_LAB
+    char ctx_tag[48];
+    char raw_after[256] = {0};
+    char comp_after[256] = {0};
+    ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+    if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
+        vl_lab_escape_str(vielotus_get_raw_text(vl_engine->session), raw_after, sizeof(raw_after));
+        vl_lab_escape_str(vielotus_get_composing_text(vl_engine->session), comp_after, sizeof(comp_after));
+    }
+    vl_lab_write_event(
+        vl_engine->is_password_field,
+        "ibus-vielotus",
+        ctx_tag,
+        "BACKSPACE",
+        vl_lab_now_us() - t0_us,
+        "before_cp=%zu after_cp=%zu replayed=1 raw=\"%s\"->\"%s\" word=\"%s\"->\"%s\"",
+        before_cp,
+        ibus_vielotus_utf8_codepoint_count(comp_after),
+        raw_before,
+        raw_after,
+        comp_before,
+        comp_after
+    );
+#endif
 }
 
 static void ibus_vielotus_engine_init(IBusVieLotusEngine *vl_engine) {
@@ -504,6 +714,10 @@ static void ibus_vielotus_engine_init(IBusVieLotusEngine *vl_engine) {
     vl_engine->preedit_underline = FALSE;
     vl_engine->is_password_field = FALSE;
     vl_engine->replayed_after_backspace = FALSE;
+    vl_engine->engine_enabled = FALSE;
+    vl_engine->preedit_visible = FALSE;
+    vl_engine->config_mtime = 0;
+    vl_engine->config_path = NULL;
     vl_engine->prop_list = NULL;
 
     vielotus_set_input_method(vl_engine->session, VIELOTUS_INPUT_TELEX);
@@ -513,6 +727,10 @@ static void ibus_vielotus_engine_init(IBusVieLotusEngine *vl_engine) {
 
 static void ibus_vielotus_engine_finalize(GObject *object) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)object;
+    if (vl_engine->config_path) {
+        g_free(vl_engine->config_path);
+        vl_engine->config_path = NULL;
+    }
     if (vl_engine->prop_list) {
         g_object_unref(vl_engine->prop_list);
         vl_engine->prop_list = NULL;
@@ -533,22 +751,49 @@ static void ibus_vielotus_engine_reset(IBusEngine *engine) {
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->reset(engine);
 }
 
+static void ibus_vielotus_activate_by_engine_name(IBusVieLotusEngine *vl_engine) {
+    const gchar *engine_name = ibus_engine_get_name((IBusEngine *)vl_engine);
+    ibus_vielotus_load_user_config(vl_engine);
+    if (engine_name && engine_name[0] != '\0') {
+        gboolean engine_is_vni = (strstr(engine_name, "vni") != NULL);
+        vl_engine->is_vni = engine_is_vni;
+        vielotus_set_input_method(
+            vl_engine->session,
+            vl_engine->is_vni ? VIELOTUS_INPUT_VNI : VIELOTUS_INPUT_TELEX
+        );
+        ibus_vielotus_save_user_config(vl_engine);
+    }
+    vl_engine->engine_enabled = TRUE;
+    ibus_vielotus_build_prop_list(vl_engine);
+}
+
 static void ibus_vielotus_engine_enable(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
-    const gchar *engine_name = ibus_engine_get_name(engine);
-    if (engine_name && strstr(engine_name, "vni") != NULL) {
-        vl_engine->is_vni = TRUE;
-        vielotus_set_input_method(vl_engine->session, VIELOTUS_INPUT_VNI);
-    } else {
-        vl_engine->is_vni = FALSE;
-        vielotus_set_input_method(vl_engine->session, VIELOTUS_INPUT_TELEX);
-    }
-    ibus_vielotus_load_user_config(vl_engine);
-    ibus_vielotus_build_prop_list(vl_engine);
+    vl_engine->preedit_visible = FALSE;
+    ibus_vielotus_activate_by_engine_name(vl_engine);
+    ibus_engine_register_properties(engine, vl_engine->prop_list);
     ibus_vielotus_engine_reset_internal(vl_engine);
     if (vl_engine->session) {
         vielotus_append_context(vl_engine->session, "");
     }
+    if (engine->client_capabilities & IBUS_CAP_SURROUNDING_TEXT) {
+        ibus_engine_get_surrounding_text(engine, NULL, NULL, NULL);
+    }
+#ifdef VIELOTUS_ENABLE_LAB
+    const gchar *engine_name = ibus_engine_get_name(engine);
+    char ctx_tag[48];
+    ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+    vl_lab_write_event(
+        vl_engine->is_password_field,
+        "ibus-vielotus",
+        ctx_tag,
+        "ENABLE",
+        0,
+        "engine=\"%s\" method=%s",
+        engine_name ? engine_name : "vielotus",
+        vl_engine->is_vni ? "VNI" : "Telex"
+    );
+#endif
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->enable(engine);
 }
 
@@ -581,6 +826,7 @@ static void ibus_vielotus_engine_set_content_type(
 
 static void ibus_vielotus_engine_disable(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
+    vl_engine->engine_enabled = FALSE;
     vl_engine->is_password_field = FALSE;
     if (vielotus_is_composing(vl_engine->session)) {
         ibus_vielotus_commit_composing(vl_engine, NULL);
@@ -593,43 +839,60 @@ static void ibus_vielotus_engine_disable(IBusEngine *engine) {
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->disable(engine);
 }
 
-static void ibus_vielotus_sync_surrounding_context(IBusVieLotusEngine *vl_engine) {
-    IBusEngine *engine = (IBusEngine *)vl_engine;
+static void ibus_vielotus_sync_armed_word_from_text(
+    IBusVieLotusEngine *vl_engine,
+    const gchar *text_str,
+    guint cursor_pos,
+    guint anchor_pos
+) {
     if (!vl_engine || !vl_engine->session || vl_engine->is_password_field) {
         return;
     }
-    vielotus_append_context(vl_engine->session, "");
-    if (!(engine->client_capabilities & IBUS_CAP_SURROUNDING_TEXT)) {
+    if (!text_str || text_str[0] == '\0' || cursor_pos == 0) {
+        vielotus_append_context(vl_engine->session, "");
         return;
     }
-    IBusText *surrounding_text = NULL;
-    guint cursor_pos = 0;
-    guint anchor_pos = 0;
-    ibus_engine_get_surrounding_text(engine, &surrounding_text, &cursor_pos, &anchor_pos);
-    if (!surrounding_text) {
-        return;
+    const gchar *end_ptr = g_utf8_offset_to_pointer(text_str, (glong)cursor_pos);
+    size_t byte_len = (size_t)(end_ptr - text_str);
+    const size_t max_window = 256;
+    const gchar *win_start = text_str;
+    if (byte_len > max_window) {
+        win_start = end_ptr - max_window;
+        while (win_start < end_ptr && ((*win_start & 0xC0) == 0x80)) {
+            win_start++;
+        }
+        byte_len = (size_t)(end_ptr - win_start);
     }
-    const gchar *text_str = ibus_text_get_text(surrounding_text);
-    if (text_str && text_str[0] != '\0' && cursor_pos > 0) {
-        const gchar *end_ptr = g_utf8_offset_to_pointer(text_str, (glong)cursor_pos);
-        size_t byte_len = (size_t)(end_ptr - text_str);
-        const size_t max_window = 256;
-        const gchar *win_start = text_str;
-        if (byte_len > max_window) {
-            win_start = end_ptr - max_window;
-            while (win_start < end_ptr && ((*win_start & 0xC0) == 0x80)) {
-                win_start++;
-            }
-            byte_len = (size_t)(end_ptr - win_start);
+    char prefix_buf[260];
+    if (byte_len < sizeof(prefix_buf)) {
+        memcpy(prefix_buf, win_start, byte_len);
+        prefix_buf[byte_len] = '\0';
+        vielotus_sync_armed_word(vl_engine->session, prefix_buf);
+#ifdef VIELOTUS_ENABLE_LAB
+        char ctx_tag[48];
+        char esc_pref[128];
+        const char *tail_src = (byte_len > 32) ? (prefix_buf + byte_len - 32) : prefix_buf;
+        while (*tail_src && ((*tail_src & 0xC0) == 0x80)) {
+            tail_src++;
         }
-        char prefix_buf[260];
-        if (byte_len < sizeof(prefix_buf)) {
-            memcpy(prefix_buf, win_start, byte_len);
-            prefix_buf[byte_len] = '\0';
-            vielotus_sync_armed_word(vl_engine->session, prefix_buf);
-        }
+        ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+        vl_lab_escape_str(tail_src, esc_pref, sizeof(esc_pref));
+        vl_lab_write_event(
+            vl_engine->is_password_field,
+            "ibus-vielotus",
+            ctx_tag,
+            "SURR_SYNC",
+            0,
+            "cursor=%u anchor=%u tail=\"%s\"",
+            cursor_pos,
+            anchor_pos,
+            esc_pref
+        );
+#endif
     }
 }
+
+static gboolean ibus_vielotus_reload_config_if_changed(IBusVieLotusEngine *vl_engine);
 
 static void ibus_vielotus_engine_focus_in(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
@@ -637,15 +900,59 @@ static void ibus_vielotus_engine_focus_in(IBusEngine *engine) {
     guint hints = IBUS_INPUT_HINT_NONE;
     ibus_engine_get_content_type(engine, &purpose, &hints);
     vl_engine->is_password_field = ibus_vielotus_is_sensitive_content_type(purpose, hints);
-    ibus_vielotus_sync_surrounding_context(vl_engine);
-    ibus_vielotus_load_user_config(vl_engine);
-    ibus_vielotus_build_prop_list(vl_engine);
+    if (vl_engine->session) {
+        vielotus_append_context(vl_engine->session, "");
+    }
+    /* Arm surrounding-text streaming on the newly focused client context without reading stale text */
+    if (!vl_engine->is_password_field && (engine->client_capabilities & IBUS_CAP_SURROUNDING_TEXT)) {
+        ibus_engine_get_surrounding_text(engine, NULL, NULL, NULL);
+    }
+    if (!vl_engine->engine_enabled) {
+        ibus_vielotus_activate_by_engine_name(vl_engine);
+    } else {
+        ibus_vielotus_reload_config_if_changed(vl_engine);
+    }
+    if (!vl_engine->prop_list) {
+        ibus_vielotus_build_prop_list(vl_engine);
+    }
     ibus_engine_register_properties(engine, vl_engine->prop_list);
+#ifdef VIELOTUS_ENABLE_LAB
+    char ctx_tag[48];
+    ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+    vl_lab_write_event(
+        vl_engine->is_password_field,
+        "ibus-vielotus",
+        ctx_tag,
+        "FOCUS_IN",
+        0,
+        "method=%s senFlex=%d smartBi=%d modern=%d quick=%d ul=%d purpose=%u",
+        vl_engine->is_vni ? "VNI" : "Telex",
+        vl_engine->sen_flex ? 1 : 0,
+        vl_engine->smart_bilingual ? 1 : 0,
+        vl_engine->modern_orthography ? 1 : 0,
+        vl_engine->quick_telex ? 1 : 0,
+        vl_engine->preedit_underline ? 1 : 0,
+        purpose
+    );
+#endif
     IBUS_ENGINE_CLASS(ibus_vielotus_engine_parent_class)->focus_in(engine);
 }
 
 static void ibus_vielotus_engine_focus_out(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
+#ifdef VIELOTUS_ENABLE_LAB
+    char ctx_tag[48];
+    ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+    vl_lab_write_event(
+        vl_engine->is_password_field,
+        "ibus-vielotus",
+        ctx_tag,
+        "FOCUS_OUT",
+        0,
+        "wasComposing=%d",
+        vielotus_is_composing(vl_engine->session) ? 1 : 0
+    );
+#endif
     vl_engine->is_password_field = FALSE;
     if (vielotus_is_composing(vl_engine->session)) {
         ibus_vielotus_commit_composing(vl_engine, NULL);
@@ -664,6 +971,16 @@ static void ibus_vielotus_engine_property_activate(
     guint prop_state
 ) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
+#ifdef VIELOTUS_ENABLE_LAB
+    if (g_strcmp0(prop_name, "open-lab") == 0) {
+        if (g_file_test("/usr/bin/vielotus-lab", G_FILE_TEST_IS_EXECUTABLE)) {
+            g_spawn_command_line_async("/usr/bin/vielotus-lab", NULL);
+        } else {
+            g_spawn_command_line_async("vielotus-lab", NULL);
+        }
+        return;
+    }
+#endif
     if (g_strcmp0(prop_name, "more-settings") == 0) {
         if (g_file_test("/usr/bin/vielotus-settings", G_FILE_TEST_IS_EXECUTABLE)) {
             g_spawn_command_line_async("/usr/bin/vielotus-settings", NULL);
@@ -671,6 +988,18 @@ static void ibus_vielotus_engine_property_activate(
             g_spawn_command_line_async("vielotus-settings", NULL);
         }
         return;
+    } else if (g_strcmp0(prop_name, "im-telex") == 0 && prop_state == PROP_STATE_CHECKED) {
+        vl_engine->is_vni = FALSE;
+        vielotus_set_input_method(vl_engine->session, VIELOTUS_INPUT_TELEX);
+        if (g_file_test("/usr/bin/vielotus-settings", G_FILE_TEST_IS_EXECUTABLE)) {
+            g_spawn_command_line_async("/usr/bin/vielotus-settings --telex", NULL);
+        }
+    } else if (g_strcmp0(prop_name, "im-vni") == 0 && prop_state == PROP_STATE_CHECKED) {
+        vl_engine->is_vni = TRUE;
+        vielotus_set_input_method(vl_engine->session, VIELOTUS_INPUT_VNI);
+        if (g_file_test("/usr/bin/vielotus-settings", G_FILE_TEST_IS_EXECUTABLE)) {
+            g_spawn_command_line_async("/usr/bin/vielotus-settings --vni", NULL);
+        }
     } else if (g_strcmp0(prop_name, "smart-bilingual") == 0) {
         vl_engine->smart_bilingual = (prop_state == PROP_STATE_CHECKED);
         vielotus_set_smart_bilingual(vl_engine->session, vl_engine->smart_bilingual);
@@ -686,33 +1015,194 @@ static void ibus_vielotus_engine_property_activate(
     } else if (g_strcmp0(prop_name, "quick-telex") == 0) {
         vl_engine->quick_telex = (prop_state == PROP_STATE_CHECKED);
         vielotus_set_quick_telex(vl_engine->session, vl_engine->quick_telex);
-    } else if (g_strcmp0(prop_name, "preedit-underline") == 0) {
-        vl_engine->preedit_underline = (prop_state == PROP_STATE_CHECKED);
     }
     ibus_vielotus_save_user_config(vl_engine);
     ibus_vielotus_build_prop_list(vl_engine);
     ibus_engine_register_properties(engine, vl_engine->prop_list);
 }
 
-static void ibus_vielotus_reload_config_if_changed(IBusVieLotusEngine *vl_engine) {
+static gboolean ibus_vielotus_reload_config_if_changed(IBusVieLotusEngine *vl_engine) {
     if (!vl_engine->session) {
-        return;
+        return FALSE;
     }
-    gchar *dir_path = ibus_vielotus_get_config_dir();
-    if (!dir_path) {
-        return;
+    const gchar *path = ibus_vielotus_get_config_path(vl_engine);
+    if (!path) {
+        return FALSE;
     }
-    gchar *path = g_build_filename(dir_path, "config.env", NULL);
-    g_free(dir_path);
     struct stat st;
     if (stat(path, &st) == 0 && st.st_mtime != vl_engine->config_mtime) {
-        g_free(path);
         ibus_vielotus_load_user_config(vl_engine);
         ibus_vielotus_build_prop_list(vl_engine);
-        ibus_engine_register_properties((IBusEngine *)vl_engine, vl_engine->prop_list);
-        return;
+        return TRUE;
     }
-    g_free(path);
+    return FALSE;
+}
+
+static inline gboolean ibus_vielotus_is_modifier_key(IBusVieLotusEngine *vl_engine, guint keyval) {
+    if (vl_engine->is_vni) {
+        return (keyval >= '0' && keyval <= '9');
+    }
+    char lower = vl_tolower((char)keyval);
+    return (lower == 's' || lower == 'f' || lower == 'r' || lower == 'x' || lower == 'j' ||
+            lower == 'w' || lower == 'a' || lower == 'e' || lower == 'o' || lower == 'd' || lower == 'z');
+}
+
+static gboolean ibus_vielotus_prepare_word_start_from_surrounding(
+    IBusVieLotusEngine *vl_engine,
+    guint keyval,
+    guint keycode,
+    guint state,
+    uint64_t t0_us
+) {
+    IBusEngine *engine = (IBusEngine *)vl_engine;
+    (void)keycode;
+    (void)state;
+    (void)t0_us;
+    if (!vl_engine || !vl_engine->session || vl_engine->is_password_field) {
+        return FALSE;
+    }
+    if (!(engine->client_capabilities & IBUS_CAP_SURROUNDING_TEXT)) {
+        return FALSE;
+    }
+    IBusText *surrounding_text = NULL;
+    guint cursor_pos = 0;
+    guint anchor_pos = 0;
+    ibus_engine_get_surrounding_text(engine, &surrounding_text, &cursor_pos, &anchor_pos);
+    if (!surrounding_text) {
+        return FALSE;
+    }
+    const gchar *text_str = ibus_text_get_text(surrounding_text);
+    if (!text_str || text_str[0] == '\0') {
+        return FALSE;
+    }
+    glong total_chars = g_utf8_strlen(text_str, -1);
+    if ((glong)cursor_pos > total_chars) cursor_pos = (guint)total_chars;
+    if ((glong)anchor_pos > total_chars) anchor_pos = (guint)total_chars;
+
+    /* Case 1: Active selection [sel_start .. sel_end).
+     * In GTK3, showing preedit does NOT delete the active selection until commit.
+     * Delete the selection immediately before starting preedit, and prime Vietnamese context
+     * if replacing inside an existing word or within a Vietnamese sentence. */
+    if (cursor_pos != anchor_pos) {
+        guint sel_start = (cursor_pos < anchor_pos) ? cursor_pos : anchor_pos;
+        guint sel_end = (cursor_pos > anchor_pos) ? cursor_pos : anchor_pos;
+        guint sel_len = sel_end - sel_start;
+        gint rel_offset = (gint)sel_start - (gint)cursor_pos;
+
+        const gchar *start_ptr = g_utf8_offset_to_pointer(text_str, (glong)sel_start);
+        const gchar *end_ptr = g_utf8_offset_to_pointer(text_str, (glong)sel_end);
+        gboolean adj_word_char = FALSE;
+        if (sel_start > 0) {
+            const gchar *prev_p = g_utf8_prev_char(start_ptr);
+            if (g_unichar_isalpha(g_utf8_get_char(prev_p))) adj_word_char = TRUE;
+        }
+        if (*end_ptr && g_unichar_isalpha(g_utf8_get_char(end_ptr))) {
+            adj_word_char = TRUE;
+        }
+        ibus_engine_delete_surrounding_text(engine, rel_offset, sel_len);
+        ibus_vielotus_sync_armed_word_from_text(vl_engine, text_str, sel_start, sel_start);
+        if (adj_word_char || ibus_vielotus_has_non_ascii(text_str)) {
+            vielotus_append_context(vl_engine->session, "ự");
+        }
+        return FALSE;
+    }
+
+    /* Sync preceding sentence context once at the start of a word */
+    ibus_vielotus_sync_armed_word_from_text(vl_engine, text_str, cursor_pos, anchor_pos);
+
+    /* Case 2: No selection (cursor_pos == anchor_pos).
+     * Inspect contiguous letters around cursor_pos: [word_start_ptr .. cursor_ptr .. word_end_ptr). */
+    const gchar *cursor_ptr = g_utf8_offset_to_pointer(text_str, (glong)cursor_pos);
+    const gchar *word_start_ptr = cursor_ptr;
+    guint left_chars = 0;
+    while (word_start_ptr > text_str && left_chars < 20) {
+        const gchar *prev_p = g_utf8_prev_char(word_start_ptr);
+        if (!g_unichar_isalpha(g_utf8_get_char(prev_p))) {
+            break;
+        }
+        word_start_ptr = prev_p;
+        left_chars++;
+    }
+    const gchar *word_end_ptr = cursor_ptr;
+    guint right_chars = 0;
+    while (*word_end_ptr && right_chars < 20) {
+        if (!g_unichar_isalpha(g_utf8_get_char(word_end_ptr))) {
+            break;
+        }
+        word_end_ptr = g_utf8_next_char(word_end_ptr);
+        right_chars++;
+    }
+    guint total_word_cp = left_chars + right_chars;
+    size_t word_bytes = (size_t)(word_end_ptr - word_start_ptr);
+
+    if (total_word_cp >= 1 && total_word_cp <= 15 && word_bytes > 0 && word_bytes < 128) {
+        char full_word[128];
+        memcpy(full_word, word_start_ptr, word_bytes);
+        full_word[word_bytes] = '\0';
+
+        /* Fast-path: if keyval is not a possible Telex/VNI diacritic modifier, skip full word
+         * reconstruction and simply prime Vietnamese context when editing an existing word. */
+        if (!ibus_vielotus_is_modifier_key(vl_engine, keyval)) {
+            if (ibus_vielotus_has_non_ascii(full_word) || ibus_vielotus_has_non_ascii(text_str)) {
+                vielotus_append_context(vl_engine->session, "ự");
+            }
+            return FALSE;
+        }
+
+        char canon_raw[256];
+        ibus_vielotus_raw_keys_for_utf8(full_word, vl_engine->is_vni, canon_raw, sizeof(canon_raw));
+        if (canon_raw[0] != '\0') {
+            vielotus_reset_session(vl_engine->session);
+            if (ibus_vielotus_has_non_ascii(full_word) || ibus_vielotus_has_non_ascii(text_str)) {
+                vielotus_append_context(vl_engine->session, "ự");
+            }
+            for (size_t i = 0; canon_raw[i] != '\0'; i++) {
+                vielotus_feed_char(vl_engine->session, (uint32_t)(unsigned char)canon_raw[i]);
+            }
+            const char *reconstructed = vielotus_get_composing_text(vl_engine->session);
+            if (vielotus_is_composing(vl_engine->session) &&
+                reconstructed && strcmp(reconstructed, full_word) == 0) {
+                vielotus_feed_char(vl_engine->session, keyval);
+                const char *after_comp = vielotus_get_composing_text(vl_engine->session);
+                if (vielotus_is_composing(vl_engine->session) &&
+                    after_comp &&
+                    ibus_vielotus_utf8_codepoint_count(after_comp) == total_word_cp &&
+                    strcmp(after_comp, full_word) != 0 &&
+                    ibus_vielotus_has_non_ascii(after_comp)) {
+                    ibus_engine_delete_surrounding_text(engine, -(gint)left_chars, total_word_cp);
+                    ibus_vielotus_update_preedit(vl_engine);
+#ifdef VIELOTUS_ENABLE_LAB
+                    char ctx_tag[48];
+                    char log_raw_after[256] = {0};
+                    char log_comp_after[256] = {0};
+                    char log_word_before[128] = {0};
+                    ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+                    vl_lab_escape_str(full_word, log_word_before, sizeof(log_word_before));
+                    vl_lab_escape_str(vielotus_get_raw_text(vl_engine->session), log_raw_after, sizeof(log_raw_after));
+                    vl_lab_escape_str(after_comp, log_comp_after, sizeof(log_comp_after));
+                    vl_lab_write_event(
+                        vl_engine->is_password_field,
+                        "ibus-vielotus",
+                        ctx_tag,
+                        "KEY_DOWN",
+                        vl_lab_now_us() - t0_us,
+                        "kv=0x%04x kc=%u mod=0x%x ch='%c' comp=0->1 act=ADOPT_MOD raw=\"%s\"->\"%s\" word=\"%s\"->\"%s\"",
+                        keyval, keycode, state, (char)keyval, canon_raw, log_raw_after, log_word_before, log_comp_after
+                    );
+#endif
+                    return TRUE;
+                }
+            }
+            /* Not an in-place diacritic modifier (e.g. inserting a new vowel/letter at đ|ng or c|c):
+             * restore clean session before feeding keyval normally. */
+            vielotus_reset_session(vl_engine->session);
+            ibus_vielotus_sync_armed_word_from_text(vl_engine, text_str, cursor_pos, anchor_pos);
+            if (ibus_vielotus_has_non_ascii(full_word) || ibus_vielotus_has_non_ascii(text_str)) {
+                vielotus_append_context(vl_engine->session, "ự");
+            }
+        }
+    }
+    return FALSE;
 }
 
 static gboolean ibus_vielotus_engine_process_key_event(
@@ -790,6 +1280,16 @@ static gboolean ibus_vielotus_engine_process_key_event(
 
     // Handle printable ASCII characters (32..126)
     if (keyval >= 32 && keyval < 127) {
+#ifdef VIELOTUS_ENABLE_LAB
+        uint64_t t0_us = vl_lab_now_us();
+        int comp_was = vielotus_is_composing(vl_engine->session) ? 1 : 0;
+        char log_raw_before[256] = {0};
+        char log_comp_before[256] = {0};
+        if (comp_was && vl_engine->session) {
+            vl_lab_escape_str(vielotus_get_raw_text(vl_engine->session), log_raw_before, sizeof(log_raw_before));
+            vl_lab_escape_str(vielotus_get_composing_text(vl_engine->session), log_comp_before, sizeof(log_comp_before));
+        }
+#endif
         gboolean is_alpha = (keyval >= 'a' && keyval <= 'z') || (keyval >= 'A' && keyval <= 'Z');
         gboolean is_digit = (keyval >= '0' && keyval <= '9');
         gboolean is_word_char = is_alpha || (vl_engine->is_vni && is_digit && vielotus_is_composing(vl_engine->session));
@@ -804,13 +1304,54 @@ static gboolean ibus_vielotus_engine_process_key_event(
                     IBusText *commit_text = ibus_text_new_from_string(buf);
                     ibus_engine_commit_text(engine, commit_text);
                     ibus_vielotus_engine_reset_internal(vl_engine);
+#ifdef VIELOTUS_ENABLE_LAB
+                    char ctx_tag[48];
+                    char esc_out[512];
+                    ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+                    vl_lab_escape_str(buf, esc_out, sizeof(esc_out));
+                    vl_lab_write_event(
+                        vl_engine->is_password_field,
+                        "ibus-vielotus",
+                        ctx_tag,
+                        "KEY_DOWN",
+                        vl_lab_now_us() - t0_us,
+                        "kv=0x%04x kc=%u mod=0x%x ch='%c' comp=%d->0 act=BRACKET_COMMIT raw=\"%s\"->\"\" word=\"%s\"->\"%s\"",
+                        keyval, keycode, state, (char)keyval, comp_was, log_raw_before, log_comp_before, esc_out
+                    );
+#endif
                     return TRUE;
                 }
                 char trail[2] = { (char)keyval, '\0' };
                 ibus_vielotus_commit_composing(vl_engine, trail);
+#ifdef VIELOTUS_ENABLE_LAB
+                char ctx_tag[48];
+                ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+                vl_lab_write_event(
+                    vl_engine->is_password_field,
+                    "ibus-vielotus",
+                    ctx_tag,
+                    "KEY_DOWN",
+                    vl_lab_now_us() - t0_us,
+                    "kv=0x%04x kc=%u mod=0x%x ch='%c' comp=%d->0 act=BOUNDARY_COMMIT raw=\"%s\"->\"\" word=\"%s\"->\"\"",
+                    keyval, keycode, state, (char)keyval, comp_was, log_raw_before, log_comp_before
+                );
+#endif
                 return TRUE;
             } else {
                 vielotus_feed_char(vl_engine->session, keyval);
+#ifdef VIELOTUS_ENABLE_LAB
+                char ctx_tag[48];
+                ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+                vl_lab_write_event(
+                    vl_engine->is_password_field,
+                    "ibus-vielotus",
+                    ctx_tag,
+                    "KEY_DOWN",
+                    vl_lab_now_us() - t0_us,
+                    "kv=0x%04x kc=%u mod=0x%x ch='%c' comp=0->0 act=PASS_THROUGH",
+                    keyval, keycode, state, (char)keyval
+                );
+#endif
                 return FALSE;
             }
         }
@@ -822,6 +1363,14 @@ static gboolean ibus_vielotus_engine_process_key_event(
             if ((raw_check && strlen(raw_check) >= 48) ||
                 (comp_check && strlen(comp_check) >= 48)) {
                 ibus_vielotus_commit_composing(vl_engine, NULL);
+            }
+        } else {
+            uint64_t adopt_t0 = 0;
+#ifdef VIELOTUS_ENABLE_LAB
+            adopt_t0 = t0_us;
+#endif
+            if (ibus_vielotus_prepare_word_start_from_surrounding(vl_engine, keyval, keycode, state, adopt_t0)) {
+                return TRUE;
             }
         }
 
@@ -899,6 +1448,34 @@ static gboolean ibus_vielotus_engine_process_key_event(
                 }
             }
         }
+#ifdef VIELOTUS_ENABLE_LAB
+        {
+            char ctx_tag[48];
+            char log_raw_after[256] = {0};
+            char log_comp_after[256] = {0};
+            int comp_now = vielotus_is_composing(vl_engine->session) ? 1 : 0;
+            const char *act_name = (action == VIELOTUS_ACTION_COMMIT) ? "COMMIT" :
+                                   (action == VIELOTUS_ACTION_REPLACE) ? "REPLACE" :
+                                   (action == VIELOTUS_ACTION_CONSUMED) ? "CONSUMED" : "NONE";
+            ibus_vielotus_lab_ctx_tag(vl_engine, ctx_tag, sizeof(ctx_tag));
+            if (comp_now && vl_engine->session) {
+                vl_lab_escape_str(vielotus_get_raw_text(vl_engine->session), log_raw_after, sizeof(log_raw_after));
+                vl_lab_escape_str(vielotus_get_composing_text(vl_engine->session), log_comp_after, sizeof(log_comp_after));
+            } else if (action == VIELOTUS_ACTION_COMMIT && vl_engine->session) {
+                vl_lab_escape_str(vielotus_get_last_text(vl_engine->session), log_comp_after, sizeof(log_comp_after));
+            }
+            vl_lab_write_event(
+                vl_engine->is_password_field,
+                "ibus-vielotus",
+                ctx_tag,
+                "KEY_DOWN",
+                vl_lab_now_us() - t0_us,
+                "kv=0x%04x kc=%u mod=0x%x ch='%c' comp=%d->%d act=%s raw=\"%s\"->\"%s\" word=\"%s\"->\"%s\"",
+                keyval, keycode, state, (char)keyval, comp_was, comp_now, act_name,
+                log_raw_before, log_raw_after, log_comp_before, log_comp_after
+            );
+        }
+#endif
         if (action == VIELOTUS_ACTION_COMMIT) {
             const char *committed = vielotus_get_last_text(vl_engine->session);
             char buf[1024];
@@ -907,7 +1484,8 @@ static gboolean ibus_vielotus_engine_process_key_event(
                 IBusText *commit_text = ibus_text_new_from_string(buf);
                 ibus_engine_commit_text(engine, commit_text);
             }
-            ibus_vielotus_engine_reset_internal(vl_engine);
+            vl_engine->replayed_after_backspace = FALSE;
+            ibus_vielotus_clear_preedit(engine);
             return TRUE;
         } else if (vielotus_is_composing(vl_engine->session) ||
                    action == VIELOTUS_ACTION_REPLACE ||
@@ -973,6 +1551,10 @@ int main(int argc, char **argv) {
     IBusFactory *factory = ibus_factory_new(ibus_bus_get_connection(bus));
     ibus_factory_add_engine(factory, "vielotus", IBUS_TYPE_VIELOTUS_ENGINE);
     ibus_factory_add_engine(factory, "vielotus-vni", IBUS_TYPE_VIELOTUS_ENGINE);
+
+    if (g_file_test("/usr/bin/vielotus-settings", G_FILE_TEST_IS_EXECUTABLE)) {
+        g_spawn_command_line_async("/usr/bin/vielotus-settings --repair-sources", NULL);
+    }
 
     if (ibus) {
         ibus_bus_request_name(bus, "org.freedesktop.IBus.VieLotus", 0);

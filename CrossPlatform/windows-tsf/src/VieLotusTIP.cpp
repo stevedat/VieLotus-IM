@@ -494,6 +494,18 @@ bool CVieLotusTIP::IsComposingSession() const {
         return api.is_composing(m_session);
     }
 #if defined(VIELOTUS_EMBEDDED_ENGINE)
+    return m_nativeEngine.isComposing();
+#else
+    return false;
+#endif
+}
+
+bool CVieLotusTIP::HasActiveWordSession() const {
+    const auto &api = GetCApi();
+    if (m_session && api.isValid) {
+        return api.is_composing(m_session);
+    }
+#if defined(VIELOTUS_EMBEDDED_ENGINE)
     return m_nativeEngine.hasActiveWord();
 #else
     return false;
@@ -629,7 +641,7 @@ void CVieLotusTIP::ExecuteEditSession(ITfContext *pic, int32_t backspaces, const
     m_lastEditShifted = 0;
     m_lastEditSetTextHr = S_OK;
     if (!pic) return;
-    const bool keepComposition = !bCommit && IsComposingSession();
+    const bool keepComposition = !bCommit && HasActiveWordSession();
     CEditSession *pEdit = new (std::nothrow) CEditSession(
         pic,
         backspaces,
@@ -809,8 +821,9 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
     }
 
     const bool isComposing = IsComposingSession();
+    const bool hasActiveWord = HasActiveWordSession();
 
-    // Backspace: eat when composing; passively clear delimiter flags when idle
+    // Backspace: eat when composing (including post-space re-arm); passively clear delimiter flags when idle
     if (wParam == VK_BACK) {
         if (isComposing) {
             *pfEaten = TRUE;
@@ -839,7 +852,7 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
                 *pfEaten = TRUE;
                 return S_OK;
             }
-            if (isComposing) {
+            if (hasActiveWord) {
                 const bool isVniDigit = m_isVniMode && (ch >= L'0' && ch <= L'9');
                 const bool isBoundary = IsEngineBoundaryPunctuation(ch);
                 if (isVniDigit || isBoundary || m_session != nullptr) {
@@ -852,11 +865,11 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
                 EndActiveComposition(pic);
                 return S_OK;
             }
-            // Idle (!isComposing): passively track leading '/', digits '0'..'9', and tech delimiters '_', '\'
+            // Idle (!hasActiveWord): passively track leading '/', digits '0'..'9', and tech delimiters '_', '\'
             // while leaving *pfEaten = FALSE so the host app receives the native key event untouched.
             FeedCharSession(static_cast<uint32_t>(ch));
             return S_OK;
-        } else if (kind == PassiveKeyKind::NonAsciiOrDeadKey && isComposing) {
+        } else if (kind == PassiveKeyKind::NonAsciiOrDeadKey && hasActiveWord) {
             ClearWordStateSession();
             EndActiveComposition(pic);
             return S_OK;
@@ -974,7 +987,12 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
                 const char *replacement = GetLastTextSession();
                 std::wstring wText = Utf8ToWide(replacement);
                 ExecuteEditSession(pic, bs, wText, false);
-                *pfEaten = TRUE;
+                if (bs > 0 && wText.empty() && m_lastEditShifted == 0) {
+                    ClearWordStateSession();
+                    *pfEaten = FALSE;
+                } else {
+                    *pfEaten = TRUE;
+                }
 #ifdef VIELOTUS_ENABLE_LAB
                 char safeOut[128] = {0};
                 vielotus_win_lab::EscapeAsciiInto(replacement, safeOut, sizeof(safeOut));
