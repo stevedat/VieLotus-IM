@@ -97,7 +97,7 @@ Filename: "{sys}\rundll32.exe"; Parameters: """{app}\VieLotusTIP.dll"",ActivateU
 Filename: "{sys}\rundll32.exe"; Parameters: "user32.dll,UpdatePerUserSystemParameters"; Flags: runhidden
 Filename: "{sys}\ctfmon.exe"; Flags: nowait runhidden
 ; Post-install checkbox to open Sen Việt Settings Window immediately (skipped automatically during Microsoft Store / WinGet silent install)
-Filename: "{app}\VieLotusSettings.exe"; Description: "Mở bảng Cài đặt Sen Việt (VieLotusIM)"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\VieLotusSettings.exe"; Description: "Mở bảng Cài đặt Sen Việt (VieLotusIM)"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
 [UninstallRun]
 Filename: "{sys}\rundll32.exe"; Parameters: """{app}\VieLotusTIP.dll"",DeactivateUserProfilesW"; Flags: runhidden; RunOnceId: "DeactivateVieLotusProfiles"
