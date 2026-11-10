@@ -642,9 +642,10 @@ enum class HitRegion : int {
 
 struct BentoSettingsState {
     VieLotusWindowsPrefs prefs{};
-    int selectedTab{0}; // 0 = Cài đặt, 1 = Về ứng dụng
+    int selectedTab{0}; // 0 = Cài đặt, 1 = Thông tin
     HitRegion hoveredRegion{HitRegion::None};
     float dpiScale{1.0f};
+    bool isDark{false};
     Image *pAppIcon{nullptr};
     HICON hWndIconBig{nullptr};
     HICON hWndIconSmall{nullptr};
@@ -652,6 +653,23 @@ struct BentoSettingsState {
     HFONT hEditFont{nullptr};
     HBRUSH hEditBgBrush{nullptr};
 };
+
+static bool IsWindowsDarkMode() {
+    HKEY hKey = nullptr;
+    DWORD useLight = 1;
+    DWORD cb = sizeof(useLight);
+    if (RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+            0,
+            KEY_READ,
+            &hKey
+        ) == ERROR_SUCCESS) {
+        RegQueryValueExW(hKey, L"AppsUseLightTheme", nullptr, nullptr, reinterpret_cast<LPBYTE>(&useLight), &cb);
+        RegCloseKey(hKey);
+    }
+    return (useLight == 0);
+}
 
 static std::wstring GetDllDirPath() {
     WCHAR path[MAX_PATH] = {0};
@@ -752,6 +770,7 @@ static HitRegion HitTestBentoUI(const BentoSettingsState *st, float xDip, float 
 static void DrawHeroInputCard(
     Graphics &g,
     float s,
+    bool isDark,
     float x, float y, float w, float h,
     bool isSelected,
     bool isHovered,
@@ -765,25 +784,34 @@ static void DrawHeroInputCard(
     StringFormat &sfLeft,
     StringFormat &sfCenter
 ) {
-    Color accent(255, 0, 122, 255); // Apple Blue #007AFF
+    Color accent = isDark ? Color(255, 77, 163, 255) : Color(255, 0, 122, 255);
     Color fill = isSelected
-        ? Color(255, 236, 245, 255)
-        : (isHovered ? Color(255, 250, 250, 253) : Color(255, 255, 255, 255));
+        ? (isDark ? Color(255, 29, 44, 72) : Color(255, 236, 245, 255))
+        : (isHovered
+            ? (isDark ? Color(255, 44, 44, 58) : Color(255, 250, 250, 253))
+            : (isDark ? Color(255, 35, 35, 46) : Color(255, 255, 255, 255)));
     Color border = isSelected
         ? accent
-        : (isHovered ? Color(255, 195, 200, 210) : Color(255, 226, 226, 232));
+        : (isHovered
+            ? (isDark ? Color(255, 82, 82, 104) : Color(255, 195, 200, 210))
+            : (isDark ? Color(255, 56, 56, 72) : Color(255, 226, 226, 232)));
     float borderW = isSelected ? (1.8f * s) : (1.0f * s);
 
     DrawCard(g, RectF(x * s, y * s, w * s, h * s), 12.0f * s, fill, border, borderW);
 
     // Icon badge square (top-left)
     RectF iconBox((x + 11.0f) * s, (y + 9.0f) * s, 22.0f * s, 22.0f * s);
-    FillRoundRect(g, iconBox, 6.0f * s, isSelected ? Color(255, 0, 122, 255) : Color(255, 236, 236, 241));
-    SolidBrush iconTextBrush(isSelected ? Color(255, 255, 255, 255) : Color(255, 100, 100, 108));
+    FillRoundRect(
+        g, iconBox, 6.0f * s,
+        isSelected ? accent : (isDark ? Color(255, 50, 50, 64) : Color(255, 236, 236, 241))
+    );
+    SolidBrush iconTextBrush(
+        isSelected ? Color(255, 255, 255, 255) : (isDark ? Color(255, 175, 175, 188) : Color(255, 100, 100, 108))
+    );
     g.DrawString(iconText, -1, &fBadge, iconBox, &sfCenter, &iconTextBrush);
 
     // Title
-    SolidBrush primaryBrush(Color(255, 28, 28, 30));
+    SolidBrush primaryBrush(isDark ? Color(255, 245, 245, 247) : Color(255, 28, 28, 30));
     RectF titleRect((x + 39.0f) * s, (y + 9.0f) * s, (w - 70.0f) * s, 22.0f * s);
     g.DrawString(title, -1, &fTitle, titleRect, &sfLeft, &primaryBrush);
 
@@ -798,18 +826,21 @@ static void DrawHeroInputCard(
         g.DrawLine(&chkPen, (x + w - 22.0f) * s, (y + 20.0f) * s, (x + w - 19.0f) * s, (y + 23.0f) * s);
         g.DrawLine(&chkPen, (x + w - 19.0f) * s, (y + 23.0f) * s, (x + w - 14.0f) * s, (y + 17.0f) * s);
     } else {
-        Pen circlePen(Color(255, 195, 195, 204), 1.4f * s);
+        Pen circlePen(isDark ? Color(255, 92, 92, 110) : Color(255, 195, 195, 204), 1.4f * s);
         g.DrawEllipse(&circlePen, chkRect);
     }
 
     // Bottom Row: Monospace Pill Badge + Subtitle
     float badgeW = 72.0f;
     RectF badgeRect((x + 11.0f) * s, (y + 36.0f) * s, badgeW * s, 19.0f * s);
-    FillRoundRect(g, badgeRect, 5.0f * s, isSelected ? Color(42, 0, 122, 255) : Color(255, 240, 240, 245));
-    SolidBrush badgeBrush(isSelected ? accent : Color(255, 95, 95, 102));
+    FillRoundRect(
+        g, badgeRect, 5.0f * s,
+        isSelected ? Color(52, accent.GetR(), accent.GetG(), accent.GetB()) : (isDark ? Color(255, 48, 48, 62) : Color(255, 240, 240, 245))
+    );
+    SolidBrush badgeBrush(isSelected ? accent : (isDark ? Color(255, 175, 175, 188) : Color(255, 95, 95, 102)));
     g.DrawString(badge, -1, &fBadge, badgeRect, &sfCenter, &badgeBrush);
 
-    SolidBrush secBrush(Color(255, 110, 110, 115));
+    SolidBrush secBrush(isDark ? Color(255, 162, 162, 174) : Color(255, 110, 110, 115));
     RectF subRect((x + 88.0f) * s, (y + 36.0f) * s, (w - 94.0f) * s, 19.0f * s);
     g.DrawString(subtitle, -1, &fSub, subRect, &sfLeft, &secBrush);
 }
@@ -817,6 +848,7 @@ static void DrawHeroInputCard(
 static void DrawBentoFeatureTile(
     Graphics &g,
     float s,
+    bool isDark,
     float x, float y, float w, float h,
     bool isActive,
     bool isHovered,
@@ -831,23 +863,25 @@ static void DrawBentoFeatureTile(
     StringFormat &sfLeft,
     StringFormat &sfCenter
 ) {
-    Color fill = isHovered ? Color(255, 250, 250, 253) : Color(255, 255, 255, 255);
+    Color fill = isHovered
+        ? (isDark ? Color(255, 44, 44, 58) : Color(255, 250, 250, 253))
+        : (isDark ? Color(255, 35, 35, 46) : Color(255, 255, 255, 255));
     Color border = isActive
-        ? Color(130, accent.GetR(), accent.GetG(), accent.GetB())
-        : Color(255, 226, 226, 232);
+        ? Color(isDark ? 165 : 130, accent.GetR(), accent.GetG(), accent.GetB())
+        : (isDark ? Color(255, 56, 56, 72) : Color(255, 226, 226, 232));
     DrawCard(g, RectF(x * s, y * s, w * s, h * s), 12.0f * s, fill, border, 1.1f * s);
 
     // Icon box (24x24)
     RectF iconBox((x + 11.0f) * s, (y + 9.0f) * s, 24.0f * s, 24.0f * s);
     Color iconBg = isActive
-        ? Color(38, accent.GetR(), accent.GetG(), accent.GetB())
-        : Color(255, 238, 238, 243);
+        ? Color(isDark ? 55 : 38, accent.GetR(), accent.GetG(), accent.GetB())
+        : (isDark ? Color(255, 48, 48, 62) : Color(255, 238, 238, 243));
     FillRoundRect(g, iconBox, 6.5f * s, iconBg);
-    SolidBrush iconBrush(isActive ? accent : Color(255, 120, 120, 128));
+    SolidBrush iconBrush(isActive ? accent : (isDark ? Color(255, 165, 165, 178) : Color(255, 120, 120, 128)));
     g.DrawString(iconGlyph, -1, &fPill, iconBox, &sfCenter, &iconBrush);
 
     // Title
-    SolidBrush primaryBrush(Color(255, 28, 28, 30));
+    SolidBrush primaryBrush(isDark ? Color(255, 245, 245, 247) : Color(255, 28, 28, 30));
     RectF titleRect((x + 41.0f) * s, (y + 10.0f) * s, (w - 116.0f) * s, 20.0f * s);
     g.DrawString(title, -1, &fTitle, titleRect, &sfLeft, &primaryBrush);
 
@@ -855,14 +889,14 @@ static void DrawBentoFeatureTile(
     float pillW = 64.0f;
     RectF pillRect((x + w - pillW - 10.0f) * s, (y + 11.0f) * s, pillW * s, 19.0f * s);
     Color pillBg = isActive
-        ? Color(38, accent.GetR(), accent.GetG(), accent.GetB())
-        : Color(255, 238, 238, 243);
+        ? Color(isDark ? 55 : 38, accent.GetR(), accent.GetG(), accent.GetB())
+        : (isDark ? Color(255, 48, 48, 62) : Color(255, 238, 238, 243));
     FillRoundRect(g, pillRect, 9.5f * s, pillBg);
-    SolidBrush pillTextBrush(isActive ? accent : Color(255, 120, 120, 128));
+    SolidBrush pillTextBrush(isActive ? accent : (isDark ? Color(255, 165, 165, 178) : Color(255, 120, 120, 128)));
     g.DrawString(pillText, -1, &fPill, pillRect, &sfCenter, &pillTextBrush);
 
     // Subtitle
-    SolidBrush secBrush(Color(255, 110, 110, 115));
+    SolidBrush secBrush(isDark ? Color(255, 162, 162, 174) : Color(255, 110, 110, 115));
     RectF subRect((x + 11.0f) * s, (y + 36.0f) * s, (w - 22.0f) * s, 19.0f * s);
     g.DrawString(subtitle, -1, &fSub, subRect, &sfLeft, &secBrush);
 }
@@ -888,6 +922,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         g.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
 
         float s = st->dpiScale;
+        bool isDark = st->isDark;
 
         FontFamily ffSans(L"Segoe UI");
         FontFamily ffMono(L"Consolas");
@@ -925,14 +960,25 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         sfCenter.SetAlignment(StringAlignmentCenter);
         sfCenter.SetLineAlignment(StringAlignmentCenter);
 
-        // 1. Background canvas (#F5F5F7 Apple macOS Grouped Background)
-        SolidBrush bgBrush(Color(255, 245, 245, 247));
+        Color canvasCol = isDark ? Color(255, 20, 20, 25) : Color(255, 245, 245, 247);
+        Color barCol = isDark ? Color(255, 28, 28, 36) : Color(255, 255, 255, 255);
+        Color cardCol = isDark ? Color(255, 35, 35, 46) : Color(255, 255, 255, 255);
+        Color cardBorderCol = isDark ? Color(255, 56, 56, 72) : Color(255, 226, 226, 232);
+        Color divCol = isDark ? Color(255, 46, 46, 58) : Color(255, 229, 229, 234);
+        Color fgPrimary = isDark ? Color(255, 245, 245, 247) : Color(255, 28, 28, 30);
+        Color fgSecondary = isDark ? Color(255, 162, 162, 174) : Color(255, 110, 110, 115);
+        Color blueCol = isDark ? Color(255, 77, 163, 255) : Color(255, 0, 122, 255);
+        Color indigoCol = isDark ? Color(255, 129, 140, 248) : Color(255, 88, 86, 214);
+        Color tealCol = isDark ? Color(255, 45, 212, 191) : Color(255, 13, 148, 136);
+
+        // 1. Background canvas
+        SolidBrush bgBrush(canvasCol);
         g.FillRectangle(&bgBrush, 0, 0, width, height);
 
         // 2. Top Header Bar (0..52)
-        SolidBrush whiteBrush(Color(255, 255, 255, 255));
-        g.FillRectangle(&whiteBrush, 0.0f, 0.0f, static_cast<float>(width), 52.0f * s);
-        Pen divPen(Color(255, 229, 229, 234), 1.0f * s);
+        SolidBrush barBrush(barCol);
+        g.FillRectangle(&barBrush, 0.0f, 0.0f, static_cast<float>(width), 52.0f * s);
+        Pen divPen(divCol, 1.0f * s);
         g.DrawLine(&divPen, 0.0f, 52.0f * s, static_cast<float>(width), 52.0f * s);
 
         // App Icon (34x34)
@@ -945,32 +991,37 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             g.DrawString(L"SV", -1, &fBrand, iconRect, &sfCenter, &wBr);
         }
 
-        // Brand Title "Sen Việt" + version pill "v2.0.2"
-        SolidBrush primaryBrush(Color(255, 28, 28, 30));
-        SolidBrush secondaryBrush(Color(255, 110, 110, 115));
-        SolidBrush blueBrush(Color(255, 0, 122, 255));
+        // Brand Title "Sen Việt" + version pill "v2.0.3"
+        SolidBrush primaryBrush(fgPrimary);
+        SolidBrush secondaryBrush(fgSecondary);
+        SolidBrush blueBrush(blueCol);
 
         RectF brandRect(62.0f * s, 8.0f * s, 72.0f * s, 20.0f * s);
         g.DrawString(L"Sen Vi\u1EC7t", -1, &fBrand, brandRect, &sfLeft, &primaryBrush);
 
         RectF verPill(130.0f * s, 10.0f * s, 42.0f * s, 16.0f * s);
-        FillRoundRect(g, verPill, 8.0f * s, Color(36, 0, 122, 255));
-        g.DrawString(L"v2.0.4", -1, &fVersion, verPill, &sfCenter, &blueBrush);
+        FillRoundRect(g, verPill, 8.0f * s, Color(isDark ? 55 : 36, blueCol.GetR(), blueCol.GetG(), blueCol.GetB()));
+        g.DrawString(L"v2.0.3", -1, &fVersion, verPill, &sfCenter, &blueBrush);
 
         RectF subBrandRect(62.0f * s, 28.0f * s, 330.0f * s, 17.0f * s);
         g.DrawString(L"B\u1ED9 g\u00F5 ti\u1EBFng Vi\u1EC7t thu\u1EA7n chu\u1EA9n Native TSF \u2022 100% Offline", -1, &fHeaderSub, subBrandRect, &sfLeft, &secondaryBrush);
 
         // 2-Tab Segmented Switcher (Cài đặt | Thông tin)
         RectF segBg(404.0f * s, 11.0f * s, 198.0f * s, 30.0f * s);
-        FillRoundRect(g, segBg, 8.0f * s, Color(255, 235, 235, 240));
+        FillRoundRect(g, segBg, 8.0f * s, isDark ? Color(255, 42, 42, 54) : Color(255, 235, 235, 240));
 
         RectF tab0Rect(407.0f * s, 14.0f * s, 94.0f * s, 24.0f * s);
         RectF tab1Rect(505.0f * s, 14.0f * s, 94.0f * s, 24.0f * s);
         RectF activeTabRect = (st->selectedTab == 0) ? tab0Rect : tab1Rect;
-        DrawCard(g, activeTabRect, 6.5f * s, Color(255, 255, 255, 255), Color(35, 0, 0, 0), 0.8f * s);
+        DrawCard(
+            g, activeTabRect, 6.5f * s,
+            isDark ? Color(255, 58, 58, 74) : Color(255, 255, 255, 255),
+            isDark ? Color(255, 82, 82, 104) : Color(35, 0, 0, 0),
+            0.8f * s
+        );
 
-        SolidBrush tab0Brush(st->selectedTab == 0 ? Color(255, 0, 122, 255) : Color(255, 95, 95, 102));
-        SolidBrush tab1Brush(st->selectedTab == 1 ? Color(255, 0, 122, 255) : Color(255, 95, 95, 102));
+        SolidBrush tab0Brush(st->selectedTab == 0 ? blueCol : fgSecondary);
+        SolidBrush tab1Brush(st->selectedTab == 1 ? blueCol : fgSecondary);
         g.DrawString(L"C\u00E0i \u0111\u1EB7t", -1, &fTab, tab0Rect, &sfCenter, &tab0Brush);
         g.DrawString(L"Th\u00F4ng tin", -1, &fTab, tab1Rect, &sfCenter, &tab1Brush);
 
@@ -989,7 +1040,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             );
 
             DrawHeroInputCard(
-                g, s, 18.0f, 80.0f, 188.0f, 62.0f,
+                g, s, isDark, 18.0f, 80.0f, 188.0f, 62.0f,
                 !st->prefs.isVni,
                 st->hoveredRegion == HitRegion::CardTelex,
                 L"TX",
@@ -1000,7 +1051,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             );
 
             DrawHeroInputCard(
-                g, s, 216.0f, 80.0f, 188.0f, 62.0f,
+                g, s, isDark, 216.0f, 80.0f, 188.0f, 62.0f,
                 st->prefs.isVni,
                 st->hoveredRegion == HitRegion::CardVni,
                 L"19",
@@ -1011,7 +1062,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             );
 
             DrawHeroInputCard(
-                g, s, 414.0f, 80.0f, 188.0f, 62.0f,
+                g, s, isDark, 414.0f, 80.0f, 188.0f, 62.0f,
                 st->prefs.senFlex,
                 st->hoveredRegion == HitRegion::BarSenFlex,
                 L"\u2726",
@@ -1029,10 +1080,10 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
             // Tile 1: Bảng gõ tắt
             DrawBentoFeatureTile(
-                g, s, 18.0f, 168.0f, 286.0f, 62.0f,
+                g, s, isDark, 18.0f, 168.0f, 286.0f, 62.0f,
                 st->prefs.macroEnabled,
                 st->hoveredRegion == HitRegion::TileMacroToggle || st->hoveredRegion == HitRegion::BtnMacroManage,
-                Color(255, 88, 86, 214), // Indigo
+                indigoCol,
                 L"GT",
                 L"B\u1EA3ng g\u00F5 t\u1EAFt",
                 st->prefs.macroEnabled
@@ -1044,10 +1095,10 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
             // Tile 2: Chế độ Code
             DrawBentoFeatureTile(
-                g, s, 316.0f, 168.0f, 286.0f, 62.0f,
+                g, s, isDark, 316.0f, 168.0f, 286.0f, 62.0f,
                 st->prefs.developerMode,
                 st->hoveredRegion == HitRegion::TileDevMode,
-                Color(255, 13, 148, 136), // Teal
+                tealCol,
                 L"<>",
                 L"Ch\u1EBF \u0111\u1ED9 Code",
                 st->prefs.developerMode
@@ -1061,16 +1112,21 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             {
                 bool anyChipActive = st->prefs.quickTelex || st->prefs.relaxedCoda;
                 bool tileHovered = (st->hoveredRegion == HitRegion::ChipQuickTelex || st->hoveredRegion == HitRegion::ChipRelaxedCoda);
-                Color orangeAcc(255, 234, 88, 12);
-                Color tileFill = tileHovered ? Color(255, 250, 250, 253) : Color(255, 255, 255, 255);
+                Color orangeAcc = isDark ? Color(255, 251, 146, 60) : Color(255, 234, 88, 12);
+                Color tileFill = tileHovered
+                    ? (isDark ? Color(255, 44, 44, 58) : Color(255, 250, 250, 253))
+                    : cardCol;
                 Color tileBorder = anyChipActive
-                    ? Color(130, orangeAcc.GetR(), orangeAcc.GetG(), orangeAcc.GetB())
-                    : Color(255, 226, 226, 232);
+                    ? Color(isDark ? 165 : 130, orangeAcc.GetR(), orangeAcc.GetG(), orangeAcc.GetB())
+                    : cardBorderCol;
                 DrawCard(g, RectF(18.0f * s, 238.0f * s, 286.0f * s, 62.0f * s), 10.0f * s, tileFill, tileBorder, 1.1f * s);
 
                 RectF iconBox(28.0f * s, 245.0f * s, 22.0f * s, 22.0f * s);
-                FillRoundRect(g, iconBox, 6.0f * s, anyChipActive ? Color(38, 234, 88, 12) : Color(255, 238, 238, 243));
-                SolidBrush iconBr(anyChipActive ? orangeAcc : Color(255, 120, 120, 128));
+                FillRoundRect(
+                    g, iconBox, 6.0f * s,
+                    anyChipActive ? Color(isDark ? 55 : 38, orangeAcc.GetR(), orangeAcc.GetG(), orangeAcc.GetB()) : (isDark ? Color(255, 48, 48, 62) : Color(255, 238, 238, 243))
+                );
+                SolidBrush iconBr(anyChipActive ? orangeAcc : fgSecondary);
                 g.DrawString(L"\u26A1", -1, &fPill, iconBox, &sfCenter, &iconBr);
 
                 g.DrawString(
@@ -1081,12 +1137,16 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 auto drawConsonantChip = [&](float cx, const WCHAR *label, bool active, bool hovered) {
                     RectF chipRect(cx * s, 271.0f * s, 128.0f * s, 21.0f * s);
                     Color cFill = active
-                        ? Color(38, 234, 88, 12)
-                        : (hovered ? Color(255, 234, 234, 240) : Color(255, 242, 242, 247));
-                    Color cBorder = active ? Color(180, 234, 88, 12) : Color(255, 222, 222, 228);
+                        ? Color(isDark ? 58 : 38, orangeAcc.GetR(), orangeAcc.GetG(), orangeAcc.GetB())
+                        : (hovered
+                            ? (isDark ? Color(255, 56, 56, 72) : Color(255, 234, 234, 240))
+                            : (isDark ? Color(255, 46, 46, 60) : Color(255, 242, 242, 247)));
+                    Color cBorder = active
+                        ? Color(190, orangeAcc.GetR(), orangeAcc.GetG(), orangeAcc.GetB())
+                        : (isDark ? Color(255, 70, 70, 88) : Color(255, 222, 222, 228));
                     FillRoundRect(g, chipRect, 6.0f * s, cFill);
                     DrawRoundRect(g, chipRect, 6.0f * s, cBorder, 1.0f * s);
-                    SolidBrush cText(active ? orangeAcc : Color(255, 105, 105, 112));
+                    SolidBrush cText(active ? orangeAcc : fgSecondary);
                     g.DrawString(label, -1, &fPill, chipRect, &sfCenter, &cText);
                 };
 
@@ -1096,10 +1156,10 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
             // Tile 4: Phím tắt bộ gõ
             DrawBentoFeatureTile(
-                g, s, 316.0f, 238.0f, 286.0f, 62.0f,
+                g, s, isDark, 316.0f, 238.0f, 286.0f, 62.0f,
                 true,
                 st->hoveredRegion == HitRegion::TileWinTypingSettings,
-                Color(255, 0, 122, 255), // Blue
+                blueCol,
                 L"KB",
                 L"Ph\u00EDm t\u1EAFt b\u1ED9 g\u00F5",
                 L"Win+Space \u2022 Ctrl+Shift+S",
@@ -1109,9 +1169,14 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
             // Hàng 3: Ô thử gõ trực tiếp ("Thử gõ nhanh")
             RectF stripRect(18.0f * s, 308.0f * s, 584.0f * s, 32.0f * s);
-            DrawCard(g, stripRect, 9.0f * s, Color(255, 255, 255, 255), Color(255, 198, 202, 248), 1.1f * s);
+            DrawCard(
+                g, stripRect, 9.0f * s,
+                cardCol,
+                isDark ? Color(255, 72, 76, 130) : Color(255, 198, 202, 248),
+                1.1f * s
+            );
 
-            SolidBrush indigoBrush(Color(255, 88, 86, 214));
+            SolidBrush indigoBrush(indigoCol);
             g.DrawString(
                 L"\u2726 Th\u1EED g\u00F5:",
                 -1, &fBodyBold, RectF(28.0f * s, 308.0f * s, 68.0f * s, 32.0f * s), &sfLeft, &indigoBrush
@@ -1126,12 +1191,12 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             // =================================================================
             // TAB 1: THÔNG TIN (Bố cục ngang chữ nhật 620x384: 3 tầng cân đối)
             // =================================================================
-            SolidBrush indigoBrush(Color(255, 88, 86, 214));
-            SolidBrush tealBrush(Color(255, 13, 148, 136));
+            SolidBrush indigoBrush(indigoCol);
+            SolidBrush tealBrush(tealCol);
             SolidBrush whiteTextBrush(Color(255, 255, 255, 255));
 
             // Hàng 1 (Toàn chiều ngang): SỨ MỆNH SEN VIỆT (x=18, y=64, w=584, h=86)
-            DrawCard(g, RectF(18.0f * s, 64.0f * s, 584.0f * s, 86.0f * s), 10.0f * s, Color(255, 255, 255, 255), Color(255, 226, 226, 232));
+            DrawCard(g, RectF(18.0f * s, 64.0f * s, 584.0f * s, 86.0f * s), 10.0f * s, cardCol, cardBorderCol);
             g.DrawString(
                 L"\u2726 S\u1EE8 M\u1EC6NH SEN VI\u1EC6T",
                 -1, &fSecHdr, RectF(30.0f * s, 72.0f * s, 200.0f * s, 16.0f * s), &sfLeft, &indigoBrush
@@ -1149,15 +1214,17 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             // Cột trái: NidoOffice (https://educenter.app)
             DrawCard(
                 g, RectF(18.0f * s, 162.0f * s, 286.0f * s, 96.0f * s), 10.0f * s,
-                st->hoveredRegion == HitRegion::BtnNidoOfficeExplore ? Color(255, 246, 247, 255) : Color(255, 255, 255, 255),
-                Color(120, 88, 86, 214), 1.1f * s
+                st->hoveredRegion == HitRegion::BtnNidoOfficeExplore
+                    ? (isDark ? Color(255, 44, 46, 66) : Color(255, 246, 247, 255))
+                    : cardCol,
+                Color(120, indigoCol.GetR(), indigoCol.GetG(), indigoCol.GetB()), 1.1f * s
             );
             g.DrawString(
                 L"NidoOffice",
                 -1, &fTileTitle, RectF(30.0f * s, 174.0f * s, 85.0f * s, 18.0f * s), &sfLeft, &primaryBrush
             );
             RectF nidoBadge(114.0f * s, 175.0f * s, 108.0f * s, 16.0f * s);
-            FillRoundRect(g, nidoBadge, 8.0f * s, Color(36, 88, 86, 214));
+            FillRoundRect(g, nidoBadge, 8.0f * s, Color(isDark ? 55 : 36, indigoCol.GetR(), indigoCol.GetG(), indigoCol.GetB()));
             g.DrawString(L"EDUCENTER.APP", -1, &fPill, nidoBadge, &sfCenter, &indigoBrush);
             g.DrawString(
                 L"So\u1EA1n th\u1EA3o T\u00E0i li\u1EC7u, Trang tr\u00ECnh b\u00E0y & B\u1EA3ng t\u00EDnh t\u00EDch h\u1EE3p AI",
@@ -1170,15 +1237,17 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             // Cột phải: YouPersona.com
             DrawCard(
                 g, RectF(316.0f * s, 162.0f * s, 286.0f * s, 96.0f * s), 10.0f * s,
-                st->hoveredRegion == HitRegion::BtnYouPersonaExplore ? Color(255, 243, 252, 251) : Color(255, 255, 255, 255),
-                Color(120, 13, 148, 136), 1.1f * s
+                st->hoveredRegion == HitRegion::BtnYouPersonaExplore
+                    ? (isDark ? Color(255, 36, 52, 54) : Color(255, 243, 252, 251))
+                    : cardCol,
+                Color(120, tealCol.GetR(), tealCol.GetG(), tealCol.GetB()), 1.1f * s
             );
             g.DrawString(
                 L"YouPersona.com",
                 -1, &fTileTitle, RectF(328.0f * s, 174.0f * s, 115.0f * s, 18.0f * s), &sfLeft, &primaryBrush
             );
             RectF ypBadge(442.0f * s, 175.0f * s, 80.0f * s, 16.0f * s);
-            FillRoundRect(g, ypBadge, 8.0f * s, Color(36, 13, 148, 136));
+            FillRoundRect(g, ypBadge, 8.0f * s, Color(isDark ? 55 : 36, tealCol.GetR(), tealCol.GetG(), tealCol.GetB()));
             g.DrawString(L"THU CHI AI", -1, &fPill, ypBadge, &sfCenter, &tealBrush);
             g.DrawString(
                 L"Qu\u1EA3n l\u00FD T\u00E0i ch\u00EDnh c\u00E1 nh\u00E2n & Ng\u00E2n s\u00E1ch 6 chi\u1EBFc l\u1ECD b\u1EB1ng AI",
@@ -1189,12 +1258,17 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             g.DrawString(L"M\u1EDF \u2197", -1, &fPill, ypCta, &sfCenter, &whiteTextBrush);
 
             // Hàng 3 (Toàn chiều ngang): Cộng đồng & Mã nguồn (x=18, y=270, w=584, h=58)
-            DrawCard(g, RectF(18.0f * s, 270.0f * s, 584.0f * s, 58.0f * s), 10.0f * s, Color(255, 255, 255, 255), Color(255, 226, 226, 232));
+            DrawCard(g, RectF(18.0f * s, 270.0f * s, 584.0f * s, 58.0f * s), 10.0f * s, cardCol, cardBorderCol);
 
             auto drawLinkBtn = [&](float bx, const WCHAR *label, bool hovered) {
                 RectF btnR(bx * s, 282.0f * s, 180.0f * s, 34.0f * s);
-                FillRoundRect(g, btnR, 7.0f * s, hovered ? Color(255, 236, 238, 248) : Color(255, 245, 245, 249));
-                DrawRoundRect(g, btnR, 7.0f * s, Color(255, 222, 222, 228), 1.0f * s);
+                FillRoundRect(
+                    g, btnR, 7.0f * s,
+                    hovered
+                        ? (isDark ? Color(255, 58, 58, 76) : Color(255, 236, 238, 248))
+                        : (isDark ? Color(255, 46, 46, 60) : Color(255, 245, 245, 249))
+                );
+                DrawRoundRect(g, btnR, 7.0f * s, isDark ? Color(255, 72, 72, 92) : Color(255, 222, 222, 228), 1.0f * s);
                 g.DrawString(label, -1, &fSub, btnR, &sfCenter, &primaryBrush);
             };
 
@@ -1204,11 +1278,11 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         }
 
         // 3. Bottom Footer Bar (348..384)
-        g.FillRectangle(&whiteBrush, 0.0f, 348.0f * s, static_cast<float>(width), 36.0f * s);
+        g.FillRectangle(&barBrush, 0.0f, 348.0f * s, static_cast<float>(width), 36.0f * s);
         g.DrawLine(&divPen, 0.0f, 348.0f * s, static_cast<float>(width), 348.0f * s);
 
         SolidBrush greenDotBrush(Color(255, 34, 197, 94));
-        SolidBrush indigoFooterBrush(Color(255, 88, 86, 214));
+        SolidBrush indigoFooterBrush(indigoCol);
         g.FillEllipse(&greenDotBrush, RectF(18.0f * s, 363.0f * s, 6.5f * s, 6.5f * s));
         g.DrawString(
             L"Song ng\u1EEF Anh\u2013Vi\u1EC7t \u2022 Ch\u00EDnh t\u1EA3 chu\u1EA9n m\u1EDBi t\u1EF1 \u0111\u1ED9ng",
@@ -1244,6 +1318,7 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         int dpiY = GetDeviceCaps(hdc, LOGPIXELSY);
         ReleaseDC(hwnd, hdc);
         st->dpiScale = (dpiY > 0) ? (static_cast<float>(dpiY) / 96.0f) : 1.0f;
+        st->isDark = IsWindowsDarkMode();
 
         LoadVieLotusPrefs(st->prefs);
 
@@ -1262,12 +1337,14 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             if (st->hWndIconSmall) SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(st->hWndIconSmall));
         }
 
-        // Enable Windows 11 rounded window corners via DWM
+        // Enable Windows 11 rounded window corners & Dark Mode titlebar via DWM
         DWORD cornerPref = 2; // DWMWCP_ROUND
         DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
+        BOOL darkTitle = st->isDark ? TRUE : FALSE;
+        DwmSetWindowAttribute(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &darkTitle, sizeof(darkTitle));
 
         float s = st->dpiScale;
-        st->hEditBgBrush = CreateSolidBrush(RGB(255, 255, 255));
+        st->hEditBgBrush = CreateSolidBrush(st->isDark ? RGB(35, 35, 46) : RGB(255, 255, 255));
         st->hEditFont = CreateFontW(
             -static_cast<int>(12.5f * s + 0.5f), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
@@ -1302,8 +1379,8 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     case WM_CTLCOLOREDIT: {
         if (st && st->hEditBgBrush && reinterpret_cast<HWND>(lParam) == st->hTestEdit) {
             HDC hdcEdit = reinterpret_cast<HDC>(wParam);
-            SetTextColor(hdcEdit, RGB(28, 28, 30));
-            SetBkColor(hdcEdit, RGB(255, 255, 255));
+            SetTextColor(hdcEdit, st->isDark ? RGB(245, 245, 247) : RGB(28, 28, 30));
+            SetBkColor(hdcEdit, st->isDark ? RGB(35, 35, 46) : RGB(255, 255, 255));
             return reinterpret_cast<LRESULT>(st->hEditBgBrush);
         }
         break;
@@ -1314,8 +1391,16 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     case WM_SETTINGCHANGE: {
         if (st) {
             bool oldVni = st->prefs.isVni;
+            bool oldDark = st->isDark;
             LoadVieLotusPrefs(st->prefs);
-            if (st->prefs.isVni != oldVni) {
+            st->isDark = IsWindowsDarkMode();
+            if (st->isDark != oldDark) {
+                if (st->hEditBgBrush) DeleteObject(st->hEditBgBrush);
+                st->hEditBgBrush = CreateSolidBrush(st->isDark ? RGB(35, 35, 46) : RGB(255, 255, 255));
+                BOOL darkTitle = st->isDark ? TRUE : FALSE;
+                DwmSetWindowAttribute(hwnd, 20, &darkTitle, sizeof(darkTitle));
+            }
+            if (st->prefs.isVni != oldVni || st->isDark != oldDark) {
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
         }

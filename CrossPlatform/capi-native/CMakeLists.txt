@@ -77,7 +77,7 @@ target_compile_options(VieLotusCAPI PRIVATE
 set_target_properties(VieLotusCAPI PROPERTIES
     OUTPUT_NAME "VieLotusCAPI"
     SOVERSION 0
-    VERSION 0.2.1
+    VERSION 0.2.2
 )
 
 install(TARGETS VieLotusCAPI

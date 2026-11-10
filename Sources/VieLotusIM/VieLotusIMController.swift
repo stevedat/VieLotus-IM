@@ -3,7 +3,6 @@ import Cocoa
 import InputMethodKit
 import NaturalLanguage
 import VieLotusTrace
-import Carbon.HIToolbox
 
 @objc(VieLotusIMController)
 final class VieLotusIMController: IMKInputController {
@@ -46,14 +45,55 @@ final class VieLotusIMController: IMKInputController {
     private var labTraceTargetBundleID: String?
     private var hasActiveMarkedText: Bool = false
     private var precededByTechnicalDelimiter: Bool = false
+    private var followsDot = false
     private var machineTypingDetector = MachineTypingDetector()
     private weak var cachedRawClientObject: AnyObject?
     private var cachedWatchdogClientAdapter: WatchdogIMKClientAdapter?
     var monotonicClockNanoseconds: () -> UInt64 = { DispatchTime.now().uptimeNanoseconds }
     var secureInputCheck: () -> Bool = { SecureInputMonitor.shared.isSecureInputActive }
-    private static var isBrowserOmniboxSession: Bool = false
-    private static var lastOmniboxShortcutTime: UInt64 = 0
-    private static var omniboxFocusTransitionsSinceShortcut: Int = 0
+    private static let omniboxLock = NSLock()
+    private static var _isBrowserOmniboxSession: Bool = false
+    private static var _lastOmniboxShortcutTime: UInt64 = 0
+    private static var _omniboxFocusTransitionsSinceShortcut: Int = 0
+
+    private static var isBrowserOmniboxSession: Bool {
+        get {
+            omniboxLock.lock()
+            defer { omniboxLock.unlock() }
+            return _isBrowserOmniboxSession
+        }
+        set {
+            omniboxLock.lock()
+            _isBrowserOmniboxSession = newValue
+            omniboxLock.unlock()
+        }
+    }
+
+    private static var lastOmniboxShortcutTime: UInt64 {
+        get {
+            omniboxLock.lock()
+            defer { omniboxLock.unlock() }
+            return _lastOmniboxShortcutTime
+        }
+        set {
+            omniboxLock.lock()
+            _lastOmniboxShortcutTime = newValue
+            omniboxLock.unlock()
+        }
+    }
+
+    private static var omniboxFocusTransitionsSinceShortcut: Int {
+        get {
+            omniboxLock.lock()
+            defer { omniboxLock.unlock() }
+            return _omniboxFocusTransitionsSinceShortcut
+        }
+        set {
+            omniboxLock.lock()
+            _omniboxFocusTransitionsSinceShortcut = newValue
+            omniboxLock.unlock()
+        }
+    }
 
     func resolveTextClient(_ sender: Any?) -> IMKClientProtocol? {
         guard let sender else { return nil }
@@ -81,9 +121,11 @@ final class VieLotusIMController: IMKInputController {
     }
 
     private func clearBrowserOmniboxSession() {
-        Self.isBrowserOmniboxSession = false
-        Self.lastOmniboxShortcutTime = 0
-        Self.omniboxFocusTransitionsSinceShortcut = 0
+        Self.omniboxLock.lock()
+        Self._isBrowserOmniboxSession = false
+        Self._lastOmniboxShortcutTime = 0
+        Self._omniboxFocusTransitionsSinceShortcut = 0
+        Self.omniboxLock.unlock()
     }
 
     private func isURLContinuationPunctuation(_ char: Character) -> Bool {
@@ -360,6 +402,7 @@ final class VieLotusIMController: IMKInputController {
             hasActiveMarkedText = false
             isEditingInTerminalOverlay = false
             precededByTechnicalDelimiter = false
+            followsDot = false
             editCaretBack = Self.caretDisarmed
             virtualCursorLocation = NSNotFound
             compositionStartLocation = NSNotFound
@@ -743,11 +786,12 @@ final class VieLotusIMController: IMKInputController {
 
         // Handle Backspace: keyCode 51 (plain Backspace)
         if keyCode == 51 {
-            return handleBackspace(client: client, selection: selection, rawSelection: rawSelection, bundleID: bundleID, presentationMode: presentationMode)
+            return handleBackspace(client: client, selection: selection, rawSelection: rawSelection, bundleID: bundleID, presentationMode: presentationMode, isRepeat: event.isARepeat)
         }
 
         // Handle Return / Enter (keyCode 36, 76)
         if keyCode == 36 || keyCode == 76 {
+            defer { followsDot = false }
             if Self.isBrowserOmniboxSession || hasActiveOmniboxAutocompleteTail(client: client, bundleID: bundleID, rawSelection: rawSelection) {
                 clearBrowserOmniboxSession()
                 engine.reset()
@@ -931,6 +975,7 @@ final class VieLotusIMController: IMKInputController {
                 lastCommittedWordStartLocation = NSNotFound
                 lastCommittedWordLength = 0
                 precededByTechnicalDelimiter = false
+                followsDot = false
                 session.precededByLeadingSlash = false
                 resetSelectionDrift()
                 lastIdleBoundaryEndLocation = selection.location + 1
@@ -943,6 +988,7 @@ final class VieLotusIMController: IMKInputController {
                 restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: " ")
             }
             precededByTechnicalDelimiter = false
+            followsDot = false
             session.precededByLeadingSlash = false
             traceLab("space", bundleID: bundleID, key: "Space", detail: "restored=\(restored)",
                      selection: client.selectedRange())
@@ -971,6 +1017,7 @@ final class VieLotusIMController: IMKInputController {
                 lastCommittedWordStartLocation = NSNotFound
                 hasActiveMarkedText = false
                 precededByTechnicalDelimiter = MacroEngine.isTechnicalDelimiter(firstChar)
+                followsDot = firstChar == "."
                 session.precededByLeadingSlash = (firstChar == "/")
                 traceLab("omniboxURLPunct", bundleID: bundleID, key: String(firstChar),
                          detail: "continue omnibox URL session", selection: rawSelection)
@@ -985,6 +1032,7 @@ final class VieLotusIMController: IMKInputController {
                 restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: firstChar)
             }
             precededByTechnicalDelimiter = MacroEngine.isTechnicalDelimiter(firstChar)
+            followsDot = firstChar == "."
             session.precededByLeadingSlash = wasComposingBeforePunct ? (firstChar == "/" && wasInLeadingSlash) : (firstChar == "/")
             recordPostBoundaryCaretLocation(
                 wasComposingBeforeBoundary: wasComposingBeforePunct,
@@ -1012,6 +1060,7 @@ final class VieLotusIMController: IMKInputController {
                 lastCommittedWordStartLocation = NSNotFound
                 hasActiveMarkedText = false
                 precededByTechnicalDelimiter = true
+                followsDot = false
                 return false
             }
             editCaretBack = Self.caretDisarmed
@@ -1021,6 +1070,7 @@ final class VieLotusIMController: IMKInputController {
                 restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: firstChar)
             }
             precededByTechnicalDelimiter = true
+            followsDot = false
             recordPostBoundaryCaretLocation(
                 wasComposingBeforeBoundary: wasComposingBeforeDigit,
                 selectionBeforeBoundary: selection,
@@ -1382,7 +1432,8 @@ final class VieLotusIMController: IMKInputController {
                 engineOutput: output,
                 smartBilingualEnabled: prefs.smartBilingual,
                 forceInlineEvaluation: true,
-                genZMode: prefs.genZMode
+                genZMode: prefs.genZMode,
+                followsDot: followsDot
             )
             let wasLiteralLockedStep = resolved.wasLiteralLockedStep
             if resolved.selectedCandidate != output {
@@ -1730,7 +1781,22 @@ final class VieLotusIMController: IMKInputController {
     override func didCommand(by aSelector: Selector!, client sender: Any!) -> Bool {
         guard let aSelector, let client = resolveTextClient(sender) else { return false }
         let selectorName = NSStringFromSelector(aSelector)
+        guard Preferences.shared.vietnameseEnabled else { return false }
+        if isSecureFieldActive() {
+            if engine.isComposing {
+                cancelComposition()
+                rawWord = ""
+            }
+            return false
+        }
         let bundleID = ClientAdapter.resolveBundleIdentifier(client.bundleIdentifier())
+        if ClientStallBreaker.shared.isDegraded(bundleIdentifier: bundleID) {
+            if engine.isComposing {
+                cancelComposition()
+                rawWord = ""
+            }
+            return false
+        }
         let rawSelection = client.selectedRange()
         if ClientStallBreaker.shared.isDegraded(bundleIdentifier: bundleID) {
             if engine.isComposing {
@@ -1740,22 +1806,6 @@ final class VieLotusIMController: IMKInputController {
             return false
         }
         let selection = effectiveSelection(for: rawSelection)
-
-        guard Preferences.shared.vietnameseEnabled else { return false }
-        if isSecureFieldActive() {
-            if engine.isComposing {
-                cancelComposition()
-                rawWord = ""
-            }
-            return false
-        }
-        if ClientStallBreaker.shared.isDegraded(bundleIdentifier: bundleID) {
-            if engine.isComposing {
-                cancelComposition()
-                rawWord = ""
-            }
-            return false
-        }
 
         let appCategory = ClientAdapter.classify(bundleIdentifier: bundleID)
         let preferences = Preferences.shared
@@ -1910,7 +1960,8 @@ final class VieLotusIMController: IMKInputController {
     }
 
     @discardableResult
-    private func handleBackspace(client: IMKClientProtocol, selection: NSRange, rawSelection: NSRange, bundleID: String?, presentationMode: PresentationMode) -> Bool {
+    private func handleBackspace(client: IMKClientProtocol, selection: NSRange, rawSelection: NSRange, bundleID: String?, presentationMode: PresentationMode, isRepeat: Bool = false) -> Bool {
+        if !engine.isComposing { followsDot = false }
         if ClientAdapter.isBrowserApp(bundleIdentifier: bundleID),
            rawSelection.location == 0,
            rawSelection.length > 0,
@@ -1974,16 +2025,18 @@ final class VieLotusIMController: IMKInputController {
         if isUserSelection {
             resetSelectionDrift()
         }
-        let consumed = handleBackspaceCore(client: client, selection: selection, isUserSelection: isUserSelection, bundleID: bundleID, presentationMode: presentationMode)
+        let consumed = handleBackspaceCore(client: client, selection: selection, isUserSelection: isUserSelection, bundleID: bundleID, presentationMode: presentationMode, isRepeat: isRepeat)
         if !consumed && !isUserSelection && rawSelection.location != NSNotFound {
             lastNativeBackspaceReportedLocation = rawSelection.location
         }
         return consumed
     }
 
-    private func handleBackspaceCore(client: IMKClientProtocol, selection: NSRange, isUserSelection: Bool, bundleID: String?, presentationMode: PresentationMode) -> Bool {
+    private func handleBackspaceCore(client: IMKClientProtocol, selection: NSRange, isUserSelection: Bool, bundleID: String?, presentationMode: PresentationMode, isRepeat: Bool = false) -> Bool {
         let now = monotonicClockNanoseconds()
-        if now - lastBackspaceTime < 25_000_000 {
+        // Debounce duplicate IMK delivery (handle(keyCode=51) followed <25ms later by didCommand(deleteBackward:))
+        // while allowing genuine OS key-repeat events (event.isARepeat == true) through without delay.
+        if !isRepeat && now - lastBackspaceTime < 25_000_000 {
             return true
         }
         lastBackspaceTime = now
@@ -2254,6 +2307,7 @@ final class VieLotusIMController: IMKInputController {
             return false
         } else {
             precededByTechnicalDelimiter = false
+            followsDot = false
             // Backspace while idle: deleting the space after committed word arms editing
             if editCaretBack == -1 {
                 editCaretBack = 0
@@ -2446,15 +2500,17 @@ final class VieLotusIMController: IMKInputController {
         let isCodeBoundary = prefs.smartBilingual && suffixChar != nil && "([{".contains(suffixChar!) &&
             !SmartBilingualDetector.isExplicitTelexEscape(raw: rawWord, rendered: output) &&
             !session.hasConfirmedNonEnglishSemanticEscape(rawWord: rawWord, rendered: output)
+        let shouldSelectEnglish = session.shouldSelectRawEnglishOnCommit(
+            rawWord: rawWord,
+            rendered: output,
+            smartBilingualEnabled: prefs.smartBilingual,
+            genZMode: prefs.genZMode,
+            wasPrecededByTechnicalDelimiter: hostPrecededByTechnicalDelimiter,
+            boundaryChar: suffixChar,
+            followsDot: followsDot
+        )
         if !rawWord.isEmpty && rawWord.lowercased() != output.lowercased() &&
-           (isCodeBoundary || session.shouldSelectRawEnglishOnCommit(
-               rawWord: rawWord,
-               rendered: output,
-               smartBilingualEnabled: prefs.smartBilingual,
-               genZMode: prefs.genZMode,
-               wasPrecededByTechnicalDelimiter: hostPrecededByTechnicalDelimiter,
-               boundaryChar: suffixChar
-           )) {
+           (isCodeBoundary || shouldSelectEnglish) {
             // Restore English rawWord or code identifier
             let restoredWord = rawWord
             session.recordExternalCommitProvenance(
@@ -2741,6 +2797,7 @@ final class VieLotusIMController: IMKInputController {
         session.clearContext()
         hasActiveMarkedText = false
         precededByTechnicalDelimiter = false
+        followsDot = false
         editCaretBack = Self.caretDisarmed
         virtualCursorLocation = NSNotFound
         compositionStartLocation = NSNotFound
@@ -2760,13 +2817,18 @@ final class VieLotusIMController: IMKInputController {
             traceLab("activateServer", bundleID: bundleID, detail: "activated")
         }
 
+        #if DEBUG
         NSLog("VieLotusIMController: Activated")
+        #endif
     }
 
     override func deactivateServer(_ sender: Any!) {
         if let client = resolveTextClient(sender ?? lastActiveClientObject) {
-            let bundleID = ClientAdapter.resolveBundleIdentifier(client.bundleIdentifier())
-            traceLab("deactivateServer", bundleID: bundleID, detail: "hadMarked=\(hasActiveMarkedText)")
+            traceLab(
+                "deactivateServer",
+                bundleID: ClientAdapter.resolveBundleIdentifier(client.bundleIdentifier()),
+                detail: "hadMarked=\(hasActiveMarkedText)"
+            )
         }
         if hasActiveMarkedText, let client = resolveTextClient(sender ?? lastActiveClientObject) {
             let pendingText = composingWord.isEmpty ? session.currentOutput() : composingWord
@@ -2786,6 +2848,7 @@ final class VieLotusIMController: IMKInputController {
         session.clearContext()
         hasActiveMarkedText = false
         precededByTechnicalDelimiter = false
+        followsDot = false
         editCaretBack = Self.caretDisarmed
         virtualCursorLocation = NSNotFound
         compositionStartLocation = NSNotFound
@@ -2798,7 +2861,9 @@ final class VieLotusIMController: IMKInputController {
         if !(sender is IMKClientProtocol) {
             super.deactivateServer(sender)
         }
+        #if DEBUG
         NSLog("VieLotusIMController: Deactivated")
+        #endif
     }
 
     // MARK: - IMKMouseHandling
@@ -2895,6 +2960,14 @@ final class VieLotusIMController: IMKInputController {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        let feedbackItem = NSMenuItem(
+            title: "Gửi góp ý & Báo lỗi...",
+            action: #selector(openFeedback),
+            keyEquivalent: ""
+        )
+        feedbackItem.target = self
+        menu.addItem(feedbackItem)
+
         return menu
     }
 
@@ -2930,6 +3003,10 @@ final class VieLotusIMController: IMKInputController {
 
     @objc private func openSettings() {
         SettingsWindowManager.shared.showSettingsWindow()
+    }
+
+    @objc private func openFeedback() {
+        SettingsWindowManager.shared.showFeedbackSheet()
     }
 
     /// Verifies that the host's on-screen text immediately before `cursorLocation` still matches

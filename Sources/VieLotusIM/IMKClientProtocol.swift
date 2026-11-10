@@ -22,6 +22,7 @@ protocol IMKClientProtocol: AnyObject {
 
 final class WatchdogIMKClientAdapter: IMKClientProtocol {
     let base: IMKClientProtocol
+    private var cachedRawBundleID: String?
     private var cachedBundleID: String?
     private var didResolveBundleID = false
 
@@ -36,18 +37,21 @@ final class WatchdogIMKClientAdapter: IMKClientProtocol {
     private var resolvedBundleID: String? {
         if !didResolveBundleID {
             didResolveBundleID = true
-            cachedBundleID = ClientAdapter.resolveBundleIdentifier(base.bundleIdentifier())
+            let raw = base.bundleIdentifier()
+            cachedRawBundleID = raw
+            cachedBundleID = ClientAdapter.resolveBundleIdentifier(raw)
         }
         return cachedBundleID
     }
 
     func bundleIdentifier() -> String! {
-        let raw = base.bundleIdentifier()
         if !didResolveBundleID {
             didResolveBundleID = true
+            let raw = base.bundleIdentifier()
+            cachedRawBundleID = raw
             cachedBundleID = ClientAdapter.resolveBundleIdentifier(raw)
         }
-        return raw
+        return cachedRawBundleID
     }
 
     func selectedRange() -> NSRange {
@@ -108,6 +112,8 @@ final class WatchdogIMKClientAdapter: IMKClientProtocol {
 final class NativeIMKClientAdapter: IMKClientProtocol {
     let rawClient: IMKTextInput
     let clientIdentityToken: ObjectIdentifier
+    private var cachedRawBundleID: String?
+    private var didCacheRawBundleID = false
 
     init(rawClient: IMKTextInput, rawSender: AnyObject) {
         self.rawClient = rawClient
@@ -115,7 +121,11 @@ final class NativeIMKClientAdapter: IMKClientProtocol {
     }
 
     func bundleIdentifier() -> String! {
-        rawClient.bundleIdentifier()
+        if !didCacheRawBundleID {
+            didCacheRawBundleID = true
+            cachedRawBundleID = rawClient.bundleIdentifier()
+        }
+        return cachedRawBundleID
     }
 
     func selectedRange() -> NSRange {

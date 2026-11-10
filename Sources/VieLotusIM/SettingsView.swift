@@ -5,77 +5,135 @@ import AppKit
 
 enum SettingsTab: String, CaseIterable, Identifiable {
     case settings = "Cài đặt"
-    case about = "Về ứng dụng"
+    case about = "Thông tin"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
         case .settings: return "slider.horizontal.3"
-        case .about: return "sparkles"
+        case .about: return "info.circle"
         }
     }
 }
 
 struct SettingsView: View {
     @ObservedObject var prefs = Preferences.shared
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: SettingsTab = .settings
     @State private var showingMacroEditor = false
     @State private var showingAdaptiveSheet = false
+    @State private var showingFeedbackSheet = false
     @State private var macroCount: Int = MacroEngine.shared.getMacroEntries().count
     @State private var tisStatus: InputSourceStatus = InputSourceDoctor.inspect()
-    @State private var showVietQR: Bool = false
-    @State private var copiedAccount: Bool = false
+    @State private var quickTestText: String = ""
 
     private let bentoColumns = [
         GridItem(.flexible(), spacing: 10),
         GridItem(.flexible(), spacing: 10)
     ]
 
+    private var isDark: Bool {
+        colorScheme == .dark
+    }
+
+    private var windowCanvasColor: Color {
+        isDark ? Color(red: 0.08, green: 0.08, blue: 0.10) : Color(red: 0.96, green: 0.96, blue: 0.97)
+    }
+
+    private var barSurfaceColor: Color {
+        isDark ? Color(red: 0.11, green: 0.11, blue: 0.14) : Color.white
+    }
+
+    private var cardSurfaceColor: Color {
+        isDark ? Color(red: 0.14, green: 0.14, blue: 0.18) : Color.white
+    }
+
+    private var cardBorderColor: Color {
+        isDark ? Color.white.opacity(0.14) : Color.black.opacity(0.09)
+    }
+
+    private var selectedSegmentSurfaceColor: Color {
+        isDark ? Color(red: 0.22, green: 0.22, blue: 0.28) : Color.white
+    }
+
+    private var cleanDisplayVersion: String {
+        let raw = AppInfo.appVersion
+        if let dashIdx = raw.firstIndex(of: "-") {
+            return String(raw[..<dashIdx])
+        }
+        return raw
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // MARK: - Header: Minimalist Branding + 2-Tab Switcher (Cài đặt | Về ứng dụng)
+            // MARK: - Header: Minimalist Landscape Header
             HStack(spacing: 12) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
                     .interpolation(.high)
-                    .frame(width: 38, height: 38)
-                    .shadow(color: .black.opacity(0.12), radius: 3, x: 0, y: 1)
+                    .frame(width: 36, height: 36)
+                    .shadow(color: .black.opacity(0.12), radius: 2.5, x: 0, y: 1)
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text("Sen Việt")
                             .font(.system(size: 15.5, weight: .bold))
-                        Text("v\(AppInfo.appVersion)")
+                        Text("v\(cleanDisplayVersion)")
                             .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 7)
                             .padding(.vertical, 1.5)
                             .background(Color.accentColor.opacity(0.14))
                             .foregroundColor(.accentColor)
                             .clipShape(Capsule())
+                            .help("Phiên bản chi tiết: v\(AppInfo.appVersion)")
                     }
-                    Text("Pure Swift 6 • Không quyền Trợ năng")
+                    Text("Thuần chuẩn Apple • 100% Offline • Không quyền Trợ năng")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
 
-                Spacer()
+                Spacer(minLength: 12)
 
-                Picker("", selection: $selectedTab) {
+                // Custom clean segmented switcher (tránh lỗi khoảng trắng nhãn ẩn của NSSegmentedControl)
+                HStack(spacing: 2) {
                     ForEach(SettingsTab.allCases) { tab in
-                        Label(tab.rawValue, systemImage: tab.icon).tag(tab)
+                        let isSelected = (selectedTab == tab)
+                        Button {
+                            selectedTab = tab
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text(tab.rawValue)
+                                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(isSelected ? selectedSegmentSurfaceColor : Color.clear)
+                                    .shadow(color: isSelected ? .black.opacity(isDark ? 0.35 : 0.08) : .clear, radius: 1.5, x: 0, y: 0.5)
+                            )
+                            .foregroundColor(isSelected ? .primary : .secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 210)
+                .padding(3)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isDark ? Color.white.opacity(0.08) : Color.secondary.opacity(0.12))
+                )
             }
             .padding(.horizontal, 18)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
+            .background(barSurfaceColor)
 
             Divider()
 
-            // MARK: - Tab Content
+            // MARK: - Tab Content (Landscape Rectangle — Zero Scroll Needed)
             Group {
                 switch selectedTab {
                 case .settings:
@@ -84,54 +142,73 @@ struct SettingsView: View {
                     aboutTabView
                 }
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(windowCanvasColor)
 
             Divider()
 
-            // MARK: - Clean Footer
-            HStack {
-                HStack(spacing: 5) {
+            // MARK: - Clean Footer (Hiển thị trọn vẹn 100%, không bị cắt đáy hay cắt chữ)
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Circle()
                         .fill(tisStatusColor)
-                        .frame(width: 6, height: 6)
-                    Text("Song ngữ • Gợi ý • Chuẩn mới • Gen Z tự động bật")
-                        .font(.system(size: 10, weight: .medium))
+                        .frame(width: 6.5, height: 6.5)
+                    Text("Song ngữ Anh–Việt • Chính tả chuẩn mới tự động")
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
 
-                Spacer()
+                Spacer(minLength: 12)
 
-                Link("NidoOffice", destination: URL(string: "https://educenter.app")!)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.indigo)
-
-                Text("•").font(.system(size: 10)).foregroundColor(.secondary)
-
-                Link("YouPersona.com", destination: URL(string: "https://youpersona.com")!)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.accentColor)
+                if let url = URL(string: "https://educenter.app") {
+                    Link("NidoOffice", destination: url)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.indigo)
+                }
 
                 Text("•").font(.system(size: 10)).foregroundColor(.secondary)
 
-                Link("Zalo", destination: URL(string: "https://zalo.me/g/6wwyvywyvhsb0n6rwkze")!)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.secondary)
+                if let url = URL(string: "https://youpersona.com") {
+                    Link("YouPersona.com", destination: url)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.accentColor)
+                }
 
                 Text("•").font(.system(size: 10)).foregroundColor(.secondary)
 
-                Link("GitHub", destination: URL(string: "https://github.com/stevedat/VieLotus-IM")!)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.secondary)
+                Button {
+                    showingFeedbackSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "bubble.left.and.text.bubble.right")
+                        Text("Góp ý & Báo lỗi")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Gửi góp ý, báo lỗi gõ từ hoặc đề xuất tính năng")
             }
             .padding(.horizontal, 18)
-            .padding(.vertical, 8)
+            .padding(.vertical, 9)
+            .background(barSurfaceColor)
         }
-        .frame(width: 480, height: 470)
+        .background(windowCanvasColor)
+        .frame(width: 640, height: 420)
         .sheet(isPresented: $showingMacroEditor) {
             MacroEditorView()
         }
         .sheet(isPresented: $showingAdaptiveSheet) {
             AdaptiveCompatibilitySheet(prefs: prefs)
+        }
+        .sheet(isPresented: $showingFeedbackSheet) {
+            FeedbackSheetView(prefs: prefs) {
+                showingFeedbackSheet = false
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: SettingsWindowManager.openFeedbackSheetNotification)) { _ in
+            showingFeedbackSheet = true
         }
         .onAppear {
             if !prefs.smartBilingual { prefs.smartBilingual = true }
@@ -157,165 +234,97 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Tab 1: Cài đặt (Phong cách Bento hiện đại, tinh gọn, phi truyền thống)
+    // MARK: - Tab 1: Cài đặt (Bố cục ngang 3 hàng vừa khít khung chữ nhật 640x420)
     private var settingsTabView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                // 1. Hero Visual Selector: Telex vs VNI
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack {
-                        Text("KIỂU GÕ TIẾNG VIỆT")
-                            .font(.system(size: 10.5, weight: .bold))
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("Bỏ dấu tự do mọi vị trí")
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundColor(.accentColor)
-                    }
-
-                    HStack(spacing: 10) {
-                        inputMethodCard(
-                            method: .telex,
-                            title: "Telex Tự Do (Mặc định)",
-                            badge: "s f r x j w",
-                            subtitle: "vieetj → việt • w → ư",
-                            icon: "command.square.fill"
-                        )
-                        inputMethodCard(
-                            method: .vni,
-                            title: "VNI (Số 1–9)",
-                            badge: "1–5  6 7 8 9",
-                            subtitle: "viet65 → việt • 9 → đ",
-                            icon: "number.square.fill"
-                        )
-                    }
-
-                    // Single clean toggle for Pre-Vowel Tone (Flex)
-                    HStack(spacing: 10) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(prefs.grammarProfile == .senFlex ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12))
-                                .frame(width: 26, height: 26)
-                            Image(systemName: "wand.and.rays")
-                                .font(.system(size: 12.5, weight: .semibold))
-                                .foregroundColor(prefs.grammarProfile == .senFlex ? .accentColor : .secondary)
-                        }
-                        VStack(alignment: .leading, spacing: 1.5) {
-                            Text("Gõ dấu trước nguyên âm (rrung rrinh → rủng rỉnh)")
-                                .font(.system(size: 12, weight: .semibold))
-                            Text("Mở để gõ dấu tự do ngay sau phụ âm đầu • Khuyên tắt nếu thường gõ lệnh Terminal / code")
-                                .font(.system(size: 10.5))
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
-                        Spacer(minLength: 6)
-                        Toggle(
-                            "",
-                            isOn: Binding(
-                                get: { prefs.grammarProfile == .senFlex },
-                                set: { prefs.grammarProfile = $0 ? .senFlex : .classic }
-                            )
-                        )
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                    }
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color(nsColor: .controlBackgroundColor))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(
-                                prefs.grammarProfile == .senFlex ? Color.accentColor.opacity(0.35) : Color.primary.opacity(0.08),
-                                lineWidth: 1.0
-                            )
-                    )
-                }
-
-                // 2. Bento Grid 2x2: Tiện ích & Chế độ thông minh
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("TIỆN ÍCH & KHÔNG GIAN LÀM VIỆC")
-                        .font(.system(size: 10.5, weight: .bold))
+        VStack(alignment: .leading, spacing: 11) {
+            // Hàng 1: Kiểu gõ tiếng Việt (3 thẻ ngang trên cùng 1 hàng: Telex Tự Do | VNI | Dấu trước âm)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("KIỂU GÕ TIẾNG VIỆT")
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.secondary)
-
-                    LazyVGrid(columns: bentoColumns, spacing: 10) {
-                        // Tile 1: Bảng gõ tắt (Macro)
-                        bentoFeatureCard(
-                            icon: "text.badge.plus",
-                            accent: .indigo,
-                            title: "Bảng gõ tắt",
-                            subtitle: prefs.macroEnabled ? "Đang bật • \(macroCount) cụm từ" : "Đang tắt gõ tắt",
-                            isActive: prefs.macroEnabled,
-                            onToggle: { prefs.macroEnabled.toggle() }
-                        ) {
-                            Button("Quản lý (\(macroCount))") {
-                                showingMacroEditor = true
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                        }
-
-                        // Tile 2: Chế độ Lập trình viên (Code & Markdown)
-                        bentoFeatureCard(
-                            icon: "chevron.left.forwardslash.chevron.right",
-                            accent: .teal,
-                            title: "Chế độ Code & Dev",
-                            subtitle: prefs.developerMode ? "Tự ngắt dấu trong `code`" : "Gõ tiếng Việt bình thường",
-                            isActive: prefs.developerMode,
-                            onToggle: { prefs.developerMode.toggle() }
-                        ) {
-                            Text(prefs.developerMode ? "ĐANG BẬT" : "TẮT")
-                                .font(.system(size: 9.5, weight: .heavy, design: .rounded))
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 2)
-                                .background(prefs.developerMode ? Color.teal.opacity(0.18) : Color.secondary.opacity(0.12))
-                                .foregroundColor(prefs.developerMode ? .teal : .secondary)
-                                .clipShape(Capsule())
-                        }
-
-                        // Tile 3: Tốc gõ phụ âm đầu & cuối
-                        bentoConsonantCard
-
-                        // Tile 4: Tương thích macOS & Phím tắt hệ thống
-                        bentoSystemShortcutCard
-                    }
+                    Spacer()
+                    Text("Bỏ dấu tự do • Z xoá dấu")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundColor(.accentColor)
                 }
 
-                // 3. Compact Smart Engine Status Strip (Always On + Adaptive Hybrid Inspector)
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.indigo)
-                    Text("Trí tuệ Sen Việt tự động:")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.primary)
-                    Text("Song ngữ • Gợi ý • Chuẩn mới • Adaptive Hybrid")
-                        .font(.system(size: 10.5))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                    Button("Tương thích App") {
-                        showingAdaptiveSheet = true
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
+                HStack(spacing: 10) {
+                    inputMethodCard(
+                        method: .telex,
+                        title: "Telex Tự Do",
+                        badge: "s f r x j w",
+                        subtitle: "vieetj → việt",
+                        icon: "command.square.fill"
+                    )
+                    inputMethodCard(
+                        method: .vni,
+                        title: "VNI (Số 1–9)",
+                        badge: "1–5 • 6–9",
+                        subtitle: "viet65 → việt",
+                        icon: "number.square.fill"
+                    )
+                    senFlexCard
                 }
-                .padding(.horizontal, 11)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.indigo.opacity(0.07))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.indigo.opacity(0.18), lineWidth: 0.8)
-                )
             }
-            .padding(16)
+
+            // Hàng 2: Tiện ích & Tương thích (Bento Grid 2x2 ngang rộng rãi)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("TIỆN ÍCH & TƯƠNG THÍCH")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
+
+                LazyVGrid(columns: bentoColumns, spacing: 9) {
+                    // Tile 1: Bảng gõ tắt
+                    bentoFeatureCard(
+                        icon: "text.badge.plus",
+                        accent: .indigo,
+                        title: "Bảng gõ tắt",
+                        subtitle: prefs.macroEnabled ? "Đang bật • \(macroCount) cụm từ" : "Đang tắt • Bấm để bật",
+                        isActive: prefs.macroEnabled,
+                        onToggle: { prefs.macroEnabled.toggle() }
+                    ) {
+                        Button("Quản lý (\(macroCount))") {
+                            showingMacroEditor = true
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                    }
+
+                    // Tile 2: Chế độ Code
+                    bentoFeatureCard(
+                        icon: "chevron.left.forwardslash.chevron.right",
+                        accent: .teal,
+                        title: "Chế độ Code",
+                        subtitle: prefs.developerMode ? "Tự ngắt dấu trong `code`" : "Gõ tiếng Việt bình thường",
+                        isActive: prefs.developerMode,
+                        onToggle: { prefs.developerMode.toggle() }
+                    ) {
+                        Text(prefs.developerMode ? "BẬT" : "TẮT")
+                            .font(.system(size: 9.5, weight: .heavy, design: .rounded))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(prefs.developerMode ? Color.teal.opacity(0.18) : Color.secondary.opacity(0.12))
+                            .foregroundColor(prefs.developerMode ? .teal : .secondary)
+                            .clipShape(Capsule())
+                    }
+
+                    // Tile 3: Tốc gõ phụ âm
+                    bentoConsonantCard
+
+                    // Tile 4: Tương thích App
+                    bentoAdaptiveCard
+                }
+            }
+
+            // Hàng 3: Trạng thái Bộ gõ Hệ thống (Full-Width 1 dòng ngang, không bao giờ cắt chữ)
+            systemStatusFullWidthCard
+
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
     }
 
     private func inputMethodCard(
@@ -330,27 +339,28 @@ struct SettingsView: View {
             prefs.inputMethod = method
         } label: {
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
+                HStack(spacing: 5) {
                     Image(systemName: icon)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 13.5, weight: .semibold))
                         .foregroundColor(isSelected ? .accentColor : .secondary)
                     Text(title)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 12.5, weight: .bold))
                         .foregroundColor(.primary)
-                    Spacer()
+                        .lineLimit(1)
+                    Spacer(minLength: 2)
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 13.5, weight: .bold))
                         .foregroundColor(isSelected ? .accentColor : .secondary.opacity(0.45))
                 }
 
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Text(badge)
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1.5)
                         .background(isSelected ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.12))
                         .foregroundColor(isSelected ? .accentColor : .secondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
 
                     Text(subtitle)
                         .font(.system(size: 10.5))
@@ -358,21 +368,77 @@ struct SettingsView: View {
                         .lineLimit(1)
                 }
             }
-            .padding(11)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor))
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isSelected ? Color.accentColor.opacity(isDark ? 0.18 : 0.08) : cardSurfaceColor)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .strokeBorder(
-                        isSelected ? Color.accentColor : Color.primary.opacity(0.09),
-                        lineWidth: isSelected ? 1.8 : 0.8
+                        isSelected ? Color.accentColor : cardBorderColor,
+                        lineWidth: isSelected ? 1.6 : 0.9
                     )
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var senFlexCard: some View {
+        let isFlex = (prefs.grammarProfile == .senFlex)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Image(systemName: "wand.and.rays")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(isFlex ? .accentColor : .secondary)
+                Text("Dấu trước âm")
+                    .font(.system(size: 12.5, weight: .bold))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 2)
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { prefs.grammarProfile == .senFlex },
+                        set: { prefs.grammarProfile = $0 ? .senFlex : .classic }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+            }
+
+            HStack(spacing: 5) {
+                Text("rrung → rủng")
+                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1.5)
+                    .background(isFlex ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.12))
+                    .foregroundColor(isFlex ? .accentColor : .secondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+
+                Text(isFlex ? "Đang bật" : "Đang tắt")
+                    .font(.system(size: 10.5))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isFlex ? Color.accentColor.opacity(isDark ? 0.14 : 0.06) : cardSurfaceColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(
+                    isFlex ? Color.accentColor.opacity(isDark ? 0.65 : 0.45) : cardBorderColor,
+                    lineWidth: 1.0
+                )
+        )
     }
 
     private func bentoFeatureCard<Trailing: View>(
@@ -384,26 +450,27 @@ struct SettingsView: View {
         onToggle: @escaping () -> Void,
         @ViewBuilder trailing: () -> Trailing
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
                 Button(action: onToggle) {
                     HStack(spacing: 6) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(isActive ? accent.opacity(0.16) : Color.secondary.opacity(0.12))
-                                .frame(width: 26, height: 26)
+                                .frame(width: 22, height: 22)
                             Image(systemName: icon)
-                                .font(.system(size: 12.5, weight: .semibold))
+                                .font(.system(size: 11.5, weight: .semibold))
                                 .foregroundColor(isActive ? accent : .secondary)
                         }
                         Text(title)
                             .font(.system(size: 12.5, weight: .bold))
                             .foregroundColor(.primary)
+                            .lineLimit(1)
                     }
                 }
                 .buttonStyle(.plain)
 
-                Spacer()
+                Spacer(minLength: 4)
                 trailing()
             }
 
@@ -413,37 +480,39 @@ struct SettingsView: View {
                         .font(.system(size: 10.5))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
             }
             .buttonStyle(.plain)
         }
-        .padding(11)
-        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(cardSurfaceColor)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(isActive ? accent.opacity(0.45) : Color.primary.opacity(0.08), lineWidth: 1.0)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(isActive ? accent.opacity(isDark ? 0.65 : 0.45) : cardBorderColor, lineWidth: 1.0)
         )
     }
 
     private var bentoConsonantCard: some View {
         let anyActive = prefs.quickTelex || prefs.relaxedCoda
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(anyActive ? Color.orange.opacity(0.16) : Color.secondary.opacity(0.12))
-                        .frame(width: 26, height: 26)
+                        .frame(width: 22, height: 22)
                     Image(systemName: "bolt.fill")
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .font(.system(size: 11.5, weight: .semibold))
                         .foregroundColor(anyActive ? .orange : .secondary)
                 }
                 Text("Tốc gõ phụ âm")
                     .font(.system(size: 12.5, weight: .bold))
+                    .lineLimit(1)
                 Spacer()
             }
 
@@ -462,15 +531,73 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding(11)
-        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(cardSurfaceColor)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(anyActive ? Color.orange.opacity(0.45) : Color.primary.opacity(0.08), lineWidth: 1.0)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(anyActive ? Color.orange.opacity(isDark ? 0.65 : 0.45) : cardBorderColor, lineWidth: 1.0)
+        )
+    }
+
+    private var bentoAdaptiveCard: some View {
+        let overrideCount = prefs.appModeOverrides.count
+        let subtitleText: String = {
+            if overrideCount > 0 {
+                return "Đã ghim \(overrideCount) ứng dụng riêng"
+            }
+            switch prefs.presentationModePreference {
+            case .automatic:
+                return "Direct & Stealth tự động"
+            case .directReplacement:
+                return "Ưu tiên Direct (Không gạch)"
+            case .markedText:
+                return "Marked Text chuẩn Apple"
+            case .passthrough:
+                return "Tạm ngắt bộ gõ"
+            }
+        }()
+
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.indigo.opacity(0.15))
+                        .frame(width: 22, height: 22)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(.indigo)
+                }
+                Text("Tương thích App")
+                    .font(.system(size: 12.5, weight: .bold))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Button("Tuỳ chỉnh") {
+                    showingAdaptiveSheet = true
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+            }
+
+            Text(subtitleText)
+                .font(.system(size: 10.5))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(cardSurfaceColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.indigo.opacity(isDark ? 0.48 : 0.32), lineWidth: 1.0)
         )
     }
 
@@ -506,362 +633,333 @@ struct SettingsView: View {
         }
     }
 
-    private var bentoSystemShortcutCard: some View {
+    private var systemStatusFullWidthCard: some View {
         let borderColor: Color = {
             if tisStatus.hasAnyInputConflict {
                 return Color.orange.opacity(0.55)
             }
             switch tisStatus.state {
             case .active:
-                return Color.green.opacity(0.42)
+                return Color.green.opacity(0.45)
             case .enabledAppleVietnameseActive:
                 return Color.orange.opacity(0.55)
             case .registeredNotEnabled, .notRegistered:
                 return Color.red.opacity(0.45)
             case .enabledNotSelected:
-                return Color.primary.opacity(0.08)
+                return cardBorderColor
             }
         }()
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(tisStatusColor.opacity(0.16))
-                        .frame(width: 26, height: 26)
-                    Image(systemName: tisStatusIcon)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundColor(tisStatusColor)
-                }
-                Text(tisStatus.summaryTitle)
-                    .font(.system(size: 12.0, weight: .bold))
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                Button("Mở cài đặt ↗") {
-                    openSystemKeyboardSettings()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
+        return HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(tisStatusColor.opacity(0.16))
+                    .frame(width: 26, height: 26)
+                Image(systemName: tisStatusIcon)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundColor(tisStatusColor)
             }
 
-            Text(tisStatus.summarySubtitle)
-                .font(.system(size: 10.5))
-                .foregroundColor(tisStatus.hasAnyInputConflict ? .orange : .secondary)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 1.5) {
+                Text(tisStatus.summaryTitle)
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                Text(tisStatus.summarySubtitle)
+                    .font(.system(size: 10))
+                    .foregroundColor(tisStatus.hasAnyInputConflict ? .orange : .secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 6)
+
+            HStack(spacing: 5) {
+                Text("✦ Thử gõ:")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .foregroundColor(.indigo)
+                TextField("Gõ thử: thuongw / viet65...", text: $quickTestText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11.5))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .frame(width: 156)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(windowCanvasColor)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(Color.indigo.opacity(isDark ? 0.45 : 0.28), lineWidth: 0.9)
+                    )
+            }
+
+            Button("Cài đặt Bàn phím ↗") {
+                openSystemKeyboardSettings()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
-        .padding(11)
-        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(cardSurfaceColor)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(borderColor, lineWidth: 1.0)
         )
     }
 
     private func chipToggleButton(label: String, isOn: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 3) {
+            HStack(spacing: 3.5) {
                 Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 9.5, weight: .bold))
                 Text(label)
                     .font(.system(size: 10, weight: .semibold))
                     .lineLimit(1)
             }
             .padding(.horizontal, 7)
-            .padding(.vertical, 4)
+            .padding(.vertical, 3.5)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(isOn ? Color.orange.opacity(0.16) : Color.secondary.opacity(0.10))
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(isOn ? Color.orange.opacity(isDark ? 0.24 : 0.16) : (isDark ? Color.white.opacity(0.08) : Color.secondary.opacity(0.10)))
             )
             .foregroundColor(isOn ? .orange : .secondary)
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Tab 3: Về ứng dụng (Đồng bộ với bản Phone + Sản phẩm khác của tác giả YouPersona.com)
+    // MARK: - Tab 2: Thông tin (Bố cục ngang chữ nhật 3 tầng cân đối, không cần cuộn)
     private var aboutTabView: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                // 1. Sứ mệnh tối thượng
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("SỨ MỆNH TỐI THƯỢNG", systemImage: "sparkles")
+        VStack(spacing: 12) {
+            // Hàng 1: Thẻ Sứ mệnh & Chuẩn mực Kỹ thuật Sen Việt (Toàn chiều ngang)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Label("SỨ MỆNH SEN VIỆT", systemImage: "sparkles")
                         .font(.system(size: 10.5, weight: .bold))
                         .foregroundColor(.indigo)
-
-                    Text("Sen Việt được phát triển theo kim chỉ nam \"Hãy để việc gõ là gõ, dù bạn gõ tiếng Việt hay tiếng Anh; nhanh hay chậm; gõ là Sen Việt\".")
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundColor(.primary)
-                        .lineSpacing(2.5)
+                    Spacer()
+                    Text("InputMethodKit Chuẩn Apple • Pure Swift 6 • 100% Offline")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
-                )
 
-                // 2. Mời tác giả ly cà phê nhỏ (Chỉ dùng VietQR, không dùng BuyMeACoffee)
+                Text("\"Hãy để việc gõ là gõ — dù bạn gõ tiếng Việt hay tiếng Anh; nhanh hay chậm; gõ là Sen Việt.\"")
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundColor(.primary)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 8) {
+                    aboutFeaturePill(icon: "bolt.fill", text: "Phản hồi tức thì (< 1ms)", color: .orange)
+                    aboutFeaturePill(icon: "globe", text: "Song ngữ Anh–Việt tự động", color: .indigo)
+                    aboutFeaturePill(icon: "lock.shield.fill", text: "Không cần quyền Trợ năng", color: .green)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(cardSurfaceColor)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(cardBorderColor, lineWidth: 0.9)
+            )
+
+            // Hàng 2: 2 thẻ Hệ sinh thái AI đặt song song cân đối (NidoOffice | YouPersona.com)
+            HStack(spacing: 12) {
+                // Thẻ Trái: NidoOffice
                 VStack(alignment: .leading, spacing: 8) {
-                    Button {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                            showVietQR.toggle()
+                    HStack(spacing: 8) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Color.indigo.opacity(0.14))
+                                .frame(width: 28, height: 28)
+                            Image(systemName: "doc.text.image.fill")
+                                .font(.system(size: 13.5, weight: .semibold))
+                                .foregroundColor(.indigo)
                         }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "cup.and.saucer.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(.orange)
-                                .frame(width: 20)
 
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("Mời tác giả ly cà phê nhỏ")
-                                    .font(.system(size: 12.5, weight: .semibold))
-                                    .foregroundColor(.primary)
-                                Text("Sen Việt hoàn toàn miễn phí. Nếu bộ gõ hữu ích, bạn có thể ủng hộ nhẹ qua VietQR.")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Spacer()
-
-                            Label(showVietQR ? "Thu gọn" : "Mã VietQR", systemImage: showVietQR ? "chevron.up" : "qrcode")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.orange)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    if showVietQR {
-                        Divider()
-                        HStack(spacing: 14) {
-                            if let qrImg = loadVietQRImage() {
-                                Image(nsImage: qrImg)
-                                    .resizable()
-                                    .interpolation(.high)
-                                    .scaledToFit()
-                                    .frame(width: 96, height: 96)
-                                    .padding(4)
-                                    .background(Color.white)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            }
-
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text("Ngân hàng Quân đội (MB Bank)")
-                                    .font(.system(size: 12, weight: .semibold))
-
-                                HStack(spacing: 8) {
-                                    Text("STK: 0979266045")
-                                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                        .foregroundColor(.indigo)
-
-                                    Button(copiedAccount ? "✓ Đã chép" : "Sao chép STK") {
-                                        NSPasteboard.general.clearContents()
-                                        NSPasteboard.general.setString("0979266045", forType: .string)
-                                        copiedAccount = true
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-                                            copiedAccount = false
-                                        }
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.mini)
-                                }
-
-                                Text("Chủ TK: Trần Phát Đạt • Nội dung: Ung ho Sen Viet")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                        }
-                    }
-                }
-                .padding(12)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
-                )
-
-                // 3. Sản phẩm khác của tác giả — NidoOffice & YouPersona.com (Giới thiệu gọn + CTA)
-                VStack(alignment: .leading, spacing: 10) {
-                    // 3a. NidoOffice (Bộ Office AI)
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "doc.text.image.fill")
-                            .font(.system(size: 15))
-                            .foregroundColor(.indigo)
-                            .frame(width: 20)
-                            .padding(.top, 1)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: 1.5) {
+                            HStack(spacing: 5) {
                                 Text("NidoOffice")
-                                    .font(.system(size: 12.5, weight: .bold))
-                                Text("BỘ OFFICE AI • EDUCENTER.APP")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.indigo.opacity(0.15))
+                                    .font(.system(size: 13, weight: .bold))
+                                Text("EDUCENTER.APP")
+                                    .font(.system(size: 8.5, weight: .bold))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1.5)
+                                    .background(Color.indigo.opacity(0.14))
                                     .foregroundColor(.indigo)
                                     .clipShape(Capsule())
                             }
-                            Text("Bộ công cụ Văn phòng & Soạn thảo Tài liệu, Trang trình bày, Bảng tính tích hợp Trí tuệ Nhân tạo (AI) thế hệ mới.")
-                                .font(.system(size: 11))
+                            Text("Bộ ứng dụng Văn phòng AI thế hệ mới")
+                                .font(.system(size: 10.5))
                                 .foregroundColor(.secondary)
-                                .lineSpacing(1.5)
                         }
 
-                        Spacer(minLength: 8)
+                        Spacer(minLength: 4)
 
-                        Link(destination: URL(string: "https://educenter.app")!) {
-                            HStack(spacing: 4) {
-                                Text("Mở ngay")
-                                Image(systemName: "arrow.up.right")
-                            }
-                            .font(.system(size: 11, weight: .semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.indigo)
-                            .foregroundColor(.white)
-                            .clipShape(Capsule())
+                        if let url = URL(string: "https://educenter.app") {
+                            Link("Mở ↗", destination: url)
+                                .font(.system(size: 10.5, weight: .semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4.5)
+                                .background(Color.indigo)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
                         }
-                        .buttonStyle(.plain)
                     }
 
-                    Divider()
+                    Text("Soạn thảo Tài liệu, Thiết kế Trang trình bày & Bảng tính thông minh tích hợp AI.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(cardSurfaceColor)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.indigo.opacity(isDark ? 0.38 : 0.22), lineWidth: 0.9)
+                )
 
-                    // 3b. YouPersona.com (Quản lý Thu Chi AI)
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "chart.pie.fill")
-                            .font(.system(size: 15))
-                            .foregroundColor(.teal)
-                            .frame(width: 20)
-                            .padding(.top, 1)
+                // Thẻ Phải: YouPersona.com
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Color.teal.opacity(0.14))
+                                .frame(width: 28, height: 28)
+                            Image(systemName: "chart.pie.fill")
+                                .font(.system(size: 13.5, weight: .semibold))
+                                .foregroundColor(.teal)
+                        }
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: 1.5) {
+                            HStack(spacing: 5) {
                                 Text("YouPersona.com")
-                                    .font(.system(size: 12.5, weight: .bold))
-                                Text("SẢN PHẨM KHÁC CỦA TÁC GIẢ")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.teal.opacity(0.15))
+                                    .font(.system(size: 13, weight: .bold))
+                                Text("THU CHI AI")
+                                    .font(.system(size: 8.5, weight: .bold))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1.5)
+                                    .background(Color.teal.opacity(0.14))
                                     .foregroundColor(.teal)
                                     .clipShape(Capsule())
                             }
-                            Text("Trợ lý Quản lý Thu Chi & Tài chính Cá nhân AI — ghi chép bằng giọng nói, quét hoá đơn tự động và quản lý ngân sách theo phương pháp 6 chiếc lọ.")
-                                .font(.system(size: 11))
+                            Text("Trợ lý Tài chính cá nhân thông minh")
+                                .font(.system(size: 10.5))
                                 .foregroundColor(.secondary)
-                                .lineSpacing(1.5)
                         }
 
-                        Spacer(minLength: 8)
+                        Spacer(minLength: 4)
 
-                        Link(destination: URL(string: "https://youpersona.com")!) {
-                            HStack(spacing: 4) {
-                                Text("Khám phá")
-                                Image(systemName: "arrow.up.right")
-                            }
-                            .font(.system(size: 11, weight: .semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.teal)
-                            .foregroundColor(.white)
-                            .clipShape(Capsule())
+                        if let url = URL(string: "https://youpersona.com") {
+                            Link("Mở ↗", destination: url)
+                                .font(.system(size: 10.5, weight: .semibold))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4.5)
+                                .background(Color.teal)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
                         }
-                        .buttonStyle(.plain)
                     }
-                }
-                .padding(12)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.indigo.opacity(0.22), lineWidth: 0.9)
-                )
 
-                // 4. Cộng đồng & Tác giả
-                VStack(spacing: 8) {
-                    aboutLinkRow(
-                        title: "Kênh Thảo luận Cộng đồng (Zalo)",
-                        urlString: "https://zalo.me/g/6wwyvywyvhsb0n6rwkze",
-                        icon: "bubble.left.and.bubble.right.fill"
-                    )
-                    Divider()
-                    aboutLinkRow(
-                        title: "Tác giả: Trần Phát Đạt (LinkedIn)",
-                        urlString: "https://www.linkedin.com/in/stevedat/?isSelfProfile=true",
-                        icon: "person.crop.circle.badge.checkmark"
-                    )
-                    Divider()
-                    aboutLinkRow(
-                        title: "Mã nguồn Mở & Báo lỗi (GitHub)",
-                        urlString: "https://github.com/stevedat/VieLotus-IM",
-                        icon: "chevron.left.forwardslash.chevron.right"
-                    )
+                    Text("Quét hoá đơn tự động, phân bổ Ngân sách 6 chiếc lọ & dự báo dòng tiền bằng AI.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(12)
-                .background(Color(nsColor: .controlBackgroundColor))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(cardSurfaceColor)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
+                        .strokeBorder(Color.teal.opacity(isDark ? 0.38 : 0.22), lineWidth: 0.9)
                 )
             }
-            .padding(16)
-        }
-    }
+            .frame(height: 98)
 
-    private func aboutLinkRow(title: String, urlString: String, icon: String) -> some View {
-        Link(destination: URL(string: urlString)!) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 12.5))
-                    .foregroundColor(.indigo)
-                    .frame(width: 20)
-                Text(title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
+            // Hàng 3: Thanh Hỗ trợ, Cộng đồng & Mã nguồn (Toàn chiều ngang)
+            HStack(spacing: 12) {
+                Button {
+                    showingFeedbackSheet = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "bubble.left.and.text.bubble.right.fill")
+                            .foregroundColor(.indigo)
+                        Text("Gửi Góp ý & Báo lỗi")
+                            .fontWeight(.semibold)
+                    }
+                    .font(.system(size: 11.5))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.indigo.opacity(isDark ? 0.22 : 0.10))
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
                 Spacer()
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 10.5))
-                    .foregroundColor(.secondary)
+
+                if let zaloURL = URL(string: "https://zalo.me/g/6wwyvywyvhsb0n6rwkze") {
+                    Link("Cộng đồng Zalo ↗", destination: zaloURL)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundColor(.primary)
+                }
+
+                Text("•").foregroundColor(.secondary)
+
+                if let authorURL = URL(string: "https://www.linkedin.com/in/stevedat/?isSelfProfile=true") {
+                    Link("Tác giả: Trần Phát Đạt ↗", destination: authorURL)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundColor(.primary)
+                }
+
+                Text("•").foregroundColor(.secondary)
+
+                if let ghURL = URL(string: "https://github.com/stevedat/VieLotus-IM") {
+                    Link("Mã nguồn GitHub ↗", destination: ghURL)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(.indigo)
+                }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity)
+            .background(cardSurfaceColor)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(cardBorderColor, lineWidth: 0.9)
+            )
+
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
     }
 
-    private func loadVietQRImage() -> NSImage? {
-        if let url = Bundle.main.url(forResource: "vietqr", withExtension: "png"),
-           let img = NSImage(contentsOf: url) {
-            return img
-        }
-        let devPaths = [
-            "Sources/VieLotusIM/Resources/vietqr.png",
-            "docs/assets/vietqr.png"
-        ]
-        for path in devPaths where FileManager.default.fileExists(atPath: path) {
-            if let img = NSImage(contentsOfFile: path) {
-                return img
-            }
-        }
-        return nil
-    }
-
-    private func toggleLabel(_ title: String, _ subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-            Text(subtitle)
-                .font(.system(size: 10))
+    private func aboutFeaturePill(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 9.5, weight: .bold))
+                .foregroundColor(color)
+            Text(text)
+                .font(.system(size: 10.5, weight: .medium))
                 .foregroundColor(.secondary)
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3.5)
+        .background(isDark ? Color.white.opacity(0.08) : Color.secondary.opacity(0.08))
+        .clipShape(Capsule())
     }
 
     // MARK: - Actions
@@ -888,10 +986,10 @@ private struct AdaptiveCompatibilitySheet: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Adaptive Hybrid • Tương thích Ứng dụng")
+                    Text("Tương thích Ứng dụng (Adaptive Hybrid)")
                         .font(.system(size: 14, weight: .bold))
-                    Text("Ưu tiên không gạch chân (Direct), tự động bảo vệ dữ liệu & tàng hình gạch chân (Stealth α=0.004)")
-                        .font(.system(size: 10.5))
+                    Text("Tự động chọn chế độ gõ tối ưu (Direct / Stealth Marked Text) cho từng ứng dụng")
+                        .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
                 Spacer()
@@ -912,15 +1010,15 @@ private struct AdaptiveCompatibilitySheet: View {
                     Picker("", selection: $prefs.presentationModePreference) {
                         Text("Tự động (Adaptive Hybrid)").tag(PresentationModePreference.automatic)
                         Text("Ưu tiên Không gạch chân (Direct)").tag(PresentationModePreference.directReplacement)
-                        Text("Native Marked Text (Chuẩn Apple)").tag(PresentationModePreference.markedText)
+                        Text("Marked Text (Chuẩn Apple)").tag(PresentationModePreference.markedText)
                     }
                     .labelsHidden()
-                    .frame(width: 240)
+                    .frame(width: 235)
 
                     Spacer()
 
                     if !prefs.appModeOverrides.isEmpty || !ClientAdapter.forcedMarkedTextBundles().isEmpty {
-                        Button("Đặt lại mặc định") {
+                        Button("Khôi phục mặc định") {
                             prefs.appModeOverrides.removeAll()
                             ClientAdapter.resetDynamicMarkedText()
                             reloadRunningApps()
@@ -943,7 +1041,7 @@ private struct AdaptiveCompatibilitySheet: View {
                 }
             }
         }
-        .frame(width: 470, height: 410)
+        .frame(width: 560, height: 360)
         .onAppear {
             reloadRunningApps()
         }
@@ -1010,7 +1108,7 @@ private struct AdaptiveCompatibilitySheet: View {
             }
             .labelsHidden()
             .controlSize(.small)
-            .frame(width: 135)
+            .frame(width: 140)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -1041,7 +1139,7 @@ private struct AdaptiveCompatibilitySheet: View {
                 return ("Direct • Không gạch chân", .green)
             case .markedText:
                 if category == .chromium {
-                    return ("Stealth • Gạch chân tàng hình", .indigo)
+                    return ("Stealth • Gạch chân ẩn", .indigo)
                 }
                 return ("Marked Text • An toàn", .blue)
             case .terminalDirect:

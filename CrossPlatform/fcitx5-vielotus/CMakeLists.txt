@@ -13,7 +13,6 @@ find_package(Fcitx5Module REQUIRED COMPONENTS QuickPhrase)
 
 include(GNUInstallDirs)
 include(FeatureSummary)
-
 # Path to VieLotusCAPI C header and built library
 set(VIELOTUS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/VieLotusCAPI/include")
 
@@ -69,7 +68,6 @@ set_target_properties(vielotus-addon PROPERTIES
     PREFIX ""
     OUTPUT_NAME "vielotus"
 )
-
 # Install addon & inputmethod configuration metadata
 configure_file(vielotus.conf.in vielotus.conf @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/vielotus.conf" DESTINATION "${FCITX_INSTALL_PKGDATADIR}/addon")

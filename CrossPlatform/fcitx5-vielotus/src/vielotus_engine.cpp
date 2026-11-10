@@ -13,9 +13,6 @@
 #include <fcitx/inputpanel.h>
 #include <fcitx/statusarea.h>
 #include <fcitx/userinterfacemanager.h>
-#ifdef VIELOTUS_ENABLE_LAB
-#include "vielotus_lab_trace.h"
-#endif
 
 namespace fcitx {
 
@@ -250,25 +247,6 @@ void VieLotusState::updatePreedit() {
             } else {
                 inputPanel.setPreedit(preedit);
             }
-#ifdef VIELOTUS_ENABLE_LAB
-            bool isPasswd = ic_->capabilityFlags().test(CapabilityFlag::Password);
-            char escRaw[256] = {0};
-            char escComp[256] = {0};
-            vl_lab_escape_str(vielotus_get_raw_text(session_), escRaw, sizeof(escRaw));
-            vl_lab_escape_str(preeditStr.c_str(), escComp, sizeof(escComp));
-            std::string prog = ic_->program();
-            vl_lab_write_event(
-                isPasswd,
-                "fcitx5-vielotus",
-                prog.empty() ? "fcitx5-ic" : prog.c_str(),
-                "PREEDIT",
-                0,
-                "clientPreedit=%d raw=\"%s\" text=\"%s\"",
-                useClientPreedit ? 1 : 0,
-                escRaw,
-                escComp
-            );
-#endif
             ic_->updatePreedit();
             ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
             return;
@@ -288,14 +266,6 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
     if (session_ && vielotus_is_composing(session_)) {
         compCpBefore = utf8CodepointCount(vielotus_get_composing_text(session_));
     }
-#ifdef VIELOTUS_ENABLE_LAB
-    char rawBefore[256] = {0};
-    char compBefore[256] = {0};
-    if (session_) {
-        vl_lab_escape_str(vielotus_get_raw_text(session_), rawBefore, sizeof(rawBefore));
-        vl_lab_escape_str(vielotus_get_composing_text(session_), compBefore, sizeof(compBefore));
-    }
-#endif
     std::string out;
     if (session_ && vielotus_is_composing(session_)) {
         if (trailingAscii && trailingAscii[0] != '\0' && trailingAscii[1] == '\0') {
@@ -335,27 +305,6 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
             ic_->deleteSurroundingText(-surrDel, static_cast<unsigned int>(surrDel));
         }
         ic_->commitString(out);
-#ifdef VIELOTUS_ENABLE_LAB
-        bool isPasswd = ic_ && ic_->capabilityFlags().test(CapabilityFlag::Password);
-        char escOut[512] = {0};
-        char escTrail[32] = {0};
-        vl_lab_escape_str(out.c_str(), escOut, sizeof(escOut));
-        vl_lab_escape_str(trailingAscii ? trailingAscii : "", escTrail, sizeof(escTrail));
-        std::string prog = ic_ ? ic_->program() : "";
-        vl_lab_write_event(
-            isPasswd,
-            "fcitx5-vielotus",
-            prog.empty() ? "fcitx5-ic" : prog.c_str(),
-            "COMMIT",
-            0,
-            "raw=\"%s\" comp=\"%s\" trail=\"%s\" out=\"%s\" retroDel=%d",
-            rawBefore,
-            compBefore,
-            escTrail,
-            escOut,
-            static_cast<int>(surrDel)
-        );
-#endif
     }
 
     replayedAfterBackspace_ = false;
@@ -509,16 +458,6 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
 
     // Handle printable ASCII characters (32..126)
     if (sym >= 32 && sym < 127) {
-#ifdef VIELOTUS_ENABLE_LAB
-        uint64_t t0Us = vl_lab_now_us();
-        int compWas = vielotus_is_composing(session_) ? 1 : 0;
-        char logRawBefore[256] = {0};
-        char logCompBefore[256] = {0};
-        if (compWas && session_) {
-            vl_lab_escape_str(vielotus_get_raw_text(session_), logRawBefore, sizeof(logRawBefore));
-            vl_lab_escape_str(vielotus_get_composing_text(session_), logCompBefore, sizeof(logCompBefore));
-        }
-#endif
         const bool isAlpha =
             (sym >= 'a' && sym <= 'z') || (sym >= 'A' && sym <= 'Z');
         const bool isDigit = (sym >= '0' && sym <= '9');
@@ -646,34 +585,6 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                 }
             }
         }
-#ifdef VIELOTUS_ENABLE_LAB
-        {
-            bool isPasswd = ic_ && ic_->capabilityFlags().test(CapabilityFlag::Password);
-            char logRawAfter[256] = {0};
-            char logCompAfter[256] = {0};
-            int compNow = vielotus_is_composing(session_) ? 1 : 0;
-            const char* actName = (action == VIELOTUS_ACTION_COMMIT) ? "COMMIT" :
-                                  (action == VIELOTUS_ACTION_REPLACE) ? "REPLACE" :
-                                  (action == VIELOTUS_ACTION_CONSUMED) ? "CONSUMED" : "NONE";
-            if (compNow && session_) {
-                vl_lab_escape_str(vielotus_get_raw_text(session_), logRawAfter, sizeof(logRawAfter));
-                vl_lab_escape_str(vielotus_get_composing_text(session_), logCompAfter, sizeof(logCompAfter));
-            } else if (action == VIELOTUS_ACTION_COMMIT && session_) {
-                vl_lab_escape_str(vielotus_get_last_text(session_), logCompAfter, sizeof(logCompAfter));
-            }
-            std::string prog = ic_ ? ic_->program() : "";
-            vl_lab_write_event(
-                isPasswd,
-                "fcitx5-vielotus",
-                prog.empty() ? "fcitx5-ic" : prog.c_str(),
-                "KEY_DOWN",
-                vl_lab_now_us() - t0Us,
-                "kv=0x%04x ch='%c' comp=%d->%d act=%s raw=\"%s\"->\"%s\" word=\"%s\"->\"%s\"",
-                static_cast<unsigned int>(sym), static_cast<char>(sym), compWas, compNow, actName,
-                logRawBefore, logRawAfter, logCompBefore, logCompAfter
-            );
-        }
-#endif
         if (action == VIELOTUS_ACTION_COMMIT) {
             const char* committed = vielotus_get_last_text(session_);
             std::string out = committed ? committed : "";

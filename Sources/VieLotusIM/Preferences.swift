@@ -26,12 +26,11 @@ final class Preferences: ObservableObject {
         static let engineBackend = "VieLotusIM.engineBackend"
         static let passthroughRemoteApps = "VieLotusIM.passthroughRemoteApps"
         static let enforceABCBaseLayout = "VieLotusIM.enforceABCBaseLayout"
-        static let macroEnabled = "VieLotusIM.macroEnabled"
+        static let macroEnabled = "VieLotusIM.macroEnabledV2"
         static let grammarProfile = "VieLotusIM.grammarProfile"
     }
     
     private func flushDefaults() {
-        defaults.synchronize()
         CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
     }
 
@@ -191,7 +190,7 @@ final class Preferences: ObservableObject {
         self.terminalDirectMode = defaults.object(forKey: Key.terminalDirectMode) as? Bool ?? true
         self.passthroughRemoteApps = defaults.object(forKey: Key.passthroughRemoteApps) as? Bool ?? true
         self.enforceABCBaseLayout = defaults.object(forKey: Key.enforceABCBaseLayout) as? Bool ?? true
-        self.macroEnabled = defaults.object(forKey: Key.macroEnabled) as? Bool ?? true
+        self.macroEnabled = defaults.object(forKey: Key.macroEnabled) as? Bool ?? false
         let rawPresentationMode = defaults.string(forKey: Key.presentationModePreference) ?? PresentationModePreference.automatic.rawValue
         self.presentationModePreference = PresentationModePreference(rawValue: rawPresentationMode) ?? .automatic
         let storedOverrides = defaults.dictionary(forKey: Key.appModeOverrides) as? [String: String] ?? [:]
@@ -233,7 +232,13 @@ final class Preferences: ObservableObject {
     public static let preferencesChangedNotification = Notification.Name("org.vielotus.inputmethod.preferencesChanged")
 
     @objc private func handleExternalPreferencesChange() {
-        reload()
+        if Thread.isMainThread {
+            reload()
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.reload()
+            }
+        }
     }
 
     public func reload() {
@@ -270,7 +275,7 @@ final class Preferences: ObservableObject {
         self.terminalDirectMode = defaults.object(forKey: Key.terminalDirectMode) as? Bool ?? true
         self.passthroughRemoteApps = defaults.object(forKey: Key.passthroughRemoteApps) as? Bool ?? true
         self.enforceABCBaseLayout = defaults.object(forKey: Key.enforceABCBaseLayout) as? Bool ?? true
-        self.macroEnabled = defaults.object(forKey: Key.macroEnabled) as? Bool ?? true
+        self.macroEnabled = defaults.object(forKey: Key.macroEnabled) as? Bool ?? false
         let rawPresentationMode = defaults.string(forKey: Key.presentationModePreference) ?? PresentationModePreference.automatic.rawValue
         self.presentationModePreference = PresentationModePreference(rawValue: rawPresentationMode) ?? .automatic
         let storedOverrides = defaults.dictionary(forKey: Key.appModeOverrides) as? [String: String] ?? [:]

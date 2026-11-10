@@ -6,7 +6,6 @@ pkg_check_modules(IBUS REQUIRED ibus-1.0>=1.5.0)
 pkg_check_modules(GLIB REQUIRED glib-2.0 gobject-2.0 gio-2.0)
 
 include(GNUInstallDirs)
-
 # Path to VieLotusCAPI header and library
 set(VIELOTUS_CAPI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/VieLotusCAPI")
 set(VIELOTUS_CAPI_INCLUDE_DIR "${VIELOTUS_CAPI_DIR}/include")
@@ -57,7 +56,6 @@ target_compile_options(ibus-engine-vielotus PRIVATE
     -Wall
     -Wextra
 )
-
 # Configure component XML (default to CMAKE_INSTALL_FULL_LIBEXECDIR, e.g. /usr/libexec)
 if(NOT DEFINED LIBEXECDIR)
     set(LIBEXECDIR "${CMAKE_INSTALL_FULL_LIBEXECDIR}")

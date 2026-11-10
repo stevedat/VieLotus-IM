@@ -60,6 +60,9 @@ void vielotus_set_grammar_profile(vielotus_session_t session, int32_t profile);
 int32_t vielotus_get_grammar_profile(vielotus_session_t session);
 
 /// Enables or disables smart bilingual auto-restore.
+// Swift mobile-core extension (iOS/Android): standalone desktop native engine
+// does not expose macro expansion. Requires rebuilding libVieLotusCAPI on Android.
+void vielotus_set_macro_enabled(vielotus_session_t session, bool enabled);
 void vielotus_set_smart_bilingual(vielotus_session_t session, bool enabled);
 
 /// Enables or disables modern diacritic orthography (òa/òe vs oà/oè).
