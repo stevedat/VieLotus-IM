@@ -21,7 +21,10 @@ public:
     // ITfEditSession
     STDMETHODIMP DoEditSession(TfEditCookie ec) override;
 
-    ITfRange *DetachResultCaretRange();
+    LONG GetActualShifted() const { return m_actualShifted; }
+    bool WasSelectionEmpty() const { return m_wasEmpty; }
+    HRESULT GetSetTextHr() const { return m_hrSetText; }
+    bool WasExecuted() const { return m_executed; }
 
 private:
     std::atomic<LONG> m_cRef{1};
@@ -29,5 +32,8 @@ private:
     int32_t m_backspaces;
     std::wstring m_insertText;
     bool m_bCommit;
-    ITfRange *m_pResultCaretRange{nullptr};
+    LONG m_actualShifted{0};
+    bool m_wasEmpty{true};
+    HRESULT m_hrSetText{S_OK};
+    bool m_executed{false};
 };

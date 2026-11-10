@@ -115,6 +115,14 @@ foreach ($targetArch in $archesToBuild) {
         Copy-Item $builtSettingsExe.FullName -Destination "$binStagingDir\VieLotusSettings.exe" -Force
         Write-Host "   ✅ Đã copy: $($builtSettingsExe.FullName) -> $binStagingDir\$targetArch\VieLotusSettings.exe"
     }
+
+    $builtLabExe = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusLab.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($builtLabExe) {
+        Copy-Item $builtLabExe.FullName -Destination "$binStagingDir\$targetArch\VieLotusLab.exe" -Force
+        Copy-Item $builtLabExe.FullName -Destination "$binStagingDir\VieLotusLab.exe" -Force
+        Copy-Item $builtLabExe.FullName -Destination "$distWindowsDir\VieLotusLab-$targetArch.exe" -Force
+        Write-Host "   ✅ Đã copy: $($builtLabExe.FullName) -> $binStagingDir\$targetArch\VieLotusLab.exe"
+    }
 }
 
 # Also try building the opposite architecture so the Inno Setup installer is always Universal (x64 + ARM64)
@@ -134,6 +142,11 @@ foreach ($extraArch in @("x64", "arm64")) {
             $builtExtraSettings = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusSettings.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($builtExtraSettings) {
                 Copy-Item $builtExtraSettings.FullName -Destination "$binStagingDir\$extraArch\VieLotusSettings.exe" -Force
+            }
+            $builtExtraLab = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusLab.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($builtExtraLab) {
+                Copy-Item $builtExtraLab.FullName -Destination "$binStagingDir\$extraArch\VieLotusLab.exe" -Force
+                Copy-Item $builtExtraLab.FullName -Destination "$distWindowsDir\VieLotusLab-$extraArch.exe" -Force
             }
         }
     }
