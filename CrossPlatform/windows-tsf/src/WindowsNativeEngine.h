@@ -53,6 +53,7 @@ public:
     int32_t getLastCommitDiffBackspaces() const { return m_lastCommitDiffBackspaces; }
     const char *getLastCommitDiffTextUtf8() const { return m_lastCommitDiffTextUtf8; }
     bool isComposing() const { return m_composingFlag; }
+    bool hasActiveWord() const { return m_activeWordFlag; }
 
 private:
     InputMethod m_inputMethod{InputMethod::Telex};
@@ -61,6 +62,7 @@ private:
     int32_t m_grammarProfile{1};
     bool m_quickTelex{false};
     bool m_composingFlag{false};
+    bool m_activeWordFlag{false};
     int32_t m_lastBackspaces{0};
     char m_lastTextUtf8[kMaxUtf8Bytes]{};
     int32_t m_lastCommitDiffBackspaces{0};

@@ -14,17 +14,59 @@ bool IsWin32EditOrRichEditHwnd(HWND hwnd) {
     return wcsstr(clsName, L"edit") != nullptr;
 }
 
+void SafeEndAndClearComposition(
+    TfEditCookie ec,
+    ITfComposition **ppComposition,
+    ITfContext **ppCompositionContext
+) {
+    if (ppComposition && *ppComposition) {
+        ITfComposition *pComp = *ppComposition;
+        *ppComposition = nullptr;
+        if (ppCompositionContext && *ppCompositionContext) {
+            (*ppCompositionContext)->Release();
+            *ppCompositionContext = nullptr;
+        }
+        pComp->EndComposition(ec);
+        pComp->Release();
+    } else if (ppCompositionContext && *ppCompositionContext) {
+        (*ppCompositionContext)->Release();
+        *ppCompositionContext = nullptr;
+    }
+}
+
+void SafeReleaseStaleComposition(
+    ITfComposition **ppComposition,
+    ITfContext **ppCompositionContext
+) {
+    if (ppComposition && *ppComposition) {
+        (*ppComposition)->Release();
+        *ppComposition = nullptr;
+    }
+    if (ppCompositionContext && *ppCompositionContext) {
+        (*ppCompositionContext)->Release();
+        *ppCompositionContext = nullptr;
+    }
+}
+
 } // namespace
 
 CEditSession::CEditSession(
     ITfContext *pContext,
     int32_t backspaces,
     const std::wstring &insertText,
-    bool bCommit
+    bool bCommit,
+    bool bKeepComposition,
+    ITfComposition **ppComposition,
+    ITfContext **ppCompositionContext,
+    ITfCompositionSink *pCompositionSink
 ) : m_pContext(pContext),
     m_backspaces(backspaces),
     m_insertText(insertText),
-    m_bCommit(bCommit) {
+    m_bCommit(bCommit),
+    m_bKeepComposition(bKeepComposition),
+    m_ppComposition(ppComposition),
+    m_ppCompositionContext(ppCompositionContext),
+    m_pCompositionSink(pCompositionSink) {
     if (m_pContext) {
         m_pContext->AddRef();
     }
@@ -63,6 +105,19 @@ STDMETHODIMP_(ULONG) CEditSession::Release() {
 STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
     if (!m_pContext) return E_FAIL;
 
+    if (m_ppComposition && *m_ppComposition &&
+        m_ppCompositionContext && *m_ppCompositionContext &&
+        *m_ppCompositionContext != m_pContext) {
+        SafeReleaseStaleComposition(m_ppComposition, m_ppCompositionContext);
+    }
+
+    // Pure composition-termination session (e.g. before non-eaten Enter/Tab/Arrow key)
+    if (m_backspaces == 0 && m_insertText.empty() && !m_bKeepComposition) {
+        SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+        m_executed = true;
+        return S_OK;
+    }
+
     TF_SELECTION sel{};
     ULONG cFetched = 0;
 
@@ -85,16 +140,41 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
     }
     m_actualShifted = cchShifted;
 
+    // Anchor composition start with backward gravity before mutating text
+    ITfRange *pCompStartAnchor = nullptr;
+    if (m_ppComposition && *m_ppComposition) {
+        ITfRange *pExistingCompRange = nullptr;
+        if (SUCCEEDED((*m_ppComposition)->GetRange(&pExistingCompRange)) && pExistingCompRange) {
+            if (SUCCEEDED(pExistingCompRange->Clone(&pCompStartAnchor)) && pCompStartAnchor) {
+                pCompStartAnchor->Collapse(ec, TF_ANCHOR_START);
+                LONG lCmp = 0;
+                if (SUCCEEDED(pCompStartAnchor->CompareStart(ec, pRange, TF_ANCHOR_START, &lCmp)) && lCmp > 0) {
+                    pCompStartAnchor->ShiftStartToRange(ec, pRange, TF_ANCHOR_START);
+                    pCompStartAnchor->Collapse(ec, TF_ANCHOR_START);
+                }
+                pCompStartAnchor->SetGravity(ec, TF_GRAVITY_BACKWARD, TF_GRAVITY_BACKWARD);
+            }
+            pExistingCompRange->Release();
+        }
+    }
+    if (!pCompStartAnchor) {
+        if (SUCCEEDED(pRange->Clone(&pCompStartAnchor)) && pCompStartAnchor) {
+            pCompStartAnchor->Collapse(ec, TF_ANCHOR_START);
+            pCompStartAnchor->SetGravity(ec, TF_GRAVITY_BACKWARD, TF_GRAVITY_BACKWARD);
+        }
+    }
+
     const int32_t actualShifted = (cchShifted < 0) ? static_cast<int32_t>(-cchShifted) : 0;
     const int32_t missingBs = (fWasEmpty && m_backspaces > actualShifted) ? (m_backspaces - actualShifted) : 0;
     bool handledByWin32Edit = false;
+    std::wstring effectiveInsertText = m_insertText;
 
     if (missingBs > 0) {
-        if (actualShifted > 0) {
-            pRange->SetText(ec, 0, L"", 0);
-        }
         HWND hFocus = GetFocus();
         if (IsWin32EditOrRichEditHwnd(hFocus)) {
+            if (actualShifted > 0) {
+                pRange->SetText(ec, 0, L"", 0);
+            }
             DWORD dwStart = 0, dwEnd = 0;
             SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
             if (dwStart >= static_cast<DWORD>(missingBs)) {
@@ -104,16 +184,13 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
                     static_cast<WPARAM>(dwStart - static_cast<DWORD>(missingBs)),
                     static_cast<LPARAM>(dwEnd)
                 );
-                SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(m_insertText.c_str()));
+                SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(effectiveInsertText.c_str()));
                 handledByWin32Edit = true;
                 m_actualShifted = -static_cast<LONG>(m_backspaces);
                 m_hrSetText = S_OK;
             }
-        }
-        if (!handledByWin32Edit && hFocus && IsWindow(hFocus)) {
-            for (int32_t i = 0; i < missingBs; ++i) {
-                SendMessageW(hFocus, WM_CHAR, VK_BACK, 1);
-            }
+        } else if (m_bCommit && actualShifted > 0 && effectiveInsertText.size() > static_cast<size_t>(missingBs)) {
+            effectiveInsertText.erase(0, static_cast<size_t>(missingBs));
         }
     } else if (fWasEmpty) {
         HWND hFocus = GetFocus();
@@ -121,7 +198,7 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
             DWORD dwStart = 0, dwEnd = 0;
             SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
             if (dwStart < dwEnd) {
-                SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(m_insertText.c_str()));
+                SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(effectiveInsertText.c_str()));
                 handledByWin32Edit = true;
                 m_hrSetText = S_OK;
             }
@@ -133,8 +210,8 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
         pRange->SetGravity(ec, TF_GRAVITY_BACKWARD, TF_GRAVITY_FORWARD);
 
         // Set new text (replaces the selected range)
-        if (!m_insertText.empty()) {
-            m_hrSetText = pRange->SetText(ec, 0, m_insertText.c_str(), static_cast<LONG>(m_insertText.length()));
+        if (!effectiveInsertText.empty()) {
+            m_hrSetText = pRange->SetText(ec, 0, effectiveInsertText.c_str(), static_cast<LONG>(effectiveInsertText.length()));
         } else if (m_backspaces > 0 || !fWasEmpty) {
             // Pure backspace delete or active selection delete
             m_hrSetText = pRange->SetText(ec, 0, L"", 0);
@@ -145,8 +222,62 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
         sel.style.ase = TF_AE_NONE;
         sel.style.fInterimChar = FALSE;
         m_pContext->SetSelection(ec, 1, &sel);
+
+        // Maintain ITfComposition lifecycle so Chromium TSFTextStore & Univer DocIMEInputController
+        // track the active syllable via SetCompositionText / CommitText instead of ExtendSelectionAndDelete.
+        if (m_ppComposition) {
+            if (m_bKeepComposition) {
+                if (*m_ppComposition == nullptr) {
+                    if (pCompStartAnchor) {
+                        pCompStartAnchor->ShiftEndToRange(ec, pRange, TF_ANCHOR_END);
+                        BOOL fCompEmpty = TRUE;
+                        pCompStartAnchor->IsEmpty(ec, &fCompEmpty);
+                        if (!fCompEmpty) {
+                            ITfContextComposition *pCtxComp = nullptr;
+                            if (SUCCEEDED(m_pContext->QueryInterface(IID_ITfContextComposition, reinterpret_cast<void **>(&pCtxComp))) && pCtxComp) {
+                                pCtxComp->StartComposition(ec, pCompStartAnchor, m_pCompositionSink, m_ppComposition);
+                                pCtxComp->Release();
+                                if (*m_ppComposition && m_ppCompositionContext) {
+                                    *m_ppCompositionContext = m_pContext;
+                                    m_pContext->AddRef();
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    (*m_ppComposition)->ShiftEnd(ec, pRange);
+                    if (pCompStartAnchor) {
+                        (*m_ppComposition)->ShiftStart(ec, pCompStartAnchor);
+                        (*m_ppComposition)->ShiftEnd(ec, pRange);
+                    }
+                    ITfRange *pUpdatedCompRange = nullptr;
+                    if (SUCCEEDED((*m_ppComposition)->GetRange(&pUpdatedCompRange)) && pUpdatedCompRange) {
+                        BOOL fUpdatedEmpty = TRUE;
+                        pUpdatedCompRange->IsEmpty(ec, &fUpdatedEmpty);
+                        pUpdatedCompRange->Release();
+                        if (fUpdatedEmpty) {
+                            SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+                        }
+                    }
+                }
+            } else {
+                if (*m_ppComposition != nullptr) {
+                    (*m_ppComposition)->ShiftEnd(ec, pRange);
+                    if (pCompStartAnchor) {
+                        (*m_ppComposition)->ShiftStart(ec, pCompStartAnchor);
+                        (*m_ppComposition)->ShiftEnd(ec, pRange);
+                    }
+                    SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+                }
+            }
+        }
+    } else {
+        SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
     }
 
+    if (pCompStartAnchor) {
+        pCompStartAnchor->Release();
+    }
     pRange->Release();
     m_executed = true;
     return S_OK;
