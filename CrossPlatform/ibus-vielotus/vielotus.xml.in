@@ -26,7 +26,7 @@
             <icon>vielotus</icon>
             <layout>us</layout>
             <rank>99</rank>
-            <symbol>🇻🇳</symbol>
+            <symbol>🇻🇳 tex</symbol>
             <setup>/usr/bin/vielotus-settings</setup>
         </engine>
         <engine>
@@ -39,7 +39,7 @@
             <icon>vielotus</icon>
             <layout>us</layout>
             <rank>98</rank>
-            <symbol>🇻🇳</symbol>
+            <symbol>🇻🇳 vni</symbol>
             <setup>/usr/bin/vielotus-settings</setup>
         </engine>
     </engines>
