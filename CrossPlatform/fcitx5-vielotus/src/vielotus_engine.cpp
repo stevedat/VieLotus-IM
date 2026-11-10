@@ -13,6 +13,9 @@
 #include <fcitx/inputpanel.h>
 #include <fcitx/statusarea.h>
 #include <fcitx/userinterfacemanager.h>
+#ifdef VIELOTUS_ENABLE_LAB
+#include "vielotus_lab_trace.h"
+#endif
 
 namespace fcitx {
 
@@ -60,6 +63,12 @@ inline size_t utf8CodepointCount(const char* utf8Str) {
         }
     }
     return count;
+}
+
+inline const char* utf8AfterFirstSpace(const char* utf8Str) {
+    if (!utf8Str) return "";
+    const char* sp = std::strchr(utf8Str, ' ');
+    return sp ? (sp + 1) : utf8Str;
 }
 
 inline char vlToLower(char c) {
@@ -224,12 +233,13 @@ void VieLotusState::setInputMethod(int32_t method) {
 
 void VieLotusState::updatePreedit() {
     auto& inputPanel = ic_->inputPanel();
-    inputPanel.reset();
 
     if (session_ && vielotus_is_composing(session_)) {
         const char* composing = vielotus_get_composing_text(session_);
         std::string preeditStr = composing ? composing : "";
         if (!preeditStr.empty()) {
+            preeditVisible_ = true;
+            inputPanel.reset();
             const bool useClientPreedit =
                 ic_->capabilityFlags().test(CapabilityFlag::Preedit);
             TextFormatFlags formatFlags = TextFormatFlag::NoFlag;
@@ -240,13 +250,52 @@ void VieLotusState::updatePreedit() {
             } else {
                 inputPanel.setPreedit(preedit);
             }
+#ifdef VIELOTUS_ENABLE_LAB
+            bool isPasswd = ic_->capabilityFlags().test(CapabilityFlag::Password);
+            char escRaw[256] = {0};
+            char escComp[256] = {0};
+            vl_lab_escape_str(vielotus_get_raw_text(session_), escRaw, sizeof(escRaw));
+            vl_lab_escape_str(preeditStr.c_str(), escComp, sizeof(escComp));
+            std::string prog = ic_->program();
+            vl_lab_write_event(
+                isPasswd,
+                "fcitx5-vielotus",
+                prog.empty() ? "fcitx5-ic" : prog.c_str(),
+                "PREEDIT",
+                0,
+                "clientPreedit=%d raw=\"%s\" text=\"%s\"",
+                useClientPreedit ? 1 : 0,
+                escRaw,
+                escComp
+            );
+#endif
+            ic_->updatePreedit();
+            ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+            return;
         }
     }
-    ic_->updatePreedit();
-    ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+    if (preeditVisible_) {
+        preeditVisible_ = false;
+        inputPanel.reset();
+        ic_->updatePreedit();
+        ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+    }
 }
 
 void VieLotusState::commitComposing(const char* trailingAscii) {
+    size_t compCpBefore = 0;
+    int32_t surrDel = 0;
+    if (session_ && vielotus_is_composing(session_)) {
+        compCpBefore = utf8CodepointCount(vielotus_get_composing_text(session_));
+    }
+#ifdef VIELOTUS_ENABLE_LAB
+    char rawBefore[256] = {0};
+    char compBefore[256] = {0};
+    if (session_) {
+        vl_lab_escape_str(vielotus_get_raw_text(session_), rawBefore, sizeof(rawBefore));
+        vl_lab_escape_str(vielotus_get_composing_text(session_), compBefore, sizeof(compBefore));
+    }
+#endif
     std::string out;
     if (session_ && vielotus_is_composing(session_)) {
         if (trailingAscii && trailingAscii[0] != '\0' && trailingAscii[1] == '\0') {
@@ -255,9 +304,20 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
         } else {
             vielotus_commit_word(session_);
         }
+        int32_t totalBs = vielotus_get_last_backspaces(session_);
+        if (totalBs > static_cast<int32_t>(compCpBefore) && compCpBefore > 0) {
+            surrDel = totalBs - static_cast<int32_t>(compCpBefore);
+        }
         const char* committed = vielotus_get_last_text(session_);
         if (committed && committed[0] != '\0') {
-            out.append(committed);
+            const bool canDeleteSurrounding =
+                ic_ && ic_->capabilityFlags().test(CapabilityFlag::SurroundingText);
+            if (surrDel > 0 && !canDeleteSurrounding) {
+                committed = utf8AfterFirstSpace(committed);
+            }
+            if (committed && committed[0] != '\0') {
+                out.append(committed);
+            }
         }
     }
     if (trailingAscii && trailingAscii[0] != '\0') {
@@ -265,10 +325,49 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
     }
 
     if (!out.empty()) {
+        if (surrDel > 0 && ic_ && ic_->capabilityFlags().test(CapabilityFlag::SurroundingText)) {
+            if (preeditVisible_) {
+                preeditVisible_ = false;
+                ic_->inputPanel().reset();
+                ic_->updatePreedit();
+                ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+            }
+            ic_->deleteSurroundingText(-surrDel, static_cast<unsigned int>(surrDel));
+        }
         ic_->commitString(out);
+#ifdef VIELOTUS_ENABLE_LAB
+        bool isPasswd = ic_ && ic_->capabilityFlags().test(CapabilityFlag::Password);
+        char escOut[512] = {0};
+        char escTrail[32] = {0};
+        vl_lab_escape_str(out.c_str(), escOut, sizeof(escOut));
+        vl_lab_escape_str(trailingAscii ? trailingAscii : "", escTrail, sizeof(escTrail));
+        std::string prog = ic_ ? ic_->program() : "";
+        vl_lab_write_event(
+            isPasswd,
+            "fcitx5-vielotus",
+            prog.empty() ? "fcitx5-ic" : prog.c_str(),
+            "COMMIT",
+            0,
+            "raw=\"%s\" comp=\"%s\" trail=\"%s\" out=\"%s\" retroDel=%d",
+            rawBefore,
+            compBefore,
+            escTrail,
+            escOut,
+            static_cast<int>(surrDel)
+        );
+#endif
     }
 
-    resetWord();
+    replayedAfterBackspace_ = false;
+    if (session_ && vielotus_is_composing(session_)) {
+        vielotus_reset_session(session_);
+    }
+    if (preeditVisible_) {
+        preeditVisible_ = false;
+        ic_->inputPanel().reset();
+        ic_->updatePreedit();
+        ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+    }
 }
 
 void VieLotusState::resetWord() {
@@ -276,9 +375,12 @@ void VieLotusState::resetWord() {
     if (session_) {
         vielotus_reset_session(session_);
     }
-    ic_->inputPanel().reset();
-    ic_->updatePreedit();
-    ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+    if (preeditVisible_) {
+        preeditVisible_ = false;
+        ic_->inputPanel().reset();
+        ic_->updatePreedit();
+        ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+    }
 }
 
 void VieLotusState::reset() {
@@ -407,6 +509,16 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
 
     // Handle printable ASCII characters (32..126)
     if (sym >= 32 && sym < 127) {
+#ifdef VIELOTUS_ENABLE_LAB
+        uint64_t t0Us = vl_lab_now_us();
+        int compWas = vielotus_is_composing(session_) ? 1 : 0;
+        char logRawBefore[256] = {0};
+        char logCompBefore[256] = {0};
+        if (compWas && session_) {
+            vl_lab_escape_str(vielotus_get_raw_text(session_), logRawBefore, sizeof(logRawBefore));
+            vl_lab_escape_str(vielotus_get_composing_text(session_), logCompBefore, sizeof(logCompBefore));
+        }
+#endif
         const bool isAlpha =
             (sym >= 'a' && sym <= 'z') || (sym >= 'A' && sym <= 'Z');
         const bool isDigit = (sym >= '0' && sym <= '9');
@@ -445,6 +557,22 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
             if ((rawCheck && std::strlen(rawCheck) >= 48) ||
                 (compCheck && std::strlen(compCheck) >= 48)) {
                 commitComposing(nullptr);
+            }
+        } else if (ic_ &&
+                   !ic_->capabilityFlags().test(CapabilityFlag::Password) &&
+                   ic_->capabilityFlags().test(CapabilityFlag::SurroundingText) &&
+                   ic_->surroundingText().isValid()) {
+            const auto& surrText = ic_->surroundingText().text();
+            const auto surrCursor = ic_->surroundingText().cursor();
+            if (!surrText.empty() && surrCursor > 0) {
+                const size_t bytePos = fcitx::utf8::ncharByteLength(surrText.begin(), surrCursor);
+                if (bytePos <= surrText.size()) {
+                    std::string prefix = surrText.substr(0, bytePos);
+                    if (prefix.size() > 256) {
+                        prefix = prefix.substr(prefix.size() - 256);
+                    }
+                    vielotus_sync_armed_word(session_, prefix.c_str());
+                }
             }
         }
 
@@ -518,13 +646,50 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                 }
             }
         }
+#ifdef VIELOTUS_ENABLE_LAB
+        {
+            bool isPasswd = ic_ && ic_->capabilityFlags().test(CapabilityFlag::Password);
+            char logRawAfter[256] = {0};
+            char logCompAfter[256] = {0};
+            int compNow = vielotus_is_composing(session_) ? 1 : 0;
+            const char* actName = (action == VIELOTUS_ACTION_COMMIT) ? "COMMIT" :
+                                  (action == VIELOTUS_ACTION_REPLACE) ? "REPLACE" :
+                                  (action == VIELOTUS_ACTION_CONSUMED) ? "CONSUMED" : "NONE";
+            if (compNow && session_) {
+                vl_lab_escape_str(vielotus_get_raw_text(session_), logRawAfter, sizeof(logRawAfter));
+                vl_lab_escape_str(vielotus_get_composing_text(session_), logCompAfter, sizeof(logCompAfter));
+            } else if (action == VIELOTUS_ACTION_COMMIT && session_) {
+                vl_lab_escape_str(vielotus_get_last_text(session_), logCompAfter, sizeof(logCompAfter));
+            }
+            std::string prog = ic_ ? ic_->program() : "";
+            vl_lab_write_event(
+                isPasswd,
+                "fcitx5-vielotus",
+                prog.empty() ? "fcitx5-ic" : prog.c_str(),
+                "KEY_DOWN",
+                vl_lab_now_us() - t0Us,
+                "kv=0x%04x ch='%c' comp=%d->%d act=%s raw=\"%s\"->\"%s\" word=\"%s\"->\"%s\"",
+                static_cast<unsigned int>(sym), static_cast<char>(sym), compWas, compNow, actName,
+                logRawBefore, logRawAfter, logCompBefore, logCompAfter
+            );
+        }
+#endif
         if (action == VIELOTUS_ACTION_COMMIT) {
             const char* committed = vielotus_get_last_text(session_);
             std::string out = committed ? committed : "";
             if (!out.empty()) {
                 ic_->commitString(out);
             }
-            resetWord();
+            replayedAfterBackspace_ = false;
+            if (vielotus_is_composing(session_)) {
+                vielotus_reset_session(session_);
+            }
+            if (preeditVisible_) {
+                preeditVisible_ = false;
+                ic_->inputPanel().reset();
+                ic_->updatePreedit();
+                ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+            }
             keyEvent.filterAndAccept();
             return;
         } else if (vielotus_is_composing(session_) ||
@@ -592,11 +757,18 @@ void VieLotusEngine::setConfig(const RawConfig& config) {
 }
 
 void VieLotusEngine::loadUserEnvConfig() {
-    std::string envPath = resolveUserEnvConfigPath();
-    if (envPath.empty()) {
+    if (cachedEnvPath_.empty()) {
+        cachedEnvPath_ = resolveUserEnvConfigPath();
+    }
+    if (cachedEnvPath_.empty()) {
         return;
     }
-    std::ifstream in(envPath);
+    std::error_code ec;
+    auto mtime = std::filesystem::last_write_time(cachedEnvPath_, ec);
+    if (!ec) {
+        envConfigMtime_ = mtime;
+    }
+    std::ifstream in(cachedEnvPath_);
     if (!in.is_open()) {
         return;
     }
@@ -626,6 +798,22 @@ void VieLotusEngine::loadUserEnvConfig() {
                                         line.find("1") != std::string::npos);
         }
     }
+}
+
+bool VieLotusEngine::reloadUserEnvConfigIfChanged() {
+    if (cachedEnvPath_.empty()) {
+        cachedEnvPath_ = resolveUserEnvConfigPath();
+    }
+    if (cachedEnvPath_.empty()) {
+        return false;
+    }
+    std::error_code ec;
+    auto mtime = std::filesystem::last_write_time(cachedEnvPath_, ec);
+    if (!ec && mtime != envConfigMtime_) {
+        loadUserEnvConfig();
+        return true;
+    }
+    return false;
 }
 
 void VieLotusEngine::saveUserEnvConfig() const {
@@ -683,7 +871,7 @@ void VieLotusEngine::reloadConfig() {
 void VieLotusEngine::activate(const InputMethodEntry& entry,
                               InputContextEvent& event) {
     FCITX_UNUSED(entry);
-    loadUserEnvConfig();
+    reloadUserEnvConfigIfChanged();
     auto* ic = event.inputContext();
     auto& statusArea = ic->statusArea();
     statusArea.addAction(StatusGroup::InputMethod, settingsAction_.get());
@@ -714,11 +902,18 @@ void VieLotusEngine::activate(const InputMethodEntry& entry,
 
 void VieLotusEngine::deactivate(const InputMethodEntry& entry,
                                 InputContextEvent& event) {
+    FCITX_UNUSED(entry);
     auto* state = event.inputContext()->propertyFor(&factory_);
     if (state) {
-        state->commitComposing(nullptr);
+        if (state->session() && vielotus_is_composing(state->session())) {
+            state->commitComposing(nullptr);
+        } else {
+            state->resetWord();
+        }
+        if (state->session()) {
+            vielotus_append_context(state->session(), "");
+        }
     }
-    reset(entry, event);
 }
 
 void VieLotusEngine::keyEvent(const InputMethodEntry& entry,

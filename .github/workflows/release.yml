@@ -50,6 +50,14 @@ jobs:
             dist/windows/VieLotus-Setup-x64.exe
             dist/windows/VieLotus-Setup-arm64.exe
 
+      - name: Upload Windows Lab diagnostic tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: VieLotus-Windows-Lab
+          path: |
+            dist/windows/VieLotusLab-x64.exe
+            dist/windows/VieLotusLab-arm64.exe
+
   linux-build:
     name: Build Linux All-in-One .deb (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
