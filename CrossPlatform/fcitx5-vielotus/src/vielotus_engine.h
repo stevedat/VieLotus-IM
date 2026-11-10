@@ -17,6 +17,7 @@
 #include <fcitx/inputmethodengine.h>
 #include <fcitx/instance.h>
 #include <fcitx/menu.h>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include "vielotus.h"
@@ -73,6 +74,7 @@ private:
     vielotus_session_t session_;
     int32_t inputMethod_{VIELOTUS_INPUT_TELEX};
     bool replayedAfterBackspace_{false};
+    bool preeditVisible_{false};
 };
 
 class VieLotusEngine : public InputMethodEngineV2 {
@@ -107,6 +109,7 @@ public:
 
 private:
     void loadUserEnvConfig();
+    bool reloadUserEnvConfigIfChanged();
     void saveUserEnvConfig() const;
     void applyConfigToAllContexts();
 
@@ -114,6 +117,8 @@ private:
     VieLotusConfig config_;
     int32_t envInputMethod_{VIELOTUS_INPUT_TELEX};
     bool hasEnvInputMethod_{false};
+    std::string cachedEnvPath_;
+    std::filesystem::file_time_type envConfigMtime_{};
     FactoryFor<VieLotusState> factory_;
     std::unique_ptr<SimpleAction> settingsAction_;
     std::vector<ScopedConnection> connections_;
