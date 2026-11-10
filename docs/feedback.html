@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Gửi góp ý & Báo lỗi — Sen Việt</title>
+  <meta name="description" content="Báo lỗi gõ từ, đề xuất tính năng hoặc gửi góp ý trực tiếp cho bộ gõ tiếng Việt Sen Việt (VieLotus).">
+  <link rel="canonical" href="https://stevedat.github.io/VieLotus-IM/feedback.html">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://stevedat.github.io/VieLotus-IM/feedback.html">
+  <meta property="og:title" content="Gửi góp ý & Báo lỗi — Sen Việt">
+  <meta property="og:description" content="Báo nhanh từ gõ chưa chuẩn hoặc gửi đề xuất tính năng cho Sen Việt.">
+  <meta property="og:image" content="https://stevedat.github.io/VieLotus-IM/assets/app-icon-512x512.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
+  <style>
+    :root {
+      --bg-canvas: #F4F7F6;
+      --bg-surface: #FCFDFD;
+      --bg-subtle: #E9F0EE;
+      --border-hairline: #D5E0DD;
+      --border-focus: #1F5B3A;
+      --text-primary: #15241E;
+      --text-secondary: #4A5E56;
+      --text-muted: #6E827A;
+      --lotus-green: #1F5B3A;
+      --lotus-teal: #1E6B7B;
+      --danger: #B42318;
+      --font-display: 'Bricolage Grotesque', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+      --font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      font-family: var(--font-body);
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+    }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 0 max(16px, env(safe-area-inset-left));
+    }
+    a { color: var(--lotus-teal); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { width: 100%; max-width: 680px; margin: 0 auto; }
+    header {
+      padding: 18px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 16.5px;
+      letter-spacing: -0.015em;
+      color: var(--text-primary);
+    }
+    .brand:hover { text-decoration: none; }
+    .brand img { width: 30px; height: 30px; border-radius: 7px; }
+    .header-nav { display: flex; gap: 14px; font-size: 14px; font-weight: 500; }
+    main { flex: 1; padding: 28px 0 44px; }
+    h1 { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px; }
+    .sub { font-size: 14.5px; color: var(--text-secondary); margin-bottom: 16px; }
+    .meta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-hairline);
+      color: var(--lotus-green);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+    }
+    .meta-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--lotus-green);
+    }
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 16px;
+    }
+    .fbkinds {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .fbkinds label {
+      cursor: pointer;
+      user-select: none;
+    }
+    .fbkinds input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .fbkinds span {
+      display: inline-block;
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 600;
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-canvas);
+      color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+    .fbkinds input:checked + span {
+      background: var(--lotus-green);
+      border-color: var(--lotus-green);
+      color: #FFFFFF;
+    }
+    .word-box {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-hairline);
+      border-radius: 11px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .word-box-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--lotus-green);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .word-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 560px) {
+      .word-grid { grid-template-columns: 1fr; }
+    }
+    .field { margin-bottom: 15px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label, .lbl {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .muted { color: var(--text-muted); font-weight: 400; }
+    .small { font-size: 12.5px; }
+    input[type="text"],
+    input[type="email"],
+    textarea {
+      width: 100%;
+      font-family: var(--font-body);
+      font-size: 14.5px;
+      color: var(--text-primary);
+      background: #FFFFFF;
+      border: 1px solid var(--border-hairline);
+      border-radius: 9px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .mono-input {
+      font-family: var(--font-mono) !important;
+      font-size: 13.5px !important;
+    }
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    textarea:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(31, 91, 58, 0.12);
+    }
+    textarea { resize: vertical; min-height: 118px; }
+    .drop {
+      border: 1.5px dashed var(--border-hairline);
+      border-radius: 10px;
+      padding: 14px;
+      background: var(--bg-canvas);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    .drop.over {
+      border-color: var(--lotus-green);
+      background: var(--bg-subtle);
+    }
+    .addf {
+      position: relative;
+      overflow: hidden;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 13px;
+      border-radius: 8px;
+      background: #FFFFFF;
+      border: 1px solid var(--border-hairline);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+    .addf:hover { border-color: var(--lotus-green); }
+    .addf input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .flist {
+      list-style: none;
+      margin-top: 10px;
+      display: grid;
+      gap: 6px;
+    }
+    .flist li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 11px;
+      background: var(--bg-subtle);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .flist .n {
+      font-family: var(--font-mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .flist .s { color: var(--text-muted); font-size: 12px; }
+    .flist button {
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    .hp {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .err {
+      color: var(--danger);
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      min-height: 20px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-family: var(--font-body);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--lotus-green);
+      color: #FFFFFF;
+      width: 100%;
+      transition: opacity 0.15s ease, transform 0.1s ease;
+    }
+    .btn:hover { opacity: 0.94; text-decoration: none; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      border: 1px solid var(--border-hairline);
+      font-size: 13.5px;
+      padding: 10px 14px;
+      width: auto;
+    }
+    .meta-footer {
+      margin-top: 10px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .fbdone {
+      text-align: center;
+      padding: 28px 20px;
+    }
+    .tick {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--bg-subtle);
+      color: var(--lotus-green);
+      font-size: 24px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .fbdone h2 {
+      font-family: var(--font-display);
+      font-size: 22px;
+      margin-bottom: 6px;
+    }
+    .preview-box {
+      text-align: left;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-hairline);
+      border-radius: 10px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 16px 0;
+      color: var(--text-primary);
+    }
+    .done-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    footer {
+      padding: 20px 0 28px;
+      border-top: 1px solid var(--border-hairline);
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .footer-links { display: flex; gap: 16px; flex-wrap: wrap; }
+    .footer-links a { color: var(--text-muted); }
+    .footer-links a:hover { color: var(--text-primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="index.html" class="brand">
+        <img src="assets/app-icon-512x512.png" alt="Sen Việt">
+        <span>Sen Việt</span>
+      </a>
+      <div class="header-nav">
+        <a href="support.html">Hướng dẫn</a>
+        <a href="index.html">← Trang chủ</a>
+      </div>
+    </header>
+
+    <main>
+      <h1>Gửi góp ý &amp; Báo lỗi</h1>
+      <p class="sub">Báo từ gõ chưa chuẩn, đề xuất tính năng hoặc chia sẻ trải nghiệm sử dụng Sen Việt. Tác giả đọc từng góp ý để hoàn thiện bộ kiểm thử 9.091 ca.</p>
+
+      <div class="meta-badge" id="meta-badge">
+        <span class="meta-dot"></span>
+        <span id="meta-badge-text">Sen Việt</span>
+      </div>
+
+      <form id="fb" class="card" novalidate>
+        <div class="fbkinds" role="radiogroup" aria-label="Loại góp ý">
+          <label><input type="radio" name="kind" value="word_bug" checked><span>Báo lỗi gõ từ</span></label>
+          <label><input type="radio" name="kind" value="bug"><span>Báo lỗi chung</span></label>
+          <label><input type="radio" name="kind" value="idea"><span>Đề xuất tính năng</span></label>
+          <label><input type="radio" name="kind" value="other"><span>Khác</span></label>
+        </div>
+
+        <div class="word-box" id="word-box">
+          <div class="word-box-title">
+            <span>Chi tiết từ / câu đang gõ (Tùy chọn)</span>
+            <span class="muted" style="text-transform:none;font-weight:500;">Giúp tái hiện chính xác 100%</span>
+          </div>
+          <div class="word-grid">
+            <div class="field">
+              <label for="fb-keys">Phím đã gõ</label>
+              <input id="fb-keys" name="typed_keys" type="text" class="mono-input" placeholder="VD: just hoặc cos">
+            </div>
+            <div class="field">
+              <label for="fb-actual">Sen Việt hiện ra</label>
+              <input id="fb-actual" name="actual_output" type="text" class="mono-input" placeholder="VD: jút">
+            </div>
+            <div class="field">
+              <label for="fb-expected">Mong muốn đúng</label>
+              <input id="fb-expected" name="expected_output" type="text" class="mono-input" placeholder="VD: just">
+            </div>
+          </div>
+          <div class="field" style="margin-top:10px;">
+            <label for="fb-app">Ứng dụng / Trang web đang gõ <span class="muted">(không bắt buộc)</span></label>
+            <input id="fb-app" name="target_app" type="text" placeholder="VD: Zalo, Safari, Tin nhắn, VS Code, Ghostty...">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="fb-msg">Nội dung mô tả</label>
+          <textarea id="fb-msg" name="message" rows="5" required placeholder="Bạn gõ gì, Sen Việt ra gì, và bạn mong muốn ra gì? Nếu có tình huống đặc biệt (như gõ xong bấm Xoá lùi, hoặc đang gõ câu song ngữ), hãy ghi chú thêm tại đây."></textarea>
+        </div>
+
+        <div class="field">
+          <label for="fb-email">Email <span class="muted">(không bắt buộc, để nhận thông báo khi lỗi được sửa)</span></label>
+          <input id="fb-email" name="email" type="email" autocomplete="email" placeholder="ban@email.com">
+        </div>
+
+        <div class="field fbfiles">
+          <span class="lbl">Tệp đính kèm <span class="muted">(không bắt buộc)</span></span>
+          <div class="drop" id="drop-zone">
+            <label class="addf">
+              <input type="file" id="file-input" name="files" multiple accept="image/*,video/*,.txt,.log,.ips,.crash,.json,.zip,.pdf">
+              <span>+ Thêm tệp</span>
+            </label>
+            <span class="muted small">Ảnh chụp màn hình, video quay màn hình, hoặc gói log VieLotusLab. Tối đa 5 tệp (25 MB/tệp).</span>
+          </div>
+          <ul class="flist" id="file-list"></ul>
+        </div>
+
+        <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <p class="err" id="fb-err" role="alert"></p>
+        <button class="btn" id="fb-submit" type="submit">Gửi góp ý cho Sen Việt</button>
+        <p class="meta-footer" id="meta-footer"></p>
+      </form>
+
+      <div id="fb-done" class="card fbdone" hidden>
+        <div class="tick">✓</div>
+        <h2 id="done-title">Cảm ơn bạn!</h2>
+        <p class="sub" id="done-desc">Góp ý của bạn đã được tổng hợp đầy đủ kèm thông số phiên bản.</p>
+        <div class="preview-box" id="done-preview"></div>
+        <div class="done-actions">
+          <a id="done-github-btn" class="btn" style="max-width:320px;" target="_blank" rel="noopener noreferrer" href="https://github.com/stevedat/VieLotus-IM/issues/new">Gửi nhanh lên GitHub Issues (1 chạm)</a>
+          <a id="done-zalo-btn" class="btn btn-secondary" target="_blank" rel="noopener noreferrer" href="https://zalo.me/g/6wwyvywyvhsb0n6rwkze">Dán vào Nhóm Zalo Cộng đồng</a>
+          <button type="button" id="done-reset-btn" class="btn btn-secondary">Gửi góp ý khác</button>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <span>Sen Việt — Miễn phí cho cộng đồng người Việt.</span>
+      <div class="footer-links">
+        <a href="index.html">Trang chủ</a>
+        <a href="support.html">Hướng dẫn</a>
+        <a href="privacy.html">Quyền riêng tư</a>
+        <a href="terms.html">Điều khoản</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const form = document.getElementById("fb");
+      if (!form) return;
+
+      const q = new URLSearchParams(location.search);
+      const ua = navigator.userAgent || "";
+      const guessPlatform = /iPhone|iPad|iPod/.test(ua)
+        ? "ios"
+        : /Android/.test(ua)
+        ? "android"
+        : /Windows/.test(ua)
+        ? "windows"
+        : /Mac OS X|Macintosh/.test(ua)
+        ? "macos"
+        : /Linux|X11/.test(ua)
+        ? "linux"
+        : "web";
+
+      const platform = (q.get("platform") || guessPlatform).toLowerCase();
+      const version = q.get("v") || "";
+      const build = q.get("build") || "";
+      const osVer = q.get("os") || "";
+      const im = (q.get("im") || "").toLowerCase();
+      const bilingual = q.get("bilingual");
+
+      const PLATFORM_NAMES = {
+        macos: "macOS",
+        ios: "iOS / iPadOS",
+        windows: "Windows",
+        linux: "Linux",
+        android: "Android",
+        web: "Web"
+      };
+      const IM_NAMES = { telex: "Telex", vni: "VNI" };
+
+      const parts = ["Sen Việt"];
+      if (version) parts.push("v" + version + (build ? " (" + build + ")" : ""));
+      parts.push(PLATFORM_NAMES[platform] || platform);
+      if (osVer) parts.push("OS " + osVer);
+      if (im) parts.push("Kiểu gõ " + (IM_NAMES[im] || im.toUpperCase()));
+      if (bilingual === "1" || bilingual === "0") {
+        parts.push("Song ngữ " + (bilingual === "1" ? "BẬT" : "TẮT"));
+      }
+
+      const metaSummary = parts.join(" • ");
+      document.getElementById("meta-badge-text").textContent = "Gửi kèm: " + metaSummary;
+      document.getElementById("meta-footer").textContent = "Thông số tự động: " + metaSummary;
+
+      // Pre-fill structured word fields if passed via query string (e.g., from iOS PlaygroundView)
+      const keysInput = document.getElementById("fb-keys");
+      const actualInput = document.getElementById("fb-actual");
+      const expectedInput = document.getElementById("fb-expected");
+      const appInput = document.getElementById("fb-app");
+      const msgInput = document.getElementById("fb-msg");
+
+      if (q.get("keys")) keysInput.value = q.get("keys");
+      if (q.get("actual")) actualInput.value = q.get("actual");
+      if (q.get("expected")) expectedInput.value = q.get("expected");
+      if (q.get("app")) appInput.value = q.get("app");
+
+      // Toggle word-box visibility based on selected kind
+      const wordBox = document.getElementById("word-box");
+      form.querySelectorAll('input[name="kind"]').forEach(radio => {
+        radio.addEventListener("change", () => {
+          wordBox.hidden = form.kind.value !== "word_bug" && form.kind.value !== "bug";
+        });
+      });
+
+      // File attachments
+      const MAX_FILES = 5;
+      const MAX_FILE = 25 * 1024 * 1024;
+      const OK_EXT = /\.(png|jpe?g|gif|webp|heic|heif|mp4|mov|m4v|webm|txt|log|ips|crash|json|zip|pdf)$/i;
+      const fileInput = document.getElementById("file-input");
+      const fileList = document.getElementById("file-list");
+      const dropZone = document.getElementById("drop-zone");
+      const errEl = document.getElementById("fb-err");
+      const submitBtn = document.getElementById("fb-submit");
+      let files = [];
+
+      const formatSize = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1048576).toFixed(1) + " MB";
+      const renderFiles = () => {
+        fileList.innerHTML = "";
+        files.forEach((f, idx) => {
+          const li = document.createElement("li");
+          li.innerHTML = '<span class="n"></span><span class="s"></span><button type="button" aria-label="Bỏ">×</button>';
+          li.querySelector(".n").textContent = f.name;
+          li.querySelector(".s").textContent = formatSize(f.size);
+          li.querySelector("button").onclick = () => {
+            files.splice(idx, 1);
+            renderFiles();
+          };
+          fileList.appendChild(li);
+        });
+      };
+
+      const addFiles = picked => {
+        errEl.textContent = "";
+        for (const f of picked) {
+          if (files.length >= MAX_FILES) {
+            errEl.textContent = "Tối đa 5 tệp đính kèm.";
+            break;
+          }
+          if (!OK_EXT.test(f.name)) {
+            errEl.textContent = "Định dạng tệp chưa hỗ trợ: " + f.name;
+            continue;
+          }
+          if (f.size > MAX_FILE) {
+            errEl.textContent = "Tệp vượt quá 25 MB: " + f.name;
+            continue;
+          }
+          files.push(f);
+        }
+        renderFiles();
+      };
+
+      fileInput.onchange = () => {
+        addFiles([...fileInput.files]);
+        fileInput.value = "";
+      };
+      ["dragenter", "dragover"].forEach(ev =>
+        dropZone.addEventListener(ev, e => {
+          e.preventDefault();
+          dropZone.classList.add("over");
+        })
+      );
+      ["dragleave", "drop"].forEach(ev =>
+        dropZone.addEventListener(ev, e => {
+          e.preventDefault();
+          dropZone.classList.remove("over");
+        })
+      );
+      dropZone.addEventListener("drop", e => addFiles([...e.dataTransfer.files]));
+
+      form.onsubmit = async e => {
+        e.preventDefault();
+        errEl.textContent = "";
+
+        const typedKeys = keysInput.value.trim();
+        const actualOut = actualInput.value.trim();
+        const expectedOut = expectedInput.value.trim();
+        const targetApp = appInput.value.trim();
+        const message = msgInput.value.trim();
+        const email = form.email.value.trim();
+        const kind = form.kind.value;
+
+        if (message.length < 3 && !typedKeys && !actualOut) {
+          errEl.textContent = "Bạn vui lòng nhập nội dung mô tả hoặc điền từ đang gặp lỗi nhé.";
+          msgInput.focus();
+          return;
+        }
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+          errEl.textContent = "Địa chỉ email chưa đúng định dạng, bạn kiểm tra lại nhé.";
+          form.email.focus();
+          return;
+        }
+
+        submitBtn.disabled = true;
+        const KIND_LABELS = {
+          word_bug: "Báo lỗi gõ từ",
+          bug: "Báo lỗi chung",
+          idea: "Đề xuất tính năng",
+          other: "Khác"
+        };
+
+        const reportLines = [
+          "### [" + (KIND_LABELS[kind] || "Góp ý") + "] " + (typedKeys ? (`\`${typedKeys}\` → \`${actualOut || "?"}\` (mong muốn: \`${expectedOut || "?"}\`)`) : (message.slice(0, 64) || "Góp ý người dùng")),
+          "- **Thông số bộ gõ:** " + metaSummary
+        ];
+        if (targetApp) reportLines.push("- **Ứng dụng / Web đang gõ:** " + targetApp);
+        if (typedKeys || actualOut || expectedOut) {
+          reportLines.push("- **Chuỗi phím đã gõ:** `" + (typedKeys || "—") + "`");
+          reportLines.push("- **Sen Việt hiện ra:** `" + (actualOut || "—") + "`");
+          reportLines.push("- **Kết quả mong muốn:** `" + (expectedOut || "—") + "`");
+        }
+        if (message) {
+          reportLines.push("\n**Mô tả chi tiết:**\n" + message);
+        }
+        const compiledReport = reportLines.join("\n");
+
+        // Try direct API POST first (/api/feedback on Cloudflare Pages/Worker)
+        let apiDelivered = false;
+        try {
+          const body = new FormData();
+          Object.entries({
+            kind,
+            platform,
+            version,
+            build,
+            os: osVer,
+            im,
+            bilingual: bilingual || "",
+            typed_keys: typedKeys,
+            actual_output: actualOut,
+            expected_output: expectedOut,
+            target_app: targetApp,
+            message: message || compiledReport,
+            email,
+            website: form.website.value
+          }).forEach(([k, v]) => body.append(k, v));
+          files.forEach(x => body.append("files", x, x.name));
+
+          const endpoint = window.VIELOTUS_FEEDBACK_ENDPOINT || "/api/feedback";
+          const res = await fetch(endpoint, { method: "POST", body });
+          if (res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (data && data.ok) apiDelivered = true;
+          }
+        } catch (_) {
+          apiDelivered = false;
+        }
+
+        // Copy compiled report to clipboard for instant pasting if needed
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(compiledReport);
+          }
+        } catch (_) {}
+
+        const issueTitle = typedKeys
+          ? `[${PLATFORM_NAMES[platform] || platform}] Gõ "${typedKeys}" ra "${actualOut}" (mong muốn "${expectedOut}")`
+          : `[${PLATFORM_NAMES[platform] || platform}] ${KIND_LABELS[kind] || "Góp ý"}: ${message.slice(0, 50)}`;
+        const ghUrl = new URL("https://github.com/stevedat/VieLotus-IM/issues/new");
+        ghUrl.searchParams.set("title", issueTitle);
+        ghUrl.searchParams.set("body", compiledReport);
+
+        document.getElementById("done-github-btn").href = ghUrl.toString();
+        document.getElementById("done-preview").textContent = compiledReport;
+
+        if (apiDelivered) {
+          document.getElementById("done-title").textContent = "Cảm ơn bạn! Góp ý đã được gửi.";
+          document.getElementById("done-desc").textContent = "Hệ thống Sen Việt đã lưu trực tiếp góp ý của bạn.";
+        } else {
+          document.getElementById("done-title").textContent = "Đã chuẩn bị & sao chép nội dung góp ý!";
+          document.getElementById("done-desc").textContent = "Nội dung kèm thông số phiên bản đã được chép sẵn vào bộ nhớ tạm. Bạn có thể bấm gửi 1 chạm qua GitHub hoặc dán (⌘V / Dán) vào nhóm Zalo Cộng đồng bên dưới:";
+        }
+
+        form.hidden = true;
+        document.getElementById("fb-done").hidden = false;
+        submitBtn.disabled = false;
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      };
+
+      document.getElementById("done-reset-btn").onclick = () => {
+        form.reset();
+        files = [];
+        renderFiles();
+        document.getElementById("fb-done").hidden = true;
+        form.hidden = false;
+      };
+    })();
+  </script>
+</body>
+</html>
