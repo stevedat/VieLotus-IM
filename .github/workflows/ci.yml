@@ -143,6 +143,8 @@ jobs:
           path: |
             Binaries/windows/VieLotus-Setup-x64.exe
             Binaries/windows/VieLotus-Setup-arm64.exe
+            dist/windows/VieLotusLab-x64.exe
+            dist/windows/VieLotusLab-arm64.exe
             scripts/windows/bin/x64/*
             scripts/windows/bin/arm64/*
             dist/windows/msix/*

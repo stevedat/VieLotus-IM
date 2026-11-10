@@ -73,6 +73,15 @@ Source: "bin\arm64\VieLotusSettings.exe"; DestDir: "{app}"; DestName: "VieLotusS
 #else
 Source: "bin\VieLotusSettings.exe"; DestDir: "{app}"; Flags: ignoreversion 64bit skipifsourcedoesntexist
 #endif
+; Native Win32 Diagnostic Lab Executable (VieLotusLab.exe)
+#if MyAppArch == "arm64" && FileExists("bin\arm64\VieLotusLab.exe")
+Source: "bin\arm64\VieLotusLab.exe"; DestDir: "{app}"; DestName: "VieLotusLab.exe"; Flags: ignoreversion 64bit
+#elif FileExists("bin\x64\VieLotusLab.exe") && FileExists("bin\arm64\VieLotusLab.exe")
+Source: "bin\x64\VieLotusLab.exe"; DestDir: "{app}"; DestName: "VieLotusLab.exe"; Check: not IsArm64; Flags: ignoreversion 64bit
+Source: "bin\arm64\VieLotusLab.exe"; DestDir: "{app}"; DestName: "VieLotusLab.exe"; Check: IsArm64; Flags: ignoreversion 64bit
+#else
+Source: "bin\VieLotusLab.exe"; DestDir: "{app}"; Flags: ignoreversion 64bit skipifsourcedoesntexist
+#endif
 ; Optional Swift C-ABI & Runtime DLLs if staged
 Source: "bin\*.dll"; Excludes: "VieLotusTIP.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 ; VieLotusCore Resource Bundle (typing-modes.yml)
@@ -83,6 +92,7 @@ Source: "assets\*.png"; DestDir: "{app}\assets"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Cài đặt Sen Việt (VieLotusIM)"; Filename: "{app}\VieLotusSettings.exe"; IconFilename: "{app}\VieLotusIM.ico"
+Name: "{group}\Chẩn đoán Sen Việt (VieLotusLab)"; Filename: "{app}\VieLotusLab.exe"; IconFilename: "{app}\VieLotusIM.ico"
 Name: "{group}\Gỡ cài đặt Sen Việt"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Cài đặt Sen Việt (VieLotusIM)"; Filename: "{app}\VieLotusSettings.exe"; IconFilename: "{app}\VieLotusIM.ico"
 
@@ -97,7 +107,7 @@ Filename: "{sys}\rundll32.exe"; Parameters: """{app}\VieLotusTIP.dll"",ActivateU
 Filename: "{sys}\rundll32.exe"; Parameters: "user32.dll,UpdatePerUserSystemParameters"; Flags: runhidden
 Filename: "{sys}\ctfmon.exe"; Flags: nowait runhidden
 ; Post-install checkbox to open Sen Việt Settings Window immediately (skipped automatically during Microsoft Store / WinGet silent install)
-Filename: "{app}\VieLotusSettings.exe"; Description: "Mở bảng Cài đặt Sen Việt (VieLotusIM)"; Flags: postinstall nowait skipifsilent runasoriginaluser
+Filename: "{app}\VieLotusSettings.exe"; Description: "Mở bảng Cài đặt Sen Việt (VieLotusIM)"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
 Filename: "{sys}\rundll32.exe"; Parameters: """{app}\VieLotusTIP.dll"",DeactivateUserProfilesW"; Flags: runhidden; RunOnceId: "DeactivateVieLotusProfiles"

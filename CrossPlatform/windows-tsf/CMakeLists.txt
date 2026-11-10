@@ -117,3 +117,22 @@ target_link_libraries(VieLotusSettings PRIVATE
 set_target_properties(VieLotusSettings PROPERTIES
     OUTPUT_NAME "VieLotusSettings"
 )
+
+add_executable(VieLotusLab WIN32
+    src/LabMain.cpp
+    VieLotusSettings.rc
+    VieLotusSettings.manifest
+)
+
+target_link_libraries(VieLotusLab PRIVATE
+    user32
+    gdi32
+    shell32
+    advapi32
+    ole32
+    uuid
+)
+
+set_target_properties(VieLotusLab PROPERTIES
+    OUTPUT_NAME "VieLotusLab"
+)

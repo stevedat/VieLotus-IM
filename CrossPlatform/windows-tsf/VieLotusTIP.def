@@ -8,3 +8,8 @@ EXPORTS
     ActivateUserProfilesW
     DeactivateUserProfilesW
     ShowSettingsDialogW
+    vielotus_create_session
+    vielotus_destroy_session
+    vielotus_feed_char
+    vielotus_get_last_backspaces
+    vielotus_get_last_text

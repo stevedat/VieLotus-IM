@@ -511,6 +511,14 @@ HRESULT ActivateUserProfiles() {
         }
 
         // Switch active input language to Vietnamese (0x042A) so typing works immediately even if the user was on ENG (0x0409)
+        HKL hklVi = LoadKeyboardLayoutW(L"0000042a", KLF_ACTIVATE | KLF_SUBSTITUTE_OK);
+        if (hklVi) {
+            ActivateKeyboardLayout(hklVi, KLF_SETFORPROCESS);
+            HWND hFg = GetForegroundWindow();
+            if (hFg && IsWindow(hFg)) {
+                PostMessageW(hFg, WM_INPUTLANGCHANGEREQUEST, 0, reinterpret_cast<LPARAM>(hklVi));
+            }
+        }
         pProfiles->ChangeCurrentLanguage(VI_LANGID);
         pProfiles->ActivateLanguageProfile(CLSID_VieLotusTIP, VI_LANGID, preferredGuid);
 
