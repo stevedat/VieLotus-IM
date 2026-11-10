@@ -133,8 +133,20 @@ static int PerformElevatedMsixTipProvisioning() {
 
     if (_wcsicmp(srcDir.c_str(), dstDir.c_str()) != 0) {
         DeleteFileW(oldDll.c_str());
+        for (int i = 1; i <= 99; ++i) {
+            WCHAR slot[MAX_PATH] = {};
+            StringCchPrintfW(slot, MAX_PATH, L"%s\\VieLotusTIP.old.%d.dll", dstDir.c_str(), i);
+            DeleteFileW(slot);
+        }
         if (!CopyFileW(srcDll.c_str(), dstDll.c_str(), FALSE)) {
-            MoveFileExW(dstDll.c_str(), oldDll.c_str(), MOVEFILE_REPLACE_EXISTING);
+            for (int i = 1; i <= 99; ++i) {
+                WCHAR slot[MAX_PATH] = {};
+                StringCchPrintfW(slot, MAX_PATH, L"%s\\VieLotusTIP.old.%d.dll", dstDir.c_str(), i);
+                DeleteFileW(slot);
+                if (MoveFileExW(dstDll.c_str(), slot, MOVEFILE_REPLACE_EXISTING)) {
+                    break;
+                }
+            }
             CopyFileW(srcDll.c_str(), dstDll.c_str(), FALSE);
         }
         std::wstring srcIco = srcDir + L"\\VieLotusIM.ico";

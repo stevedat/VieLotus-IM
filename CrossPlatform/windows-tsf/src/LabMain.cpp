@@ -5,9 +5,16 @@
 #include <strsafe.h>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 #include "vielotus_win_lab_trace.h"
+#if __has_include("EmbeddedTipDll.h")
+#include "EmbeddedTipDll.h"
+#else
+static constexpr size_t kEmbeddedTipDllSize = 0;
+static const uint8_t kEmbeddedTipDll[1] = {0};
+#endif
 
 #ifndef TF_PROFILETYPE_INPUTPROCESSOR
 #define TF_PROFILETYPE_INPUTPROCESSOR 1
@@ -52,12 +59,14 @@ struct LabAppState {
     HWND hTestLabel{nullptr};
     HWND hTestEdit{nullptr};
     HWND hLogEdit{nullptr};
+    WNDPROC origTestEditProc{nullptr};
     HFONT hUiFont{nullptr};
     HFONT hBoldFont{nullptr};
     HFONT hMonoFont{nullptr};
     bool isRecording{false};
     DWORD lastLogFileSize{0};
     float dpiScale{1.0f};
+    std::wstring startupProvisionLog;
 };
 
 static LabAppState g_app{};
@@ -82,6 +91,232 @@ static std::wstring GetExeDirectory() {
         }
     }
     return std::wstring(buf);
+}
+
+static std::wstring GetProgramFilesInstallDir() {
+    WCHAR pf[MAX_PATH] = {0};
+    if (ExpandEnvironmentStringsW(L"%ProgramW6432%\\VieLotusIM", pf, MAX_PATH) > 0 && pf[0] != L'%') {
+        return std::wstring(pf);
+    }
+    return L"C:\\Program Files\\VieLotusIM";
+}
+
+static bool IsCurrentProcessElevated() {
+    BOOL isMember = FALSE;
+    PSID adminGroup = nullptr;
+    SID_IDENTIFIER_AUTHORITY ntAuthority = SECURITY_NT_AUTHORITY;
+    if (AllocateAndInitializeSid(
+            &ntAuthority, 2,
+            SECURITY_BUILTIN_DOMAIN_RID,
+            DOMAIN_ALIAS_RID_ADMINS,
+            0, 0, 0, 0, 0, 0,
+            &adminGroup)) {
+        if (!CheckTokenMembership(nullptr, adminGroup, &isMember)) {
+            isMember = FALSE;
+        }
+        FreeSid(adminGroup);
+    }
+    return isMember != FALSE;
+}
+
+static void EnsureHealthyUserRegistryPrefs() {
+    HKEY hKey = nullptr;
+    if (RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            L"Software\\VieLotusIM",
+            0,
+            nullptr,
+            REG_OPTION_NON_VOLATILE,
+            KEY_READ | KEY_WRITE,
+            nullptr,
+            &hKey,
+            nullptr
+        ) == ERROR_SUCCESS && hKey) {
+        DWORD one = 1;
+        RegSetValueExW(hKey, L"VietnameseEnabled", 0, REG_DWORD, reinterpret_cast<const BYTE *>(&one), sizeof(one));
+        RegSetValueExW(hKey, L"SmartBilingual", 0, REG_DWORD, reinterpret_cast<const BYTE *>(&one), sizeof(one));
+        RegSetValueExW(hKey, L"ModernOrthography", 0, REG_DWORD, reinterpret_cast<const BYTE *>(&one), sizeof(one));
+        RegSetValueExW(hKey, L"SenFlexProfile", 0, REG_DWORD, reinterpret_cast<const BYTE *>(&one), sizeof(one));
+        RegCloseKey(hKey);
+    }
+}
+
+static bool IsFileMatchingEmbeddedTipDll(const std::wstring &filePath) {
+    if (filePath.empty()) return false;
+    HANDLE hFile = CreateFileW(
+        filePath.c_str(),
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+    if (hFile == INVALID_HANDLE_VALUE) return false;
+
+    LARGE_INTEGER fsize{};
+    if (!GetFileSizeEx(hFile, &fsize) ||
+        fsize.QuadPart != static_cast<LONGLONG>(kEmbeddedTipDllSize) ||
+        kEmbeddedTipDllSize == 0) {
+        CloseHandle(hFile);
+        return false;
+    }
+
+    std::vector<uint8_t> buf(kEmbeddedTipDllSize);
+    DWORD totalRead = 0;
+    while (totalRead < static_cast<DWORD>(kEmbeddedTipDllSize)) {
+        DWORD chunk = 0;
+        if (!ReadFile(
+                hFile,
+                buf.data() + totalRead,
+                static_cast<DWORD>(kEmbeddedTipDllSize) - totalRead,
+                &chunk,
+                nullptr
+            ) || chunk == 0) {
+            break;
+        }
+        totalRead += chunk;
+    }
+    CloseHandle(hFile);
+    if (totalRead != static_cast<DWORD>(kEmbeddedTipDllSize)) return false;
+    return std::memcmp(buf.data(), kEmbeddedTipDll, kEmbeddedTipDllSize) == 0;
+}
+
+static bool ProvisionEmbeddedTipDllToProgramFiles(std::wstring &outLog) {
+    EnsureHealthyUserRegistryPrefs();
+    std::wstring targetDir = GetProgramFilesInstallDir();
+    CreateDirectoryW(targetDir.c_str(), nullptr);
+    std::wstring dstDll = targetDir + L"\\VieLotusTIP.dll";
+
+    // Best-effort cleanup of any unlocked old DLL backups from earlier sessions
+    DeleteFileW((targetDir + L"\\VieLotusTIP.old.dll").c_str());
+    for (int i = 1; i <= 99; ++i) {
+        WCHAR oldSlot[MAX_PATH] = {0};
+        StringCchPrintfW(oldSlot, MAX_PATH, L"%s\\VieLotusTIP.old.%d.dll", targetDir.c_str(), i);
+        DeleteFileW(oldSlot);
+    }
+
+    if (GetFileAttributesW(dstDll.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        if (!DeleteFileW(dstDll.c_str())) {
+            bool moved = false;
+            for (int i = 1; i <= 99; ++i) {
+                WCHAR oldSlot[MAX_PATH] = {0};
+                StringCchPrintfW(oldSlot, MAX_PATH, L"%s\\VieLotusTIP.old.%d.dll", targetDir.c_str(), i);
+                DeleteFileW(oldSlot);
+                if (MoveFileExW(dstDll.c_str(), oldSlot, MOVEFILE_REPLACE_EXISTING)) {
+                    WCHAR msg[320] = {0};
+                    StringCchPrintfW(msg, 320, L"[LAB] ✓ Đã đổi tên DLL cũ đang khoá sang VieLotusTIP.old.%d.dll.\r\n", i);
+                    outLog += msg;
+                    moved = true;
+                    break;
+                }
+            }
+            if (!moved) {
+                WCHAR msg[256] = {0};
+                StringCchPrintfW(msg, 256, L"[LAB] ✗ Không thể đổi tên %s (err=%lu).\r\n", dstDll.c_str(), GetLastError());
+                outLog += msg;
+                return false;
+            }
+        }
+    }
+
+    HANDLE hOut = CreateFileW(
+        dstDll.c_str(),
+        GENERIC_WRITE,
+        0,
+        nullptr,
+        CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+    if (hOut == INVALID_HANDLE_VALUE) {
+        WCHAR msg[256] = {0};
+        StringCchPrintfW(msg, 256, L"[LAB] ✗ Không thể ghi %s (err=%lu).\r\n", dstDll.c_str(), GetLastError());
+        outLog += msg;
+        return false;
+    }
+
+    DWORD written = 0;
+    BOOL writeOk = WriteFile(hOut, kEmbeddedTipDll, static_cast<DWORD>(kEmbeddedTipDllSize), &written, nullptr);
+    CloseHandle(hOut);
+    if (!writeOk || written != static_cast<DWORD>(kEmbeddedTipDllSize)) {
+        outLog += L"[LAB] ✗ Ghi dữ liệu VieLotusTIP.dll không hoàn tất.\r\n";
+        return false;
+    }
+
+    WCHAR msgOk[256] = {0};
+    StringCchPrintfW(msgOk, 256, L"[LAB] ✓ Đã cập nhật %s (%zu bytes) lên bản mới nhất.\r\n", dstDll.c_str(), kEmbeddedTipDllSize);
+    outLog += msgOk;
+
+    // Grant Read & Execute ACLs to ALL APPLICATION PACKAGES and ALL RESTRICTED APPLICATION PACKAGES
+    std::wstring icaclsArgs = L"\"" + targetDir + L"\" /grant \"*S-1-15-2-1:(OI)(CI)(RX)\" /grant \"*S-1-15-2-2:(OI)(CI)(RX)\" /T /C /Q";
+    SHELLEXECUTEINFOW sei{};
+    sei.cbSize = sizeof(sei);
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.lpFile = L"icacls.exe";
+    sei.lpParameters = icaclsArgs.c_str();
+    sei.nShow = SW_HIDE;
+    if (ShellExecuteExW(&sei) && sei.hProcess) {
+        WaitForSingleObject(sei.hProcess, 4000);
+        CloseHandle(sei.hProcess);
+    }
+
+    HMODULE hDll = LoadLibraryW(dstDll.c_str());
+    if (!hDll) {
+        outLog += L"[LAB] ✗ LoadLibraryW sau khi ghi DLL thất bại.\r\n";
+        return false;
+    }
+
+    using PFN_DllRegisterServer = HRESULT(STDAPICALLTYPE *)(void);
+    using PFN_RundllEntryW = void(CALLBACK *)(HWND, HINSTANCE, LPWSTR, int);
+    auto pfnReg = reinterpret_cast<PFN_DllRegisterServer>(GetProcAddress(hDll, "DllRegisterServer"));
+    auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(GetProcAddress(hDll, "ActivateUserProfilesW"));
+    HRESULT hrReg = pfnReg ? pfnReg() : E_FAIL;
+    if (SUCCEEDED(hrReg) && pfnAct) {
+        pfnAct(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
+        outLog += L"[LAB] ✓ Đã đăng ký COM/TSF (DllRegisterServer + ActivateUserProfilesW).\r\n";
+    }
+    FreeLibrary(hDll);
+    return SUCCEEDED(hrReg);
+}
+
+static bool EnsureProgramFilesTipDllUpToDate(std::wstring &outLog) {
+    EnsureHealthyUserRegistryPrefs();
+    std::wstring dstDll = GetProgramFilesInstallDir() + L"\\VieLotusTIP.dll";
+    if (IsFileMatchingEmbeddedTipDll(dstDll)) {
+        return true;
+    }
+
+    if (IsCurrentProcessElevated()) {
+        return ProvisionEmbeddedTipDllToProgramFiles(outLog);
+    }
+
+    outLog += L"[LAB] Phát hiện VieLotusTIP.dll trên máy là bản cũ — đang yêu cầu quyền Admin để cập nhật tự động...\r\n";
+    WCHAR selfPath[MAX_PATH] = {0};
+    if (GetModuleFileNameW(nullptr, selfPath, MAX_PATH) == 0) {
+        return false;
+    }
+
+    SHELLEXECUTEINFOW sei{};
+    sei.cbSize = sizeof(sei);
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.lpVerb = L"runas";
+    sei.lpFile = selfPath;
+    sei.lpParameters = L"--provision-tip-dll";
+    sei.nShow = SW_SHOWNORMAL;
+    if (ShellExecuteExW(&sei) && sei.hProcess) {
+        WaitForSingleObject(sei.hProcess, 25000);
+        CloseHandle(sei.hProcess);
+    }
+
+    EnsureHealthyUserRegistryPrefs();
+    bool updated = IsFileMatchingEmbeddedTipDll(dstDll);
+    if (updated) {
+        outLog += L"[LAB] ✓ Đã nâng cấp C:\\Program Files\\VieLotusIM\\VieLotusTIP.dll lên bản mới nhất thành công!\r\n";
+    } else {
+        outLog += L"[LAB] ✗ Cảnh báo: Chưa cập nhật được C:\\Program Files\\VieLotusIM\\VieLotusTIP.dll (cần chấp nhận hộp thoại UAC Admin)!\r\n";
+    }
+    return updated;
 }
 
 static std::wstring FindVieLotusTipDllPath(std::wstring &outRegisteredPath) {
@@ -109,11 +344,34 @@ static std::wstring FindVieLotusTipDllPath(std::wstring &outRegisteredPath) {
     if (GetFileAttributesW(localDll.c_str()) != INVALID_FILE_ATTRIBUTES) {
         return localDll;
     }
-    std::wstring pfDll = L"C:\\Program Files\\VieLotusIM\\VieLotusTIP.dll";
+    std::wstring pfDll = GetProgramFilesInstallDir() + L"\\VieLotusTIP.dll";
     if (GetFileAttributesW(pfDll.c_str()) != INVALID_FILE_ATTRIBUTES) {
         return pfDll;
     }
     return L"";
+}
+
+static std::wstring QueryDllBuildStamp(const std::wstring &dllPath) {
+    if (dllPath.empty() || GetFileAttributesW(dllPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        return L"Không tìm thấy DLL ✗";
+    }
+    bool matchesEmbedded = IsFileMatchingEmbeddedTipDll(dllPath);
+    HMODULE hDll = LoadLibraryW(dllPath.c_str());
+    if (!hDll) {
+        return L"Lỗi nạp DLL ✗";
+    }
+    using pfn_stamp = const char *(*)(void);
+    auto get_stamp = reinterpret_cast<pfn_stamp>(GetProcAddress(hDll, "vielotus_get_build_stamp"));
+    std::wstring stampStr;
+    if (get_stamp && get_stamp()) {
+        stampStr = Utf8ToWideStr(get_stamp());
+    } else {
+        stampStr = L"Bản CŨ (trước r3 — chưa có LabTrace!)";
+    }
+    FreeLibrary(hDll);
+
+    stampStr += matchesEmbedded ? L" — Khớp 100% ✓" : L" — LỆCH/CŨ ✗";
+    return stampStr;
 }
 
 static void AppendLogWide(const std::wstring &wText) {
@@ -163,6 +421,37 @@ static void AppendLogUtf8Line(const char *utf8Line) {
     }
 }
 
+static LRESULT CALLBACK TestEditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (g_app.isRecording && (msg == WM_KEYDOWN || msg == WM_CHAR)) {
+        LRESULT res = CallWindowProcW(g_app.origTestEditProc, hwnd, msg, wParam, lParam);
+        WCHAR curText[256] = {0};
+        GetWindowTextW(hwnd, curText, 250);
+        DWORD selStart = 0, selEnd = 0;
+        SendMessageW(hwnd, EM_GETSEL, reinterpret_cast<WPARAM>(&selStart), reinterpret_cast<LPARAM>(&selEnd));
+
+        WCHAR line[512] = {0};
+        if (msg == WM_KEYDOWN) {
+            StringCchPrintfW(
+                line, 512,
+                L"[host-edit] WM_KEYDOWN vk=0x%02X sel=%lu..%lu text=\"%s\"\r\n",
+                static_cast<unsigned>(wParam & 0xFF),
+                selStart, selEnd, curText
+            );
+        } else {
+            StringCchPrintfW(
+                line, 512,
+                L"[host-edit] WM_CHAR    ch=U+%04X ('%c') sel=%lu..%lu text=\"%s\"\r\n",
+                static_cast<unsigned>(wParam & 0xFFFF),
+                (wParam >= 32 && wParam < 127) ? static_cast<WCHAR>(wParam) : L'?',
+                selStart, selEnd, curText
+            );
+        }
+        AppendLogWide(line);
+        return res;
+    }
+    return CallWindowProcW(g_app.origTestEditProc, hwnd, msg, wParam, lParam);
+}
+
 static std::wstring QueryTsfAndSystemStatusSummary() {
 #if defined(_M_ARM64) || defined(__aarch64__)
     const wchar_t *archStr = L"ARM64";
@@ -174,7 +463,7 @@ static std::wstring QueryTsfAndSystemStatusSummary() {
 
     std::wstring regDll;
     std::wstring resolvedDll = FindVieLotusTipDllPath(regDll);
-    bool dllExists = !resolvedDll.empty() && (GetFileAttributesW(resolvedDll.c_str()) != INVALID_FILE_ATTRIBUTES);
+    std::wstring dllStamp = QueryDllBuildStamp(resolvedDll);
 
     HKL hkl = GetKeyboardLayout(0);
     unsigned hklVal = static_cast<unsigned>(reinterpret_cast<uintptr_t>(hkl) & 0xFFFFFFFFu);
@@ -234,7 +523,7 @@ static std::wstring QueryTsfAndSystemStatusSummary() {
         (langId == 0x042A) ? L"Tiếng Việt 0x042A ✓" : L"Tiếng Anh / Khác — bấm 'Kích hoạt & Sửa TSF'",
         activeProfileStr.c_str(),
         regDll.empty() ? L"(Chưa đăng ký HKLM)" : regDll.c_str(),
-        dllExists ? L"Tồn tại ✓" : L"Không tìm thấy DLL ✗",
+        dllStamp.c_str(),
         vnEnabled,
         (inputMethod == 1) ? L"VNI" : L"Telex",
         smartBi,
@@ -308,7 +597,13 @@ static void StopTraceRecording() {
 }
 
 static void RunFixAndActivateTsf() {
-    AppendLogWide(L"[LAB] Đang kiểm tra và kích hoạt TSF Profile + HKL Tiếng Việt (0x042A)...\r\n");
+    AppendLogWide(L"[LAB] Đang kiểm tra, cập nhật DLL và kích hoạt TSF Profile + HKL Tiếng Việt (0x042A)...\r\n");
+    std::wstring provLog;
+    EnsureProgramFilesTipDllUpToDate(provLog);
+    if (!provLog.empty()) {
+        AppendLogWide(provLog);
+    }
+
     std::wstring regDll;
     std::wstring dllPath = FindVieLotusTipDllPath(regDll);
     if (dllPath.empty()) {
@@ -368,12 +663,14 @@ static void RunEngineSelfTest() {
 
     using pfn_create = void *(*)(void);
     using pfn_destroy = void (*)(void *);
+    using pfn_set_im = void (*)(void *, int32_t);
     using pfn_feed = int32_t (*)(void *, uint32_t);
     using pfn_bs = int32_t (*)(void *);
     using pfn_text = const char *(*)(void *);
 
     auto create_session = reinterpret_cast<pfn_create>(GetProcAddress(hDll, "vielotus_create_session"));
     auto destroy_session = reinterpret_cast<pfn_destroy>(GetProcAddress(hDll, "vielotus_destroy_session"));
+    auto set_im = reinterpret_cast<pfn_set_im>(GetProcAddress(hDll, "vielotus_set_input_method"));
     auto feed_char = reinterpret_cast<pfn_feed>(GetProcAddress(hDll, "vielotus_feed_char"));
     auto get_bs = reinterpret_cast<pfn_bs>(GetProcAddress(hDll, "vielotus_get_last_backspaces"));
     auto get_text = reinterpret_cast<pfn_text>(GetProcAddress(hDll, "vielotus_get_last_text"));
@@ -385,20 +682,30 @@ static void RunEngineSelfTest() {
     }
 
     struct TestCase {
+        int32_t im; // 0 = Telex, 1 = VNI
         const char *keys;
         const wchar_t *expected;
     };
     static const TestCase kCases[] = {
-        { "vieets ", L"việt " },
-        { "tiengs ", L"tiếng " },
-        { "truowngr ", L"trưởng " },
-        { "dduowcj ", L"được " },
-        { "window user ", L"window user " }
+        { 0, "vieetj ", L"việt " },
+        { 0, "tieengs ", L"tiếng " },
+        { 0, "truowngr ", L"trưởng " },
+        { 0, "dduowcj ", L"được " },
+        { 0, "dducj loor ", L"đục lổ " },
+        { 0, "window user ", L"window user " },
+        { 1, "duoc975 ", L"được " },
+        { 1, "duc95 lo63 ", L"đục lổ " }
     };
 
     void *sess = create_session();
+    int total = static_cast<int>(sizeof(kCases) / sizeof(kCases[0]));
     int passed = 0;
     for (const auto &tc : kCases) {
+        if (set_im) {
+            set_im(sess, tc.im);
+        } else if (tc.im != 0) {
+            // Older DLL didn't export vielotus_set_input_method; skip VNI or recreate
+        }
         std::wstring screen;
         for (const char *p = tc.keys; *p; ++p) {
             uint32_t cp = static_cast<uint32_t>(static_cast<unsigned char>(*p));
@@ -410,7 +717,7 @@ static void RunEngineSelfTest() {
                 }
                 const char *txt = get_text(sess);
                 screen += Utf8ToWideStr(txt ? txt : "");
-                screen.push_back( static_cast<wchar_t>(cp) );
+                screen.push_back(static_cast<wchar_t>(cp));
             } else if (act == 2 /* REPLACE */) {
                 int32_t bs = get_bs(sess);
                 if (bs > 0 && static_cast<size_t>(bs) <= screen.size()) {
@@ -428,7 +735,8 @@ static void RunEngineSelfTest() {
         StringCchPrintfW(
             line,
             256,
-            L"[SELF-TEST] %s: input=\"%S\" -> output=\"%s\" (expected=\"%s\")\r\n",
+            L"[SELF-TEST][%s] %s: input=\"%S\" -> output=\"%s\" (expected=\"%s\")\r\n",
+            (tc.im == 1) ? L"VNI" : L"Telex",
             ok ? L"PASS ✓" : L"FAIL ✗",
             tc.keys,
             screen.c_str(),
@@ -440,7 +748,7 @@ static void RunEngineSelfTest() {
     FreeLibrary(hDll);
 
     WCHAR summary[128] = {0};
-    StringCchPrintfW(summary, 128, L"[LAB] Kết quả Self-Test Engine: %d/5 PASS.\r\n", passed);
+    StringCchPrintfW(summary, 128, L"[LAB] Kết quả Self-Test Engine: %d/%d PASS.\r\n", passed, total);
     AppendLogWide(summary);
 }
 
@@ -642,9 +950,12 @@ static LRESULT CALLBACK LabWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
             0, 0, 100, 28, hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_EDIT_TEST_INPUT)), GetModuleHandleW(nullptr), nullptr
         );
+        g_app.origTestEditProc = reinterpret_cast<WNDPROC>(
+            SetWindowLongPtrW(g_app.hTestEdit, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(TestEditSubclassProc))
+        );
         SendMessageW(
             g_app.hTestEdit, 0x1501 /* EM_SETCUEBANNER */, TRUE,
-            reinterpret_cast<LPARAM>(L"Gõ thử tại đây: vieets -> việt | tiengs -> tiếng | truowngr -> trưởng...")
+            reinterpret_cast<LPARAM>(L"Gõ thử tại đây: vieetj -> việt | tieengs -> tiếng | dducj loor -> đục lổ | duoc975 -> được...")
         );
 
         g_app.hLogEdit = CreateWindowExW(
@@ -678,6 +989,10 @@ static LRESULT CALLBACK LabWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
         std::wstring logPath = vielotus_win_lab::GetSpoolDir() + L"\\events.log";
         DeleteFileW(logPath.c_str());
         g_app.lastLogFileSize = 0;
+
+        if (!g_app.startupProvisionLog.empty()) {
+            AppendLogWide(g_app.startupProvisionLog);
+        }
 
         RefreshStatusHeader();
         StartTraceRecording();
@@ -760,7 +1075,19 @@ static LRESULT CALLBACK LabWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLine, int nCmdShow) {
     (void)hPrevInstance;
-    (void)lpCmdLine;
+
+    std::wstring cmdArgs = lpCmdLine ? lpCmdLine : L"";
+    if (cmdArgs.find(L"--provision-tip-dll") != std::wstring::npos) {
+        HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        std::wstring log;
+        bool ok = ProvisionEmbeddedTipDllToProgramFiles(log);
+        if (SUCCEEDED(hrCo)) CoUninitialize();
+        return ok ? 0 : 1;
+    }
+
+    // Before initializing TSF/COM or creating any window, guarantee C:\Program Files\VieLotusIM\VieLotusTIP.dll
+    // matches our embedded build byte-for-byte so msctf.dll loads the exact latest VieLotusTIP.dll!
+    EnsureProgramFilesTipDllUpToDate(g_app.startupProvisionLog);
 
     HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
     if (hUser32) {
@@ -805,9 +1132,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     int posY = (scrH > winH) ? ((scrH - winH) / 2) : 40;
 
 #if defined(_M_ARM64) || defined(__aarch64__)
-    const wchar_t *winTitle = L"Sen Việt Diagnostic Lab (VieLotusLab — Windows ARM64)";
+    const wchar_t *winTitle = L"Sen Việt Diagnostic Lab v2.0.2-r3 (VieLotusLab — Windows ARM64)";
 #else
-    const wchar_t *winTitle = L"Sen Việt Diagnostic Lab (VieLotusLab — Windows x64)";
+    const wchar_t *winTitle = L"Sen Việt Diagnostic Lab v2.0.2-r3 (VieLotusLab — Windows x64)";
 #endif
 
     HWND hwnd = CreateWindowExW(
