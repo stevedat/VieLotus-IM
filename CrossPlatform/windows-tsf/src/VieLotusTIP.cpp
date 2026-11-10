@@ -1,7 +1,9 @@
 #include "VieLotusTIP.h"
 #include "EditSession.h"
 #include "Register.h"
+#ifdef VIELOTUS_ENABLE_LAB
 #include "vielotus_win_lab_trace.h"
+#endif
 #include <vector>
 
 #define VI_LANGID 0x042A
@@ -492,7 +494,7 @@ bool CVieLotusTIP::IsComposingSession() const {
         return api.is_composing(m_session);
     }
 #if defined(VIELOTUS_EMBEDDED_ENGINE)
-    return m_nativeEngine.isComposing();
+    return m_nativeEngine.hasActiveWord();
 #else
     return false;
 #endif
@@ -582,11 +584,62 @@ const char *CVieLotusTIP::GetLastCommitDiffTextSession() const {
 #endif
 }
 
+void CVieLotusTIP::ReleaseCompositionRefs() {
+    if (m_pComposition) {
+        m_pComposition->Release();
+        m_pComposition = nullptr;
+    }
+    if (m_pCompositionContext) {
+        m_pCompositionContext->Release();
+        m_pCompositionContext = nullptr;
+    }
+}
+
+void CVieLotusTIP::EndActiveComposition(ITfContext *pic) {
+    if (!m_pComposition) {
+        ReleaseCompositionRefs();
+        return;
+    }
+    ITfContext *targetCtx = pic ? pic : m_pCompositionContext;
+    if (!targetCtx) {
+        ReleaseCompositionRefs();
+        return;
+    }
+    targetCtx->AddRef();
+    CEditSession *pEdit = new (std::nothrow) CEditSession(
+        targetCtx,
+        0,
+        L"",
+        true,
+        false,
+        &m_pComposition,
+        &m_pCompositionContext,
+        static_cast<ITfCompositionSink *>(this)
+    );
+    if (pEdit) {
+        HRESULT hrSession = S_OK;
+        targetCtx->RequestEditSession(m_tfClientId, pEdit, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hrSession);
+        pEdit->Release();
+    }
+    ReleaseCompositionRefs();
+    targetCtx->Release();
+}
+
 void CVieLotusTIP::ExecuteEditSession(ITfContext *pic, int32_t backspaces, const std::wstring &text, bool bCommit) {
     m_lastEditShifted = 0;
     m_lastEditSetTextHr = S_OK;
     if (!pic) return;
-    CEditSession *pEdit = new (std::nothrow) CEditSession(pic, backspaces, text, bCommit);
+    const bool keepComposition = !bCommit && IsComposingSession();
+    CEditSession *pEdit = new (std::nothrow) CEditSession(
+        pic,
+        backspaces,
+        text,
+        bCommit,
+        keepComposition,
+        &m_pComposition,
+        &m_pCompositionContext,
+        static_cast<ITfCompositionSink *>(this)
+    );
     if (!pEdit) return;
     HRESULT hrSession = S_OK;
     HRESULT hrReq = pic->RequestEditSession(m_tfClientId, pEdit, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hrSession);
@@ -610,10 +663,7 @@ void CVieLotusTIP::CleanSession() {
         api.destroy_session(m_session);
         m_session = nullptr;
     }
-    if (m_pComposition) {
-        m_pComposition->Release();
-        m_pComposition = nullptr;
-    }
+    ReleaseCompositionRefs();
 }
 
 STDMETHODIMP CVieLotusTIP::Activate(ITfThreadMgr *ptim, TfClientId tid) {
@@ -682,10 +732,16 @@ STDMETHODIMP CVieLotusTIP::Deactivate() {
 }
 
 STDMETHODIMP CVieLotusTIP::OnSetFocus(BOOL fForeground) {
+#ifdef VIELOTUS_ENABLE_LAB
     uint64_t t0 = vielotus_win_lab::NowUs();
-    ReloadUserPreferences();
-    SyncActiveLanguageProfile();
+#endif
+    if (fForeground) {
+        ReloadUserPreferences();
+        SyncActiveLanguageProfile();
+    }
+    ReleaseCompositionRefs();
     ResetComposingSession();
+#ifdef VIELOTUS_ENABLE_LAB
     vielotus_win_lab::WriteEvent(
         m_currentExeName,
         "FOCUS",
@@ -696,11 +752,11 @@ STDMETHODIMP CVieLotusTIP::OnSetFocus(BOOL fForeground) {
         m_isVniMode ? 1 : 0,
         static_cast<unsigned>(reinterpret_cast<uintptr_t>(GetKeyboardLayout(0)) & 0xFFFFFFFFu)
     );
+#endif
     return S_OK;
 }
 
 STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lParam, BOOL *pfEaten) {
-    (void)pic;
     if (!pfEaten) return E_POINTER;
     *pfEaten = FALSE;
 
@@ -741,23 +797,26 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
             // end current composing word while preserving sentence context.
             ClearWordStateSession();
         }
+        EndActiveComposition(pic);
         return S_OK;
     }
 
     // Navigation / Enter / Tab / Escape / Delete / Insert / Function keys -> never eat, reset full session & context
     if (IsNavigationOrLineBreakKey(wParam)) {
         ResetComposingSession();
+        EndActiveComposition(pic);
         return S_OK;
     }
 
     const bool isComposing = IsComposingSession();
 
-    // Backspace: eat when composing (including post-space re-arm); passively clear delimiter flags when idle
+    // Backspace: eat when composing; passively clear delimiter flags when idle
     if (wParam == VK_BACK) {
         if (isComposing) {
             *pfEaten = TRUE;
         } else {
             ClearWordStateSession();
+            EndActiveComposition(pic);
             FeedCharSession(static_cast<uint32_t>(L' '));
         }
         return S_OK;
@@ -790,6 +849,7 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
                 // Non-boundary symbol/digit in Telex mode (e.g. '2' in "v2", '@' in "user@"):
                 // passively clear word state & update m_afterDigit without eating the keystroke.
                 FeedCharSession(static_cast<uint32_t>(ch));
+                EndActiveComposition(pic);
                 return S_OK;
             }
             // Idle (!isComposing): passively track leading '/', digits '0'..'9', and tech delimiters '_', '\'
@@ -798,6 +858,7 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
             return S_OK;
         } else if (kind == PassiveKeyKind::NonAsciiOrDeadKey && isComposing) {
             ClearWordStateSession();
+            EndActiveComposition(pic);
             return S_OK;
         }
     }
@@ -811,7 +872,9 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
 
     if (!pic) return S_OK;
 
+#ifdef VIELOTUS_ENABLE_LAB
     uint64_t t0 = vielotus_win_lab::NowUs();
+#endif
 
     const bool hasCtrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
     const bool hasShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
@@ -821,6 +884,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
     // Hotkey: Ctrl + Shift + S -> Open Sen Viet Settings Window
     if (wParam == 'S' && hasCtrl && hasShift && !hasAlt && !hasWin) {
         ResetComposingSession();
+        EndActiveComposition(pic);
         ShowVieLotusSettingsDialog(GetForegroundWindow());
         ReloadUserPreferences();
         *pfEaten = TRUE;
@@ -842,7 +906,9 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
             SaveVieLotusPrefs(prefs);
         }
         ResetComposingSession();
+        EndActiveComposition(pic);
         *pfEaten = TRUE;
+#ifdef VIELOTUS_ENABLE_LAB
         vielotus_win_lab::WriteEvent(
             m_currentExeName,
             "TOGGLE",
@@ -851,6 +917,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
             m_isVietnameseMode ? 1 : 0,
             m_isVniMode ? 1 : 0
         );
+#endif
         return S_OK;
     }
 
@@ -858,7 +925,10 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
 
     if (GetLocalPrefsRevision() != m_lastPrefsRevision) {
         ReloadUserPreferences();
-        if (!m_isVietnameseMode) return S_OK;
+        if (!m_isVietnameseMode) {
+            EndActiveComposition(pic);
+            return S_OK;
+        }
     }
 
     if (IsBareModifierOrToggleKey(wParam)) {
@@ -876,6 +946,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
         } else {
             ClearWordStateSession();
         }
+        EndActiveComposition(pic);
         return S_OK;
     }
 
@@ -887,6 +958,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
                 ClearWordStateSession();
                 ExecuteEditSession(pic, 1, L"", false);
                 *pfEaten = TRUE;
+#ifdef VIELOTUS_ENABLE_LAB
                 vielotus_win_lab::WriteEvent(
                     m_currentExeName,
                     "BACKSPACE",
@@ -896,12 +968,14 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
                     static_cast<long>(m_lastEditShifted),
                     static_cast<unsigned>(m_lastEditSetTextHr)
                 );
+#endif
             } else {
                 int32_t bs = GetLastBackspacesSession();
                 const char *replacement = GetLastTextSession();
                 std::wstring wText = Utf8ToWide(replacement);
                 ExecuteEditSession(pic, bs, wText, false);
                 *pfEaten = TRUE;
+#ifdef VIELOTUS_ENABLE_LAB
                 char safeOut[128] = {0};
                 vielotus_win_lab::EscapeAsciiInto(replacement, safeOut, sizeof(safeOut));
                 vielotus_win_lab::WriteEvent(
@@ -915,6 +989,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
                     static_cast<long>(m_lastEditShifted),
                     static_cast<unsigned>(m_lastEditSetTextHr)
                 );
+#endif
             }
             return S_OK;
         }
@@ -924,6 +999,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
     // Navigation / Enter / Escape / Tab / Delete / Function keys -> reset full session and let host process key
     if (IsNavigationOrLineBreakKey(wParam)) {
         ResetComposingSession();
+        EndActiveComposition(pic);
         return S_OK;
     }
 
@@ -946,6 +1022,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
             wCommitted += chBuf[0]; // Append boundary key
             ExecuteEditSession(pic, bs, wCommitted, true);
             *pfEaten = TRUE;
+#ifdef VIELOTUS_ENABLE_LAB
             std::string outUtf8 = vielotus_win_lab::WideToUtf8Safe(wCommitted);
             char safeOut[128] = {0};
             vielotus_win_lab::EscapeAsciiInto(outUtf8.c_str(), safeOut, sizeof(safeOut));
@@ -962,6 +1039,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
                 static_cast<long>(m_lastEditShifted),
                 static_cast<unsigned>(m_lastEditSetTextHr)
             );
+#endif
             return S_OK;
         } else if (action == VIELOTUS_ACTION_REPLACE) {
             int32_t bs = GetLastBackspacesSession();
@@ -969,6 +1047,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
             std::wstring wText = Utf8ToWide(replacement);
             ExecuteEditSession(pic, bs, wText, false);
             *pfEaten = TRUE;
+#ifdef VIELOTUS_ENABLE_LAB
             char safeOut[128] = {0};
             vielotus_win_lab::EscapeAsciiInto(replacement, safeOut, sizeof(safeOut));
             vielotus_win_lab::WriteEvent(
@@ -984,12 +1063,14 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
                 static_cast<long>(m_lastEditShifted),
                 static_cast<unsigned>(m_lastEditSetTextHr)
             );
+#endif
             return S_OK;
         } else {
             // CONSUMED or PASS_THROUGH after OnTestKeyDown ate the key: insert character directly
             std::wstring wText(1, chBuf[0]);
             ExecuteEditSession(pic, 0, wText, false);
             *pfEaten = TRUE;
+#ifdef VIELOTUS_ENABLE_LAB
             vielotus_win_lab::WriteEvent(
                 m_currentExeName,
                 "KEY_DOWN",
@@ -1002,6 +1083,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
                 static_cast<long>(m_lastEditShifted),
                 static_cast<unsigned>(m_lastEditSetTextHr)
             );
+#endif
             return S_OK;
         }
     } else if (toAsciiRes > 0) {
@@ -1054,20 +1136,25 @@ STDMETHODIMP CVieLotusTIP::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMgr 
     if (pdimFocus != nullptr && pdimFocus == pdimPrevFocus) {
         return S_OK;
     }
-    ReloadUserPreferences();
-    SyncActiveLanguageProfile();
+    if (pdimFocus != nullptr && GetLocalPrefsRevision() != m_lastPrefsRevision) {
+        ReloadUserPreferences();
+        SyncActiveLanguageProfile();
+    }
+    ReleaseCompositionRefs();
     ResetComposingSession();
     return S_OK;
 }
 
 STDMETHODIMP CVieLotusTIP::OnPushContext(ITfContext *pic) {
     (void)pic;
+    ReleaseCompositionRefs();
     ResetComposingSession();
     return S_OK;
 }
 
 STDMETHODIMP CVieLotusTIP::OnPopContext(ITfContext *pic) {
     (void)pic;
+    ReleaseCompositionRefs();
     ResetComposingSession();
     return S_OK;
 }
@@ -1079,6 +1166,7 @@ STDMETHODIMP CVieLotusTIP::OnActivated(REFCLSID clsid, REFGUID guidProfile, BOOL
         } else if (IsEqualGUID(guidProfile, GUID_VieLotusProfile)) {
             ApplyVniMode(false, true);
         }
+#ifdef VIELOTUS_ENABLE_LAB
         vielotus_win_lab::WriteEvent(
             m_currentExeName,
             "PROFILE",
@@ -1086,15 +1174,16 @@ STDMETHODIMP CVieLotusTIP::OnActivated(REFCLSID clsid, REFGUID guidProfile, BOOL
             "activated=1 vni=%d",
             m_isVniMode ? 1 : 0
         );
+#endif
     }
     return S_OK;
 }
 
 STDMETHODIMP CVieLotusTIP::OnCompositionTerminated(TfEditCookie ecWrite, ITfComposition *pComposition) {
     (void)ecWrite;
-    if (m_pComposition == pComposition) {
-        m_pComposition->Release();
-        m_pComposition = nullptr;
+    if (m_pComposition && (!pComposition || m_pComposition == pComposition)) {
+        ReleaseCompositionRefs();
+        ClearWordStateSession();
     }
     return S_OK;
 }

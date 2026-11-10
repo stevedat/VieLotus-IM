@@ -9,7 +9,11 @@ public:
         ITfContext *pContext,
         int32_t backspaces,
         const std::wstring &insertText,
-        bool bCommit
+        bool bCommit,
+        bool bKeepComposition = false,
+        ITfComposition **ppComposition = nullptr,
+        ITfContext **ppCompositionContext = nullptr,
+        ITfCompositionSink *pCompositionSink = nullptr
     );
     virtual ~CEditSession();
 
@@ -32,6 +36,10 @@ private:
     int32_t m_backspaces;
     std::wstring m_insertText;
     bool m_bCommit;
+    bool m_bKeepComposition{false};
+    ITfComposition **m_ppComposition{nullptr};
+    ITfContext **m_ppCompositionContext{nullptr};
+    ITfCompositionSink *m_pCompositionSink{nullptr};
     LONG m_actualShifted{0};
     bool m_wasEmpty{true};
     HRESULT m_hrSetText{S_OK};

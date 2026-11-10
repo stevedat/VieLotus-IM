@@ -60,6 +60,7 @@ private:
     vielotus_win::WindowsNativeEngine m_nativeEngine{};
 #endif
     ITfComposition *m_pComposition{nullptr};
+    ITfContext *m_pCompositionContext{nullptr};
 
     bool m_isVietnameseMode{true};
     bool m_isVniMode{false};
@@ -73,6 +74,8 @@ private:
 
     void InitSession();
     void CleanSession();
+    void ReleaseCompositionRefs();
+    void EndActiveComposition(ITfContext *pic);
     void ApplyVniMode(bool isVni, bool persistToRegistry);
     void ReloadUserPreferences();
     void SyncActiveLanguageProfile();

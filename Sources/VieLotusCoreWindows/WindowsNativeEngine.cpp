@@ -2712,7 +2712,7 @@ inline NativeEngineState *getImpl(uint8_t *buf) {
     return reinterpret_cast<NativeEngineState *>(buf);
 }
 
-inline void syncOut(WindowsNativeEngine *pub, NativeEngineState *impl, int32_t &outBs, char *outUtf8, int32_t &outCommitDiffBs, char *outCommitDiffUtf8, bool &outComp) {
+inline void syncOut(WindowsNativeEngine *pub, NativeEngineState *impl, int32_t &outBs, char *outUtf8, int32_t &outCommitDiffBs, char *outCommitDiffUtf8, bool &outComp, bool &outActiveWord) {
     (void)pub;
     outBs = impl->m_lastBackspaces;
     for (int i = 0; i < kMaxUtf8Bytes; ++i) {
@@ -2725,6 +2725,7 @@ inline void syncOut(WindowsNativeEngine *pub, NativeEngineState *impl, int32_t &
         if (impl->m_lastCommitDiffTextUtf8[i] == '\0') break;
     }
     outComp = impl->isComposing();
+    outActiveWord = (impl->m_displayedLen > 0);
 }
 
 } // namespace
@@ -2761,6 +2762,7 @@ void WindowsNativeEngine::clearWordState() {
     impl->m_quickTelex = m_quickTelex;
     impl->clearWordState();
     m_composingFlag = false;
+    m_activeWordFlag = false;
     m_lastBackspaces = 0;
     m_lastTextUtf8[0] = '\0';
     m_lastCommitDiffBackspaces = 0;
@@ -2772,6 +2774,7 @@ void WindowsNativeEngine::setInputMethod(InputMethod method) {
     auto *impl = getImpl(m_opaqueState);
     impl->setInputMethod(method);
     m_composingFlag = impl->isComposing();
+    m_activeWordFlag = (impl->m_displayedLen > 0);
     m_lastBackspaces = impl->m_lastBackspaces;
     m_lastTextUtf8[0] = '\0';
     m_lastCommitDiffBackspaces = 0;
@@ -2786,7 +2789,7 @@ int32_t WindowsNativeEngine::feedChar(uint32_t codepoint) {
     impl->m_grammarProfile = m_grammarProfile;
     impl->m_quickTelex = m_quickTelex;
     int32_t act = impl->feedChar(codepoint);
-    syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_lastCommitDiffBackspaces, m_lastCommitDiffTextUtf8, m_composingFlag);
+    syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_lastCommitDiffBackspaces, m_lastCommitDiffTextUtf8, m_composingFlag, m_activeWordFlag);
     return act;
 }
 
@@ -2798,7 +2801,7 @@ int32_t WindowsNativeEngine::feedBackspace() {
     impl->m_grammarProfile = m_grammarProfile;
     impl->m_quickTelex = m_quickTelex;
     int32_t act = impl->feedBackspace();
-    syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_lastCommitDiffBackspaces, m_lastCommitDiffTextUtf8, m_composingFlag);
+    syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_lastCommitDiffBackspaces, m_lastCommitDiffTextUtf8, m_composingFlag, m_activeWordFlag);
     return act;
 }
 
@@ -2810,7 +2813,7 @@ int32_t WindowsNativeEngine::commitWord() {
     impl->m_grammarProfile = m_grammarProfile;
     impl->m_quickTelex = m_quickTelex;
     int32_t act = impl->commitWord();
-    syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_lastCommitDiffBackspaces, m_lastCommitDiffTextUtf8, m_composingFlag);
+    syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_lastCommitDiffBackspaces, m_lastCommitDiffTextUtf8, m_composingFlag, m_activeWordFlag);
     return act;
 }
 
@@ -3285,5 +3288,5 @@ VIELOTUS_CAPI_EXPORT const char *vielotus_get_version(void) {
 }
 
 VIELOTUS_CAPI_EXPORT const char *vielotus_get_build_stamp(void) {
-    return "2.0.2-r3 (PureTSF+CUAS+LabTrace)";
+    return "2.0.2-r4 (PureTSF+CUAS+LabTrace)";
 }
