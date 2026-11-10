@@ -5,12 +5,17 @@
 #include <dwmapi.h>
 #include <shellapi.h>
 #include <string>
+#include <vector>
 
 #define CLSID_STRLEN 38
 #define VI_LANGID 0x042A // Vietnamese
 
 #ifndef ILOT_UNINSTALL
 #define ILOT_UNINSTALL 0x00000001
+#endif
+
+#ifndef SDLOT_APPLYTOCURRENTTHREAD
+#define SDLOT_APPLYTOCURRENTTHREAD 0x00000002
 #endif
 
 #ifndef TF_PROFILETYPE_INPUTPROCESSOR
@@ -25,6 +30,9 @@
 #endif
 #ifndef TF_IPPMF_ENABLEPROFILE
 #define TF_IPPMF_ENABLEPROFILE 0x00000002
+#endif
+#ifndef TF_IPPMF_DONTCARECURRENTINPUTLANGUAGE
+#define TF_IPPMF_DONTCARECURRENTINPUTLANGUAGE 0x00000004
 #endif
 
 #ifndef DWMWA_WINDOW_CORNER_PREFERENCE
@@ -356,32 +364,157 @@ HRESULT RegisterProfiles() {
     return hr;
 }
 
+static void EnsureVietnameseUserProfileLanguage(bool preferVni) {
+    HKEY hUserProfile = nullptr;
+    if (RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            L"Control Panel\\International\\User Profile",
+            0,
+            nullptr,
+            REG_OPTION_NON_VOLATILE,
+            KEY_READ | KEY_WRITE,
+            nullptr,
+            &hUserProfile,
+            nullptr
+        ) == ERROR_SUCCESS && hUserProfile) {
+        DWORD dwType = 0;
+        DWORD cbData = 0;
+        std::vector<std::wstring> langs;
+        bool hasVi = false;
+
+        if (RegQueryValueExW(hUserProfile, L"Languages", nullptr, &dwType, nullptr, &cbData) == ERROR_SUCCESS &&
+            (dwType == REG_MULTI_SZ || dwType == REG_SZ) && cbData >= sizeof(WCHAR)) {
+            std::vector<WCHAR> buf((cbData / sizeof(WCHAR)) + 2, L'\0');
+            if (RegQueryValueExW(hUserProfile, L"Languages", nullptr, &dwType, reinterpret_cast<LPBYTE>(buf.data()), &cbData) == ERROR_SUCCESS) {
+                const WCHAR *p = buf.data();
+                const WCHAR *end = buf.data() + (cbData / sizeof(WCHAR));
+                while (p < end && *p != L'\0') {
+                    std::wstring entry(p);
+                    if (!entry.empty()) {
+                        if (_wcsicmp(entry.c_str(), L"vi-VN") == 0 || _wcsicmp(entry.c_str(), L"vi") == 0) {
+                            hasVi = true;
+                        }
+                        langs.push_back(entry);
+                    }
+                    p += entry.size() + 1;
+                }
+            }
+        }
+
+        if (!hasVi) {
+            if (langs.empty()) {
+                langs.push_back(L"en-US");
+            }
+            langs.push_back(L"vi-VN");
+            std::vector<WCHAR> multiSz;
+            for (const auto &s : langs) {
+                multiSz.insert(multiSz.end(), s.begin(), s.end());
+                multiSz.push_back(L'\0');
+            }
+            multiSz.push_back(L'\0');
+            RegSetValueExW(
+                hUserProfile,
+                L"Languages",
+                0,
+                REG_MULTI_SZ,
+                reinterpret_cast<const BYTE *>(multiSz.data()),
+                static_cast<DWORD>(multiSz.size() * sizeof(WCHAR))
+            );
+        }
+        RegCloseKey(hUserProfile);
+    }
+
+    HKEY hViKey = nullptr;
+    if (RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            L"Control Panel\\International\\User Profile\\vi-VN",
+            0,
+            nullptr,
+            REG_OPTION_NON_VOLATILE,
+            KEY_READ | KEY_WRITE,
+            nullptr,
+            &hViKey,
+            nullptr
+        ) == ERROR_SUCCESS && hViKey) {
+        DWORD dwType = 0;
+        DWORD cbData = 0;
+        if (RegQueryValueExW(hViKey, L"CachedLanguageName", nullptr, &dwType, nullptr, &cbData) != ERROR_SUCCESS) {
+            static const WCHAR kCachedName[] = L"@Winlangdb.dll,-1481";
+            RegSetValueExW(
+                hViKey,
+                L"CachedLanguageName",
+                0,
+                REG_SZ,
+                reinterpret_cast<const BYTE *>(kCachedName),
+                static_cast<DWORD>(sizeof(kCachedName))
+            );
+        }
+        WriteRegDword(hViKey, c_szTipTelexLayoutString, preferVni ? 2u : 1u);
+        WriteRegDword(hViKey, c_szTipVniLayoutString, preferVni ? 1u : 2u);
+        RegCloseKey(hViKey);
+    }
+}
+
 HRESULT ActivateUserProfiles() {
+    bool preferVni = false;
+    LoadPersistedVniPreference(preferVni);
+    const GUID &preferredGuid = preferVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
+    LPCWSTR preferredTipString = preferVni ? c_szTipVniLayoutString : c_szTipTelexLayoutString;
+
+    EnsureVietnameseUserProfileLanguage(preferVni);
+
     HMODULE hInputDll = LoadLibraryExW(L"input.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (hInputDll) {
         using PFN_InstallLayoutOrTip = BOOL(WINAPI *)(LPCWSTR psz, DWORD dwFlags);
+        using PFN_SetDefaultLayoutOrTip = BOOL(WINAPI *)(LPCWSTR psz, DWORD dwFlags);
         auto pfnInstallLayoutOrTip = reinterpret_cast<PFN_InstallLayoutOrTip>(GetProcAddress(hInputDll, "InstallLayoutOrTip"));
         if (pfnInstallLayoutOrTip) {
             pfnInstallLayoutOrTip(c_szTipTelexLayoutString, 0);
             pfnInstallLayoutOrTip(c_szTipVniLayoutString, 0);
+            pfnInstallLayoutOrTip(preferredTipString, 0);
+        }
+        auto pfnSetDefaultLayoutOrTip = reinterpret_cast<PFN_SetDefaultLayoutOrTip>(GetProcAddress(hInputDll, "SetDefaultLayoutOrTip"));
+        if (pfnSetDefaultLayoutOrTip) {
+            pfnSetDefaultLayoutOrTip(preferredTipString, 0);
+            pfnSetDefaultLayoutOrTip(preferredTipString, SDLOT_APPLYTOCURRENTTHREAD);
         }
         FreeLibrary(hInputDll);
     }
-
-    bool preferVni = false;
-    LoadPersistedVniPreference(preferVni);
-    const GUID &preferredGuid = preferVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
 
     ITfInputProcessorProfiles *pProfiles = nullptr;
     HRESULT hr = CoCreateInstance(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER, IID_ITfInputProcessorProfiles, (void **)&pProfiles);
     if (SUCCEEDED(hr) && pProfiles) {
         pProfiles->EnableLanguageProfile(CLSID_VieLotusTIP, VI_LANGID, GUID_VieLotusProfile, TRUE);
         pProfiles->EnableLanguageProfile(CLSID_VieLotusTIP, VI_LANGID, GUID_VieLotusProfileVNI, TRUE);
+        pProfiles->EnableLanguageProfileByDefault(CLSID_VieLotusTIP, VI_LANGID, GUID_VieLotusProfile, TRUE);
+        pProfiles->EnableLanguageProfileByDefault(CLSID_VieLotusTIP, VI_LANGID, GUID_VieLotusProfileVNI, TRUE);
         pProfiles->SetDefaultLanguageProfile(VI_LANGID, CLSID_VieLotusTIP, preferredGuid);
-        pProfiles->ActivateLanguageProfile(CLSID_VieLotusTIP, VI_LANGID, preferredGuid);
 
         ITfInputProcessorProfileMgr *pProfileMgr = nullptr;
         if (SUCCEEDED(pProfiles->QueryInterface(IID_ITfInputProcessorProfileMgr, reinterpret_cast<void **>(&pProfileMgr))) && pProfileMgr) {
+            pProfileMgr->ActivateProfile(
+                TF_PROFILETYPE_INPUTPROCESSOR,
+                VI_LANGID,
+                CLSID_VieLotusTIP,
+                preferredGuid,
+                nullptr,
+                TF_IPPMF_FORSESSION | TF_IPPMF_ENABLEPROFILE | TF_IPPMF_DONTCARECURRENTINPUTLANGUAGE
+            );
+            pProfileMgr->ActivateProfile(
+                TF_PROFILETYPE_INPUTPROCESSOR,
+                VI_LANGID,
+                CLSID_VieLotusTIP,
+                preferredGuid,
+                nullptr,
+                TF_IPPMF_FORPROCESS | TF_IPPMF_ENABLEPROFILE | TF_IPPMF_DONTCARECURRENTINPUTLANGUAGE
+            );
+        }
+
+        // Switch active input language to Vietnamese (0x042A) so typing works immediately even if the user was on ENG (0x0409)
+        pProfiles->ChangeCurrentLanguage(VI_LANGID);
+        pProfiles->ActivateLanguageProfile(CLSID_VieLotusTIP, VI_LANGID, preferredGuid);
+
+        if (pProfileMgr) {
             pProfileMgr->ActivateProfile(
                 TF_PROFILETYPE_INPUTPROCESSOR,
                 VI_LANGID,
@@ -415,6 +548,12 @@ HRESULT DeactivateUserProfiles() {
             pfnInstallLayoutOrTip(c_szTipVniLayoutString, ILOT_UNINSTALL);
         }
         FreeLibrary(hInputDll);
+    }
+    HKEY hViKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Control Panel\\International\\User Profile\\vi-VN", 0, KEY_SET_VALUE, &hViKey) == ERROR_SUCCESS && hViKey) {
+        RegDeleteValueW(hViKey, c_szTipTelexLayoutString);
+        RegDeleteValueW(hViKey, c_szTipVniLayoutString);
+        RegCloseKey(hViKey);
     }
     return S_OK;
 }
@@ -489,7 +628,8 @@ enum class HitRegion : int {
     FooterNidoOffice,
     FooterYouPersona,
     FooterZalo,
-    FooterGitHub
+    FooterGitHub,
+    FooterFeedback
 };
 
 struct BentoSettingsState {
@@ -562,6 +702,7 @@ static HitRegion HitTestBentoUI(const BentoSettingsState *st, float xDip, float 
     if (PtInDipRect(xDip, yDip, 504.0f, 11.0f, 98.0f, 30.0f)) return HitRegion::TabAbout;
 
     // Footer Links (y=348..384)
+    if (PtInDipRect(xDip, yDip, 336.0f, 352.0f, 44.0f, 24.0f)) return HitRegion::FooterFeedback;
     if (PtInDipRect(xDip, yDip, 388.0f, 352.0f, 62.0f, 24.0f)) return HitRegion::FooterNidoOffice;
     if (PtInDipRect(xDip, yDip, 456.0f, 352.0f, 82.0f, 24.0f)) return HitRegion::FooterYouPersona;
     if (PtInDipRect(xDip, yDip, 544.0f, 352.0f, 28.0f, 24.0f)) return HitRegion::FooterZalo;
@@ -806,7 +947,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
         RectF verPill(130.0f * s, 10.0f * s, 42.0f * s, 16.0f * s);
         FillRoundRect(g, verPill, 8.0f * s, Color(36, 0, 122, 255));
-        g.DrawString(L"v2.0.2", -1, &fVersion, verPill, &sfCenter, &blueBrush);
+        g.DrawString(L"v2.0.4", -1, &fVersion, verPill, &sfCenter, &blueBrush);
 
         RectF subBrandRect(62.0f * s, 28.0f * s, 330.0f * s, 17.0f * s);
         g.DrawString(L"B\u1ED9 g\u00F5 ti\u1EBFng Vi\u1EC7t thu\u1EA7n chu\u1EA9n Native TSF \u2022 100% Offline", -1, &fHeaderSub, subBrandRect, &sfLeft, &secondaryBrush);
@@ -1063,9 +1204,11 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         g.FillEllipse(&greenDotBrush, RectF(18.0f * s, 363.0f * s, 6.5f * s, 6.5f * s));
         g.DrawString(
             L"Song ng\u1EEF Anh\u2013Vi\u1EC7t \u2022 Ch\u00EDnh t\u1EA3 chu\u1EA9n m\u1EDBi t\u1EF1 \u0111\u1ED9ng",
-            -1, &fFooter, RectF(30.0f * s, 348.0f * s, 320.0f * s, 36.0f * s), &sfLeft, &secondaryBrush
+            -1, &fFooter, RectF(30.0f * s, 348.0f * s, 300.0f * s, 36.0f * s), &sfLeft, &secondaryBrush
         );
 
+        g.DrawString(L"G\u00F3p \u00FD", -1, &fFooterBold, RectF(336.0f * s, 348.0f * s, 44.0f * s, 36.0f * s), &sfCenter, &blueBrush);
+        g.DrawString(L"\u2022", -1, &fFooter, RectF(381.0f * s, 348.0f * s, 6.0f * s, 36.0f * s), &sfCenter, &secondaryBrush);
         g.DrawString(L"NidoOffice", -1, &fFooterBold, RectF(388.0f * s, 348.0f * s, 62.0f * s, 36.0f * s), &sfCenter, &indigoFooterBrush);
         g.DrawString(L"\u2022", -1, &fFooter, RectF(450.0f * s, 348.0f * s, 6.0f * s, 36.0f * s), &sfCenter, &secondaryBrush);
         g.DrawString(L"YouPersona.com", -1, &fFooterBold, RectF(456.0f * s, 348.0f * s, 82.0f * s, 36.0f * s), &sfCenter, &blueBrush);
@@ -1140,6 +1283,10 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                 st->hTestEdit, 0x1501, TRUE,
                 reinterpret_cast<LPARAM>(L"G\u00F5 th\u1EED: truowngr \u2192 tr\u01B0\u1EDFng \u2022 rrinh \u2192 r\u1EC9nh \u2022 window user...")
             );
+        }
+        ActivateUserProfiles();
+        if (st->hTestEdit) {
+            SetFocus(st->hTestEdit);
         }
         return 0;
     }
@@ -1220,20 +1367,18 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             }
             break;
         case HitRegion::CardTelex:
-            if (st->prefs.isVni) {
-                st->prefs.isVni = false;
-                SaveVieLotusPrefs(st->prefs);
-                ActivateUserProfiles();
-                InvalidateRect(hwnd, nullptr, FALSE);
-            }
+            st->prefs.isVni = false;
+            SaveVieLotusPrefs(st->prefs);
+            ActivateUserProfiles();
+            InvalidateRect(hwnd, nullptr, FALSE);
+            if (st->hTestEdit) SetFocus(st->hTestEdit);
             break;
         case HitRegion::CardVni:
-            if (!st->prefs.isVni) {
-                st->prefs.isVni = true;
-                SaveVieLotusPrefs(st->prefs);
-                ActivateUserProfiles();
-                InvalidateRect(hwnd, nullptr, FALSE);
-            }
+            st->prefs.isVni = true;
+            SaveVieLotusPrefs(st->prefs);
+            ActivateUserProfiles();
+            InvalidateRect(hwnd, nullptr, FALSE);
+            if (st->hTestEdit) SetFocus(st->hTestEdit);
             break;
         case HitRegion::BarSenFlex:
             st->prefs.senFlex = !st->prefs.senFlex;
@@ -1299,6 +1444,9 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         case HitRegion::RowGitHub:
         case HitRegion::FooterGitHub:
             ShellExecuteW(hwnd, L"open", L"https://github.com/stevedat/VieLotus-IM", nullptr, nullptr, SW_SHOWNORMAL);
+            break;
+        case HitRegion::FooterFeedback:
+            ShellExecuteW(hwnd, L"open", L"https://vielotus.org/feedback.html?platform=Windows", nullptr, nullptr, SW_SHOWNORMAL);
             break;
         default:
             break;

@@ -34,7 +34,44 @@ static std::wstring GetProgramFilesInstallDir() {
     return L"C:\\Program Files\\VieLotusIM";
 }
 
-static bool IsTipRegisteredInHKLM() {
+static bool AreFilesIdentical(const std::wstring &pathA, const std::wstring &pathB) {
+    HANDLE hA = CreateFileW(pathA.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hA == INVALID_HANDLE_VALUE) return false;
+    HANDLE hB = CreateFileW(pathB.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hB == INVALID_HANDLE_VALUE) {
+        CloseHandle(hA);
+        return false;
+    }
+
+    LARGE_INTEGER sizeA{}, sizeB{};
+    if (!GetFileSizeEx(hA, &sizeA) || !GetFileSizeEx(hB, &sizeB) || sizeA.QuadPart != sizeB.QuadPart || sizeA.QuadPart <= 0) {
+        CloseHandle(hA);
+        CloseHandle(hB);
+        return false;
+    }
+
+    bool identical = true;
+    BYTE bufA[8192];
+    BYTE bufB[8192];
+    DWORD readA = 0, readB = 0;
+    while (ReadFile(hA, bufA, sizeof(bufA), &readA, nullptr) && ReadFile(hB, bufB, sizeof(bufB), &readB, nullptr)) {
+        if (readA != readB) {
+            identical = false;
+            break;
+        }
+        if (readA == 0) break;
+        if (memcmp(bufA, bufB, readA) != 0) {
+            identical = false;
+            break;
+        }
+    }
+
+    CloseHandle(hA);
+    CloseHandle(hB);
+    return identical;
+}
+
+static bool IsTipRegisteredAndUpToDate(const std::wstring &localDll) {
     HKEY hKey = nullptr;
     LSTATUS st = RegOpenKeyExW(
         HKEY_LOCAL_MACHINE,
@@ -52,6 +89,14 @@ static bool IsTipRegisteredInHKLM() {
         if (qst == ERROR_SUCCESS && dllPath[0] != L'\0') {
             DWORD attrs = GetFileAttributesW(dllPath);
             if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                // If running from an MSIX package or staging folder where localDll differs from the registered HKLM path,
+                // verify that the deployed Program Files DLL matches the package's latest VieLotusTIP.dll byte-for-byte.
+                DWORD localAttrs = GetFileAttributesW(localDll.c_str());
+                if (localAttrs != INVALID_FILE_ATTRIBUTES && !(localAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                    if (_wcsicmp(localDll.c_str(), dllPath) != 0 && !AreFilesIdentical(localDll, dllPath)) {
+                        return false;
+                    }
+                }
                 return true;
             }
         }
@@ -123,6 +168,7 @@ static int PerformElevatedMsixTipProvisioning() {
     }
 
     FreeLibrary(hDll);
+    ShellExecuteW(nullptr, L"open", L"ctfmon.exe", nullptr, nullptr, SW_HIDE);
     return SUCCEEDED(hr) ? 0 : 3;
 }
 
@@ -152,9 +198,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     std::wstring localDll = exeDir + L"\\VieLotusTIP.dll";
     std::wstring pfDll = GetProgramFilesInstallDir() + L"\\VieLotusTIP.dll";
 
-    // If launched from an MSIX package (or portable directory) before HKLM TSF registration,
-    // elevate once to provision %ProgramFiles%\VieLotusIM\VieLotusTIP.dll and register the TSF TIP.
-    if (!IsTipRegisteredInHKLM()) {
+    // If launched from an MSIX package (or portable directory) before HKLM TSF registration
+    // or after an MSIX Store update, elevate once to provision %ProgramFiles%\VieLotusIM\VieLotusTIP.dll.
+    if (!IsTipRegisteredAndUpToDate(localDll)) {
         WCHAR selfExe[MAX_PATH] = {};
         GetModuleFileNameW(nullptr, selfExe, MAX_PATH);
         SHELLEXECUTEINFOW sei{};
@@ -170,9 +216,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         }
     }
 
-    HMODULE hDll = LoadLibraryW(localDll.c_str());
+    HMODULE hDll = LoadLibraryW(pfDll.c_str());
     if (!hDll) {
-        hDll = LoadLibraryW(pfDll.c_str());
+        hDll = LoadLibraryW(localDll.c_str());
     }
     if (!hDll) {
         MessageBoxW(
