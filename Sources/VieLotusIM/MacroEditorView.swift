@@ -36,9 +36,9 @@ struct MacroEditorView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Bảng gõ tắt cá nhân (Macro)")
+                    Text("Bảng gõ tắt cá nhân")
                         .font(.system(size: 15, weight: .bold))
-                    Text("Gõ phím tắt rồi nhấn phím Cách hoặc Dấu câu để bung cụm từ thay thế.")
+                    Text("Gõ từ viết tắt rồi nhấn phím Cách hoặc dấu câu để bung cụm từ.")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }

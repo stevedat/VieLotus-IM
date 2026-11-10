@@ -244,23 +244,9 @@ if [ -n "$USER_BAK" ] && [ -d "$USER_BAK" ]; then
     rm -rf "$USER_BAK" 2>/dev/null || true
 fi
 
-# 7. Also update /Applications/VieLotusLab.app if installed locally
-LAB_TARGET="/Applications/VieLotusLab.app"
-if [ "${DEPLOY_LAB:-1}" = "1" ]; then
-    echo "→ Building & updating local VieLotusLab.app at $LAB_TARGET..."
-    if ./scripts/build_lab.sh "$@"; then
-        pkill -9 -f VieLotusLab 2>/dev/null || true
-        rm -rf "$LAB_TARGET"
-        ditto "$SCRIPT_DIR/.build/dist/VieLotusLab.app" "$LAB_TARGET"
-        "$LSREGISTER" -f "$LAB_TARGET" 2>/dev/null || true
-        echo "  • Đã cập nhật VieLotusLab.app tại: $LAB_TARGET"
-    fi
-fi
-
 DEPLOYED_VER="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$TARGET/Contents/Info.plist" 2>/dev/null || echo "Unknown")"
 DEPLOYED_COMMIT="$(/usr/libexec/PlistBuddy -c "Print :GitCommitHash" "$TARGET/Contents/Info.plist" 2>/dev/null || echo "Unknown")"
 DEPLOYED_TIME="$(/usr/libexec/PlistBuddy -c "Print :BuildTimestamp" "$TARGET/Contents/Info.plist" 2>/dev/null || echo "Unknown")"
-LAB_TIME="$(/usr/libexec/PlistBuddy -c "Print :BuildTimestamp" "$LAB_TARGET/Contents/Info.plist" 2>/dev/null || echo "N/A")"
 
 echo "======================================================="
 echo "✅ NẠP VÀ KIỂM ĐỊNH THÀNH CÔNG VIELOTUSIM & LAB!"

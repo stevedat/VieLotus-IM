@@ -1,9 +1,6 @@
 #include "VieLotusTIP.h"
 #include "EditSession.h"
 #include "Register.h"
-#ifdef VIELOTUS_ENABLE_LAB
-#include "vielotus_win_lab_trace.h"
-#endif
 #include <vector>
 
 #define VI_LANGID 0x042A
@@ -744,27 +741,12 @@ STDMETHODIMP CVieLotusTIP::Deactivate() {
 }
 
 STDMETHODIMP CVieLotusTIP::OnSetFocus(BOOL fForeground) {
-#ifdef VIELOTUS_ENABLE_LAB
-    uint64_t t0 = vielotus_win_lab::NowUs();
-#endif
     if (fForeground) {
         ReloadUserPreferences();
         SyncActiveLanguageProfile();
     }
     ReleaseCompositionRefs();
     ResetComposingSession();
-#ifdef VIELOTUS_ENABLE_LAB
-    vielotus_win_lab::WriteEvent(
-        m_currentExeName,
-        "FOCUS",
-        vielotus_win_lab::NowUs() - t0,
-        "fg=%d vn=%d vni=%d hkl=0x%08X",
-        fForeground ? 1 : 0,
-        m_isVietnameseMode ? 1 : 0,
-        m_isVniMode ? 1 : 0,
-        static_cast<unsigned>(reinterpret_cast<uintptr_t>(GetKeyboardLayout(0)) & 0xFFFFFFFFu)
-    );
-#endif
     return S_OK;
 }
 
@@ -885,9 +867,6 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
 
     if (!pic) return S_OK;
 
-#ifdef VIELOTUS_ENABLE_LAB
-    uint64_t t0 = vielotus_win_lab::NowUs();
-#endif
 
     const bool hasCtrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
     const bool hasShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
@@ -921,16 +900,6 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
         ResetComposingSession();
         EndActiveComposition(pic);
         *pfEaten = TRUE;
-#ifdef VIELOTUS_ENABLE_LAB
-        vielotus_win_lab::WriteEvent(
-            m_currentExeName,
-            "TOGGLE",
-            vielotus_win_lab::NowUs() - t0,
-            "vn=%d vni=%d",
-            m_isVietnameseMode ? 1 : 0,
-            m_isVniMode ? 1 : 0
-        );
-#endif
         return S_OK;
     }
 
@@ -971,17 +940,6 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
                 ClearWordStateSession();
                 ExecuteEditSession(pic, 1, L"", false);
                 *pfEaten = TRUE;
-#ifdef VIELOTUS_ENABLE_LAB
-                vielotus_win_lab::WriteEvent(
-                    m_currentExeName,
-                    "BACKSPACE",
-                    vielotus_win_lab::NowUs() - t0,
-                    "act=RESET bs=1 out=\"\" comp=%d shifted=%ld hr=0x%08X",
-                    IsComposingSession() ? 1 : 0,
-                    static_cast<long>(m_lastEditShifted),
-                    static_cast<unsigned>(m_lastEditSetTextHr)
-                );
-#endif
             } else {
                 int32_t bs = GetLastBackspacesSession();
                 const char *replacement = GetLastTextSession();
@@ -993,21 +951,6 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
                 } else {
                     *pfEaten = TRUE;
                 }
-#ifdef VIELOTUS_ENABLE_LAB
-                char safeOut[128] = {0};
-                vielotus_win_lab::EscapeAsciiInto(replacement, safeOut, sizeof(safeOut));
-                vielotus_win_lab::WriteEvent(
-                    m_currentExeName,
-                    "BACKSPACE",
-                    vielotus_win_lab::NowUs() - t0,
-                    "act=REPLACE bs=%d out=\"%s\" comp=%d shifted=%ld hr=0x%08X",
-                    bs,
-                    safeOut,
-                    IsComposingSession() ? 1 : 0,
-                    static_cast<long>(m_lastEditShifted),
-                    static_cast<unsigned>(m_lastEditSetTextHr)
-                );
-#endif
             }
             return S_OK;
         }
@@ -1040,24 +983,6 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
             wCommitted += chBuf[0]; // Append boundary key
             ExecuteEditSession(pic, bs, wCommitted, true);
             *pfEaten = TRUE;
-#ifdef VIELOTUS_ENABLE_LAB
-            std::string outUtf8 = vielotus_win_lab::WideToUtf8Safe(wCommitted);
-            char safeOut[128] = {0};
-            vielotus_win_lab::EscapeAsciiInto(outUtf8.c_str(), safeOut, sizeof(safeOut));
-            vielotus_win_lab::WriteEvent(
-                m_currentExeName,
-                "KEY_DOWN",
-                vielotus_win_lab::NowUs() - t0,
-                "vk=0x%02X ch='%c' act=COMMIT bs=%d out=\"%s\" comp=%d shifted=%ld hr=0x%08X",
-                static_cast<unsigned>(wParam & 0xFF),
-                static_cast<char>(chBuf[0]),
-                bs,
-                safeOut,
-                IsComposingSession() ? 1 : 0,
-                static_cast<long>(m_lastEditShifted),
-                static_cast<unsigned>(m_lastEditSetTextHr)
-            );
-#endif
             return S_OK;
         } else if (action == VIELOTUS_ACTION_REPLACE) {
             int32_t bs = GetLastBackspacesSession();
@@ -1065,43 +990,12 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
             std::wstring wText = Utf8ToWide(replacement);
             ExecuteEditSession(pic, bs, wText, false);
             *pfEaten = TRUE;
-#ifdef VIELOTUS_ENABLE_LAB
-            char safeOut[128] = {0};
-            vielotus_win_lab::EscapeAsciiInto(replacement, safeOut, sizeof(safeOut));
-            vielotus_win_lab::WriteEvent(
-                m_currentExeName,
-                "KEY_DOWN",
-                vielotus_win_lab::NowUs() - t0,
-                "vk=0x%02X ch='%c' act=REPLACE bs=%d out=\"%s\" comp=%d shifted=%ld hr=0x%08X",
-                static_cast<unsigned>(wParam & 0xFF),
-                static_cast<char>(chBuf[0]),
-                bs,
-                safeOut,
-                IsComposingSession() ? 1 : 0,
-                static_cast<long>(m_lastEditShifted),
-                static_cast<unsigned>(m_lastEditSetTextHr)
-            );
-#endif
             return S_OK;
         } else {
             // CONSUMED or PASS_THROUGH after OnTestKeyDown ate the key: insert character directly
             std::wstring wText(1, chBuf[0]);
             ExecuteEditSession(pic, 0, wText, false);
             *pfEaten = TRUE;
-#ifdef VIELOTUS_ENABLE_LAB
-            vielotus_win_lab::WriteEvent(
-                m_currentExeName,
-                "KEY_DOWN",
-                vielotus_win_lab::NowUs() - t0,
-                "vk=0x%02X ch='%c' act=PASSTHRU bs=0 out=\"%c\" comp=%d shifted=%ld hr=0x%08X",
-                static_cast<unsigned>(wParam & 0xFF),
-                static_cast<char>(chBuf[0]),
-                static_cast<char>(chBuf[0]),
-                IsComposingSession() ? 1 : 0,
-                static_cast<long>(m_lastEditShifted),
-                static_cast<unsigned>(m_lastEditSetTextHr)
-            );
-#endif
             return S_OK;
         }
     } else if (toAsciiRes > 0) {
@@ -1184,15 +1078,6 @@ STDMETHODIMP CVieLotusTIP::OnActivated(REFCLSID clsid, REFGUID guidProfile, BOOL
         } else if (IsEqualGUID(guidProfile, GUID_VieLotusProfile)) {
             ApplyVniMode(false, true);
         }
-#ifdef VIELOTUS_ENABLE_LAB
-        vielotus_win_lab::WriteEvent(
-            m_currentExeName,
-            "PROFILE",
-            0,
-            "activated=1 vni=%d",
-            m_isVniMode ? 1 : 0
-        );
-#endif
     }
     return S_OK;
 }

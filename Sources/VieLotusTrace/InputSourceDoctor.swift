@@ -54,7 +54,10 @@ public struct InputSourceStatus: Codable, Equatable, Sendable {
             return "Chuyển sang Sen Việt trên thanh menu để tránh xung đột"
         }
         if !enabledAppleVietnameseNames.isEmpty {
-            return "Bộ gõ Apple (\(enabledAppleVietnameseNames.joined(separator: ", "))) đang bật cùng danh sách — nên tắt bớt"
+            if enabledAppleVietnameseNames.count == 1 {
+                return "Bộ gõ Apple (\(enabledAppleVietnameseNames[0])) đang bật kèm — nên tắt bớt"
+            }
+            return "Đang bật kèm \(enabledAppleVietnameseNames.count) bộ gõ Tiếng Việt của Apple — nên tắt bớt"
         }
         return nil
     }

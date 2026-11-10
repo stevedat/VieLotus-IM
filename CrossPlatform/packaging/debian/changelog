@@ -1,3 +1,13 @@
+vielotus (2.0.2-1) unstable; urgency=medium
+
+  * New upstream release 2.0.2:
+    - Post-coda circumflex bilingual preservation (theme -> theme vs theem -> thêm).
+    - Cross-platform code-switching alignment for ee/oo Vietnamese syllables
+      in English context (check status treen website -> check status trên website).
+    - Full 9,091-case + 44 bilingual phrase regression verification (100.00%).
+
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Wed, 04 Nov 2026 18:45:00 +0700
+
 vielotus (2.0.1-1) unstable; urgency=medium
 
   * Initial release. (Closes: #1152533)

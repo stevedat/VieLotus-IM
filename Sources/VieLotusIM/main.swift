@@ -31,7 +31,6 @@ final class VieLotusIMAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         NSLog("VieLotusIM (Sen Việt): InputMethodKit server terminating")
-        UserDefaults.standard.synchronize()
         CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
     }
 }

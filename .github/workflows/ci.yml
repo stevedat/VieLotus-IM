@@ -132,7 +132,7 @@ jobs:
       - name: Build Windows TSF COM Shell, Inno Setup Installers & Microsoft Store MSIX (x64 & ARM64)
         shell: pwsh
         run: |
-          ./scripts/build_windows.ps1 -Version 2.0.4 -Arch all -SkipTests
+          ./scripts/build_windows.ps1 -Version 2.0.2 -Arch all -SkipTests
           Copy-Item dist/windows/VieLotus-Setup-x64.exe Binaries/windows/VieLotus-Setup-x64.exe -Force
           Copy-Item dist/windows/VieLotus-Setup-arm64.exe Binaries/windows/VieLotus-Setup-arm64.exe -Force
 
@@ -143,8 +143,6 @@ jobs:
           path: |
             Binaries/windows/VieLotus-Setup-x64.exe
             Binaries/windows/VieLotus-Setup-arm64.exe
-            dist/windows/VieLotusLab-x64.exe
-            dist/windows/VieLotusLab-arm64.exe
             scripts/windows/bin/x64/*
             scripts/windows/bin/arm64/*
             dist/windows/msix/*

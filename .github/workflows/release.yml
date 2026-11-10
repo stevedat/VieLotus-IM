@@ -50,13 +50,12 @@ jobs:
             dist/windows/VieLotus-Setup-x64.exe
             dist/windows/VieLotus-Setup-arm64.exe
 
-      - name: Upload Windows Lab diagnostic tools
+      - name: Upload Windows Store MSIX bundle
         uses: actions/upload-artifact@v4
         with:
-          name: VieLotus-Windows-Lab
+          name: VieLotus-Windows-MSIX
           path: |
-            dist/windows/VieLotusLab-x64.exe
-            dist/windows/VieLotusLab-arm64.exe
+            dist/windows/msix/*
 
   linux-build:
     name: Build Linux All-in-One .deb (${{ matrix.arch }})
@@ -238,7 +237,12 @@ jobs:
           NOTARIZE: ${{ steps.notary.outputs.enabled }}
           NOTARY_KEYCHAIN_PROFILE: "notarytool-profile"
         run: |
-          ./scripts/build_pkg.sh "${{ steps.version.outputs.version }}"
+          if [ "${{ steps.notary.outputs.enabled }}" = "1" ] || [ ! -f Binaries/VieLotusIM.pkg ]; then
+            ./scripts/build_pkg.sh "${{ steps.version.outputs.version }}"
+          else
+            mkdir -p .build/dist
+            cp Binaries/VieLotusIM.pkg .build/dist/VieLotusIM.pkg
+          fi
 
       - name: Download freshly built Windows Release Installers
         uses: actions/download-artifact@v4
@@ -259,7 +263,9 @@ jobs:
             cp Binaries/windows/VieLotus-Setup-x64.exe .build/dist/
             cp Binaries/windows/VieLotus-Setup-arm64.exe .build/dist/
           fi
-          if [ -f Binaries/windows/VieLotus-Store-Setup.exe ]; then
+          if [ -f .build/dist/VieLotus-Setup-x64.exe ]; then
+            cp .build/dist/VieLotus-Setup-x64.exe .build/dist/VieLotus-Store-Setup.exe
+          elif [ -f Binaries/windows/VieLotus-Store-Setup.exe ]; then
             cp Binaries/windows/VieLotus-Store-Setup.exe .build/dist/
           fi
           if ! ls .build/dist/vielotus_*.deb >/dev/null 2>&1; then
@@ -303,12 +309,35 @@ jobs:
           files: |
             .build/dist/VieLotusIM.pkg
             .build/dist/VieLotus-Store-Setup.exe
-            .build/dist/VieLotus-Setup-*.exe
+            .build/dist/VieLotus-Setup-x64.exe
+            .build/dist/VieLotus-Setup-arm64.exe
             .build/dist/vielotus_*.deb
             .build/dist/checksums.sha256
           draft: false
           prerelease: false
           generate_release_notes: true
+
+      - name: Verify GitHub Release 7-Asset Allowlist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ACTUAL=$(gh release view "$TAG_NAME" --json assets -q '.assets[].name' | sort)
+          EXPECTED=$(printf "%s\n" \
+            "VieLotus-Setup-arm64.exe" \
+            "VieLotus-Setup-x64.exe" \
+            "VieLotus-Store-Setup.exe" \
+            "VieLotusIM.pkg" \
+            "checksums.sha256" \
+            "vielotus_${VERSION}_amd64.deb" \
+            "vielotus_${VERSION}_arm64.deb" | sort)
+          echo "Published Release Assets:"
+          echo "$ACTUAL"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Release asset allowlist mismatch!"
+            exit 1
+          fi
 
       - name: Clean up temporary keychain
         if: always()
