@@ -32,16 +32,31 @@ override_dh_auto_build:
 
 override_dh_auto_install:
 	DESTDIR=$(CURDIR)/debian/libvielotus0 cmake --install build-core
+	if [ -f Resources/typing-modes.yml ]; then \
+		install -Dm644 Resources/typing-modes.yml $(CURDIR)/debian/libvielotus0/usr/share/vielotus/typing-modes.yml; \
+	elif [ -f Sources/VieLotusCore/Resources/typing-modes.yml ]; then \
+		install -Dm644 Sources/VieLotusCore/Resources/typing-modes.yml $(CURDIR)/debian/libvielotus0/usr/share/vielotus/typing-modes.yml; \
+	fi
+	if [ -f CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf ]; then \
+		install -Dm644 CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf \
+			$(CURDIR)/debian/libvielotus0/etc/fonts/conf.d/51-vielotus-vietnamese.conf; \
+		install -Dm644 CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf \
+			$(CURDIR)/debian/libvielotus0/etc/fonts/conf.d/99-vielotus-vietnamese.conf; \
+	fi
 	DESTDIR=$(CURDIR)/debian/fcitx5-vielotus cmake --install build-fcitx5
 	DESTDIR=$(CURDIR)/debian/ibus-vielotus cmake --install build-ibus
 	install -Dm755 CrossPlatform/packaging/linux/vielotus-settings \
 		$(CURDIR)/debian/ibus-vielotus/usr/bin/vielotus-settings
+	ln -sf vielotus-settings $(CURDIR)/debian/ibus-vielotus/usr/bin/vielotus
 	install -Dm644 CrossPlatform/packaging/linux/vielotus.desktop \
 		$(CURDIR)/debian/ibus-vielotus/usr/share/applications/vielotus.desktop
+	install -Dm644 CrossPlatform/packaging/linux/vielotus-onboard.desktop \
+		$(CURDIR)/debian/ibus-vielotus/etc/xdg/autostart/vielotus-onboard.desktop
 	install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml \
 		$(CURDIR)/debian/ibus-vielotus/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml
 	install -Dm644 CrossPlatform/packaging/linux/vielotus-settings.1 \
 		$(CURDIR)/debian/ibus-vielotus/usr/share/man/man1/vielotus-settings.1
+	ln -sf vielotus-settings.1 $(CURDIR)/debian/ibus-vielotus/usr/share/man/man1/vielotus.1
 	for sz in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do \
 		if [ -f CrossPlatform/linux-icons/hicolor_$${sz}_apps/vielotus.png ]; then \
 			install -Dm644 CrossPlatform/linux-icons/hicolor_$${sz}_apps/vielotus.png \

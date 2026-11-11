@@ -1,5 +1,5 @@
 Name:           vielotus
-Version:        2.0.1
+Version:        2.0.2
 Release:        1%{?dist}
 Summary:        VieLotusIM (Sen Viet) — Next-Gen Vietnamese Input Method for IBus & Fcitx5
 License:        MIT AND FSFAP
@@ -11,7 +11,7 @@ BuildRequires:  gcc-c++
 BuildRequires:  pkgconf-pkg-config
 BuildRequires:  python3
 BuildRequires:  ibus-devel
-BuildRequires:   glib2-devel
+BuildRequires:  glib2-devel
 BuildRequires:  fcitx5-devel
 
 Requires:       ibus-vielotus = %{version}-%{release}
@@ -19,7 +19,9 @@ Recommends:     fcitx5-vielotus = %{version}-%{release}
 
 %description
 VieLotusIM (Sen Viet) is a modern Vietnamese input method engine supporting
-Telex and VNI with Smart Bilingual English-Vietnamese collision resolution.
+Telex and VNI with Smart Bilingual English-Vietnamese collision resolution,
+MacroEngine, Relaxed Coda, Developer Mode backtick code bypass, and per-app
+PresentationRules.
 
 %package -n libvielotus0
 Summary:        VieLotusIM shared C-ABI core library
@@ -34,7 +36,7 @@ Requires:       ibus
 Requires:       python3-gobject
 
 %description -n ibus-vielotus
-Native IBus engine for VieLotusIM (Sen Viet).
+Native IBus engine and GTK3 settings/doctor utility for VieLotusIM (Sen Viet).
 
 %package -n fcitx5-vielotus
 Summary:        VieLotusIM plugin for Fcitx5
@@ -51,7 +53,8 @@ Native Fcitx5 addon for VieLotusIM (Sen Viet).
 cmake -S CrossPlatform/capi-native -B build-core \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
-    -DCMAKE_INSTALL_LIBDIR=%{_lib}
+    -DCMAKE_INSTALL_LIBDIR=%{_lib} \
+    -DVIELOTUS_INSTALL_DEV=ON
 cmake --build build-core
 
 cmake -S CrossPlatform/fcitx5-vielotus -B build-fcitx5 \
@@ -77,9 +80,14 @@ DESTDIR=%{buildroot} cmake --install build-fcitx5
 DESTDIR=%{buildroot} cmake --install build-ibus
 
 install -Dm644 Resources/typing-modes.yml \
+    %{buildroot}%{_datadir}/vielotus/typing-modes.yml
+install -Dm644 Resources/typing-modes.yml \
     %{buildroot}%{_datadir}/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml
 install -Dm755 CrossPlatform/packaging/linux/vielotus-settings \
     %{buildroot}%{_bindir}/vielotus-settings
+ln -sf vielotus-settings %{buildroot}%{_bindir}/vielotus
+install -Dm644 CrossPlatform/packaging/linux/vielotus-settings.1 \
+    %{buildroot}%{_mandir}/man1/vielotus-settings.1
 install -Dm644 CrossPlatform/packaging/linux/vielotus.desktop \
     %{buildroot}%{_datadir}/applications/vielotus.desktop
 install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml \
@@ -93,10 +101,13 @@ install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml 
 %license LICENSE
 %{_libdir}/libVieLotusCAPI.so*
 %{_includedir}/vielotus.h
+%{_datadir}/vielotus/typing-modes.yml
 %{_datadir}/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml
 
 %files -n ibus-vielotus
+%{_bindir}/vielotus
 %{_bindir}/vielotus-settings
+%{_mandir}/man1/vielotus-settings.1*
 %{_prefix}/lib/ibus/ibus-engine-vielotus
 %{_datadir}/ibus/component/vielotus.xml
 %{_datadir}/applications/vielotus.desktop
@@ -109,5 +120,5 @@ install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml 
 %{_datadir}/fcitx5/inputmethod/vielotus-vni.conf
 
 %changelog
-* Thu Oct 30 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com> - 2.0.0-1
-- Official Pure C++20 source-built release of Sen Việt (VieLotusIM) 2.0.0
+* Wed Nov 11 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com> - 2.0.2-1
+- Official Pure C++20 source-built release of Sen Việt (VieLotusIM) 2.0.2

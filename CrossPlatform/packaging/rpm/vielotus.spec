@@ -1,5 +1,5 @@
 Name:           vielotus
-Version:        2.0.0
+Version:        2.0.2
 Release:        1%{?dist}
 Summary:        Sen Việt (VieLotusIM) - Bộ gõ tiếng Việt thế hệ mới cho Linux (IBus & Fcitx5)
 
@@ -18,9 +18,11 @@ Provides:       fcitx5-vielotus = %{version}-%{release}
 Provides:       ibus-vielotus = %{version}-%{release}
 
 %description
-VieLotusIM (Sen Việt) là bộ gõ tiếng Việt thế hệ mới, xây dựng trên lõi Pure Swift 6
-kết hợp C-ABI đạt độ chính xác song ngữ 100.00% (với 97.33% đối xứng hai chiều).
-Hỗ trợ đồng thời cả IBus và Fcitx5 trên Fedora, RHEL, CentOS Stream và openSUSE.
+VieLotusIM (Sen Việt) là bộ gõ tiếng Việt thế hệ mới với lõi C++20 Native C-ABI
+không làm mờ (MIT/Expat), đạt độ chính xác song ngữ 100.00% (9.091/9.091) kèm
+chỉ số đối xứng ambiguous_both_sides 97.33% (365/375) và bảo toàn đường gõ duy nhất
+whitelist_safe = never 100.00% (182/182). Hỗ trợ đồng thời IBus và Fcitx5 trên
+Fedora, RHEL, CentOS Stream và openSUSE.
 
 %install
 %ifarch aarch64
@@ -54,6 +56,8 @@ fi
 
 %files
 /etc/ld.so.conf.d/vielotus.conf
+/etc/fonts/conf.d/*vielotus*.conf
+/etc/xdg/autostart/vielotus-onboard.desktop
 /usr/bin/vielotus
 /usr/bin/vielotus-settings
 /usr/include/vielotus.h
@@ -67,6 +71,7 @@ fi
 %{_libdir}/fcitx5/vielotus.so
 %endif
 /usr/share/applications/vielotus.desktop
+/usr/share/applications/ibus-setup-vielotus*.desktop
 /usr/share/doc/vielotus/README.md
 /usr/share/fcitx5/addon/vielotus.conf
 /usr/share/fcitx5/inputmethod/vielotus-telex.conf
@@ -74,8 +79,9 @@ fi
 /usr/share/ibus/component/vielotus.xml
 /usr/share/icons/hicolor/*/apps/vielotus.png
 /usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml
+/usr/share/man/man1/*
 /usr/share/vielotus/*
 
 %changelog
-* Thu Oct 29 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.0-1
-- Release of VieLotusIM (Sen Việt) v2.0.0 All-in-One (IBus & Fcitx5) for Linux (x86_64 & aarch64)
+* Wed Nov 11 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.2-1
+- Release of VieLotusIM (Sen Việt) v2.0.2 with MacroEngine, RelaxedCoda, DeveloperMode, PresentationRules & Doctor

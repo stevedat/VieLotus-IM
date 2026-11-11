@@ -151,18 +151,25 @@ install_desktop_integration() {
     mkdir -p "${target_root}/usr/bin"
     mkdir -p "${target_root}/usr/share/applications"
     mkdir -p "${target_root}/usr/share/metainfo"
+    mkdir -p "${target_root}/etc/xdg/autostart"
 
     cp "${PACKAGING_LINUX}/vielotus-settings" "${target_root}/usr/bin/vielotus-settings"
     chmod 755 "${target_root}/usr/bin/vielotus-settings"
     ln -sf vielotus-settings "${target_root}/usr/bin/vielotus"
 
     cp "${PACKAGING_LINUX}/vielotus.desktop" "${target_root}/usr/share/applications/vielotus.desktop"
+    cp "${PACKAGING_LINUX}/vielotus-onboard.desktop" "${target_root}/etc/xdg/autostart/vielotus-onboard.desktop"
     for setup_name in ibus-setup-vielotus.desktop ibus-setup-vielotus-vni.desktop; do
         cp "${PACKAGING_LINUX}/vielotus.desktop" "${target_root}/usr/share/applications/${setup_name}"
         echo "NoDisplay=true" >> "${target_root}/usr/share/applications/${setup_name}"
     done
     cp "${PACKAGING_LINUX}/org.vielotus.VieLotus.metainfo.xml" \
        "${target_root}/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml"
+    if [ -f "${PACKAGING_LINUX}/vielotus-settings.1" ]; then
+        mkdir -p "${target_root}/usr/share/man/man1"
+        gzip -n -9 -c "${PACKAGING_LINUX}/vielotus-settings.1" > "${target_root}/usr/share/man/man1/vielotus-settings.1.gz"
+        ln -sf vielotus-settings.1.gz "${target_root}/usr/share/man/man1/vielotus.1.gz"
+    fi
 }
 
 write_maintainer_scripts() {
@@ -280,7 +287,9 @@ package_single_arch() {
     # 6. Desktop Application Launcher, GUI/CLI Settings Utility & AppStream Metadata
     install_desktop_integration "${pkg_dir}"
 
-    # 7. System-wide Fontconfig rule for Vietnamese Latin Extended Additional (U+1EA0..U+1EF9: ệ, ộ, ậ, ử...)
+    # 7. System-wide Fontconfig rule for Vietnamese Latin Extended Additional & combining marks (NFC + NFD: chuẩn, thử...)
+    # Note: DejaVu Sans Mono lacks OpenType GPOS mkmk/mark anchors for U+0309 (shifting dấu hỏi +1 cell right on NFD),
+    # whereas Noto Sans Mono and Liberation Mono render both NFC and NFD Vietnamese diacritics accurately in one cell.
     mkdir -p "${pkg_dir}/etc/fonts/conf.d"
     cat <<'FC_SYS_EOF' > "${pkg_dir}/etc/fonts/conf.d/99-vielotus-vietnamese.conf"
 <?xml version="1.0"?>
@@ -289,8 +298,11 @@ package_single_arch() {
   <selectfont>
     <rejectfont>
       <glob>/usr/share/fonts/truetype/ubuntu/*</glob>
+      <glob>/usr/share/fonts/opentype/ubuntu/*</glob>
       <glob>/var/lib/snapd/hostfs/usr/share/fonts/truetype/ubuntu/*</glob>
+      <glob>/var/lib/snapd/hostfs/usr/share/fonts/opentype/ubuntu/*</glob>
       <glob>/snap/*/usr/share/fonts/truetype/ubuntu/*</glob>
+      <glob>/snap/*/usr/share/fonts/opentype/ubuntu/*</glob>
     </rejectfont>
   </selectfont>
   <match target="pattern">
@@ -298,7 +310,7 @@ package_single_arch() {
       <string>Ubuntu</string>
     </test>
     <edit name="family" mode="assign" binding="same">
-      <string>DejaVu Sans</string>
+      <string>Noto Sans</string>
     </edit>
   </match>
   <match target="pattern">
@@ -306,7 +318,7 @@ package_single_arch() {
       <string>Ubuntu Sans</string>
     </test>
     <edit name="family" mode="assign" binding="same">
-      <string>DejaVu Sans</string>
+      <string>Noto Sans</string>
     </edit>
   </match>
   <match target="pattern">
@@ -314,7 +326,7 @@ package_single_arch() {
       <string>Ubuntu Mono</string>
     </test>
     <edit name="family" mode="assign" binding="same">
-      <string>DejaVu Sans Mono</string>
+      <string>Noto Sans Mono</string>
     </edit>
   </match>
   <match target="pattern">
@@ -322,19 +334,26 @@ package_single_arch() {
       <string>Ubuntu Sans Mono</string>
     </test>
     <edit name="family" mode="assign" binding="same">
-      <string>DejaVu Sans Mono</string>
+      <string>Noto Sans Mono</string>
     </edit>
   </match>
   <alias>
     <family>sans-serif</family>
     <prefer>
-      <family>DejaVu Sans</family>
       <family>Noto Sans</family>
+      <family>DejaVu Sans</family>
+    </prefer>
+  </alias>
+  <alias>
+    <family>monospace</family>
+    <prefer>
+      <family>Noto Sans Mono</family>
+      <family>Liberation Mono</family>
     </prefer>
   </alias>
 </fontconfig>
 FC_SYS_EOF
-    cp -f "${pkg_dir}/etc/fonts/conf.d/99-vielotus-vietnamese.conf" "${pkg_dir}/etc/fonts/conf.d/64-vielotus-vietnamese.conf"
+    cp -f "${pkg_dir}/etc/fonts/conf.d/99-vielotus-vietnamese.conf" "${pkg_dir}/etc/fonts/conf.d/51-vielotus-vietnamese.conf"
 
     local installed_size
     installed_size=$(du -sk "${pkg_dir}" | awk '{print $1}')
@@ -348,8 +367,8 @@ Architecture: ${target_arch}
 Installed-Size: ${installed_size}
 Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
 Homepage: https://github.com/stevedat/VieLotus-IM
-Depends: libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3, python3-gi, gir1.2-gtk-3.0, fonts-dejavu-core | fonts-noto-core
-Recommends: ibus | fcitx5, im-config, zenity, fonts-noto-core, fonts-dejavu-core, fonts-ubuntu-classic
+Depends: libc6, libstdc++6, libgcc-s1, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, libfcitx5core7, libfcitx5config6, libfcitx5utils2, python3, python3-gi, gir1.2-gtk-3.0, fonts-noto-mono | fonts-liberation, fonts-noto-core | fonts-dejavu-core
+Recommends: ibus | fcitx5, im-config, zenity, fonts-noto-mono, fonts-noto-core, fonts-liberation
 Suggests: fcitx5, fcitx5-config-qt, fcitx5-frontend-all, ibus, zenity
 Provides: fcitx5-vielotus, ibus-vielotus
 Enhances: fcitx5, ibus, language-selector-common
@@ -424,7 +443,7 @@ Installed-Size: ${ibus_size}
 Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
 Homepage: https://github.com/stevedat/VieLotus-IM
 Depends: libvielotus0 (= ${VERSION}), libc6, libglib2.0-0t64 | libglib2.0-0, libibus-1.0-5, ibus (>= 1.5), python3, python3-gi, gir1.2-gtk-3.0
-Recommends: im-config, zenity, fonts-dejavu-core | fonts-noto-core
+Recommends: im-config, zenity, fonts-noto-mono | fonts-liberation, fonts-noto-core | fonts-dejavu-core
 Enhances: ibus, language-selector-common
 Description: VieLotusIM (Sen Viet) Vietnamese Input Method plugin for IBus
  Native IBus input method engine (ibus-engine-vielotus) for VieLotusIM
@@ -455,7 +474,7 @@ Installed-Size: ${fcitx_size}
 Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
 Homepage: https://github.com/stevedat/VieLotus-IM
 Depends: libvielotus0 (= ${VERSION}), libc6, libstdc++6, libgcc-s1, libfcitx5core7, libfcitx5config6, libfcitx5utils2, fcitx5
-Recommends: fcitx5-config-qt, fonts-dejavu-core | fonts-noto-core
+Recommends: fcitx5-config-qt, fonts-noto-mono | fonts-liberation, fonts-noto-core | fonts-dejavu-core
 Enhances: fcitx5, language-selector-common
 Description: VieLotusIM (Sen Viet) Vietnamese Input Method plugin for Fcitx5
  Native Fcitx5 input method addon (vielotus.so) for VieLotusIM (Sen Viet),

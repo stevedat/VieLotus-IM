@@ -49,6 +49,7 @@ endif()
 
 include_directories(
     ${VIELOTUS_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 

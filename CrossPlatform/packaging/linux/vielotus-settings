@@ -1,7 +1,8 @@
 #!/bin/bash
 # ==============================================================================
-# Sen Việt (VieLotusIM) — Linux Desktop Settings Utility
+# Sen Việt (VieLotusIM) — Linux Desktop Settings, Macro/App Rules & Doctor Utility
 # Supports both Fcitx5 (fcitx5-configtool) and IBus (GNOME Input Sources)
+# License: MIT / Expat (100% Clean-Room Native Implementation)
 # ==============================================================================
 
 UID_CUR="$(id -u 2>/dev/null || echo 1000)"
@@ -21,15 +22,17 @@ if [ ! -d "${CONFIG_DIR}" ] || [ ! -w "${CONFIG_DIR}" ]; then
     trap 'rm -rf "${TMP_CONFIG_DIR}"' EXIT HUP INT TERM
 fi
 CONFIG_FILE="${CONFIG_DIR}/config.env"
+MACROS_FILE="${CONFIG_DIR}/macros.json"
+TYPING_MODES_FILE="${CONFIG_DIR}/typing-modes.yml"
 LOG_FILE="${CONFIG_DIR}/settings.log"
 
 INPUT_METHOD="telex"
-GRAMMAR_PROFILE="sen_flex"
+GRAMMAR_PROFILE="classic"
 SMART_BILINGUAL="true"
 MODERN_ORTHOGRAPHY="true"
 QUICK_TELEX="false"
 RELAXED_CODA="false"
-MACRO_ENABLED="true"
+MACRO_ENABLED="false"
 DEVELOPER_MODE="false"
 PREEDIT_UNDERLINE="false"
 
@@ -52,8 +55,8 @@ load_config() {
                 ;;
             GRAMMAR_PROFILE)
                 case "${val}" in
-                    classic|Classic|CLASSIC) GRAMMAR_PROFILE="classic" ;;
-                    *) GRAMMAR_PROFILE="sen_flex" ;;
+                    sen_flex|SenFlex|SEN_FLEX|senflex|SENFLEX) GRAMMAR_PROFILE="sen_flex" ;;
+                    *) GRAMMAR_PROFILE="classic" ;;
                 esac
                 ;;
             SMART_BILINGUAL)
@@ -82,8 +85,8 @@ load_config() {
                 ;;
             MACRO_ENABLED)
                 case "${val}" in
-                    false|False|FALSE|0) MACRO_ENABLED="false" ;;
-                    *) MACRO_ENABLED="true" ;;
+                    true|True|TRUE|1) MACRO_ENABLED="true" ;;
+                    *) MACRO_ENABLED="false" ;;
                 esac
                 ;;
             DEVELOPER_MODE)
@@ -100,6 +103,99 @@ load_config() {
                 ;;
         esac
     done < "${CONFIG_FILE}"
+}
+
+merge_save_config_env() {
+    mkdir -p -m 0700 "${CONFIG_DIR}" 2>/dev/null || true
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - "${CONFIG_FILE}" \
+            "${INPUT_METHOD}" \
+            "${GRAMMAR_PROFILE}" \
+            "${SMART_BILINGUAL}" \
+            "${MODERN_ORTHOGRAPHY}" \
+            "${QUICK_TELEX}" \
+            "${RELAXED_CODA}" \
+            "${MACRO_ENABLED}" \
+            "${DEVELOPER_MODE}" \
+            "${PREEDIT_UNDERLINE}" <<'MERGE_PYEOF'
+import os, sys, tempfile
+
+cfg_path = sys.argv[1]
+ordered_keys = [
+    ("INPUT_METHOD", sys.argv[2]),
+    ("GRAMMAR_PROFILE", sys.argv[3]),
+    ("SMART_BILINGUAL", sys.argv[4]),
+    ("MODERN_ORTHOGRAPHY", sys.argv[5]),
+    ("QUICK_TELEX", sys.argv[6]),
+    ("RELAXED_CODA", sys.argv[7]),
+    ("MACRO_ENABLED", sys.argv[8]),
+    ("DEVELOPER_MODE", sys.argv[9]),
+    ("PREEDIT_UNDERLINE", sys.argv[10]),
+]
+updates = dict(ordered_keys)
+seen = set()
+out_lines = []
+
+if os.path.exists(cfg_path):
+    with open(cfg_path, "r", encoding="utf-8", errors="replace") as f:
+        for raw_line in f:
+            stripped = raw_line.lstrip()
+            if not stripped or stripped.startswith("#") or "=" not in raw_line:
+                out_lines.append(raw_line if raw_line.endswith("\n") else raw_line + "\n")
+                continue
+            k_part, _ = raw_line.split("=", 1)
+            k = k_part.strip()
+            if k in updates:
+                if k not in seen:
+                    out_lines.append(f'{k}="{updates[k]}"\n')
+                    seen.add(k)
+            else:
+                out_lines.append(raw_line if raw_line.endswith("\n") else raw_line + "\n")
+
+for k, v in ordered_keys:
+    if k not in seen:
+        out_lines.append(f'{k}="{v}"\n')
+
+parent = os.path.dirname(os.path.abspath(cfg_path))
+os.makedirs(parent, mode=0o700, exist_ok=True)
+fd, tmp_path = tempfile.mkstemp(prefix=".config.env.", dir=parent)
+try:
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as tf:
+        tf.writelines(out_lines)
+        tf.flush()
+        os.fsync(tf.fileno())
+    os.replace(tmp_path, cfg_path)
+except Exception:
+    try:
+        os.unlink(tmp_path)
+    except OSError:
+        pass
+    raise
+MERGE_PYEOF
+    else
+        TMP_ENV="${CONFIG_FILE}.tmp.$$"
+        (
+            umask 077
+            if [ -f "${CONFIG_FILE}" ]; then
+                grep -v -E '^[[:space:]]*(INPUT_METHOD|GRAMMAR_PROFILE|SMART_BILINGUAL|MODERN_ORTHOGRAPHY|QUICK_TELEX|RELAXED_CODA|MACRO_ENABLED|DEVELOPER_MODE|PREEDIT_UNDERLINE)[[:space:]]*=' "${CONFIG_FILE}" > "${TMP_ENV}" 2>/dev/null || : > "${TMP_ENV}"
+            else
+                : > "${TMP_ENV}"
+            fi
+            cat <<ENV_EOF >> "${TMP_ENV}"
+INPUT_METHOD="${INPUT_METHOD}"
+GRAMMAR_PROFILE="${GRAMMAR_PROFILE}"
+SMART_BILINGUAL="${SMART_BILINGUAL}"
+MODERN_ORTHOGRAPHY="${MODERN_ORTHOGRAPHY}"
+QUICK_TELEX="${QUICK_TELEX}"
+RELAXED_CODA="${RELAXED_CODA}"
+MACRO_ENABLED="${MACRO_ENABLED}"
+DEVELOPER_MODE="${DEVELOPER_MODE}"
+PREEDIT_UNDERLINE="${PREEDIT_UNDERLINE}"
+ENV_EOF
+            mv -f "${TMP_ENV}" "${CONFIG_FILE}"
+        )
+    fi
 }
 
 load_config
@@ -121,6 +217,14 @@ configure_fcitx5_profile() {
     [ "${MODERN_ORTHOGRAPHY}" = "false" ] && FCITX_MOD="False"
     FCITX_QT="False"
     [ "${QUICK_TELEX}" = "true" ] && FCITX_QT="True"
+    FCITX_RC="False"
+    [ "${RELAXED_CODA}" = "true" ] && FCITX_RC="True"
+    FCITX_MC="True"
+    [ "${MACRO_ENABLED}" = "false" ] && FCITX_MC="False"
+    FCITX_DM="False"
+    [ "${DEVELOPER_MODE}" = "true" ] && FCITX_DM="True"
+    FCITX_PU="False"
+    [ "${PREEDIT_UNDERLINE}" = "true" ] && FCITX_PU="True"
 
     cat <<FCITX_CONF_EOF > "${FCITX_PROFILE_DIR}/conf/vielotus.conf"
 # Chế độ đặt dấu (Grammar Profile)
@@ -129,8 +233,16 @@ GrammarProfile=${FCITX_GRAMMAR}
 SmartBilingual=${FCITX_SB}
 # Chính tả hiện đại: oà, uý (thay vì òa, úy)
 ModernOrthography=${FCITX_MOD}
-# Gõ tắt phụ âm (Quick Telex: cc=ch, gg=gi, kk=kh...)
+# Gõ tắt phụ âm đầu (Quick Telex: cc=ch, gg=gi, kk=kh...)
 QuickTelex=${FCITX_QT}
+# Gõ tắt phụ âm cuối (Relaxed Coda: -g=-ng, -h=-nh, -k=-ch)
+RelaxedCoda=${FCITX_RC}
+# Bảng gõ tắt thông minh (Macro Expansion)
+MacroEnabled=${FCITX_MC}
+# Chế độ Nhà phát triển (tạm ngắt dấu trong khối code)
+DeveloperMode=${FCITX_DM}
+# Hiện gạch chân khi đang gõ dấu (Preedit Underline)
+PreeditUnderline=${FCITX_PU}
 FCITX_CONF_EOF
 
     if [ "${ACTIVATE_PROFILE}" = "1" ] && [ -f "${FCITX_PROFILE}" ] && command -v python3 >/dev/null 2>&1; then
@@ -143,22 +255,87 @@ with open(profile_path, "r", encoding="utf-8", errors="ignore") as f:
 
 if re.search(r"^Name=vielotus-(telex|vni)$", text, flags=re.M):
     text = re.sub(r"^Name=vielotus-(telex|vni)$", f"Name={im_name}", text, count=1, flags=re.M)
+    text = re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", text, count=1, flags=re.M)
+    with open(profile_path, "w", encoding="utf-8") as f:
+        f.write(text)
+elif "[Groups/0]" in text:
+    indices = [int(m) for m in re.findall(r"^\[Groups/0/Items/(\d+)\]", text, flags=re.M)]
+    next_idx = (max(indices) + 1) if indices else 0
+    new_item = f"\n[Groups/0/Items/{next_idx}]\nName={im_name}\nLayout=\n"
+    text = re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", text, count=1, flags=re.M)
+    if "[GroupOrder]" in text:
+        text = text.replace("[GroupOrder]", new_item.lstrip("\n") + "\n[GroupOrder]", 1)
+    else:
+        text = text.rstrip() + "\n" + new_item
     with open(profile_path, "w", encoding="utf-8") as f:
         f.write(text)
 PYEOF
     fi
 }
 
+IBUS_WAS_RELOADED=0
+
+discover_live_ibus_address() {
+    [ -d "${CONFIG_ROOT}/ibus/bus" ] || return 0
+    for bfile in $(ls -1t "${CONFIG_ROOT}/ibus/bus"/* 2>/dev/null); do
+        [ -f "${bfile}" ] || continue
+        b_pid=$(sed -n 's/^IBUS_DAEMON_PID=//p' "${bfile}" 2>/dev/null | tr -d "\"'[:space:]")
+        b_addr=$(sed -n 's/^IBUS_ADDRESS=//p' "${bfile}" 2>/dev/null | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+        if [ -n "${b_pid}" ] && [ -n "${b_addr}" ] && kill -0 "${b_pid}" 2>/dev/null; then
+            export IBUS_ADDRESS="${b_addr}"
+            return 0
+        fi
+    done
+    return 0
+}
+
+reload_live_ibus_if_needed() {
+    IBUS_WAS_RELOADED=0
+    command -v ibus >/dev/null 2>&1 || return 0
+    rm -f "${HOME_DIR}/.cache/ibus/bus/registry"* 2>/dev/null || true
+    ibus write-cache >/dev/null 2>&1 || true
+    pgrep -x ibus-daemon >/dev/null 2>&1 || return 0
+    discover_live_ibus_address
+    if ibus list-engine 2>/dev/null | grep -q "vielotus"; then
+        return 0
+    fi
+    # Live ibus-daemon has not loaded /usr/share/ibus/component/vielotus.xml into RAM yet.
+    # Reload cleanly via user systemd unit (if active) or direct IBus D-Bus restart.
+    if command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet org.freedesktop.IBus.session.GNOME.service 2>/dev/null; then
+        systemctl --user restart org.freedesktop.IBus.session.GNOME.service >/dev/null 2>&1 || true
+        sleep 0.35
+        discover_live_ibus_address
+    fi
+    if ! ibus list-engine 2>/dev/null | grep -q "vielotus"; then
+        ibus restart --type=direct >/dev/null 2>&1 || ibus restart >/dev/null 2>&1 || true
+    fi
+    i=0
+    while [ "${i}" -lt 12 ]; do
+        sleep 0.25
+        discover_live_ibus_address
+        if ibus list-engine 2>/dev/null | grep -q "vielotus"; then
+            IBUS_WAS_RELOADED=1
+            # Give GNOME Shell IBusManager time to finish list_engines_async() before rebinding sources
+            sleep 0.35
+            return 0
+        fi
+        i=$((i + 1))
+    done
+    return 0
+}
+
 repair_and_sync_gnome_sources() {
     TARGET_ENGINE_ID="${1:-vielotus}"
     REPAIR_ONLY="${2:-0}"
+    FORCE_REBIND="${3:-0}"
     if ! command -v gsettings >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
         return 0
     fi
-    python3 - "${TARGET_ENGINE_ID}" "${REPAIR_ONLY}" <<'PYEOF' 2>/dev/null || true
-import ast, glob, os, subprocess, sys
+    python3 - "${TARGET_ENGINE_ID}" "${REPAIR_ONLY}" "${FORCE_REBIND}" <<'PYEOF' 2>/dev/null || true
+import ast, glob, os, subprocess, sys, time
 engine_id = sys.argv[1]
 repair_only = sys.argv[2] == "1"
+force_rebind = sys.argv[3] == "1"
 
 # Ensure user IBus component cache has the latest '🇻🇳 tex' / '🇻🇳 vni' symbols
 ibus_cache_dir = os.path.expanduser("~/.cache/ibus/bus")
@@ -201,35 +378,45 @@ def set_gsettings(key, val):
 sources = get_sources_list("sources")
 vl_indices = [i for i, s in enumerate(sources) if s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni")]
 if not vl_indices:
-    sys.exit(0)
-
-new_sources = list(sources)
-if len(vl_indices) >= 2:
-    # Auto-repair duplicate ('ibus', 'vielotus-vni') / ('ibus', 'vielotus') entries so
-    # entry #1 is always Sen Việt - Telex ('vielotus') and entry #2 is Sen Việt - VNI ('vielotus-vni')
-    repaired = []
-    vl_seen = 0
-    for s in sources:
-        if s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni"):
-            if vl_seen == 0:
-                repaired.append(("ibus", "vielotus"))
-                vl_seen += 1
-            elif vl_seen == 1:
-                repaired.append(("ibus", "vielotus-vni"))
-                vl_seen += 1
-        else:
-            repaired.append(s)
-    new_sources = repaired
-elif not repair_only and len(vl_indices) == 1:
-    idx = vl_indices[0]
-    new_sources[idx] = ("ibus", engine_id)
+    if repair_only:
+        sys.exit(0)
+    desk_env = (os.environ.get("XDG_CURRENT_DESKTOP", "") + " " + os.environ.get("DESKTOP_SESSION", "")).lower()
+    if not sources and "gnome" not in desk_env and "ubuntu" not in desk_env:
+        sys.exit(0)
+    new_sources = list(sources) if sources else [("xkb", "us")]
+    new_sources.append(("ibus", engine_id))
+    vl_indices = [len(new_sources) - 1]
+else:
+    new_sources = list(sources)
+    if len(vl_indices) >= 2:
+        # Auto-repair duplicate ('ibus', 'vielotus-vni') / ('ibus', 'vielotus') entries so
+        # entry #1 is always Sen Việt - Telex ('vielotus') and entry #2 is Sen Việt - VNI ('vielotus-vni')
+        repaired = []
+        vl_seen = 0
+        for s in sources:
+            if s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni"):
+                if vl_seen == 0:
+                    repaired.append(("ibus", "vielotus"))
+                    vl_seen += 1
+                elif vl_seen == 1:
+                    repaired.append(("ibus", "vielotus-vni"))
+                    vl_seen += 1
+            else:
+                repaired.append(s)
+        new_sources = repaired
+    elif not repair_only and len(vl_indices) == 1:
+        idx = vl_indices[0]
+        new_sources[idx] = ("ibus", engine_id)
 
 if repair_only:
     if new_sources != sources:
         set_gsettings("sources", fmt_sources(new_sources))
-    elif cache_refreshed and len(new_sources) >= 2:
-        temp_sources = [s for s in new_sources if s != ("ibus", "vielotus-vni")]
-        set_gsettings("sources", fmt_sources(temp_sources))
+    elif (cache_refreshed or force_rebind) and vl_indices:
+        without_vl = [s for s in new_sources if not (s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni"))]
+        if not without_vl:
+            without_vl = [("xkb", "us")]
+        set_gsettings("sources", fmt_sources(without_vl))
+        time.sleep(0.15)
         set_gsettings("sources", fmt_sources(new_sources))
     sys.exit(0)
 
@@ -244,6 +431,21 @@ for s in base_for_mru:
 for s in new_sources:
     if s not in new_mru:
         new_mru.append(s)
+
+if force_rebind and vl_indices:
+    # Force GNOME Shell & gnome-control-center to drop stale raw IDs ('vielotus') and
+    # re-resolve IBusEngineDesc ('Sen Việt - Telex' / '🇻🇳 tex') from reloaded ibus-daemon
+    without_vl = [s for s in new_sources if not (s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni"))]
+    if not without_vl:
+        without_vl = [("xkb", "us")]
+    set_gsettings("sources", fmt_sources(without_vl))
+    time.sleep(0.15)
+    set_gsettings("sources", fmt_sources(new_sources))
+    set_gsettings("mru-sources", fmt_sources(new_mru))
+    if target_tuple in new_sources:
+        set_gsettings("current", f"uint32 {new_sources.index(target_tuple)}")
+    sys.exit(0)
+
 set_gsettings("mru-sources", fmt_sources(new_mru))
 
 if target_tuple in new_sources:
@@ -264,22 +466,13 @@ PYEOF
 save_and_apply() {
     MODE="${1:-$INPUT_METHOD}"
     ACTIVATE_SOURCES="${2:-0}"
+    FORCE_REBIND_ARG="${3:-0}"
     case "${MODE}" in
         vni|VNI) INPUT_METHOD="vni" ;;
         *) INPUT_METHOD="telex" ;;
     esac
 
-    cat <<ENV_EOF > "${CONFIG_FILE}"
-INPUT_METHOD="${INPUT_METHOD}"
-GRAMMAR_PROFILE="${GRAMMAR_PROFILE}"
-SMART_BILINGUAL="${SMART_BILINGUAL}"
-MODERN_ORTHOGRAPHY="${MODERN_ORTHOGRAPHY}"
-QUICK_TELEX="${QUICK_TELEX}"
-RELAXED_CODA="${RELAXED_CODA}"
-MACRO_ENABLED="${MACRO_ENABLED}"
-DEVELOPER_MODE="${DEVELOPER_MODE}"
-PREEDIT_UNDERLINE="${PREEDIT_UNDERLINE}"
-ENV_EOF
+    merge_save_config_env
 
     ENGINE_ID="vielotus"
     FCITX_IM_ID="vielotus-telex"
@@ -303,28 +496,291 @@ ENV_EOF
         fi
     fi
 
-    # 2. Switch active IBus engine if IBus daemon is reachable and user explicitly changed mode
+    # 2. Ensure live ibus-daemon has loaded vielotus.xml before binding GNOME Input Sources
+    REBIND_FLAG="${FORCE_REBIND_ARG}"
     if [ "${ACTIVATE_SOURCES}" = "1" ] && command -v ibus >/dev/null 2>&1; then
-        if pgrep -x ibus-daemon >/dev/null 2>&1; then
-            (ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true) &
+        reload_live_ibus_if_needed
+        if [ "${IBUS_WAS_RELOADED:-0}" = "1" ]; then
+            REBIND_FLAG="1"
         fi
     fi
 
     # 3. Repair duplicate GNOME Input Sources and sync active Telex/VNI selection
     if [ "${ACTIVATE_SOURCES}" = "1" ]; then
-        repair_and_sync_gnome_sources "${ENGINE_ID}" "0"
+        repair_and_sync_gnome_sources "${ENGINE_ID}" "0" "${REBIND_FLAG}"
+    fi
+
+    # 4. Switch active IBus engine if IBus daemon is reachable and user explicitly changed mode
+    if [ "${ACTIVATE_SOURCES}" = "1" ] && command -v ibus >/dev/null 2>&1; then
+        if pgrep -x ibus-daemon >/dev/null 2>&1; then
+            discover_live_ibus_address
+            (ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true) &
+        fi
+    fi
+
+    # 5. Sync drop-in fontconfig rules for sandboxed Snap apps (never touches ~/.config/fontconfig/fonts.conf)
+    if [ -d /snap ] && [ -f /etc/fonts/conf.d/99-vielotus-vietnamese.conf ]; then
+        mkdir -p "${CONFIG_ROOT}/fontconfig/conf.d" 2>/dev/null || true
+        if [ -f /etc/fonts/conf.d/51-vielotus-vietnamese.conf ]; then
+            cp -f /etc/fonts/conf.d/51-vielotus-vietnamese.conf "${CONFIG_ROOT}/fontconfig/conf.d/51-vielotus-vietnamese.conf" 2>/dev/null || true
+        fi
+        cp -f /etc/fonts/conf.d/99-vielotus-vietnamese.conf "${CONFIG_ROOT}/fontconfig/conf.d/99-vielotus-vietnamese.conf" 2>/dev/null || true
+    fi
+}
+
+run_doctor() {
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - "${CONFIG_FILE}" "${MACROS_FILE}" "${TYPING_MODES_FILE}" <<'DOC_PYEOF'
+import glob, json, os, platform, shutil, subprocess, sys
+
+cfg_path, macros_path, modes_path = sys.argv[1], sys.argv[2], sys.argv[3]
+warnings = 0
+errors = 0
+
+print("✦ === Chẩn đoán Môi trường Sen Việt (VieLotusIM Doctor) ===")
+print(f"• Hệ điều hành / Kiến trúc : {platform.system()} {platform.release()} ({platform.machine()})")
+
+session_type = os.environ.get("XDG_SESSION_TYPE", "").strip()
+if not session_type:
+    if os.environ.get("WAYLAND_DISPLAY"):
+        session_type = "wayland"
+    elif os.environ.get("DISPLAY"):
+        session_type = "x11"
+    else:
+        session_type = "headless"
+desktop = os.environ.get("XDG_CURRENT_DESKTOP") or os.environ.get("DESKTOP_SESSION") or "unknown"
+print(f"• Giao thức hiển thị       : {session_type} (Desktop: {desktop})")
+
+def is_running(proc_name):
+    try:
+        return subprocess.call(["pgrep", "-x", proc_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+    except Exception:
+        return False
+
+ibus_up = is_running("ibus-daemon")
+fcitx_up = is_running("fcitx5")
+daemons = []
+if ibus_up:
+    daemons.append("ibus-daemon")
+if fcitx_up:
+    daemons.append("fcitx5")
+if daemons:
+    print(f"• Tiến trình bộ gõ         : ✓ Đang chạy ({', '.join(daemons)})")
+else:
+    warnings += 1
+    print("• Tiến trình bộ gõ         : ⚠ Chưa phát hiện ibus-daemon hoặc fcitx5 đang chạy")
+
+gtk_im = os.environ.get("GTK_IM_MODULE", "")
+qt_im = os.environ.get("QT_IM_MODULE", "")
+xmod = os.environ.get("XMODIFIERS", "")
+print(f"• Biến môi trường IM       : GTK_IM_MODULE={gtk_im or '(mặc định Wayland)'} | QT_IM_MODULE={qt_im or '(trống)'} | XMODIFIERS={xmod or '(trống)'}")
+if fcitx_up and not ibus_up and "ibus" in (gtk_im + qt_im + xmod):
+    warnings += 1
+    print("  ⚠ Cảnh báo: fcitx5 đang chạy nhưng biến môi trường trỏ sang ibus.")
+elif ibus_up and not fcitx_up and "fcitx" in (gtk_im + qt_im + xmod):
+    warnings += 1
+    print("  ⚠ Cảnh báo: ibus-daemon đang chạy nhưng biến môi trường trỏ sang fcitx.")
+
+def find_first(patterns):
+    for pat in patterns:
+        matches = sorted(glob.glob(pat))
+        for m in matches:
+            if os.path.exists(m):
+                return m
+    return None
+
+core_so = find_first([
+    "/usr/lib/libVieLotusCAPI.so*",
+    "/usr/lib64/libVieLotusCAPI.so*",
+    "/usr/lib/*-linux-gnu/libVieLotusCAPI.so*",
+    "/usr/local/lib/libVieLotusCAPI.so*",
+])
+fcitx_so = find_first([
+    "/usr/lib/fcitx5/vielotus.so",
+    "/usr/lib64/fcitx5/vielotus.so",
+    "/usr/lib/*-linux-gnu/fcitx5/vielotus.so",
+])
+ibus_bin = find_first([
+    "/usr/lib/ibus/ibus-engine-vielotus",
+    "/usr/libexec/ibus-engine-vielotus",
+    "/usr/lib64/ibus/ibus-engine-vielotus",
+])
+
+ldd_bin = shutil.which("ldd")
+for label, path, required in (
+    ("Thư viện lõi C-ABI", core_so, True),
+    ("Plugin Fcitx5", fcitx_so, False),
+    ("Engine IBus", ibus_bin, False),
+):
+    if not path:
+        if required:
+            errors += 1
+            print(f"• {label:<24} : ✗ Không tìm thấy trên hệ thống")
+        else:
+            print(f"• {label:<24} : - Chưa cài đặt")
+        continue
+    ldd_issue = ""
+    if ldd_bin:
+        try:
+            env = dict(os.environ)
+            env["LC_ALL"] = "C"
+            out = subprocess.check_output([ldd_bin, "-r", path], stderr=subprocess.STDOUT, env=env, timeout=4).decode("utf-8", errors="replace")
+            bad = [ln.strip() for ln in out.splitlines() if "not found" in ln or "undefined symbol:" in ln]
+            if bad:
+                ldd_issue = "; ".join(bad[:2])
+        except Exception as exc:
+            ldd_issue = str(exc)
+    if ldd_issue:
+        errors += 1
+        print(f"• {label:<24} : ✗ Lỗi liên kết động tại {path} ({ldd_issue})")
+    else:
+        print(f"• {label:<24} : ✓ Khỏe mạnh ({path})")
+
+# Configuration files
+if os.path.exists(cfg_path):
+    print(f"• Cấu hình người dùng      : ✓ {cfg_path}")
+else:
+    print(f"• Cấu hình người dùng      : • Dùng mặc định ({cfg_path} chưa tạo)")
+
+if os.path.exists(macros_path):
+    try:
+        with open(macros_path, "r", encoding="utf-8") as mf:
+            mdata = json.load(mf)
+        if isinstance(mdata, dict):
+            print(f"• Bảng gõ tắt (macros.json): ✓ Hợp lệ ({len(mdata)} cụm từ tuỳ chỉnh)")
+        else:
+            warnings += 1
+            print(f"• Bảng gõ tắt (macros.json): ⚠ Không phải JSON object ({macros_path})")
+    except Exception as exc:
+        warnings += 1
+        print(f"• Bảng gõ tắt (macros.json): ⚠ Lỗi cú pháp JSON ({exc})")
+else:
+    print("• Bảng gõ tắt (macros.json): ✓ Mặc định hệ thống (41 cụm từ)")
+
+rule_count = 0
+if os.path.exists(modes_path):
+    with open(modes_path, "r", encoding="utf-8", errors="ignore") as rf:
+        for ln in rf:
+            s = ln.strip()
+            if s and not s.startswith("#") and ":" in s:
+                rule_count += 1
+    print(f"• Quy tắc App (typing-modes): ✓ {rule_count} quy tắc đang bật ({modes_path})")
+else:
+    print("• Quy tắc App (typing-modes): ✓ Tự động phân loại theo hệ thống")
+
+# Fontconfig monospace check (prevents DejaVu Sans Mono NFD U+0309 +1 cell offset)
+fc_match_bin = shutil.which("fc-match")
+if fc_match_bin:
+    try:
+        mono_out = subprocess.check_output([fc_match_bin, "monospace"], stderr=subprocess.DEVNULL, timeout=3).decode("utf-8", errors="replace").strip()
+        if "DejaVuSansMono" in mono_out:
+            warnings += 1
+            print(f"• Phông chữ Monospace      : ⚠ {mono_out} (nên cài 'fonts-noto-mono' để tránh lệch dấu hỏi NFD)")
+        else:
+            print(f"• Phông chữ Monospace      : ✓ {mono_out}")
+    except Exception:
+        pass
+
+# Live IBus registry check (detects fresh-install session where ibus-daemon hasn't reloaded vielotus.xml yet)
+def get_live_ibus_env():
+    env = dict(os.environ)
+    bus_dir = os.path.join(os.path.expanduser("~/.config"), "ibus", "bus")
+    if os.path.isdir(bus_dir):
+        try:
+            files = sorted(
+                (os.path.join(bus_dir, fn) for fn in os.listdir(bus_dir)),
+                key=lambda p: os.path.getmtime(p),
+                reverse=True,
+            )
+            for bf in files:
+                if not os.path.isfile(bf):
+                    continue
+                pid_s, addr_s = "", ""
+                with open(bf, "r", encoding="utf-8", errors="ignore") as f:
+                    for ln in f:
+                        if ln.startswith("IBUS_DAEMON_PID="):
+                            pid_s = ln.split("=", 1)[1].strip().strip('"').strip("'")
+                        elif ln.startswith("IBUS_ADDRESS="):
+                            addr_s = ln.split("=", 1)[1].strip().strip('"').strip("'")
+                if pid_s.isdigit() and addr_s:
+                    try:
+                        os.kill(int(pid_s), 0)
+                        env["IBUS_ADDRESS"] = addr_s
+                        break
+                    except OSError:
+                        pass
+        except Exception:
+            pass
+    return env
+
+ibus_cli = shutil.which("ibus")
+if ibus_up and ibus_cli:
+    try:
+        eng_out = subprocess.check_output(
+            [ibus_cli, "list-engine"],
+            env=get_live_ibus_env(),
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+        ).decode("utf-8", errors="replace")
+        if "vielotus" in eng_out:
+            print("• Đăng ký Engine IBus      : ✓ Đã nạp vào phiên hiện tại (Sen Việt - Telex / VNI)")
+        else:
+            warnings += 1
+            print("• Đăng ký Engine IBus      : ⚠ ibus-daemon phiên hiện tại chưa nạp danh mục Sen Việt mới")
+            print("  ↳ Giải pháp: Bấm 'Tự sửa & Kích hoạt' (vielotus --doctor --fix) hoặc Đăng xuất (Log Out) & Đăng nhập lại 1 lần.")
+    except Exception:
+        pass
+
+# GNOME Input Sources check (warns if raw XKB 'vn' layout is active instead of IBus 'vielotus')
+gsettings_bin = shutil.which("gsettings")
+if gsettings_bin and ("gnome" in desktop.lower() or "ubuntu" in desktop.lower()):
+    try:
+        import ast
+        src_raw = subprocess.check_output([gsettings_bin, "get", "org.gnome.desktop.input-sources", "sources"], stderr=subprocess.DEVNULL, timeout=3).decode("utf-8", errors="replace").strip()
+        if src_raw.startswith("@a(ss) "):
+            src_raw = src_raw[len("@a(ss) "):]
+        src_list = list(ast.literal_eval(src_raw)) if src_raw else []
+        mru_raw = subprocess.check_output([gsettings_bin, "get", "org.gnome.desktop.input-sources", "mru-sources"], stderr=subprocess.DEVNULL, timeout=3).decode("utf-8", errors="replace").strip()
+        if mru_raw.startswith("@a(ss) "):
+            mru_raw = mru_raw[len("@a(ss) "):]
+        mru_list = list(ast.literal_eval(mru_raw)) if mru_raw else []
+        if mru_list and mru_list[0] == ("xkb", "vn"):
+            warnings += 1
+            print("• Nguồn gõ GNOME đang bật  : ⚠ Đang chọn bàn phím tĩnh 'Vietnamese (vi)' xuất mã NFD rời dấu — hãy chuyển sang 'Sen Việt (🇻🇳 tex)'!")
+        elif any(s[0] == "ibus" and s[1] in ("vielotus", "vielotus-vni") for s in (mru_list or src_list)):
+            active_id = mru_list[0][1] if (mru_list and mru_list[0][0] == "ibus") else "vielotus"
+            print(f"• Nguồn gõ GNOME đang bật  : ✓ Đã đăng ký Sen Việt ({active_id})")
+            if ("xkb", "vn") in src_list:
+                print("  ℹ Lưu ý: Danh sách bàn phím còn mục tĩnh 'Vietnamese (vi)' — trên thanh trên cùng hãy chọn '🇻🇳 tex', không chọn 'vi'.")
+    except Exception:
+        pass
+
+print("----------------------------------------------------------------------")
+if errors == 0 and warnings == 0:
+    print("✓ Kết luận: Hệ thống Sen Việt hoạt động hoàn hảo (0 lỗi, 0 cảnh báo).")
+    print("  ℹ Lưu ý GNOME Wayland: Nếu vừa mới cài mà thanh trên cùng chưa hiện '🇻🇳 tex' hoặc Settings hiện chữ 'vielotus', hãy Log Out & Log In 1 lần.")
+elif errors == 0:
+    print(f"• Kết luận: Hoạt động ổn định ({warnings} lưu ý nhỏ). Gợi ý: bấm 'Tự sửa & Kích hoạt' hoặc Log Out & Log In 1 lần.")
+else:
+    print(f"✗ Kết luận: Phát hiện {errors} lỗi cần xử lý. Gợi ý: cài đặt lại gói hoặc chạy 'vielotus-settings --activate'.")
+DOC_PYEOF
+    else
+        echo "✦ === Chẩn đoán Môi trường Sen Việt (VieLotusIM) ==="
+        echo "• Phiên hiển thị : ${XDG_SESSION_TYPE:-unknown} (DISPLAY=${DISPLAY:-} WAYLAND=${WAYLAND_DISPLAY:-})"
+        echo "• Cấu hình       : ${CONFIG_FILE}"
     fi
 }
 
 run_gtk_settings() {
     SMOKE_MODE="${1:-0}"
-    python3 - "${CONFIG_FILE}" "${SMOKE_MODE}" <<'GTK_PYEOF'
-import os, subprocess, sys, webbrowser
+    python3 - "${CONFIG_FILE}" "${SMOKE_MODE}" "$0" <<'GTK_PYEOF'
+import ast, json, os, platform, shutil, subprocess, sys, tempfile, urllib.parse, webbrowser
 
 try:
     import gi
     gi.require_version("Gtk", "3.0")
-    from gi.repository import Gtk, Gdk, GLib
+    gi.require_version("GdkPixbuf", "2.0")
+    from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Pango
 except Exception:
     sys.exit(2)
 
@@ -333,16 +789,76 @@ if not ok:
     sys.exit(2)
 
 config_path = sys.argv[1]
+config_dir = os.path.dirname(os.path.abspath(config_path))
+macros_path = os.path.join(config_dir, "macros.json")
+typing_modes_path = os.path.join(config_dir, "typing-modes.yml")
 smoke_mode = len(sys.argv) > 2 and sys.argv[2] == "1"
+invoked_script = sys.argv[3] if len(sys.argv) > 3 else "/usr/bin/vielotus-settings"
+
+FACTORY_DEFAULT_MACROS = {
+    "sg": "Sài Gòn",
+    "hn": "Hà Nội",
+    "dn": "Đà Nẵng",
+    "hp": "Hải Phòng",
+    "ct": "Cần Thơ",
+    "dl": "Đà Lạt",
+    "vt": "Vũng Tàu",
+    "bd": "Bình Dương",
+    "đn": "Đồng Nai",
+    "qn": "Quảng Ninh",
+    "hue": "Thừa Thiên Huế",
+    "ntr": "Nha Trang",
+    "hl": "Hạ Long",
+    "hcm": "Hồ Chí Minh",
+    "tphcm": "TP. Hồ Chí Minh",
+    "dc": "được",
+    "đc": "được",
+    "ko": "không",
+    "vs": "với",
+    "ng": "người",
+    "ch": "chưa",
+    "nt": "nhắn tin",
+    "kb": "không biết",
+    "tn": "thế nào",
+    "bh": "bây giờ",
+    "tc": "tất cả",
+    "cty": "công ty",
+    "sđt": "số điện thoại",
+    "sdt": "số điện thoại",
+    "tk": "tài khoản",
+    "kh": "khách hàng",
+    "sp": "sản phẩm",
+    "dv": "dịch vụ",
+    "tg": "thời gian",
+    "tt": "thông tin",
+    "lh": "liên hệ",
+    "kn": "kinh nghiệm",
+    "pt": "phát triển",
+    "nv": "nhân viên",
+    "ql": "quản lý",
+    "gd": "giám đốc",
+}
+
+CANONICAL_KEYS = (
+    "INPUT_METHOD",
+    "GRAMMAR_PROFILE",
+    "SMART_BILINGUAL",
+    "MODERN_ORTHOGRAPHY",
+    "QUICK_TELEX",
+    "RELAXED_CODA",
+    "MACRO_ENABLED",
+    "DEVELOPER_MODE",
+    "PREEDIT_UNDERLINE",
+)
 
 cfg = {
     "INPUT_METHOD": "telex",
-    "GRAMMAR_PROFILE": "sen_flex",
+    "GRAMMAR_PROFILE": "classic",
     "SMART_BILINGUAL": "true",
     "MODERN_ORTHOGRAPHY": "true",
     "QUICK_TELEX": "false",
     "RELAXED_CODA": "false",
-    "MACRO_ENABLED": "true",
+    "MACRO_ENABLED": "false",
     "DEVELOPER_MODE": "false",
     "PREEDIT_UNDERLINE": "false",
 }
@@ -353,9 +869,80 @@ if os.path.exists(config_path):
                 k, v = line.strip().split("=", 1)
                 cfg[k.strip()] = v.strip().strip('"').strip("'")
 
-# Always-On Smart Engine parity with macOS
-cfg["SMART_BILINGUAL"] = "true"
-cfg["MODERN_ORTHOGRAPHY"] = "true"
+# Normalize legacy values without clobbering user preferences
+cfg["INPUT_METHOD"] = "vni" if cfg.get("INPUT_METHOD", "").lower() == "vni" else "telex"
+cfg["GRAMMAR_PROFILE"] = "sen_flex" if cfg.get("GRAMMAR_PROFILE", "").lower() in ("sen_flex", "senflex") else "classic"
+for bool_key, default_val in (
+    ("SMART_BILINGUAL", "true"),
+    ("MODERN_ORTHOGRAPHY", "true"),
+    ("QUICK_TELEX", "false"),
+    ("RELAXED_CODA", "false"),
+    ("MACRO_ENABLED", "false"),
+    ("DEVELOPER_MODE", "false"),
+    ("PREEDIT_UNDERLINE", "false"),
+):
+    raw_b = cfg.get(bool_key, default_val).strip().lower()
+    if default_val == "true":
+        cfg[bool_key] = "false" if raw_b in ("false", "0", "no", "off") else "true"
+    else:
+        cfg[bool_key] = "true" if raw_b in ("true", "1", "yes", "on") else "false"
+
+def atomic_write_text(path, content):
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, mode=0o700, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(prefix=".vielotus.", dir=parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as tf:
+            tf.write(content)
+            tf.flush()
+            os.fsync(tf.fileno())
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+def atomic_merge_config_env(path, values):
+    seen = set()
+    out_lines = []
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            for raw_line in f:
+                stripped = raw_line.lstrip()
+                if not stripped or stripped.startswith("#") or "=" not in raw_line:
+                    out_lines.append(raw_line if raw_line.endswith("\n") else raw_line + "\n")
+                    continue
+                k_part, _ = raw_line.split("=", 1)
+                k = k_part.strip()
+                if k in CANONICAL_KEYS:
+                    if k not in seen:
+                        out_lines.append(f'{k}="{values[k]}"\n')
+                        seen.add(k)
+                else:
+                    out_lines.append(raw_line if raw_line.endswith("\n") else raw_line + "\n")
+    for k in CANONICAL_KEYS:
+        if k not in seen:
+            out_lines.append(f'{k}="{values[k]}"\n')
+    atomic_write_text(path, "".join(out_lines))
+
+def resolve_settings_bin():
+    if invoked_script and invoked_script != "-" and os.path.exists(invoked_script):
+        return os.path.abspath(invoked_script)
+    settings_bin = "/usr/bin/vielotus-settings"
+    if os.path.exists(settings_bin):
+        return settings_bin
+    return os.path.abspath(sys.argv[0])
+
+def notify_running_engines():
+    if smoke_mode:
+        return
+    try:
+        subprocess.Popen(["fcitx5-remote", "-r"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
 
 def is_dark_theme():
     env_override = os.environ.get("VIELOTUS_DARK_MODE", "").strip().lower()
@@ -412,18 +999,29 @@ if DARK:
         "bar_bg": "#1c1c24",
         "bar_border": "#2e2e3a",
         "card_bg": "#23232e",
+        "card_hover": "#2a2a38",
         "card_border": "#383848",
         "card_active_bg": "#1d2c48",
-        "card_active_border": "#3b82f6",
-        "strip_bg": "#202238",
-        "strip_border": "#3d4270",
+        "card_active_border": "#4da3ff",
+        "seg_track": "#292936",
+        "seg_active_bg": "#3a3a4c",
+        "seg_active_border": "#525268",
         "fg_primary": "#f5f5f7",
         "fg_secondary": "#a1a1aa",
         "accent": "#4da3ff",
+        "accent_soft": "#1e3658",
         "indigo": "#818cf8",
+        "indigo_soft": "#282b4c",
+        "indigo_border": "#4f5696",
         "teal": "#2dd4bf",
+        "teal_soft": "#183b3a",
+        "teal_border": "#287a70",
         "orange": "#fb923c",
+        "orange_soft": "#3b2818",
+        "orange_border": "#c26a27",
         "green": "#4ade80",
+        "green_soft": "#193826",
+        "green_border": "#2b7a4b",
         "btn_bg": "#2e2e3c",
         "btn_hover": "#3a3a4c",
         "btn_border": "#48485c",
@@ -431,7 +1029,7 @@ if DARK:
         "chip_active_border": "#fb923c",
         "chip_active_fg": "#fdba74",
         "entry_bg": "#181820",
-        "entry_border": "#484862",
+        "entry_border": "#484866",
         "pill_bg": "#2c2c3a",
     }
 else:
@@ -440,115 +1038,261 @@ else:
         "bar_bg": "#ffffff",
         "bar_border": "#e5e5ea",
         "card_bg": "#ffffff",
-        "card_border": "#dcdce4",
+        "card_hover": "#f8f8fc",
+        "card_border": "#e2e2e8",
         "card_active_bg": "#ecf5ff",
         "card_active_border": "#007aff",
-        "strip_bg": "#f0f1fe",
-        "strip_border": "#c7cbf6",
+        "seg_track": "#ebebf0",
+        "seg_active_bg": "#ffffff",
+        "seg_active_border": "#d4d4dc",
         "fg_primary": "#1c1c1e",
-        "fg_secondary": "#636369",
+        "fg_secondary": "#6e6e73",
         "accent": "#007aff",
+        "accent_soft": "#e5f1ff",
         "indigo": "#5856d6",
+        "indigo_soft": "#ededfc",
+        "indigo_border": "#b9b8f3",
         "teal": "#0d9488",
+        "teal_soft": "#e6f7f5",
+        "teal_border": "#99ded6",
         "orange": "#ea580c",
+        "orange_soft": "#fff1e6",
+        "orange_border": "#f7b286",
         "green": "#16a34a",
+        "green_soft": "#e8f8ee",
+        "green_border": "#9be0b4",
         "btn_bg": "#f2f2f7",
-        "btn_hover": "#e5e5ef",
-        "btn_border": "#d1d1db",
-        "chip_active_bg": "#fff3e6",
+        "btn_hover": "#e6e6ef",
+        "btn_border": "#d6d6e0",
+        "chip_active_bg": "#fff1e6",
         "chip_active_border": "#f97316",
         "chip_active_fg": "#c2410c",
-        "entry_bg": "#ffffff",
-        "entry_border": "#c5c7e8",
-        "pill_bg": "#eff0f6",
+        "entry_bg": "#f5f5f9",
+        "entry_border": "#c6c8ec",
+        "pill_bg": "#eff0f5",
     }
 
 css = f"""
-* {{ font-family: "Noto Sans", "DejaVu Sans", "Liberation Sans", "Ubuntu", sans-serif; }}
+* {{ font-family: "Ubuntu", "Cantarell", "Noto Sans", "DejaVu Sans", sans-serif; }}
 .bento-win {{ background-color: {P["win_bg"]}; color: {P["fg_primary"]}; }}
-.bento-header {{ background-color: {P["bar_bg"]}; border-bottom: 1px solid {P["bar_border"]}; padding: 10px 16px; }}
-.bento-footer {{ background-color: {P["bar_bg"]}; border-top: 1px solid {P["bar_border"]}; padding: 8px 16px; }}
-.bento-card, button.bento-card {{
-    background-color: {P["card_bg"]};
-    background-image: none;
-    border: 1px solid {P["card_border"]};
-    border-radius: 10px;
-    padding: 9px 12px;
-    box-shadow: none;
-    text-shadow: none;
-    color: {P["fg_primary"]};
+.bento-header {{ background-color: {P["bar_bg"]}; border-bottom: 1px solid {P["bar_border"]}; padding: 9px 18px; }}
+.bento-footer {{ background-color: {P["bar_bg"]}; border-top: 1px solid {P["bar_border"]}; padding: 7px 18px; }}
+.bento-seg-wrap {{
+    background-color: {P["seg_track"]};
+    border-radius: 8px;
+    padding: 3px;
 }}
-button.bento-card:hover {{
-    background-color: {P["btn_hover"]};
+button.bento-seg-btn {{
+    background-color: transparent;
     background-image: none;
-}}
-.bento-card-active, button.bento-card-active {{
-    background-color: {P["card_active_bg"]};
-    background-image: none;
-    border: 2px solid {P["card_active_border"]};
-    border-radius: 10px;
-    padding: 9px 12px;
-    box-shadow: none;
-    text-shadow: none;
-    color: {P["fg_primary"]};
-}}
-.bento-strip {{
-    background-color: {P["strip_bg"]};
-    border: 1px solid {P["strip_border"]};
-    border-radius: 9px;
-    padding: 7px 12px;
-}}
-button.bento-btn {{
-    background-color: {P["btn_bg"]};
-    background-image: none;
-    border: 1px solid {P["btn_border"]};
-    border-radius: 7px;
-    padding: 4px 10px;
-    color: {P["fg_primary"]};
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 13px;
+    color: {P["fg_secondary"]};
     box-shadow: none;
     text-shadow: none;
     font-weight: 600;
     font-size: 11.5px;
 }}
+button.bento-seg-btn-active {{
+    background-color: {P["seg_active_bg"]};
+    background-image: none;
+    border: 1px solid {P["seg_active_border"]};
+    border-radius: 6px;
+    padding: 4px 13px;
+    color: {P["fg_primary"]};
+    box-shadow: none;
+    text-shadow: none;
+    font-weight: 700;
+    font-size: 11.5px;
+}}
+.bento-card, button.bento-card {{
+    background-color: {P["card_bg"]};
+    background-image: none;
+    border: 1px solid {P["card_border"]};
+    border-radius: 10px;
+    padding: 8px 11px;
+    box-shadow: none;
+    text-shadow: none;
+    color: {P["fg_primary"]};
+}}
+button.bento-card:hover {{
+    background-color: {P["card_hover"]};
+    background-image: none;
+}}
+.bento-card-active, button.bento-card-active {{
+    background-color: {P["card_active_bg"]};
+    background-image: none;
+    border: 1.6px solid {P["card_active_border"]};
+    border-radius: 10px;
+    padding: 8px 11px;
+    box-shadow: none;
+    text-shadow: none;
+    color: {P["fg_primary"]};
+}}
+.bento-card-indigo, button.bento-card-indigo {{
+    background-color: {P["card_bg"]};
+    background-image: none;
+    border: 1px solid {P["indigo_border"]};
+    border-radius: 10px;
+    padding: 8px 11px;
+    box-shadow: none;
+    text-shadow: none;
+    color: {P["fg_primary"]};
+}}
+.bento-card-teal, button.bento-card-teal {{
+    background-color: {P["card_bg"]};
+    background-image: none;
+    border: 1px solid {P["teal_border"]};
+    border-radius: 10px;
+    padding: 8px 11px;
+    box-shadow: none;
+    text-shadow: none;
+    color: {P["fg_primary"]};
+}}
+button.bento-card-teal:hover, button.bento-card-indigo:hover {{
+    background-color: {P["card_hover"]};
+    background-image: none;
+}}
+.bento-card-orange {{
+    background-color: {P["card_bg"]};
+    border: 1px solid {P["orange_border"]};
+    border-radius: 10px;
+    padding: 8px 11px;
+}}
+.bento-card-green {{
+    background-color: {P["card_bg"]};
+    border: 1px solid {P["green_border"]};
+    border-radius: 10px;
+    padding: 7px 11px;
+}}
+.bento-card-warn {{
+    background-color: {P["card_bg"]};
+    border: 1px solid {P["orange_border"]};
+    border-radius: 10px;
+    padding: 7px 11px;
+}}
+button.bento-flat-hit {{
+    background-color: transparent;
+    background-image: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+    text-shadow: none;
+}}
+.bento-ver-pill {{
+    background-color: {P["accent_soft"]};
+    border-radius: 99px;
+    padding: 1px 7px;
+}}
+.bento-icon-accent {{ background-color: {P["accent"]}; border-radius: 6px; min-width: 22px; min-height: 22px; }}
+.bento-icon-muted {{ background-color: {P["pill_bg"]}; border-radius: 6px; min-width: 22px; min-height: 22px; }}
+.bento-icon-indigo {{ background-color: {P["indigo_soft"]}; border-radius: 6px; min-width: 22px; min-height: 22px; }}
+.bento-icon-teal {{ background-color: {P["teal_soft"]}; border-radius: 6px; min-width: 22px; min-height: 22px; }}
+.bento-icon-orange {{ background-color: {P["orange_soft"]}; border-radius: 6px; min-width: 22px; min-height: 22px; }}
+.bento-icon-green {{ background-color: {P["green_soft"]}; border-radius: 7px; min-width: 26px; min-height: 26px; }}
+.bento-code-accent {{ background-color: {P["accent_soft"]}; border-radius: 4px; padding: 1px 6px; }}
+.bento-code-muted {{ background-color: {P["pill_bg"]}; border-radius: 4px; padding: 1px 6px; }}
+.bento-status-teal {{ background-color: {P["teal_soft"]}; border-radius: 99px; padding: 1px 8px; }}
+.bento-status-indigo {{ background-color: {P["indigo_soft"]}; border-radius: 99px; padding: 1px 8px; }}
+.bento-status-off {{ background-color: {P["pill_bg"]}; border-radius: 99px; padding: 1px 8px; }}
+button.bento-btn {{
+    background-color: {P["btn_bg"]};
+    background-image: none;
+    border: 1px solid {P["btn_border"]};
+    border-radius: 6px;
+    padding: 3px 9px;
+    min-height: 22px;
+    color: {P["fg_primary"]};
+    box-shadow: none;
+    text-shadow: none;
+    font-weight: 600;
+    font-size: 11px;
+}}
 button.bento-btn:hover {{
     background-color: {P["btn_hover"]};
     background-image: none;
+}}
+button.bento-btn-primary {{
+    background-color: {P["accent"]};
+    background-image: none;
+    border: 1px solid {P["accent"]};
+    border-radius: 6px;
+    padding: 3px 11px;
+    min-height: 22px;
+    color: #ffffff;
+    box-shadow: none;
+    text-shadow: none;
+    font-weight: 700;
+    font-size: 11px;
 }}
 button.bento-btn-indigo {{
     background-color: #5856d6;
     background-image: none;
     border: 1px solid #4745c4;
     border-radius: 99px;
-    padding: 3px 11px;
+    padding: 3px 10px;
+    min-height: 22px;
     color: #ffffff;
     box-shadow: none;
     text-shadow: none;
     font-weight: 700;
-    font-size: 11px;
+    font-size: 10.5px;
 }}
 button.bento-btn-teal {{
     background-color: #0d9488;
     background-image: none;
     border: 1px solid #0f766e;
     border-radius: 99px;
-    padding: 3px 11px;
+    padding: 3px 10px;
+    min-height: 22px;
     color: #ffffff;
     box-shadow: none;
     text-shadow: none;
     font-weight: 700;
+    font-size: 10.5px;
+}}
+button.bento-btn-soft-indigo {{
+    background-color: {P["indigo_soft"]};
+    background-image: none;
+    border: 1px solid {P["indigo_border"]};
+    border-radius: 7px;
+    padding: 4px 10px;
+    min-height: 24px;
+    color: {P["indigo"]};
+    box-shadow: none;
+    text-shadow: none;
+    font-weight: 700;
     font-size: 11px;
+}}
+button.bento-link {{
+    background-color: transparent;
+    background-image: none;
+    border: none;
+    padding: 2px 4px;
+    min-height: 20px;
+    color: {P["fg_primary"]};
+    box-shadow: none;
+    text-shadow: none;
+    font-weight: 600;
+    font-size: 11px;
+}}
+button.bento-link:hover {{
+    color: {P["accent"]};
 }}
 button.bento-chip {{
     background-color: {P["btn_bg"]};
     background-image: none;
     border: 1px solid {P["btn_border"]};
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 3px 7px;
+    min-height: 22px;
     color: {P["fg_secondary"]};
     box-shadow: none;
     text-shadow: none;
     font-weight: 600;
-    font-size: 11px;
+    font-size: 10.5px;
 }}
 button.bento-chip:checked {{
     background-color: {P["chip_active_bg"]};
@@ -562,8 +1306,9 @@ entry.bento-entry {{
     color: {P["fg_primary"]};
     border: 1px solid {P["entry_border"]};
     border-radius: 6px;
-    padding: 3px 8px;
+    padding: 2px 8px;
     min-height: 24px;
+    font-size: 11.5px;
     box-shadow: none;
 }}
 .bento-pill {{
@@ -571,20 +1316,55 @@ entry.bento-entry {{
     border-radius: 99px;
     padding: 3px 9px;
 }}
-stackswitcher button {{
+button.bento-btn-indigo-rect {{
+    background-color: #5856d6;
+    background-image: none;
+    border: 1px solid #4745c4;
+    border-radius: 7px;
+    padding: 4px 12px;
+    min-height: 24px;
+    color: #ffffff;
+    box-shadow: none;
+    text-shadow: none;
+    font-weight: 700;
+    font-size: 11px;
+}}
+button.bento-fb-cat {{
     background-color: {P["btn_bg"]};
     background-image: none;
     border: 1px solid {P["btn_border"]};
-    color: {P["fg_secondary"]};
+    border-radius: 7px;
+    padding: 4px 9px;
+    min-height: 24px;
+    color: {P["fg_primary"]};
     box-shadow: none;
     text-shadow: none;
-    padding: 4px 12px;
-    font-weight: 600;
+    font-weight: 500;
+    font-size: 11px;
 }}
-stackswitcher button:checked {{
-    background-color: {P["card_active_bg"]};
+button.bento-fb-cat-active {{
+    background-color: {P["indigo_soft"]};
     background-image: none;
-    border-color: {P["card_active_border"]};
+    border: 1px solid {P["indigo_border"]};
+    border-radius: 7px;
+    padding: 4px 9px;
+    min-height: 24px;
+    color: {P["indigo"]};
+    box-shadow: none;
+    text-shadow: none;
+    font-weight: 700;
+    font-size: 11px;
+}}
+.bento-banner-ok {{
+    background-color: {P["green_soft"]};
+    border: 1px solid {P["green_border"]};
+    border-radius: 7px;
+    padding: 5px 10px;
+}}
+textview.bento-doctor, textview.bento-doctor text {{
+    font-family: "Noto Sans Mono", "Liberation Mono", "Ubuntu Mono", monospace;
+    font-size: 11px;
+    background-color: transparent;
     color: {P["fg_primary"]};
 }}
 """.encode("utf-8")
@@ -600,14 +1380,15 @@ try:
 except Exception:
     pass
 
-win = Gtk.Window(title="Sen Việt (VieLotusIM) — Cài đặt")
+win = Gtk.Window(title="Sen Việt — Cài đặt")
 try:
     GLib.set_prgname("vielotus")
     GLib.set_application_name("Sen Việt")
 except Exception:
     pass
 win.set_default_size(640, 420)
-win.set_resizable(True)
+win.set_size_request(640, 420)
+win.set_resizable(False)
 win.set_position(Gtk.WindowPosition.CENTER)
 win.get_style_context().add_class("bento-win")
 try:
@@ -615,59 +1396,116 @@ try:
 except Exception:
     pass
 
+def on_win_key_press(_w, event):
+    if event.keyval == Gdk.KEY_Escape:
+        Gtk.main_quit()
+        return True
+    return False
+win.connect("key-press-event", on_win_key_press)
+
+def make_icon_badge(glyph_text, fg_color, style_class):
+    eb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+    eb.get_style_context().add_class(style_class)
+    eb.set_valign(Gtk.Align.CENTER)
+    lbl = Gtk.Label()
+    lbl.set_markup(f"<span size='x-small' weight='bold' foreground='{fg_color}'>{glyph_text}</span>")
+    lbl.set_halign(Gtk.Align.CENTER)
+    lbl.set_valign(Gtk.Align.CENTER)
+    eb.pack_start(lbl, True, True, 0)
+    return eb
+
+def make_app_logo_widget(px_size=36):
+    candidates = [
+        "/usr/share/icons/hicolor/128x128/apps/vielotus.png",
+        "/usr/share/icons/hicolor/64x64/apps/vielotus.png",
+        "/usr/share/pixmaps/vielotus.png",
+    ]
+    if invoked_script and invoked_script != "-":
+        sdir = os.path.dirname(os.path.abspath(invoked_script))
+        candidates.append(os.path.normpath(os.path.join(sdir, "../../linux-icons/hicolor_128x128_apps/vielotus.png")))
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(p, px_size, px_size, True)
+                img = Gtk.Image.new_from_pixbuf(pb)
+                img.set_valign(Gtk.Align.CENTER)
+                return img
+            except Exception:
+                pass
+    return make_icon_badge("SV", "#ffffff", "bento-icon-accent")
+
 root_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 win.add(root_vbox)
 
-# 1. Top Header Bar (Matches macOS SettingsView.swift & Windows Register.cpp: Brand + 2-Tab Switcher)
-header_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+# ==============================================================================
+# 1. HEADER BAR — Unified with macOS (SettingsView.swift) & Windows (Register.cpp)
+#    2-Tab Segmented Switcher ONLY: [ Cài đặt | Thông tin ]
+# ==============================================================================
+header_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
 header_bar.get_style_context().add_class("bento-header")
 
-brand_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+header_bar.pack_start(make_app_logo_widget(36), False, False, 0)
+
+brand_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+brand_vbox.set_valign(Gtk.Align.CENTER)
+brand_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 title_lbl = Gtk.Label()
-title_lbl.set_markup(
-    f"<span size='large' weight='bold' foreground='{P['fg_primary']}'>🌸 Sen Việt</span> "
-    f"<span size='small' weight='bold' foreground='{P['accent']}'>v2.0.3</span>"
-)
+title_lbl.set_markup(f"<span size='11500' weight='bold' foreground='{P['fg_primary']}'>Sen Việt</span>")
 title_lbl.set_xalign(0)
+ver_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+ver_box.get_style_context().add_class("bento-ver-pill")
+ver_box.set_valign(Gtk.Align.CENTER)
+ver_lbl = Gtk.Label()
+ver_lbl.set_markup(f"<span size='8500' weight='bold' foreground='{P['accent']}'>v2.0.2</span>")
+ver_box.pack_start(ver_lbl, False, False, 0)
+brand_top.pack_start(title_lbl, False, False, 0)
+brand_top.pack_start(ver_box, False, False, 0)
+
 sub_lbl = Gtk.Label()
 sub_lbl.set_markup(
-    f"<span size='small' foreground='{P['fg_secondary']}'>Thuần chuẩn IBus &amp; Fcitx5 • 100% Offline • Không quyền hệ thống</span>"
+    f"<span size='8600' foreground='{P['fg_secondary']}'>Thuần chuẩn IBus &amp; Fcitx5 • C++20 • 100% Offline</span>"
 )
 sub_lbl.set_xalign(0)
-brand_vbox.pack_start(title_lbl, False, False, 0)
+brand_vbox.pack_start(brand_top, False, False, 0)
 brand_vbox.pack_start(sub_lbl, False, False, 0)
 header_bar.pack_start(brand_vbox, True, True, 0)
 
 stack = Gtk.Stack()
-stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-stack.set_transition_duration(120)
+stack.set_transition_type(Gtk.StackTransitionType.NONE if smoke_mode else Gtk.StackTransitionType.CROSSFADE)
+stack.set_transition_duration(0 if smoke_mode else 110)
 
-stack_switcher = Gtk.StackSwitcher()
-stack_switcher.set_stack(stack)
-header_bar.pack_end(stack_switcher, False, False, 0)
+seg_wrap = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+seg_wrap.get_style_context().add_class("bento-seg-wrap")
+seg_wrap.set_valign(Gtk.Align.CENTER)
+btn_seg_settings = Gtk.Button(label="Cài đặt")
+btn_seg_settings.set_can_focus(False)
+btn_seg_about = Gtk.Button(label="Thông tin")
+btn_seg_about.set_can_focus(False)
+seg_wrap.pack_start(btn_seg_settings, False, False, 0)
+seg_wrap.pack_start(btn_seg_about, False, False, 0)
+header_bar.pack_end(seg_wrap, False, False, 0)
 root_vbox.pack_start(header_bar, False, False, 0)
 
+def select_main_tab(tab_name):
+    stack.set_visible_child_name(tab_name)
+    for b, active in ((btn_seg_settings, tab_name == "settings"), (btn_seg_about, tab_name == "about")):
+        ctx = b.get_style_context()
+        ctx.remove_class("bento-seg-btn")
+        ctx.remove_class("bento-seg-btn-active")
+        ctx.add_class("bento-seg-btn-active" if active else "bento-seg-btn")
+        b.queue_draw()
+    seg_wrap.queue_draw()
+    stack.queue_draw()
+
+btn_seg_settings.connect("clicked", lambda *_: select_main_tab("settings"))
+btn_seg_about.connect("clicked", lambda *_: select_main_tab("about"))
+
 def save_current_config(*_):
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "w", encoding="utf-8") as f:
-        for key in (
-            "INPUT_METHOD",
-            "GRAMMAR_PROFILE",
-            "SMART_BILINGUAL",
-            "MODERN_ORTHOGRAPHY",
-            "QUICK_TELEX",
-            "RELAXED_CODA",
-            "MACRO_ENABLED",
-            "DEVELOPER_MODE",
-            "PREEDIT_UNDERLINE",
-        ):
-            f.write(f'{key}="{cfg[key]}"\n')
-    settings_bin = "/usr/bin/vielotus-settings"
-    if not os.path.exists(settings_bin):
-        settings_bin = os.path.abspath(sys.argv[0])
+    atomic_merge_config_env(config_path, cfg)
+    settings_bin = resolve_settings_bin()
     im_flag = "--vni" if cfg["INPUT_METHOD"] == "vni" else "--telex"
     if smoke_mode:
-        subprocess.call([settings_bin, im_flag])
+        subprocess.call([settings_bin, im_flag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         subprocess.Popen(
             [settings_bin, im_flag],
@@ -675,59 +1513,273 @@ def save_current_config(*_):
             stderr=subprocess.DEVNULL,
         )
 
+def load_macros_dict():
+    if os.path.exists(macros_path):
+        try:
+            with open(macros_path, "r", encoding="utf-8") as mf:
+                raw = json.load(mf)
+            if isinstance(raw, dict):
+                cleaned = {}
+                for k, v in raw.items():
+                    ks = str(k).strip().lower()
+                    vs = str(v).strip()
+                    if ks and vs:
+                        cleaned[ks] = vs
+                return cleaned
+        except Exception:
+            pass
+    return dict(FACTORY_DEFAULT_MACROS)
+
+macros_data = load_macros_dict()
+
+MODE_LABELS = {
+    "passthrough": "Passthrough • Tắt bộ gõ",
+    "directReplacement": "Direct • Không gạch chân",
+    "markedText": "Marked Text • Gạch chân chuẩn",
+    "automatic": "Tự động theo hệ thống",
+}
+
+def load_app_rules():
+    rules = []
+    if os.path.exists(typing_modes_path):
+        with open(typing_modes_path, "r", encoding="utf-8", errors="ignore") as rf:
+            for raw_ln in rf:
+                ln = raw_ln.split("#", 1)[0].strip()
+                if not ln or ":" not in ln:
+                    continue
+                pat, mode_raw = ln.split(":", 1)
+                pat = pat.strip().strip('"').strip("'")
+                mode_norm = mode_raw.strip().strip('"').strip("'")
+                low = mode_norm.lower()
+                if low == "passthrough":
+                    mode_norm = "passthrough"
+                elif low in ("directreplacement", "direct_replacement", "direct"):
+                    mode_norm = "directReplacement"
+                elif low in ("markedtext", "marked_text", "preedit"):
+                    mode_norm = "markedText"
+                elif low in ("automatic", "auto"):
+                    mode_norm = "automatic"
+                else:
+                    continue
+                if pat:
+                    rules.append([pat, mode_norm])
+    return rules
+
+app_rules = load_app_rules()
+
+def save_app_rules():
+    lines = [
+        "# Sen Việt (VieLotusIM) — Quy tắc chế độ gõ theo từng ứng dụng (typing-modes.yml)\n",
+        "# Cú pháp: app-pattern: passthrough | directReplacement | markedText | automatic\n",
+        "# Hỗ trợ ký tự đại diện '*': *remmina*, code, *kitty*, org.mozilla.*\n\n",
+    ]
+    for pat, mode_name in app_rules:
+        lines.append(f"{pat}: {mode_name}\n")
+    atomic_write_text(typing_modes_path, "".join(lines))
+    notify_running_engines()
+
+def open_system_keyboard_settings(*_):
+    for cmd in (
+        ["gnome-control-center", "keyboard"],
+        ["fcitx5-configtool"],
+        ["fcitx5-config-qt"],
+        ["ibus-setup"],
+    ):
+        try:
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return
+        except Exception:
+            pass
+
+def get_live_ibus_env():
+    env = dict(os.environ)
+    bus_dir = os.path.join(os.path.expanduser("~/.config"), "ibus", "bus")
+    if os.path.isdir(bus_dir):
+        try:
+            files = sorted(
+                (os.path.join(bus_dir, fn) for fn in os.listdir(bus_dir)),
+                key=lambda p: os.path.getmtime(p),
+                reverse=True,
+            )
+            for bf in files:
+                if not os.path.isfile(bf):
+                    continue
+                pid_s, addr_s = "", ""
+                with open(bf, "r", encoding="utf-8", errors="ignore") as f:
+                    for ln in f:
+                        if ln.startswith("IBUS_DAEMON_PID="):
+                            pid_s = ln.split("=", 1)[1].strip().strip('"').strip("'")
+                        elif ln.startswith("IBUS_ADDRESS="):
+                            addr_s = ln.split("=", 1)[1].strip().strip('"').strip("'")
+                if pid_s.isdigit() and addr_s:
+                    try:
+                        os.kill(int(pid_s), 0)
+                        env["IBUS_ADDRESS"] = addr_s
+                        break
+                    except OSError:
+                        pass
+        except Exception:
+            pass
+    return env
+
+def detect_linux_ime_status():
+    def proc_up(name):
+        try:
+            return subprocess.call(["pgrep", "-x", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+        except Exception:
+            return False
+    fcitx_up = proc_up("fcitx5")
+    ibus_up = proc_up("ibus-daemon")
+    gtk_im = os.environ.get("GTK_IM_MODULE", "")
+    qt_im = os.environ.get("QT_IM_MODULE", "")
+    xmod = os.environ.get("XMODIFIERS", "")
+    im_vars = (gtk_im + " " + qt_im + " " + xmod).lower()
+    if fcitx_up and not ibus_up and "ibus" in im_vars:
+        return ("warn", "Lệch biến môi trường (Fcitx5 ↔ IBus)", "Bấm Riêng Linux để tự động đồng bộ")
+    if ibus_up and not fcitx_up and "fcitx" in im_vars:
+        return ("warn", "Lệch biến môi trường (IBus ↔ Fcitx5)", "Bấm Riêng Linux để tự động đồng bộ")
+    if fcitx_up:
+        return ("ok", "Sen Việt đang bật (Fcitx5)", "Super+Space hoặc Ctrl+Space chuyển gõ")
+    if ibus_up:
+        ibus_cli = shutil.which("ibus")
+        if ibus_cli:
+            try:
+                eng_out = subprocess.check_output(
+                    [ibus_cli, "list-engine"],
+                    env=get_live_ibus_env(),
+                    stderr=subprocess.DEVNULL,
+                    timeout=0.7,
+                ).decode("utf-8", errors="replace")
+                if "vielotus" not in eng_out:
+                    return (
+                        "warn",
+                        "Mới cài đặt: Cần Đăng xuất (Log Out) 1 lần",
+                        "Bấm Riêng Linux → Tự sửa, hoặc Log Out & Log In để hiện đủ Sen Việt",
+                    )
+            except Exception:
+                pass
+        desk_env = (os.environ.get("XDG_CURRENT_DESKTOP", "") + " " + os.environ.get("DESKTOP_SESSION", "")).lower()
+        gset_cli = shutil.which("gsettings")
+        if gset_cli and ("gnome" in desk_env or "ubuntu" in desk_env):
+            try:
+                mru_raw = subprocess.check_output(
+                    [gset_cli, "get", "org.gnome.desktop.input-sources", "mru-sources"],
+                    stderr=subprocess.DEVNULL,
+                    timeout=0.5,
+                ).decode("utf-8", errors="replace").strip()
+                if mru_raw.startswith("@a(ss) "):
+                    mru_raw = mru_raw[len("@a(ss) "):]
+                mru_list = list(ast.literal_eval(mru_raw)) if mru_raw else []
+                if mru_list and mru_list[0] == ("xkb", "vn"):
+                    return (
+                        "warn",
+                        "Đang chọn bàn phím tĩnh 'Vietnamese (vi)'",
+                        "Hãy chọn '🇻🇳 tex' trên thanh trên cùng để gõ dấu (không chọn 'vi')",
+                    )
+            except Exception:
+                pass
+        im_badge = "vni" if cfg["INPUT_METHOD"] == "vni" else "tex"
+        return ("ok", f"Sen Việt đang bật (IBus • {im_badge})", "Super+Space chuyển gõ • Mới cài thiếu tên hãy Log Out 1 lần")
+    return ("warn", "Chưa phát hiện daemon bộ gõ", "Bấm Riêng Linux → Tự sửa & Kích hoạt")
+
+# Forward references for refresh hooks
+f_status = Gtk.Label()
+def refresh_footer_status():
+    sb_on = cfg["SMART_BILINGUAL"] == "true"
+    mo_on = cfg["MODERN_ORTHOGRAPHY"] == "true"
+    parts = []
+    parts.append("Song ngữ Anh–Việt" if sb_on else "Song ngữ: Tắt")
+    parts.append("Chính tả chuẩn mới tự động" if mo_on else "Chính tả cổ điển (òa, úy)")
+    dot_col = P["green"] if sb_on else P["orange"]
+    f_status.set_markup(
+        f"<span foreground='{dot_col}'>●</span> "
+        f"<span size='8600' weight='500' foreground='{P['fg_secondary']}'>{' • '.join(parts)}</span>"
+    )
+
 # ==============================================================================
-# TAB 1: CÀI ĐẶT (Matches macOS & Windows: 3-Card Row 1 + 2x2 Bento Grid + Live Test Strip)
+# TAB 1: CÀI ĐẶT — Exact 3-Row Landscape Bento Layout (macOS & Windows Parity)
+#   Row 1: 3 Cards (Telex Tự Do | VNI (Số 1–9) | Dấu trước âm)
+#   Row 2: 2x2 Bento Grid (Bảng gõ tắt | Chế độ Code | Tốc gõ phụ âm | Tương thích App)
+#   Row 3: System Status + Quick Test Entry + [Riêng Linux] button
 # ==============================================================================
 tab_settings = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
-tab_settings.set_border_width(14)
+tab_settings.set_margin_start(18)
+tab_settings.set_margin_end(18)
+tab_settings.set_margin_top(11)
+tab_settings.set_margin_bottom(8)
 
-# Section 1 Header
 sec1_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 sec1_left = Gtk.Label()
-sec1_left.set_markup(f"<span size='small' weight='bold' foreground='{P['fg_secondary']}'>KIỂU GÕ TIẾNG VIỆT</span>")
+sec1_left.set_markup(f"<span size='7800' weight='bold' foreground='{P['fg_secondary']}'>KIỂU GÕ TIẾNG VIỆT</span>")
 sec1_left.set_xalign(0)
 sec1_right = Gtk.Label()
-sec1_right.set_markup(f"<span size='small' weight='bold' foreground='{P['accent']}'>Bỏ dấu tự do • Z xoá dấu</span>")
+sec1_right.set_markup(f"<span size='8300' weight='600' foreground='{P['accent']}'>Bỏ dấu tự do • Z xoá dấu</span>")
 sec1_right.set_xalign(1)
 sec1_hdr.pack_start(sec1_left, True, True, 0)
 sec1_hdr.pack_end(sec1_right, False, False, 0)
 tab_settings.pack_start(sec1_hdr, False, False, 0)
 
-# Hero Input Method Cards + SenFlex (3 equal cards in 1 horizontal row)
 hero_grid = Gtk.Grid()
 hero_grid.set_column_homogeneous(True)
 hero_grid.set_column_spacing(10)
 
 btn_telex = Gtk.Button()
 btn_vni = Gtk.Button()
+btn_flex = Gtk.Button()
 
-def build_hero_card_content(title, code_pill, desc, active=False):
-    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-    top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+def build_hero_card(glyph, title, code_pill, desc, active, is_toggle=False):
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+    top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    badge_fg = "#ffffff" if active else P["fg_secondary"]
+    badge_cls = "bento-icon-accent" if active else "bento-icon-muted"
+    top_row.pack_start(make_icon_badge(glyph, badge_fg, badge_cls), False, False, 0)
+
     l1 = Gtk.Label()
-    l1.set_markup(f"<span weight='bold' foreground='{P['fg_primary']}'>{title}</span>")
+    l1.set_markup(f"<span size='9600' weight='bold' foreground='{P['fg_primary']}'>{title}</span>")
     l1.set_xalign(0)
-    chk = Gtk.Label()
-    chk_mark = "●" if active else "○"
-    chk_col = P["accent"] if active else P["fg_secondary"]
-    chk.set_markup(f"<span weight='bold' foreground='{chk_col}'>{chk_mark}</span>")
     top_row.pack_start(l1, True, True, 0)
-    top_row.pack_end(chk, False, False, 0)
+
+    if is_toggle:
+        pill_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        pill_box.get_style_context().add_class("bento-ver-pill" if active else "bento-status-off")
+        pill_box.set_valign(Gtk.Align.CENTER)
+        p_lbl = Gtk.Label()
+        p_col = P["accent"] if active else P["fg_secondary"]
+        p_lbl.set_markup(f"<span size='7500' weight='bold' foreground='{p_col}'>{'BẬT' if active else 'TẮT'}</span>")
+        pill_box.pack_start(p_lbl, False, False, 0)
+        top_row.pack_end(pill_box, False, False, 0)
+    else:
+        chk = Gtk.Label()
+        chk_mark = "●" if active else "○"
+        chk_col = P["accent"] if active else P["fg_secondary"]
+        chk.set_markup(f"<span size='10000' weight='bold' foreground='{chk_col}'>{chk_mark}</span>")
+        top_row.pack_end(chk, False, False, 0)
+
+    bot_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    code_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+    code_box.get_style_context().add_class("bento-code-accent" if active else "bento-code-muted")
+    code_lbl = Gtk.Label()
+    code_col = P["accent"] if active else P["fg_secondary"]
+    code_lbl.set_markup(f"<tt><span size='7800' weight='bold' foreground='{code_col}'>{code_pill}</span></tt>")
+    code_box.pack_start(code_lbl, False, False, 0)
+
     l2 = Gtk.Label()
-    l2.set_markup(
-        f"<tt><span size='small' weight='bold' foreground='{P['accent']}'>[{code_pill}]</span></tt> "
-        f"<span size='small' foreground='{P['fg_secondary']}'>{desc}</span>"
-    )
+    l2.set_markup(f"<span size='8300' foreground='{P['fg_secondary']}'>{desc}</span>")
     l2.set_xalign(0)
+    bot_row.pack_start(code_box, False, False, 0)
+    bot_row.pack_start(l2, True, True, 0)
+
     box.pack_start(top_row, False, False, 0)
-    box.pack_start(l2, False, False, 0)
+    box.pack_start(bot_row, False, False, 0)
     return box
 
 def refresh_hero_cards():
     is_vni = cfg["INPUT_METHOD"] == "vni"
-    for btn, active, title, pill, desc in (
-        (btn_telex, not is_vni, "Telex Tự Do", "s f r x j w", "vieetj → việt"),
-        (btn_vni, is_vni, "VNI (Số 1–9)", "1–5 • 6–9", "viet65 → việt"),
+    is_flex = cfg["GRAMMAR_PROFILE"] != "classic"
+    for btn, active, glyph, title, pill, desc, is_tog in (
+        (btn_telex, not is_vni, "TX", "Telex Tự Do", "s f r x j w", "vieetj → việt", False),
+        (btn_vni, is_vni, "19", "VNI (Số 1–9)", "1–5 • 6–9", "viet65 → việt", False),
+        (btn_flex, is_flex, "✦", "Dấu trước âm", "rrung → rủng", "Đang bật" if is_flex else "Đang tắt", True),
     ):
         ctx = btn.get_style_context()
         ctx.remove_class("bento-card")
@@ -736,7 +1788,7 @@ def refresh_hero_cards():
         child = btn.get_child()
         if child is not None:
             btn.remove(child)
-        btn.add(build_hero_card_content(title, pill, desc, active))
+        btn.add(build_hero_card(glyph, title, pill, desc, active, is_tog))
         btn.show_all()
 
 def on_select_im(mode):
@@ -745,137 +1797,149 @@ def on_select_im(mode):
         refresh_hero_cards()
         save_current_config()
 
+def on_toggle_flex(*_):
+    cfg["GRAMMAR_PROFILE"] = "classic" if cfg["GRAMMAR_PROFILE"] != "classic" else "sen_flex"
+    refresh_hero_cards()
+    save_current_config()
+
 btn_telex.connect("clicked", lambda *_: on_select_im("telex"))
 btn_vni.connect("clicked", lambda *_: on_select_im("vni"))
+btn_flex.connect("clicked", on_toggle_flex)
 refresh_hero_cards()
-
-# Card 3 on Row 1: Dấu trước âm (rrung -> rủng)
-flex_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-flex_card.get_style_context().add_class("bento-card")
-flex_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-flex_lbl = Gtk.Label()
-flex_lbl.set_markup(f"<span weight='bold' foreground='{P['fg_primary']}'>Dấu trước âm</span>")
-flex_lbl.set_xalign(0)
-sw_flex = Gtk.Switch()
-sw_flex.set_active(cfg.get("GRAMMAR_PROFILE", "senFlex") != "classic")
-flex_top.pack_start(flex_lbl, True, True, 0)
-flex_top.pack_end(sw_flex, False, False, 0)
-
-flex_sub = Gtk.Label()
-def update_flex_sub():
-    on = sw_flex.get_active()
-    flex_sub.set_markup(
-        f"<tt><span size='small' weight='bold' foreground='{P['accent']}'>[rrung → rủng]</span></tt> "
-        f"<span size='small' foreground='{P['fg_secondary']}'>{'Đang bật' if on else 'Đang tắt'}</span>"
-    )
-update_flex_sub()
-flex_sub.set_xalign(0)
-def on_flex_toggled(sw, _pspec):
-    cfg["GRAMMAR_PROFILE"] = "senFlex" if sw.get_active() else "classic"
-    update_flex_sub()
-    save_current_config()
-sw_flex.connect("notify::active", on_flex_toggled)
-flex_card.pack_start(flex_top, False, False, 0)
-flex_card.pack_start(flex_sub, False, False, 0)
 
 hero_grid.attach(btn_telex, 0, 0, 1, 1)
 hero_grid.attach(btn_vni, 1, 0, 1, 1)
-hero_grid.attach(flex_card, 2, 0, 1, 1)
+hero_grid.attach(btn_flex, 2, 0, 1, 1)
 tab_settings.pack_start(hero_grid, False, False, 0)
 
-# Section 2 Header
+# Row 2: TIỆN ÍCH & TƯƠNG THÍCH (2x2 Bento Grid)
 sec2_lbl = Gtk.Label()
-sec2_lbl.set_markup(f"<span size='small' weight='bold' foreground='{P['fg_secondary']}'>TIỆN ÍCH &amp; TƯƠNG THÍCH</span>")
+sec2_lbl.set_markup(f"<span size='7800' weight='bold' foreground='{P['fg_secondary']}'>TIỆN ÍCH &amp; TƯƠNG THÍCH</span>")
 sec2_lbl.set_xalign(0)
 tab_settings.pack_start(sec2_lbl, False, False, 0)
 
-# 2x2 Bento Feature Grid
 bento_grid = Gtk.Grid()
 bento_grid.set_column_homogeneous(True)
 bento_grid.set_row_homogeneous(True)
 bento_grid.set_column_spacing(10)
 bento_grid.set_row_spacing(9)
 
-# Tile 1: Bảng gõ tắt
+# Tile 1: Bảng gõ tắt (Click left to toggle, click [Quản lý (N)] to open sheet)
 tile1 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-tile1.get_style_context().add_class("bento-card")
 t1_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-t1_lbl = Gtk.Label()
-t1_lbl.set_markup(f"<span weight='bold' foreground='{P['fg_primary']}'>Bảng gõ tắt</span>")
-t1_lbl.set_xalign(0)
-sw_macro = Gtk.Switch()
-sw_macro.set_active(cfg["MACRO_ENABLED"] != "false")
-t1_top.pack_start(t1_lbl, True, True, 0)
-t1_top.pack_end(sw_macro, False, False, 0)
-
-t1_bot = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-t1_sub = Gtk.Label()
-def update_macro_sub():
-    on = sw_macro.get_active()
-    t1_sub.set_markup(
-        f"<span size='small' foreground='{P['fg_secondary']}'>{'Đang bật • 38 cụm từ' if on else 'Đang tắt • Bấm để bật'}</span>"
-    )
-update_macro_sub()
-t1_sub.set_xalign(0)
-btn_macro_mgr = Gtk.Button(label="Quản lý")
+t1_hit_top = Gtk.Button()
+t1_hit_top.get_style_context().add_class("bento-flat-hit")
+btn_macro_mgr = Gtk.Button()
 btn_macro_mgr.get_style_context().add_class("bento-btn")
-def on_open_macros(*_):
-    macro_file = os.path.join(os.path.dirname(config_path), "macros.json")
-    if not os.path.exists(macro_file):
-        os.makedirs(os.path.dirname(macro_file), exist_ok=True)
-        with open(macro_file, "w", encoding="utf-8") as mf:
-            mf.write('{\n  "ks": "Khách sạn",\n  "vn": "Việt Nam",\n  "tphcm": "TP. Hồ Chí Minh",\n  "ko": "không"\n}\n')
-    try:
-        subprocess.Popen(["xdg-open", macro_file])
-    except Exception:
-        pass
-btn_macro_mgr.connect("clicked", on_open_macros)
-t1_bot.pack_start(t1_sub, True, True, 0)
-t1_bot.pack_end(btn_macro_mgr, False, False, 0)
+t1_top.pack_start(t1_hit_top, True, True, 0)
+t1_top.pack_end(btn_macro_mgr, False, False, 0)
+
+t1_hit_bot = Gtk.Button()
+t1_hit_bot.get_style_context().add_class("bento-flat-hit")
 tile1.pack_start(t1_top, False, False, 0)
-tile1.pack_start(t1_bot, False, False, 0)
+tile1.pack_start(t1_hit_bot, False, False, 0)
 
-def on_macro_toggled(sw, _pspec):
-    cfg["MACRO_ENABLED"] = "true" if sw.get_active() else "false"
-    update_macro_sub()
-    save_current_config()
-sw_macro.connect("notify::active", on_macro_toggled)
+def refresh_tile1():
+    on = cfg["MACRO_ENABLED"] != "false"
+    count = len(macros_data)
+    ctx = tile1.get_style_context()
+    ctx.remove_class("bento-card")
+    ctx.remove_class("bento-card-indigo")
+    ctx.add_class("bento-card-indigo" if on else "bento-card")
 
-# Tile 2: Chế độ Code
-tile2 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-tile2.get_style_context().add_class("bento-card")
-t2_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-t2_lbl = Gtk.Label()
-t2_lbl.set_markup(f"<span weight='bold' foreground='{P['fg_primary']}'>Chế độ Code</span>")
-t2_lbl.set_xalign(0)
-sw_dev = Gtk.Switch()
-sw_dev.set_active(cfg["DEVELOPER_MODE"] == "true")
-t2_top.pack_start(t2_lbl, True, True, 0)
-t2_top.pack_end(sw_dev, False, False, 0)
-t2_sub = Gtk.Label()
-def update_dev_sub():
-    on = sw_dev.get_active()
-    t2_sub.set_markup(
-        f"<span size='small' foreground='{P['fg_secondary']}'>{'Tự ngắt dấu trong `code`' if on else 'Gõ tiếng Việt bình thường'}</span>"
+    old_top = t1_hit_top.get_child()
+    if old_top is not None:
+        t1_hit_top.remove(old_top)
+    hb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    hb.pack_start(
+        make_icon_badge("GT", P["indigo"] if on else P["fg_secondary"], "bento-icon-indigo" if on else "bento-icon-muted"),
+        False, False, 0,
     )
-update_dev_sub()
-t2_sub.set_xalign(0)
-tile2.pack_start(t2_top, False, False, 0)
-tile2.pack_start(t2_sub, False, False, 0)
+    tl = Gtk.Label()
+    tl.set_markup(f"<span size='9600' weight='bold' foreground='{P['fg_primary']}'>Bảng gõ tắt</span>")
+    tl.set_xalign(0)
+    hb.pack_start(tl, True, True, 0)
+    t1_hit_top.add(hb)
 
-def on_dev_toggled(sw, _pspec):
-    cfg["DEVELOPER_MODE"] = "true" if sw.get_active() else "false"
-    update_dev_sub()
+    old_bot = t1_hit_bot.get_child()
+    if old_bot is not None:
+        t1_hit_bot.remove(old_bot)
+    sl = Gtk.Label()
+    sl.set_markup(
+        f"<span size='8300' foreground='{P['fg_secondary']}'>"
+        f"{f'Đang bật • {count} cụm từ' if on else 'Đang tắt • Bấm để bật'}</span>"
+    )
+    sl.set_xalign(0)
+    t1_hit_bot.add(sl)
+
+    btn_macro_mgr.set_label(f"Quản lý ({count})")
+    tile1.show_all()
+
+def on_toggle_macro(*_):
+    cfg["MACRO_ENABLED"] = "false" if cfg["MACRO_ENABLED"] != "false" else "true"
+    refresh_tile1()
     save_current_config()
-sw_dev.connect("notify::active", on_dev_toggled)
 
-# Tile 3: Tốc gõ phụ âm (2 chips: Đầu cc/gg/qq & Cuối -g/-h/-k)
+t1_hit_top.connect("clicked", on_toggle_macro)
+t1_hit_bot.connect("clicked", on_toggle_macro)
+refresh_tile1()
+
+# Tile 2: Chế độ Code (Whole card clickable, BẬT / TẮT pill)
+btn_tile2 = Gtk.Button()
+def refresh_tile2():
+    on = cfg["DEVELOPER_MODE"] == "true"
+    ctx = btn_tile2.get_style_context()
+    ctx.remove_class("bento-card")
+    ctx.remove_class("bento-card-teal")
+    ctx.add_class("bento-card-teal" if on else "bento-card")
+    old_c = btn_tile2.get_child()
+    if old_c is not None:
+        btn_tile2.remove(old_c)
+    vb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+    top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    top.pack_start(
+        make_icon_badge("&lt;&gt;", P["teal"] if on else P["fg_secondary"], "bento-icon-teal" if on else "bento-icon-muted"),
+        False, False, 0,
+    )
+    tl = Gtk.Label()
+    tl.set_markup(f"<span size='9600' weight='bold' foreground='{P['fg_primary']}'>Chế độ Code</span>")
+    tl.set_xalign(0)
+    top.pack_start(tl, True, True, 0)
+
+    pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+    pill.get_style_context().add_class("bento-status-teal" if on else "bento-status-off")
+    pill.set_valign(Gtk.Align.CENTER)
+    pl = Gtk.Label()
+    pl.set_markup(
+        f"<span size='7500' weight='bold' foreground='{P['teal'] if on else P['fg_secondary']}'>{'BẬT' if on else 'TẮT'}</span>"
+    )
+    pill.pack_start(pl, False, False, 0)
+    top.pack_end(pill, False, False, 0)
+
+    sub = Gtk.Label()
+    sub.set_markup(
+        f"<span size='8300' foreground='{P['fg_secondary']}'>"
+        f"{'Tự ngắt dấu trong `code`' if on else 'Gõ tiếng Việt bình thường'}</span>"
+    )
+    sub.set_xalign(0)
+    vb.pack_start(top, False, False, 0)
+    vb.pack_start(sub, False, False, 0)
+    btn_tile2.add(vb)
+    btn_tile2.show_all()
+
+def on_toggle_dev(*_):
+    cfg["DEVELOPER_MODE"] = "false" if cfg["DEVELOPER_MODE"] == "true" else "true"
+    refresh_tile2()
+    save_current_config()
+
+btn_tile2.connect("clicked", on_toggle_dev)
+refresh_tile2()
+
+# Tile 3: Tốc gõ phụ âm (2 clean chips: Đầu (cc/gg/qq) & Cuối (-g/-h/-k))
 tile3 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-tile3.get_style_context().add_class("bento-card")
-t3_lbl = Gtk.Label()
-t3_lbl.set_markup(f"<span weight='bold' foreground='{P['fg_primary']}'>⚡ Tốc gõ phụ âm</span>")
-t3_lbl.set_xalign(0)
+t3_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 t3_chips = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+t3_chips.set_homogeneous(True)
 chk_qt = Gtk.ToggleButton(label="Đầu (cc/gg/qq)")
 chk_qt.get_style_context().add_class("bento-chip")
 chk_qt.set_active(cfg["QUICK_TELEX"] == "true")
@@ -884,38 +1948,476 @@ chk_rc.get_style_context().add_class("bento-chip")
 chk_rc.set_active(cfg["RELAXED_CODA"] == "true")
 t3_chips.pack_start(chk_qt, True, True, 0)
 t3_chips.pack_start(chk_rc, True, True, 0)
-tile3.pack_start(t3_lbl, False, False, 0)
+tile3.pack_start(t3_top, False, False, 0)
 tile3.pack_start(t3_chips, False, False, 0)
+
+def refresh_tile3_chrome():
+    any_on = chk_qt.get_active() or chk_rc.get_active()
+    ctx = tile3.get_style_context()
+    ctx.remove_class("bento-card")
+    ctx.remove_class("bento-card-orange")
+    ctx.add_class("bento-card-orange" if any_on else "bento-card")
+    for ch in list(t3_top.get_children()):
+        t3_top.remove(ch)
+    t3_top.pack_start(
+        make_icon_badge("⚡", P["orange"] if any_on else P["fg_secondary"], "bento-icon-orange" if any_on else "bento-icon-muted"),
+        False, False, 0,
+    )
+    tl = Gtk.Label()
+    tl.set_markup(f"<span size='9600' weight='bold' foreground='{P['fg_primary']}'>Tốc gõ phụ âm</span>")
+    tl.set_xalign(0)
+    t3_top.pack_start(tl, True, True, 0)
+    tile3.show_all()
 
 def on_qt_toggled(btn):
     cfg["QUICK_TELEX"] = "true" if btn.get_active() else "false"
+    refresh_tile3_chrome()
     save_current_config()
+
 def on_rc_toggled(btn):
     cfg["RELAXED_CODA"] = "true" if btn.get_active() else "false"
+    refresh_tile3_chrome()
     save_current_config()
+
 chk_qt.connect("toggled", on_qt_toggled)
 chk_rc.connect("toggled", on_rc_toggled)
+refresh_tile3_chrome()
 
-# Tile 4: Tương thích App & Cửa sổ
+# Tile 4: Tương thích App (macOS Adaptive Card Parity -> opens App Rules Sheet)
 tile4 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-tile4.get_style_context().add_class("bento-card")
+tile4.get_style_context().add_class("bento-card-indigo")
 t4_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+t4_top.pack_start(make_icon_badge("✦", P["indigo"], "bento-icon-indigo"), False, False, 0)
 t4_lbl = Gtk.Label()
-t4_lbl.set_markup(f"<span weight='bold' foreground='{P['fg_primary']}'>✦ Tương thích App</span>")
+t4_lbl.set_markup(f"<span size='9600' weight='bold' foreground='{P['fg_primary']}'>Tương thích App</span>")
 t4_lbl.set_xalign(0)
-btn_fcitx = Gtk.Button(label="Phím tắt ↗")
-btn_fcitx.get_style_context().add_class("bento-btn")
-def on_fcitx_clicked(_btn):
-    for cmd in (["gnome-control-center", "keyboard"], ["fcitx5-configtool"], ["fcitx5-config-qt"]):
-        try:
-            subprocess.Popen(cmd)
+btn_app_customize = Gtk.Button(label="Tuỳ chỉnh")
+btn_app_customize.get_style_context().add_class("bento-btn")
+t4_top.pack_start(t4_lbl, True, True, 0)
+t4_top.pack_end(btn_app_customize, False, False, 0)
+
+t4_sub = Gtk.Label()
+t4_sub.set_xalign(0)
+def refresh_tile4():
+    n_rules = len(app_rules)
+    if n_rules > 0:
+        sub_txt = f"Đã ghim {n_rules} quy tắc ứng dụng riêng"
+    elif cfg["PREEDIT_UNDERLINE"] == "true":
+        sub_txt = "Marked Text (Hiện gạch chân dưới từ)"
+    else:
+        sub_txt = "Direct &amp; Stealth tự động theo ứng dụng"
+    t4_sub.set_markup(f"<span size='8300' foreground='{P['fg_secondary']}'>{sub_txt}</span>")
+
+refresh_tile4()
+tile4.pack_start(t4_top, False, False, 0)
+tile4.pack_start(t4_sub, False, False, 0)
+
+bento_grid.attach(tile1, 0, 0, 1, 1)
+bento_grid.attach(btn_tile2, 1, 0, 1, 1)
+bento_grid.attach(tile3, 0, 1, 1, 1)
+bento_grid.attach(tile4, 1, 1, 1, 1)
+tab_settings.pack_start(bento_grid, False, False, 0)
+
+# Row 3: System Status Card + Quick Test Entry + [Riêng Linux] button
+status_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
+status_left = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+status_card.pack_start(status_left, True, True, 0)
+
+test_wrap = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+test_lbl = Gtk.Label()
+test_lbl.set_markup(f"<span size='8300' weight='bold' foreground='{P['indigo']}'>✦ Thử gõ:</span>")
+test_entry = Gtk.Entry()
+test_entry.get_style_context().add_class("bento-entry")
+test_entry.set_placeholder_text("thuongw / viet65...")
+test_entry.set_width_chars(16)
+test_wrap.pack_start(test_lbl, False, False, 0)
+test_wrap.pack_start(test_entry, False, False, 0)
+
+btn_linux_only = Gtk.Button(label="Riêng Linux ⚙")
+btn_linux_only.get_style_context().add_class("bento-btn")
+btn_linux_only.set_tooltip_text("Cài đặt đặc thù của Linux (IBus/Fcitx5, Wayland, Gạch chân, Chẩn đoán)")
+
+status_card.pack_end(btn_linux_only, False, False, 0)
+status_card.pack_end(test_wrap, False, False, 0)
+
+def refresh_status_card():
+    state_kind, st_title, st_sub = detect_linux_ime_status()
+    ctx = status_card.get_style_context()
+    ctx.remove_class("bento-card-green")
+    ctx.remove_class("bento-card-warn")
+    ctx.add_class("bento-card-green" if state_kind == "ok" else "bento-card-warn")
+    for ch in list(status_left.get_children()):
+        status_left.remove(ch)
+    if state_kind == "ok":
+        status_left.pack_start(make_icon_badge("✓", P["green"], "bento-icon-green"), False, False, 0)
+    else:
+        status_left.pack_start(make_icon_badge("!", P["orange"], "bento-icon-orange"), False, False, 0)
+    vb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+    vb.set_valign(Gtk.Align.CENTER)
+    l_t = Gtk.Label()
+    l_t.set_markup(f"<span size='8900' weight='bold' foreground='{P['fg_primary']}'>{GLib.markup_escape_text(st_title)}</span>")
+    l_t.set_xalign(0)
+    l_s = Gtk.Label()
+    sub_col = P["fg_secondary"] if state_kind == "ok" else P["orange"]
+    l_s.set_markup(f"<span size='7800' foreground='{sub_col}'>{GLib.markup_escape_text(st_sub)}</span>")
+    l_s.set_xalign(0)
+    vb.pack_start(l_t, False, False, 0)
+    vb.pack_start(l_s, False, False, 0)
+    status_left.pack_start(vb, True, True, 0)
+    status_card.show_all()
+
+refresh_status_card()
+tab_settings.pack_start(status_card, False, False, 0)
+
+stack.add_named(tab_settings, "settings")
+
+# ==============================================================================
+# MODAL SHEET 1: BẢNG GÕ TẮT CÁ NHÂN (macOS MacroEditorView.swift Parity)
+# ==============================================================================
+def open_macro_sheet(*_, auto_close=False):
+    dlg = Gtk.Window(title="Bảng gõ tắt cá nhân — Sen Việt")
+    dlg.set_transient_for(win)
+    dlg.set_modal(True)
+    dlg.set_default_size(520, 450)
+    dlg.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
+    dlg.get_style_context().add_class("bento-win")
+    dlg.connect("key-press-event", lambda w, ev: w.destroy() if ev.keyval == Gdk.KEY_Escape else False)
+
+    vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+    dlg.add(vbox)
+
+    hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+    hdr.get_style_context().add_class("bento-header")
+    hdr.pack_start(make_icon_badge("GT", P["indigo"], "bento-icon-indigo"), False, False, 0)
+    hv = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+    ht = Gtk.Label()
+    ht.set_markup(f"<span size='10500' weight='bold' foreground='{P['fg_primary']}'>Bảng gõ tắt cá nhân</span>")
+    ht.set_xalign(0)
+    hs = Gtk.Label()
+    hs.set_markup(f"<span size='8300' foreground='{P['fg_secondary']}'>Gõ từ viết tắt rồi nhấn phím Cách hoặc dấu câu để bung cụm từ (tự thích ứng HOA/Thường).</span>")
+    hs.set_xalign(0)
+    hv.pack_start(ht, False, False, 0)
+    hv.pack_start(hs, False, False, 0)
+    hdr.pack_start(hv, True, True, 0)
+    vbox.pack_start(hdr, False, False, 0)
+
+    body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    body.set_border_width(14)
+
+    edit_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    e_key = Gtk.Entry()
+    e_key.get_style_context().add_class("bento-entry")
+    e_key.set_placeholder_text("Viết tắt (vd: hn)")
+    e_key.set_width_chars(14)
+    arr = Gtk.Label(label="→")
+    e_val = Gtk.Entry()
+    e_val.get_style_context().add_class("bento-entry")
+    e_val.set_placeholder_text("Cụm từ thay thế (vd: Hà Nội)")
+    b_save = Gtk.Button(label="Thêm / Lưu")
+    b_save.get_style_context().add_class("bento-btn-primary")
+    b_del = Gtk.Button(label="Xoá")
+    b_del.get_style_context().add_class("bento-btn")
+    edit_bar.pack_start(e_key, False, False, 0)
+    edit_bar.pack_start(arr, False, False, 0)
+    edit_bar.pack_start(e_val, True, True, 0)
+    edit_bar.pack_start(b_save, False, False, 0)
+    edit_bar.pack_start(b_del, False, False, 0)
+    body.pack_start(edit_bar, False, False, 0)
+
+    search_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    e_search = Gtk.Entry()
+    e_search.get_style_context().add_class("bento-entry")
+    e_search.set_placeholder_text("Tìm kiếm phím tắt hoặc từ thay thế...")
+    lbl_cnt = Gtk.Label()
+    search_bar.pack_start(e_search, True, True, 0)
+    search_bar.pack_end(lbl_cnt, False, False, 0)
+    body.pack_start(search_bar, False, False, 0)
+
+    m_store = Gtk.ListStore(str, str)
+    def reload_m_store():
+        q = e_search.get_text().strip().lower()
+        m_store.clear()
+        shown = 0
+        for k in sorted(macros_data.keys()):
+            v = macros_data[k]
+            if not q or q in k.lower() or q in v.lower():
+                m_store.append([k, v])
+                shown += 1
+        lbl_cnt.set_markup(
+            f"<span size='8300' weight='600' foreground='{P['fg_secondary']}'>{shown} / {len(macros_data)} từ</span>"
+        )
+        refresh_tile1()
+
+    tree = Gtk.TreeView(model=m_store)
+    tree.set_headers_visible(True)
+    c1 = Gtk.TreeViewColumn("Phím tắt", Gtk.CellRendererText(weight=Pango.Weight.BOLD), text=0)
+    c1.set_min_width(110)
+    c2 = Gtk.TreeViewColumn("Cụm từ thay thế", Gtk.CellRendererText(), text=1)
+    c2.set_expand(True)
+    tree.append_column(c1)
+    tree.append_column(c2)
+
+    sc = Gtk.ScrolledWindow()
+    sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    sc.get_style_context().add_class("bento-card")
+    sc.add(tree)
+    body.pack_start(sc, True, True, 0)
+    vbox.pack_start(body, True, True, 0)
+
+    def persist_m():
+        payload = json.dumps(dict(sorted(macros_data.items())), ensure_ascii=False, indent=2) + "\n"
+        atomic_write_text(macros_path, payload)
+        reload_m_store()
+        notify_running_engines()
+
+    def on_sel(sel):
+        model, it = sel.get_selected()
+        if it is not None:
+            e_key.set_text(model[it][0])
+            e_val.set_text(model[it][1])
+    tree.get_selection().connect("changed", on_sel)
+    e_search.connect("changed", lambda *_: reload_m_store())
+
+    def on_save(*_):
+        k = e_key.get_text().strip().lower()
+        v = e_val.get_text().strip()
+        if not k or not v or " " in k:
             return
+        macros_data[k] = v
+        e_key.set_text("")
+        e_val.set_text("")
+        persist_m()
+
+    def on_del(*_):
+        model, it = tree.get_selection().get_selected()
+        k = model[it][0] if it is not None else e_key.get_text().strip().lower()
+        if k in macros_data:
+            del macros_data[k]
+            e_key.set_text("")
+            e_val.set_text("")
+            persist_m()
+
+    def on_reset(*_):
+        macros_data.clear()
+        macros_data.update(FACTORY_DEFAULT_MACROS)
+        try:
+            if os.path.exists(macros_path):
+                os.unlink(macros_path)
+        except OSError:
+            pass
+        reload_m_store()
+        notify_running_engines()
+
+    def on_open_json(*_):
+        if not os.path.exists(macros_path):
+            persist_m()
+        try:
+            subprocess.Popen(["xdg-open", macros_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
-btn_fcitx.connect("clicked", on_fcitx_clicked)
-t4_top.pack_start(t4_lbl, True, True, 0)
-t4_top.pack_end(btn_fcitx, False, False, 0)
 
+    b_save.connect("clicked", on_save)
+    e_val.connect("activate", on_save)
+    b_del.connect("clicked", on_del)
+
+    ftr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    ftr.get_style_context().add_class("bento-footer")
+    b_rst = Gtk.Button(label="Khôi phục mặc định")
+    b_rst.get_style_context().add_class("bento-btn")
+    b_rst.connect("clicked", on_reset)
+    b_opn = Gtk.Button(label="Mở macros.json")
+    b_opn.get_style_context().add_class("bento-btn")
+    b_opn.connect("clicked", on_open_json)
+    b_cls = Gtk.Button(label="Đóng")
+    b_cls.get_style_context().add_class("bento-btn-primary")
+    b_cls.connect("clicked", lambda *_: dlg.destroy())
+    ftr.pack_start(b_rst, False, False, 0)
+    ftr.pack_start(b_opn, False, False, 0)
+    ftr.pack_end(b_cls, False, False, 0)
+    vbox.pack_end(ftr, False, False, 0)
+
+    reload_m_store()
+    dlg.show_all()
+    if auto_close:
+        while Gtk.events_pending():
+            Gtk.main_iteration_do(False)
+        dlg.destroy()
+    return dlg
+
+btn_macro_mgr.connect("clicked", open_macro_sheet)
+
+# ==============================================================================
+# MODAL SHEET 2: TƯƠNG THÍCH ỨNG DỤNG (macOS AdaptiveCompatibilitySheet Parity)
+# ==============================================================================
+def open_app_rules_sheet(*_, auto_close=False):
+    dlg = Gtk.Window(title="Tương thích Ứng dụng — Sen Việt")
+    dlg.set_transient_for(win)
+    dlg.set_modal(True)
+    dlg.set_default_size(560, 420)
+    dlg.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
+    dlg.get_style_context().add_class("bento-win")
+    dlg.connect("key-press-event", lambda w, ev: w.destroy() if ev.keyval == Gdk.KEY_Escape else False)
+
+    vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+    dlg.add(vbox)
+
+    hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+    hdr.get_style_context().add_class("bento-header")
+    hdr.pack_start(make_icon_badge("✦", P["indigo"], "bento-icon-indigo"), False, False, 0)
+    hv = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+    ht = Gtk.Label()
+    ht.set_markup(f"<span size='10500' weight='bold' foreground='{P['fg_primary']}'>Tương thích Ứng dụng (Adaptive Hybrid)</span>")
+    ht.set_xalign(0)
+    hs = Gtk.Label()
+    hs.set_markup(f"<span size='8300' foreground='{P['fg_secondary']}'>Gán chế độ gõ riêng (Direct / Marked Text / Passthrough) theo WM_CLASS hoặc glob '*'.</span>")
+    hs.set_xalign(0)
+    hv.pack_start(ht, False, False, 0)
+    hv.pack_start(hs, False, False, 0)
+    hdr.pack_start(hv, True, True, 0)
+    vbox.pack_start(hdr, False, False, 0)
+
+    body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    body.set_border_width(14)
+
+    preset_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    plbl = Gtk.Label()
+    plbl.set_markup(f"<span size='8300' weight='bold' foreground='{P['fg_secondary']}'>Mẫu nhanh:</span>")
+    preset_bar.pack_start(plbl, False, False, 0)
+
+    a_store = Gtk.ListStore(str, str, str)
+    def reload_a_store():
+        a_store.clear()
+        for pat, mname in app_rules:
+            a_store.append([pat, mname, MODE_LABELS.get(mname, mname)])
+        refresh_tile4()
+
+    def upsert_rule(pat, mname):
+        p = pat.strip()
+        if not p or ":" in p:
+            return
+        for item in app_rules:
+            if item[0].lower() == p.lower():
+                item[0] = p
+                item[1] = mname
+                break
+        else:
+            app_rules.append([p, mname])
+
+    def apply_preset(pairs):
+        for pat, mname in pairs:
+            upsert_rule(pat, mname)
+        save_app_rules()
+        reload_a_store()
+
+    for p_title, p_items in (
+        ("+ Remote Desktop", [("*remmina*", "passthrough"), ("*rustdesk*", "passthrough"), ("*xfreerdp*", "passthrough")]),
+        ("+ Terminal GPU", [("*kitty*", "directReplacement"), ("*alacritty*", "directReplacement"), ("*wezterm*", "directReplacement")]),
+        ("+ Web / Electron", [("*chromium*", "markedText"), ("*chrome*", "markedText"), ("*code*", "markedText")]),
+    ):
+        pb = Gtk.Button(label=p_title)
+        pb.get_style_context().add_class("bento-btn")
+        pb.connect("clicked", lambda _b, items=p_items: apply_preset(items))
+        preset_bar.pack_start(pb, False, False, 0)
+    body.pack_start(preset_bar, False, False, 0)
+
+    tree = Gtk.TreeView(model=a_store)
+    tree.set_headers_visible(True)
+    c1 = Gtk.TreeViewColumn("Ứng dụng / WM_CLASS", Gtk.CellRendererText(weight=Pango.Weight.BOLD), text=0)
+    c1.set_min_width(165)
+    c2 = Gtk.TreeViewColumn("Chế độ", Gtk.CellRendererText(), text=2)
+    c2.set_expand(True)
+    tree.append_column(c1)
+    tree.append_column(c2)
+
+    sc = Gtk.ScrolledWindow()
+    sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    sc.get_style_context().add_class("bento-card")
+    sc.add(tree)
+    body.pack_start(sc, True, True, 0)
+
+    edit_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    e_pat = Gtk.Entry()
+    e_pat.get_style_context().add_class("bento-entry")
+    e_pat.set_placeholder_text("WM_CLASS hoặc glob (vd: *remmina*, *kitty*, code)")
+    combo = Gtk.ComboBoxText()
+    for mid, mlbl in (
+        ("passthrough", "Passthrough (Tắt bộ gõ)"),
+        ("directReplacement", "Direct (Không gạch chân)"),
+        ("markedText", "Marked Text (Gạch chân)"),
+        ("automatic", "Tự động"),
+    ):
+        combo.append(mid, mlbl)
+    combo.set_active_id("passthrough")
+    b_add = Gtk.Button(label="Thêm / Lưu")
+    b_add.get_style_context().add_class("bento-btn-primary")
+    b_del = Gtk.Button(label="Xoá")
+    b_del.get_style_context().add_class("bento-btn")
+    edit_bar.pack_start(e_pat, True, True, 0)
+    edit_bar.pack_start(combo, False, False, 0)
+    edit_bar.pack_start(b_add, False, False, 0)
+    edit_bar.pack_start(b_del, False, False, 0)
+    body.pack_start(edit_bar, False, False, 0)
+    vbox.pack_start(body, True, True, 0)
+
+    def on_add(*_):
+        pat = e_pat.get_text().strip()
+        mid = combo.get_active_id() or "passthrough"
+        if not pat or ":" in pat:
+            return
+        upsert_rule(pat, mid)
+        e_pat.set_text("")
+        save_app_rules()
+        reload_a_store()
+
+    def on_del(*_):
+        model, it = tree.get_selection().get_selected()
+        if it is None:
+            return
+        pat = model[it][0]
+        app_rules[:] = [x for x in app_rules if x[0] != pat]
+        save_app_rules()
+        reload_a_store()
+
+    def on_clear_all(*_):
+        app_rules.clear()
+        try:
+            if os.path.exists(typing_modes_path):
+                os.unlink(typing_modes_path)
+        except OSError:
+            pass
+        notify_running_engines()
+        reload_a_store()
+
+    b_add.connect("clicked", on_add)
+    e_pat.connect("activate", on_add)
+    b_del.connect("clicked", on_del)
+
+    ftr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    ftr.get_style_context().add_class("bento-footer")
+    b_clr = Gtk.Button(label="Khôi phục mặc định")
+    b_clr.get_style_context().add_class("bento-btn")
+    b_clr.connect("clicked", on_clear_all)
+    b_cls = Gtk.Button(label="Đóng")
+    b_cls.get_style_context().add_class("bento-btn-primary")
+    b_cls.connect("clicked", lambda *_: dlg.destroy())
+    ftr.pack_start(b_clr, False, False, 0)
+    ftr.pack_end(b_cls, False, False, 0)
+    vbox.pack_end(ftr, False, False, 0)
+
+    reload_a_store()
+    dlg.show_all()
+    if auto_close:
+        while Gtk.events_pending():
+            Gtk.main_iteration_do(False)
+        dlg.destroy()
+    return dlg
+
+btn_app_customize.connect("clicked", open_app_rules_sheet)
+
+# ==============================================================================
+# MODAL SHEET 3: RIÊNG BẢN LINUX (IBus / Fcitx5 / Wayland / Preedit / Doctor)
+#   Isolates all Linux-only settings cleanly away from the shared main window!
+# ==============================================================================
 def get_gnome_per_window():
     try:
         out = subprocess.check_output(
@@ -927,72 +2429,582 @@ def get_gnome_per_window():
     except Exception:
         return False
 
-t4_chips = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-chk_pw = Gtk.ToggleButton(label="Nhớ kiểu gõ riêng từng cửa sổ")
-chk_pw.get_style_context().add_class("bento-chip")
-chk_pw.set_tooltip_text("Nhớ chế độ bộ gõ riêng cho từng cửa sổ ứng dụng (VD: Terminal tiếng Anh, Trình duyệt tiếng Việt)")
-chk_pw.set_active(get_gnome_per_window())
-t4_chips.pack_start(chk_pw, True, True, 0)
+def open_linux_sheet(*_, auto_close=False):
+    dlg = Gtk.Window(title="Cài đặt Riêng cho Linux — Sen Việt")
+    dlg.set_transient_for(win)
+    dlg.set_modal(True)
+    dlg.set_default_size(620, 575)
+    dlg.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
+    dlg.get_style_context().add_class("bento-win")
+    dlg.connect("key-press-event", lambda w, ev: w.destroy() if ev.keyval == Gdk.KEY_Escape else False)
 
-def on_pw_toggled(btn):
-    val = "true" if btn.get_active() else "false"
+    vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+    dlg.add(vbox)
+
+    hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+    hdr.get_style_context().add_class("bento-header")
+    hdr.pack_start(make_icon_badge("LX", "#ffffff", "bento-icon-accent"), False, False, 0)
+    hv = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+    ht = Gtk.Label()
+    ht.set_markup(f"<span size='10500' weight='bold' foreground='{P['fg_primary']}'>Cài đặt &amp; Chẩn đoán Riêng cho Linux</span>")
+    ht.set_xalign(0)
+    hs = Gtk.Label()
+    hs.set_markup(f"<span size='8300' foreground='{P['fg_secondary']}'>Các tuỳ chọn đặc thù môi trường Linux (IBus / Fcitx5 / Wayland / X11) &amp; kiểm tra hệ thống.</span>")
+    hs.set_xalign(0)
+    hv.pack_start(ht, False, False, 0)
+    hv.pack_start(hs, False, False, 0)
+    hdr.pack_start(hv, True, True, 0)
+    vbox.pack_start(hdr, False, False, 0)
+
+    body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
+    body.set_border_width(14)
+
+    note_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    note_card.get_style_context().add_class("bento-card-indigo")
+    note_card.pack_start(make_icon_badge("ℹ", P["indigo"], "bento-icon-indigo"), False, False, 0)
+    note_lbl = Gtk.Label()
+    note_lbl.set_markup(
+        f"<span size='8100' foreground='{P['fg_primary']}'>"
+        f"<b>Lưu ý sau khi mới cài trên Ubuntu / GNOME:</b> Nếu thanh trên cùng chưa hiện <b>tex / vni</b> hoặc Cài đặt Bàn phím "
+        f"chỉ hiện chữ thường <tt>vielotus</tt>, hãy bấm <b>「Tự sửa &amp; Kích hoạt」</b> bên dưới. "
+        f"Trên phiên Wayland, nếu GNOME vẫn giữ bộ nhớ đệm cũ thì chỉ cần <b>Đăng xuất (Log Out) rồi Đăng nhập lại 1 lần</b>."
+        f"</span>"
+    )
+    note_lbl.set_xalign(0)
+    note_lbl.set_line_wrap(True)
+    note_lbl.set_max_width_chars(76)
+    note_card.pack_start(note_lbl, True, True, 0)
+    body.pack_start(note_card, False, False, 0)
+
+    opts_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
+    opts_card.get_style_context().add_class("bento-card")
+    o_hdr = Gtk.Label()
+    o_hdr.set_markup(f"<span size='7800' weight='bold' foreground='{P['fg_secondary']}'>TUỲ CHỌN ĐẶC THÙ LINUX &amp; NGÔN NGỮ</span>")
+    o_hdr.set_xalign(0)
+    opts_card.pack_start(o_hdr, False, False, 0)
+
+    o_grid = Gtk.Grid()
+    o_grid.set_column_homogeneous(True)
+    o_grid.set_column_spacing(8)
+    o_grid.set_row_spacing(6)
+
+    def sync_chip_label(btn, base_text):
+        btn.set_label(f"{'✓ ' if btn.get_active() else '○ '}{base_text}")
+
+    cb_pu = Gtk.ToggleButton()
+    cb_pu.get_style_context().add_class("bento-chip")
+    cb_pu.set_active(cfg["PREEDIT_UNDERLINE"] == "true")
+    sync_chip_label(cb_pu, "Hiện gạch chân từ đang gõ (Preedit)")
+
+    cb_pw = Gtk.ToggleButton()
+    cb_pw.get_style_context().add_class("bento-chip")
+    cb_pw.set_active(get_gnome_per_window())
+    sync_chip_label(cb_pw, "Nhớ bộ gõ riêng từng cửa sổ (GNOME)")
+
+    cb_sb = Gtk.ToggleButton()
+    cb_sb.get_style_context().add_class("bento-chip")
+    cb_sb.set_active(cfg["SMART_BILINGUAL"] == "true")
+    sync_chip_label(cb_sb, "Song ngữ Anh–Việt tự động")
+
+    cb_mo = Gtk.ToggleButton()
+    cb_mo.get_style_context().add_class("bento-chip")
+    cb_mo.set_active(cfg["MODERN_ORTHOGRAPHY"] == "true")
+    sync_chip_label(cb_mo, "Chính tả chuẩn mới (oà, uý)")
+
+    def on_pu(b):
+        sync_chip_label(b, "Hiện gạch chân từ đang gõ (Preedit)")
+        cfg["PREEDIT_UNDERLINE"] = "true" if b.get_active() else "false"
+        refresh_tile4()
+        save_current_config()
+
+    def on_pw(b):
+        sync_chip_label(b, "Nhớ bộ gõ riêng từng cửa sổ (GNOME)")
+        val = "true" if b.get_active() else "false"
+        try:
+            subprocess.Popen(
+                ["gsettings", "set", "org.gnome.desktop.input-sources", "per-window", val],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
+
+    def on_sb(b):
+        sync_chip_label(b, "Song ngữ Anh–Việt tự động")
+        cfg["SMART_BILINGUAL"] = "true" if b.get_active() else "false"
+        refresh_footer_status()
+        save_current_config()
+
+    def on_mo(b):
+        sync_chip_label(b, "Chính tả chuẩn mới (oà, uý)")
+        cfg["MODERN_ORTHOGRAPHY"] = "true" if b.get_active() else "false"
+        refresh_footer_status()
+        save_current_config()
+
+    cb_pu.connect("toggled", on_pu)
+    cb_pw.connect("toggled", on_pw)
+    cb_sb.connect("toggled", on_sb)
+    cb_mo.connect("toggled", on_mo)
+
+    o_grid.attach(cb_pu, 0, 0, 1, 1)
+    o_grid.attach(cb_pw, 1, 0, 1, 1)
+    o_grid.attach(cb_sb, 0, 1, 1, 1)
+    o_grid.attach(cb_mo, 1, 1, 1, 1)
+    opts_card.pack_start(o_grid, False, False, 0)
+    body.pack_start(opts_card, False, False, 0)
+
+    doc_hdr_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    doc_lbl = Gtk.Label()
+    doc_lbl.set_markup(f"<span size='7800' weight='bold' foreground='{P['fg_secondary']}'>CHẨN ĐOÁN MÔI TRƯỜNG HỆ THỐNG (--doctor)</span>")
+    doc_lbl.set_xalign(0)
+    doc_hdr_row.pack_start(doc_lbl, True, True, 0)
+    body.pack_start(doc_hdr_row, False, False, 0)
+
+    d_view = Gtk.TextView()
+    d_view.get_style_context().add_class("bento-doctor")
+    d_view.set_editable(False)
+    d_view.set_cursor_visible(False)
+    d_view.set_monospace(True)
+    d_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+    d_view.set_left_margin(8)
+    d_view.set_right_margin(8)
+    d_view.set_top_margin(6)
+    d_view.set_bottom_margin(6)
+    d_buf = d_view.get_buffer()
+
+    d_sc = Gtk.ScrolledWindow()
+    d_sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    d_sc.get_style_context().add_class("bento-card")
+    d_sc.add(d_view)
+    body.pack_start(d_sc, True, True, 0)
+    vbox.pack_start(body, True, True, 0)
+
+    def run_doc(fix=False):
+        sbin = resolve_settings_bin()
+        args = [sbin, "--doctor", "--fix"] if fix else [sbin, "--doctor"]
+        try:
+            out = subprocess.check_output(args, stderr=subprocess.STDOUT, timeout=6).decode("utf-8", errors="replace")
+        except Exception as exc:
+            out = f"Không thể chạy trình chẩn đoán: {exc}"
+        d_buf.set_text(out)
+        refresh_status_card()
+
+    def copy_doc(*_):
+        s_it, e_it = d_buf.get_bounds()
+        txt = d_buf.get_text(s_it, e_it, False)
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(txt, -1)
+
+    ftr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    ftr.get_style_context().add_class("bento-footer")
+    b_kbd = Gtk.Button(label="Cài đặt Bàn phím ↗")
+    b_kbd.get_style_context().add_class("bento-btn")
+    b_kbd.connect("clicked", open_system_keyboard_settings)
+    b_scan = Gtk.Button(label="Quét lại")
+    b_scan.get_style_context().add_class("bento-btn")
+    b_scan.connect("clicked", lambda *_: run_doc(False))
+    b_fix = Gtk.Button(label="Tự sửa & Kích hoạt")
+    b_fix.get_style_context().add_class("bento-btn")
+    b_fix.connect("clicked", lambda *_: run_doc(True))
+    b_cp = Gtk.Button(label="Sao chép")
+    b_cp.get_style_context().add_class("bento-btn")
+    b_cp.connect("clicked", copy_doc)
+    b_cls = Gtk.Button(label="Đóng")
+    b_cls.get_style_context().add_class("bento-btn-primary")
+    b_cls.connect("clicked", lambda *_: dlg.destroy())
+
+    ftr.pack_start(b_kbd, False, False, 0)
+    ftr.pack_start(b_scan, False, False, 0)
+    ftr.pack_start(b_fix, False, False, 0)
+    ftr.pack_start(b_cp, False, False, 0)
+    ftr.pack_end(b_cls, False, False, 0)
+    vbox.pack_end(ftr, False, False, 0)
+
+    run_doc(False)
+    dlg.show_all()
+    if auto_close:
+        while Gtk.events_pending():
+            Gtk.main_iteration_do(False)
+        dlg.destroy()
+    return dlg
+
+btn_linux_only.connect("clicked", open_linux_sheet)
+
+# ==============================================================================
+# MODAL SHEET 4: GÓP Ý & BÁO LỖI NHANH (1:1 macOS FeedbackSheetView Parity)
+# ==============================================================================
+FEEDBACK_KINDS = (
+    ("word_bug", "✎ Lỗi gõ từ / Song ngữ", "[Word/Bilingual Bug]", "Lỗi gõ từ / Song ngữ"),
+    ("app_compat", "⊞ Tương thích App / Web", "[App/Web Compat]", "Tương thích App / Web"),
+    ("feature_request", "✦ Đề xuất tính năng", "[Feature Request]", "Đề xuất tính năng"),
+    ("general_feedback", "❖ Góp ý chung", "[Feedback]", "Góp ý chung"),
+)
+GITHUB_ISSUES_NEW_URL = "https://github.com/stevedat/VieLotus-IM/issues/new"
+COMMUNITY_ZALO_URL = "https://zalo.me/g/6wwyvywyvhsb0n6rwkze"
+SUPPORT_EMAIL = "eduflows.app@gmail.com"
+
+def detect_os_pretty_name():
     try:
-        subprocess.Popen(
-            ["gsettings", "set", "org.gnome.desktop.input-sources", "per-window", val],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        if os.path.exists("/etc/os-release"):
+            with open("/etc/os-release", "r", encoding="utf-8", errors="ignore") as f:
+                for ln in f:
+                    if ln.startswith("PRETTY_NAME="):
+                        return ln.split("=", 1)[1].strip().strip('"').strip("'")
     except Exception:
         pass
+    return f"Linux {platform.release()}"
 
-chk_pw.connect("toggled", on_pw_toggled)
-tile4.pack_start(t4_top, False, False, 0)
-tile4.pack_start(t4_chips, False, False, 0)
+def open_feedback_sheet(*_, auto_close=False):
+    dlg = Gtk.Window(title="Góp ý & Báo lỗi nhanh — Sen Việt")
+    dlg.set_transient_for(win)
+    dlg.set_modal(True)
+    dlg.set_default_size(660, 505)
+    dlg.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
+    dlg.get_style_context().add_class("bento-win")
+    dlg.connect("key-press-event", lambda w, ev: w.destroy() if ev.keyval == Gdk.KEY_Escape else False)
 
-bento_grid.attach(tile1, 0, 0, 1, 1)
-bento_grid.attach(tile2, 1, 0, 1, 1)
-bento_grid.attach(tile3, 0, 1, 1, 1)
-bento_grid.attach(tile4, 1, 1, 1, 1)
-tab_settings.pack_start(bento_grid, False, False, 0)
+    vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+    dlg.add(vbox)
 
-# Section 3: Compact Smart Engine Status & Live Test Strip (Synchronized with Windows & macOS)
-strip_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-strip_box.get_style_context().add_class("bento-strip")
-strip_lbl = Gtk.Label()
-strip_lbl.set_markup(
-    f"<span size='small' weight='bold' foreground='{P['indigo']}'>✦ Thử gõ nhanh:</span>"
-)
-strip_lbl.set_xalign(0)
-test_entry = Gtk.Entry()
-test_entry.get_style_context().add_class("bento-entry")
-test_entry.set_placeholder_text("Gõ thử tại đây: thuongw / viet65 / window...")
-strip_hint = Gtk.Label()
-strip_hint.set_markup(
-    f"<span size='small' foreground='{P['fg_secondary']}'>Song ngữ • Chuẩn mới</span>"
-)
-strip_box.pack_start(strip_lbl, False, False, 0)
-strip_box.pack_start(test_entry, True, True, 0)
-strip_box.pack_end(strip_hint, False, False, 0)
-tab_settings.pack_start(strip_box, False, False, 0)
+    hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+    hdr.get_style_context().add_class("bento-header")
+    hdr.pack_start(make_icon_badge("GY", P["indigo"], "bento-icon-indigo"), False, False, 0)
+    hv = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+    ht = Gtk.Label()
+    ht.set_markup(f"<span size='10800' weight='bold' foreground='{P['fg_primary']}'>Góp ý &amp; Báo lỗi nhanh</span>")
+    ht.set_xalign(0)
+    hs = Gtk.Label()
+    hs.set_markup(f"<span size='8300' foreground='{P['fg_secondary']}'>Báo lỗi gõ từ song ngữ, tương thích ứng dụng hoặc đề xuất tính năng mới.</span>")
+    hs.set_xalign(0)
+    hv.pack_start(ht, False, False, 0)
+    hv.pack_start(hs, False, False, 0)
+    hdr.pack_start(hv, True, True, 0)
+    btn_x = Gtk.Button(label="✕")
+    btn_x.get_style_context().add_class("bento-btn")
+    btn_x.set_valign(Gtk.Align.CENTER)
+    btn_x.connect("clicked", lambda *_: dlg.destroy())
+    hdr.pack_end(btn_x, False, False, 0)
+    vbox.pack_start(hdr, False, False, 0)
 
-stack.add_titled(tab_settings, "settings", "Cài đặt")
+    body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
+    body.set_border_width(14)
+
+    im_title = "VNI" if cfg["INPUT_METHOD"] == "vni" else "Telex"
+    sess_type = (os.environ.get("XDG_SESSION_TYPE") or ("wayland" if os.environ.get("WAYLAND_DISPLAY") else "x11")).upper()
+    os_name = detect_os_pretty_name()
+    arch_name = platform.machine() or "linux"
+    sys_badge_str = f"Sen Việt v2.0.2 • {os_name} ({arch_name}) • {sess_type} • {im_title}"
+
+    meta_pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    meta_pill.get_style_context().add_class("bento-pill")
+    meta_lbl = Gtk.Label()
+    meta_lbl.set_markup(
+        f"<span foreground='{P['green']}' weight='bold'>●</span> "
+        f"<span font_family='monospace' size='8000' foreground='{P['fg_secondary']}'>{GLib.markup_escape_text(sys_badge_str)}</span>"
+    )
+    meta_lbl.set_xalign(0)
+    meta_pill.pack_start(meta_lbl, True, True, 0)
+    body.pack_start(meta_pill, False, False, 0)
+
+    cat_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+    cat_lbl = Gtk.Label()
+    cat_lbl.set_markup(f"<span size='8300' weight='bold' foreground='{P['fg_primary']}'>Loại phản hồi</span>")
+    cat_lbl.set_xalign(0)
+    cat_box.pack_start(cat_lbl, False, False, 0)
+
+    cat_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    fb_state = {"kind": "word_bug", "preview_open": False}
+    cat_btns = {}
+
+    word_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    word_row.set_homogeneous(True)
+
+    def make_labeled_entry(title_txt, placeholder_txt, mono=False):
+        col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        lb = Gtk.Label()
+        lb.set_markup(f"<span size='8000' weight='600' foreground='{P['fg_secondary']}'>{title_txt}</span>")
+        lb.set_xalign(0)
+        en = Gtk.Entry()
+        en.get_style_context().add_class("bento-entry")
+        en.set_placeholder_text(placeholder_txt)
+        col.pack_start(lb, False, False, 0)
+        col.pack_start(en, False, False, 0)
+        return col, en
+
+    c_typed, e_typed = make_labeled_entry("Phím đã gõ (Tuỳ chọn)", "VD: just, cos...", True)
+    c_actual, e_actual = make_labeled_entry("Sen Việt hiện ra", "VD: jút...", True)
+    c_expect, e_expect = make_labeled_entry("Mong muốn đúng", "VD: just...", True)
+    word_row.pack_start(c_typed, True, True, 0)
+    word_row.pack_start(c_actual, True, True, 0)
+    word_row.pack_start(c_expect, True, True, 0)
+
+    def select_fb_kind(kid):
+        fb_state["kind"] = kid
+        for k_id, b_w in cat_btns.items():
+            sc = b_w.get_style_context()
+            sc.remove_class("bento-fb-cat")
+            sc.remove_class("bento-fb-cat-active")
+            sc.add_class("bento-fb-cat-active" if k_id == kid else "bento-fb-cat")
+        if kid in ("word_bug", "app_compat"):
+            word_row.show_all()
+        else:
+            word_row.hide()
+        refresh_diag_preview()
+
+    for kid, k_btn_lbl, _kpfx, _kt in FEEDBACK_KINDS:
+        kb = Gtk.Button(label=k_btn_lbl)
+        kb.connect("clicked", lambda _b, k=kid: select_fb_kind(k))
+        cat_btns[kid] = kb
+        cat_row.pack_start(kb, True, True, 0)
+
+    cat_box.pack_start(cat_row, False, False, 0)
+    body.pack_start(cat_box, False, False, 0)
+    body.pack_start(word_row, False, False, 0)
+
+    topic_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    c_topic, e_topic = make_labeled_entry("Ứng dụng / Trang web hoặc Chủ đề (Tuỳ chọn)", "VD: Chrome, Firefox, Ghostty, VS Code, Text Editor...")
+    c_email, e_email = make_labeled_entry("Email liên hệ (Tuỳ chọn)", "you@example.com")
+    c_email.set_size_request(195, -1)
+    topic_row.pack_start(c_topic, True, True, 0)
+    topic_row.pack_start(c_email, False, False, 0)
+    body.pack_start(topic_row, False, False, 0)
+
+    desc_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+    desc_lbl = Gtk.Label()
+    desc_lbl.set_markup(f"<span size='8000' weight='600' foreground='{P['fg_secondary']}'>Nội dung chi tiết</span>")
+    desc_lbl.set_xalign(0)
+    desc_col.pack_start(desc_lbl, False, False, 0)
+
+    desc_view = Gtk.TextView()
+    desc_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+    desc_view.set_left_margin(8)
+    desc_view.set_right_margin(8)
+    desc_view.set_top_margin(6)
+    desc_view.set_bottom_margin(6)
+    desc_buf = desc_view.get_buffer()
+    desc_sc = Gtk.ScrolledWindow()
+    desc_sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    desc_sc.set_min_content_height(78)
+    desc_sc.get_style_context().add_class("bento-card")
+    desc_sc.add(desc_view)
+    desc_col.pack_start(desc_sc, True, True, 0)
+    body.pack_start(desc_col, True, True, 0)
+
+    diag_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+    diag_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    cb_diag = Gtk.CheckButton(label="Đính kèm cấu hình bộ gõ & trạng thái hệ thống (ẩn danh, không chứa văn bản gõ)")
+    cb_diag.set_active(True)
+    btn_prev = Gtk.Button(label="Xem dữ liệu đính kèm")
+    btn_prev.get_style_context().add_class("bento-link")
+    diag_top.pack_start(cb_diag, False, False, 0)
+    diag_top.pack_end(btn_prev, False, False, 0)
+    diag_col.pack_start(diag_top, False, False, 0)
+
+    prev_view = Gtk.TextView()
+    prev_view.get_style_context().add_class("bento-doctor")
+    prev_view.set_editable(False)
+    prev_view.set_cursor_visible(False)
+    prev_view.set_monospace(True)
+    prev_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+    prev_view.set_left_margin(8)
+    prev_view.set_right_margin(8)
+    prev_view.set_top_margin(5)
+    prev_view.set_bottom_margin(5)
+    prev_buf = prev_view.get_buffer()
+    prev_sc = Gtk.ScrolledWindow()
+    prev_sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    prev_sc.set_min_content_height(86)
+    prev_sc.get_style_context().add_class("bento-card")
+    prev_sc.add(prev_view)
+    prev_sc.set_no_show_all(True)
+    diag_col.pack_start(prev_sc, False, False, 0)
+    body.pack_start(diag_col, False, False, 0)
+
+    banner_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    banner_box.get_style_context().add_class("bento-banner-ok")
+    banner_box.set_no_show_all(True)
+    banner_lbl = Gtk.Label()
+    banner_lbl.set_xalign(0)
+    banner_lbl.set_line_wrap(True)
+    banner_box.pack_start(banner_lbl, True, True, 0)
+    body.pack_start(banner_box, False, False, 0)
+    vbox.pack_start(body, True, True, 0)
+
+    def get_kind_meta():
+        for item in FEEDBACK_KINDS:
+            if item[0] == fb_state["kind"]:
+                return item
+        return FEEDBACK_KINDS[0]
+
+    def build_ime_diag_block():
+        _sk, st_t, st_s = detect_linux_ime_status()
+        lines = [
+            f"- **Kiểu gõ (Input Method):** `{im_title}` (`{cfg['GRAMMAR_PROFILE']}`)",
+            f"- **Song ngữ thông minh (Smart Bilingual):** `{'Bật' if cfg['SMART_BILINGUAL'] == 'true' else 'Tắt'}`",
+            f"- **Chính tả chuẩn mới (oà, uý):** `{'Bật' if cfg['MODERN_ORTHOGRAPHY'] == 'true' else 'Tắt'}`",
+            f"- **Bảng gõ tắt (Macros):** `{'Bật' if cfg['MACRO_ENABLED'] == 'true' else 'Tắt'}` (`{len(macros_data)}` cụm từ)",
+            f"- **Chế độ Code (Developer Mode):** `{'Bật' if cfg['DEVELOPER_MODE'] == 'true' else 'Tắt'}`",
+            f"- **Tốc gõ phụ âm (QuickTelex / RelaxedCoda):** `{cfg['QUICK_TELEX']} / {cfg['RELAXED_CODA']}`",
+            f"- **Hiện gạch chân Preedit:** `{'Bật' if cfg['PREEDIT_UNDERLINE'] == 'true' else 'Tắt'}`",
+            f"- **Trạng thái Daemon Linux:** `{st_t} — {st_s}`",
+            f"- **Quy tắc Ứng dụng (typing-modes.yml):** `{len(app_rules)} quy tắc cá nhân`",
+        ]
+        return "\n".join(lines)
+
+    def compile_report_and_title():
+        _kid, _kbtn, k_prefix, k_title = get_kind_meta()
+        t_keys = e_typed.get_text().strip() if fb_state["kind"] in ("word_bug", "app_compat") else ""
+        t_act = e_actual.get_text().strip() if fb_state["kind"] in ("word_bug", "app_compat") else ""
+        t_exp = e_expect.get_text().strip() if fb_state["kind"] in ("word_bug", "app_compat") else ""
+        t_top = e_topic.get_text().strip()
+        t_eml = e_email.get_text().strip()
+        s_it, e_it = desc_buf.get_bounds()
+        t_msg = desc_buf.get_text(s_it, e_it, False).strip()
+
+        if t_keys:
+            hdr_topic = f"Gõ `{t_keys}` ra `{t_act or '?'}` (mong muốn `{t_exp or '?'}`)"
+            issue_sum = f'Gõ "{t_keys}" ra "{t_act or "?"}" (mong muốn "{t_exp or "?"}")'
+        elif t_top:
+            hdr_topic = t_top
+            issue_sum = t_top
+        elif t_msg:
+            first_ln = t_msg.splitlines()[0][:64]
+            hdr_topic = k_title
+            issue_sum = first_ln
+        else:
+            hdr_topic = k_title
+            issue_sum = k_title
+
+        issue_title = f"{k_prefix} {issue_sum} (Linux v2.0.2)"
+        lines = [f"### {k_prefix} {hdr_topic}", ""]
+        if t_keys or t_act or t_exp:
+            lines.append(f"- **Chuỗi phím đã gõ (Typed Keys):** `{t_keys or '—'}`")
+            lines.append(f"- **Sen Việt hiện ra (Actual Output):** `{t_act or '—'}`")
+            lines.append(f"- **Kết quả mong muốn (Expected Output):** `{t_exp or '—'}`")
+        if t_top:
+            lines.append(f"- **Ứng dụng / Chủ đề (App / Topic):** `{t_top}`")
+        if t_eml:
+            lines.append(f"- **Email liên hệ (Contact):** `{t_eml}`")
+        if t_msg:
+            lines.extend(["", "**Mô tả chi tiết / Description:**", t_msg, ""])
+        if cb_diag.get_active():
+            lines.extend([
+                f"- **Phiên bản & Hệ điều hành (System):** `{sys_badge_str}`",
+                "",
+                "<details>",
+                "<summary><strong>Thông số Cấu hình &amp; Chẩn đoán Bộ gõ (Linux IME Diagnostics)</strong></summary>",
+                "",
+                build_ime_diag_block(),
+                "",
+                "</details>",
+            ])
+        return "\n".join(lines), issue_title
+
+    def refresh_diag_preview(*_):
+        if fb_state["preview_open"]:
+            rep_md, _ = compile_report_and_title()
+            prev_buf.set_text(rep_md)
+
+    def toggle_diag_preview(*_):
+        fb_state["preview_open"] = not fb_state["preview_open"]
+        if fb_state["preview_open"]:
+            btn_prev.set_label("Ẩn bản xem trước")
+            refresh_diag_preview()
+            prev_sc.show()
+            prev_view.show()
+        else:
+            btn_prev.set_label("Xem dữ liệu đính kèm")
+            prev_sc.hide()
+
+    btn_prev.connect("clicked", toggle_diag_preview)
+    cb_diag.connect("toggled", refresh_diag_preview)
+    for w_entry in (e_typed, e_actual, e_expect, e_topic, e_email):
+        w_entry.connect("changed", refresh_diag_preview)
+    desc_buf.connect("changed", refresh_diag_preview)
+
+    def show_banner(msg_txt):
+        banner_lbl.set_markup(
+            f"<span foreground='{P['green']}' weight='bold'>✓</span> "
+            f"<span size='8300' weight='600' foreground='{P['fg_primary']}'>{GLib.markup_escape_text(msg_txt)}</span>"
+        )
+        banner_box.show()
+        banner_lbl.show()
+
+    def copy_report():
+        rep_md, iss_title = compile_report_and_title()
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(rep_md, -1)
+        return rep_md, iss_title
+
+    def on_fb_copy(*_):
+        copy_report()
+        show_banner("Đã sao chép báo cáo kèm thông số chẩn đoán vào Clipboard!")
+
+    def on_fb_zalo(*_):
+        copy_report()
+        show_banner("Đã chép báo cáo vào Clipboard! Hãy nhấn Ctrl+V (Dán) vào nhóm Zalo Hỗ trợ.")
+        webbrowser.open(COMMUNITY_ZALO_URL)
+
+    def on_fb_email(*_):
+        rep_md, iss_title = copy_report()
+        q = urllib.parse.urlencode({"subject": iss_title, "body": rep_md}, quote_via=urllib.parse.quote)
+        webbrowser.open(f"mailto:{SUPPORT_EMAIL}?{q}")
+        show_banner("Đã mở trình gửi Email (điền sẵn nội dung) và sao chép dự phòng vào Clipboard!")
+
+    def on_fb_github(*_):
+        rep_md, iss_title = copy_report()
+        q = urllib.parse.urlencode({"title": iss_title, "body": rep_md}, quote_via=urllib.parse.quote)
+        webbrowser.open(f"{GITHUB_ISSUES_NEW_URL}?{q}")
+        show_banner("Đã mở GitHub Issues (điền sẵn thông số) và sao chép dự phòng vào Clipboard!")
+
+    ftr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    ftr.get_style_context().add_class("bento-footer")
+    b_cp = Gtk.Button(label="Sao chép")
+    b_cp.get_style_context().add_class("bento-btn")
+    b_cp.connect("clicked", on_fb_copy)
+    b_zl = Gtk.Button(label="Chép & Mở Zalo ↗")
+    b_zl.get_style_context().add_class("bento-btn")
+    b_zl.connect("clicked", on_fb_zalo)
+    b_em = Gtk.Button(label="✉ Gửi Email")
+    b_em.get_style_context().add_class("bento-btn")
+    b_em.connect("clicked", on_fb_email)
+    b_gh = Gtk.Button(label="➤ Gửi lên GitHub Issues")
+    b_gh.get_style_context().add_class("bento-btn-indigo-rect")
+    b_gh.connect("clicked", on_fb_github)
+
+    ftr.pack_start(b_cp, False, False, 0)
+    ftr.pack_start(b_zl, False, False, 0)
+    ftr.pack_start(b_em, False, False, 0)
+    ftr.pack_end(b_gh, False, False, 0)
+    vbox.pack_end(ftr, False, False, 0)
+
+    dlg.show_all()
+    select_fb_kind("word_bug")
+    if auto_close:
+        while Gtk.events_pending():
+            Gtk.main_iteration_do(False)
+        dlg.destroy()
+    return dlg
 
 # ==============================================================================
-# TAB 2: THÔNG TIN (3 tầng cân đối: Sứ mệnh + 3 Pills, Hệ sinh thái AI 2 cột, Hỗ trợ & Cộng đồng)
+# TAB 2: THÔNG TIN — Exact 3-Row Landscape Layout (macOS & Windows Parity)
+#   Row 1: Sứ mệnh Sen Việt + 3 Feature Pills
+#   Row 2: 2 Ecosystem Cards (NidoOffice | YouPersona.com)
+#   Row 3: Hỗ trợ, Cộng đồng & Mã nguồn
 # ==============================================================================
 tab_about = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-tab_about.set_border_width(14)
+tab_about.set_margin_start(18)
+tab_about.set_margin_end(18)
+tab_about.set_margin_top(12)
+tab_about.set_margin_bottom(8)
 
-# Card 1: SỨ MỆNH SEN VIỆT (Toàn chiều ngang + 3 Feature Pills đồng bộ macOS & Windows)
-c_mission = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+c_mission = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
 c_mission.get_style_context().add_class("bento-card")
 m_hdr_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 m_hdr = Gtk.Label()
-m_hdr.set_markup(f"<span size='small' weight='bold' foreground='{P['indigo']}'>✦ SỨ MỆNH SEN VIỆT</span>")
+m_hdr.set_markup(f"<span size='8000' weight='bold' foreground='{P['indigo']}'>✦ SỨ MỆNH SEN VIỆT</span>")
 m_hdr.set_xalign(0)
 m_badge = Gtk.Label()
 m_badge.set_markup(
-    f"<span size='small' foreground='{P['fg_secondary']}'>IBus &amp; Fcitx5 Native • 100% Offline • Không thu thập dữ liệu</span>"
+    f"<span size='7800' weight='600' foreground='{P['fg_secondary']}'>IBus &amp; Fcitx5 Native • C++20 • 100% Offline</span>"
 )
 m_badge.set_xalign(1)
 m_hdr_row.pack_start(m_hdr, False, False, 0)
@@ -1000,7 +3012,7 @@ m_hdr_row.pack_end(m_badge, False, False, 0)
 
 m_body = Gtk.Label()
 m_body.set_markup(
-    f"<span foreground='{P['fg_primary']}'>\"Hãy để việc gõ là gõ — dù bạn gõ tiếng Việt hay tiếng Anh; nhanh hay chậm; gõ là Sen Việt.\"</span>"
+    f"<span size='9500' weight='500' foreground='{P['fg_primary']}'>\"Hãy để việc gõ là gõ — dù bạn gõ tiếng Việt hay tiếng Anh; nhanh hay chậm; gõ là Sen Việt.\"</span>"
 )
 m_body.set_line_wrap(True)
 m_body.set_xalign(0)
@@ -1008,15 +3020,15 @@ m_body.set_xalign(0)
 m_pills = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 for pill_icon, pill_col, pill_txt in (
     ("⚡", P["orange"], "Phản hồi tức thì (&lt; 1ms)"),
-    ("🌐", P["indigo"], "Song ngữ Anh–Việt tự động"),
-    ("🛡", P["green"], "100% Offline • Riêng tư"),
+    ("⇄", P["indigo"], "Song ngữ Anh–Việt tự động"),
+    ("✓", P["green"], "100% Offline • Không quyền ngầm"),
 ):
     p_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
     p_box.get_style_context().add_class("bento-pill")
     p_lbl = Gtk.Label()
     p_lbl.set_markup(
-        f"<span size='small' weight='bold' foreground='{pill_col}'>{pill_icon}</span> "
-        f"<span size='small' weight='bold' foreground='{P['fg_secondary']}'>{pill_txt}</span>"
+        f"<span size='8000' weight='bold' foreground='{pill_col}'>{pill_icon}</span> "
+        f"<span size='8000' weight='600' foreground='{P['fg_secondary']}'>{pill_txt}</span>"
     )
     p_box.pack_start(p_lbl, False, False, 0)
     m_pills.pack_start(p_box, False, False, 0)
@@ -1026,25 +3038,33 @@ c_mission.pack_start(m_body, False, False, 0)
 c_mission.pack_start(m_pills, False, False, 0)
 tab_about.pack_start(c_mission, False, False, 0)
 
-# Card 2: HỆ SINH THÁI AI (2 thẻ ngang đặt song song: NidoOffice | YouPersona.com)
-eco_grid = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+eco_grid = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
 eco_grid.set_homogeneous(True)
 
-def make_eco_card(title, badge, badge_color, sub_title, desc, url, btn_class):
-    card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-    card.get_style_context().add_class("bento-card")
-    top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+def make_eco_card(glyph, glyph_fg, glyph_cls, card_cls, title, badge, badge_col, badge_cls, sub_title, desc, url, btn_class):
+    card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+    card.get_style_context().add_class(card_cls)
+    top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    top_row.pack_start(make_icon_badge(glyph, glyph_fg, glyph_cls), False, False, 0)
+
     title_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
-    lbl_top = Gtk.Label()
-    lbl_top.set_markup(
-        f"<span weight='bold' foreground='{P['fg_primary']}'>{title}</span>  "
-        f"<span size='x-small' weight='bold' foreground='{badge_color}'>[{badge}]</span>"
-    )
-    lbl_top.set_xalign(0)
+    t_line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+    lbl_t = Gtk.Label()
+    lbl_t.set_markup(f"<span size='9600' weight='bold' foreground='{P['fg_primary']}'>{title}</span>")
+    lbl_t.set_xalign(0)
+    b_pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+    b_pill.get_style_context().add_class(badge_cls)
+    b_pill.set_valign(Gtk.Align.CENTER)
+    lbl_b = Gtk.Label()
+    lbl_b.set_markup(f"<span size='6800' weight='bold' foreground='{badge_col}'>{badge}</span>")
+    b_pill.pack_start(lbl_b, False, False, 0)
+    t_line.pack_start(lbl_t, False, False, 0)
+    t_line.pack_start(b_pill, False, False, 0)
+
     lbl_role = Gtk.Label()
-    lbl_role.set_markup(f"<span size='x-small' foreground='{P['fg_secondary']}'>{sub_title}</span>")
+    lbl_role.set_markup(f"<span size='8000' foreground='{P['fg_secondary']}'>{sub_title}</span>")
     lbl_role.set_xalign(0)
-    title_col.pack_start(lbl_top, False, False, 0)
+    title_col.pack_start(t_line, False, False, 0)
     title_col.pack_start(lbl_role, False, False, 0)
 
     btn = Gtk.Button(label="Mở ↗")
@@ -1055,7 +3075,7 @@ def make_eco_card(title, badge, badge_color, sub_title, desc, url, btn_class):
     top_row.pack_end(btn, False, False, 0)
 
     lbl_sub = Gtk.Label()
-    lbl_sub.set_markup(f"<span size='small' foreground='{P['fg_secondary']}'>{desc}</span>")
+    lbl_sub.set_markup(f"<span size='8300' foreground='{P['fg_secondary']}'>{desc}</span>")
     lbl_sub.set_line_wrap(True)
     lbl_sub.set_xalign(0)
     card.pack_start(top_row, False, False, 0)
@@ -1064,75 +3084,86 @@ def make_eco_card(title, badge, badge_color, sub_title, desc, url, btn_class):
 
 eco_grid.pack_start(
     make_eco_card(
-        "NidoOffice",
-        "EDUCENTER.APP",
-        P["indigo"],
+        "AI", P["indigo"], "bento-icon-indigo", "bento-card-indigo",
+        "NidoOffice", "EDUCENTER.APP", P["indigo"], "bento-status-indigo",
         "Bộ ứng dụng Văn phòng AI thế hệ mới",
         "Soạn thảo Tài liệu, Thiết kế Trang trình bày &amp; Bảng tính thông minh tích hợp AI.",
-        "https://educenter.app",
-        "bento-btn-indigo",
+        "https://educenter.app", "bento-btn-indigo",
     ),
-    True,
-    True,
-    0,
+    True, True, 0,
 )
 eco_grid.pack_start(
     make_eco_card(
-        "YouPersona.com",
-        "THU CHI AI",
-        P["teal"],
+        "6J", P["teal"], "bento-icon-teal", "bento-card-teal",
+        "YouPersona.com", "THU CHI AI", P["teal"], "bento-status-teal",
         "Trợ lý Tài chính cá nhân thông minh",
         "Quét hoá đơn tự động, phân bổ Ngân sách 6 chiếc lọ &amp; dự báo dòng tiền bằng AI.",
-        "https://youpersona.com",
-        "bento-btn-teal",
+        "https://youpersona.com", "bento-btn-teal",
     ),
-    True,
-    True,
-    0,
+    True, True, 0,
 )
 tab_about.pack_start(eco_grid, False, False, 0)
 
-# Card 3: HỖ TRỢ, CỘNG ĐỒNG & MÃ NGUỒN (Thanh ngang toàn chiều rộng đồng bộ macOS & Windows)
-c_eco = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-c_eco.get_style_context().add_class("bento-card")
-
 c_links = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-for lbl_txt, link_url in (
-    ("💬 Gửi Góp ý & Báo lỗi ↗", "https://github.com/stevedat/VieLotus-IM/issues"),
+c_links.get_style_context().add_class("bento-card")
+btn_fb_about = Gtk.Button(label="Gửi Góp ý & Báo lỗi")
+btn_fb_about.get_style_context().add_class("bento-btn-soft-indigo")
+btn_fb_about.connect("clicked", open_feedback_sheet)
+c_links.pack_start(btn_fb_about, False, False, 0)
+
+links_right = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+for idx_l, (lbl_txt, link_url) in enumerate((
     ("Cộng đồng Zalo ↗", "https://zalo.me/g/6wwyvywyvhsb0n6rwkze"),
     ("Tác giả: Trần Phát Đạt ↗", "https://www.linkedin.com/in/stevedat/?isSelfProfile=true"),
     ("Mã nguồn GitHub ↗", "https://github.com/stevedat/VieLotus-IM"),
-):
+)):
+    if idx_l > 0:
+        dot = Gtk.Label()
+        dot.set_markup(f"<span size='8000' foreground='{P['fg_secondary']}'>•</span>")
+        links_right.pack_start(dot, False, False, 0)
     b = Gtk.Button(label=lbl_txt)
-    b.get_style_context().add_class("bento-btn")
+    b.get_style_context().add_class("bento-link")
     b.connect("clicked", lambda _b, u=link_url: webbrowser.open(u))
-    c_links.pack_start(b, True, True, 0)
-c_eco.pack_start(c_links, False, False, 0)
-tab_about.pack_start(c_eco, False, False, 0)
+    links_right.pack_start(b, False, False, 0)
 
-stack.add_titled(tab_about, "about", "Thông tin")
+c_links.pack_end(links_right, False, False, 0)
+tab_about.pack_start(c_links, False, False, 0)
+
+stack.add_named(tab_about, "about")
 root_vbox.pack_start(stack, True, True, 0)
+select_main_tab("settings")
 
-# 3. Bottom Footer Bar (Matches macOS & Windows footer: Status + NidoOffice • YouPersona.com • Góp ý & Báo lỗi)
-footer_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+# ==============================================================================
+# 3. CLEAN FOOTER BAR (macOS & Windows Parity)
+# ==============================================================================
+footer_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 footer_bar.get_style_context().add_class("bento-footer")
-f_status = Gtk.Label()
-f_status.set_markup(
-    f"<span foreground='{P['green']}'>●</span> "
-    f"<span size='small' foreground='{P['fg_secondary']}'>Song ngữ Anh–Việt • Chính tả chuẩn mới tự động</span>"
-)
+refresh_footer_status()
 f_status.set_xalign(0)
 footer_bar.pack_start(f_status, True, True, 0)
 
-for f_txt, f_url in (
-    ("NidoOffice", "https://educenter.app"),
-    ("YouPersona.com", "https://youpersona.com"),
-    ("Góp ý & Báo lỗi", "https://github.com/stevedat/VieLotus-IM/issues"),
-):
-    fb = Gtk.Button(label=f_txt)
-    fb.get_style_context().add_class("bento-btn")
-    fb.connect("clicked", lambda _b, u=f_url: webbrowser.open(u))
-    footer_bar.pack_start(fb, False, False, 0)
+btn_f_fb = Gtk.Button(label="Góp ý & Báo lỗi")
+btn_f_fb.get_style_context().add_class("bento-btn")
+btn_f_fb.connect("clicked", open_feedback_sheet)
+footer_bar.pack_end(btn_f_fb, False, False, 0)
+
+dot_f2 = Gtk.Label()
+dot_f2.set_markup(f"<span size='8000' foreground='{P['fg_secondary']}'>•</span>")
+footer_bar.pack_end(dot_f2, False, False, 0)
+
+btn_f_yp = Gtk.Button(label="YouPersona.com")
+btn_f_yp.get_style_context().add_class("bento-link")
+btn_f_yp.connect("clicked", lambda *_: webbrowser.open("https://youpersona.com"))
+footer_bar.pack_end(btn_f_yp, False, False, 0)
+
+dot_f1 = Gtk.Label()
+dot_f1.set_markup(f"<span size='8000' foreground='{P['fg_secondary']}'>•</span>")
+footer_bar.pack_end(dot_f1, False, False, 0)
+
+btn_f_nido = Gtk.Button(label="NidoOffice")
+btn_f_nido.get_style_context().add_class("bento-link")
+btn_f_nido.connect("clicked", lambda *_: webbrowser.open("https://educenter.app"))
+footer_bar.pack_end(btn_f_nido, False, False, 0)
 
 root_vbox.pack_end(footer_bar, False, False, 0)
 
@@ -1143,22 +3174,115 @@ try:
 except Exception:
     pass
 
+def _capture_gtk_window_png(gtk_win, out_path):
+    try:
+        while Gtk.events_pending():
+            Gtk.main_iteration_do(False)
+        gdk_win = gtk_win.get_window()
+        if gdk_win is None:
+            return
+        w, h = gtk_win.get_size()
+        pb = Gdk.pixbuf_get_from_window(gdk_win, 0, 0, w, h)
+        if pb is not None:
+            pb.savev(out_path, "png", [], [])
+    except Exception:
+        pass
+
 if smoke_mode:
-    def _smoke_step():
-        save_current_config()
-        Gtk.main_quit()
-        return False
-    GLib.timeout_add(150, _smoke_step)
+    shot_dir = os.environ.get("VIELOTUS_SCREENSHOT_DIR", "").strip()
+    if not shot_dir:
+        def _fast_smoke():
+            select_main_tab("about")
+            select_main_tab("settings")
+            open_macro_sheet(auto_close=True)
+            open_app_rules_sheet(auto_close=True)
+            open_linux_sheet(auto_close=True)
+            open_feedback_sheet(auto_close=True)
+            save_current_config()
+            Gtk.main_quit()
+            return False
+        GLib.timeout_add(140, _fast_smoke)
+    else:
+        os.makedirs(shot_dir, exist_ok=True)
+        _state = {"step": 0, "dlg": None}
+        def _shot_tick():
+            st = _state["step"]
+            if st == 0:
+                _capture_gtk_window_png(win, os.path.join(shot_dir, "01_main_settings.png"))
+                select_main_tab("about")
+            elif st == 1:
+                _capture_gtk_window_png(win, os.path.join(shot_dir, "02_main_about.png"))
+                select_main_tab("settings")
+            elif st == 2:
+                _state["dlg"] = open_macro_sheet(auto_close=False)
+            elif st == 3:
+                _capture_gtk_window_png(_state["dlg"], os.path.join(shot_dir, "03_sheet_macros.png"))
+                _state["dlg"].destroy()
+                _state["dlg"] = open_app_rules_sheet(auto_close=False)
+            elif st == 4:
+                _capture_gtk_window_png(_state["dlg"], os.path.join(shot_dir, "04_sheet_apps.png"))
+                _state["dlg"].destroy()
+                _state["dlg"] = open_linux_sheet(auto_close=False)
+            elif st == 5:
+                _capture_gtk_window_png(_state["dlg"], os.path.join(shot_dir, "05_sheet_linux.png"))
+                _state["dlg"].destroy()
+                _state["dlg"] = open_feedback_sheet(auto_close=False)
+            elif st == 6:
+                _capture_gtk_window_png(_state["dlg"], os.path.join(shot_dir, "06_sheet_feedback.png"))
+                _state["dlg"].destroy()
+                save_current_config()
+                Gtk.main_quit()
+                return False
+            _state["step"] = st + 1
+            return True
+        GLib.timeout_add(120, _shot_tick)
 
 Gtk.main()
 GTK_PYEOF
 }
 
+# Ensure graphical/DBus session variables are discovered before CLI dispatch too
+UID_CUR="$(id -u 2>/dev/null || echo 1000)"
+if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/${UID_CUR}" ]; then
+    export XDG_RUNTIME_DIR="/run/user/${UID_CUR}"
+fi
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/${UID_CUR}/bus" ]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${UID_CUR}/bus"
+fi
+if [ -z "${WAYLAND_DISPLAY:-}" ] && [ -S "/run/user/${UID_CUR}/wayland-0" ]; then
+    export WAYLAND_DISPLAY="wayland-0"
+fi
+if [ -z "${DISPLAY:-}" ] && [ -S "/tmp/.X11-unix/X0" ]; then
+    export DISPLAY=":0"
+fi
+
+discover_live_ibus_address
+
 case "${1:-}" in
+    --auto-onboard)
+        ONBOARD_MARKER="${CONFIG_DIR}/.onboarded"
+        load_config
+        if [ -f "${ONBOARD_MARKER}" ]; then
+            reload_live_ibus_if_needed
+            repair_and_sync_gnome_sources "vielotus" "1" "${IBUS_WAS_RELOADED:-0}"
+            exit 0
+        fi
+        save_and_apply "${INPUT_METHOD}" "1" "1"
+        if ! pgrep -x ibus-daemon >/dev/null 2>&1 || ! command -v ibus >/dev/null 2>&1; then
+            : > "${ONBOARD_MARKER}" 2>/dev/null || true
+        else
+            discover_live_ibus_address
+            if ibus list-engine 2>/dev/null | grep -q "vielotus"; then
+                : > "${ONBOARD_MARKER}" 2>/dev/null || true
+            fi
+        fi
+        exit 0
+        ;;
     --activate)
         load_config
-        save_and_apply "${INPUT_METHOD}" "1"
+        save_and_apply "${INPUT_METHOD}" "1" "1"
         echo "✅ Đã kích hoạt bộ gõ Sen Việt (${INPUT_METHOD}) cho cả Fcitx5 và IBus."
+        echo "ℹ Lưu ý Ubuntu/GNOME (Wayland): Nếu thanh trên cùng chưa hiện '🇻🇳 tex' hoặc Settings chỉ hiện chữ 'vielotus', hãy Đăng xuất (Log Out) & Đăng nhập lại 1 lần."
         exit 0
         ;;
     --telex)
@@ -1175,7 +3299,17 @@ case "${1:-}" in
         ;;
     --repair-sources)
         load_config
-        repair_and_sync_gnome_sources "vielotus" "1"
+        reload_live_ibus_if_needed
+        repair_and_sync_gnome_sources "vielotus" "1" "${IBUS_WAS_RELOADED:-0}"
+        exit 0
+        ;;
+    --doctor)
+        load_config
+        if [ "${2:-}" = "--fix" ]; then
+            save_and_apply "${INPUT_METHOD}" "1" "1"
+            repair_and_sync_gnome_sources "vielotus" "1" "1"
+        fi
+        run_doctor
         exit 0
         ;;
     --status)
@@ -1199,24 +3333,10 @@ case "${1:-}" in
         ;;
 esac
 
-# Ensure graphical session variables are discovered if launched from a minimal desktop/terminal context
-UID_CUR="$(id -u 2>/dev/null || echo 1000)"
-if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/${UID_CUR}" ]; then
-    export XDG_RUNTIME_DIR="/run/user/${UID_CUR}"
-fi
-if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/${UID_CUR}/bus" ]; then
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${UID_CUR}/bus"
-fi
-if [ -z "${WAYLAND_DISPLAY:-}" ] && [ -S "/run/user/${UID_CUR}/wayland-0" ]; then
-    export WAYLAND_DISPLAY="wayland-0"
-fi
-if [ -z "${DISPLAY:-}" ] && [ -S "/tmp/.X11-unix/X0" ]; then
-    export DISPLAY=":0"
-fi
-
-# Load current configuration and auto-repair any duplicate GNOME Input Sources
+# Load current configuration, ensure live IBus knows vielotus, and auto-repair GNOME Input Sources
 load_config
-repair_and_sync_gnome_sources "vielotus" "1"
+reload_live_ibus_if_needed
+repair_and_sync_gnome_sources "vielotus" "1" "${IBUS_WAS_RELOADED:-0}"
 
 # Launch Native GTK3 Desktop Settings Window if graphical session is available
 if command -v python3 >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
@@ -1225,19 +3345,30 @@ if command -v python3 >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}"
     fi
     # Fallback to Python Tkinter GUI if python3-gi is not installed
     if python3 - "${CONFIG_FILE}" <<'TK_PYEOF' 2>>"${LOG_FILE}"; then
-import os, subprocess, sys
+import os, subprocess, sys, tempfile
 import tkinter as tk
 from tkinter import ttk
 
 config_path = sys.argv[1]
+CANONICAL_KEYS = (
+    "INPUT_METHOD",
+    "GRAMMAR_PROFILE",
+    "SMART_BILINGUAL",
+    "MODERN_ORTHOGRAPHY",
+    "QUICK_TELEX",
+    "RELAXED_CODA",
+    "MACRO_ENABLED",
+    "DEVELOPER_MODE",
+    "PREEDIT_UNDERLINE",
+)
 cfg = {
     "INPUT_METHOD": "telex",
-    "GRAMMAR_PROFILE": "sen_flex",
+    "GRAMMAR_PROFILE": "classic",
     "SMART_BILINGUAL": "true",
     "MODERN_ORTHOGRAPHY": "true",
     "QUICK_TELEX": "false",
     "RELAXED_CODA": "false",
-    "MACRO_ENABLED": "true",
+    "MACRO_ENABLED": "false",
     "DEVELOPER_MODE": "false",
     "PREEDIT_UNDERLINE": "false",
 }
@@ -1249,15 +3380,15 @@ if os.path.exists(config_path):
                 cfg[k.strip()] = v.strip().strip('"').strip("'")
 
 root = tk.Tk()
-root.title("Sen Việt (VieLotusIM v2.0.3) — Cài đặt")
+root.title("Sen Việt (VieLotusIM v2.0.2) — Cài đặt")
 root.geometry("460x320")
 root.resizable(False, False)
 
-im_var = tk.StringVar(value=cfg.get("INPUT_METHOD", "telex"))
-qt_var = tk.BooleanVar(value=cfg.get("QUICK_TELEX", "false") == "true")
-rc_var = tk.BooleanVar(value=cfg.get("RELAXED_CODA", "false") == "true")
-mc_var = tk.BooleanVar(value=cfg.get("MACRO_ENABLED", "true") == "true")
-dv_var = tk.BooleanVar(value=cfg.get("DEVELOPER_MODE", "false") == "true")
+im_var = tk.StringVar(value="vni" if cfg.get("INPUT_METHOD", "").lower() == "vni" else "telex")
+qt_var = tk.BooleanVar(value=cfg.get("QUICK_TELEX", "false").lower() == "true")
+rc_var = tk.BooleanVar(value=cfg.get("RELAXED_CODA", "false").lower() == "true")
+mc_var = tk.BooleanVar(value=cfg.get("MACRO_ENABLED", "false").lower() == "true")
+dv_var = tk.BooleanVar(value=cfg.get("DEVELOPER_MODE", "false").lower() == "true")
 
 def apply_changes(*_):
     cfg["INPUT_METHOD"] = im_var.get()
@@ -1265,24 +3396,50 @@ def apply_changes(*_):
     cfg["RELAXED_CODA"] = "true" if rc_var.get() else "false"
     cfg["MACRO_ENABLED"] = "true" if mc_var.get() else "false"
     cfg["DEVELOPER_MODE"] = "true" if dv_var.get() else "false"
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "w", encoding="utf-8") as f:
-        for k, v in cfg.items():
-            f.write(f'{k}="{v}"\n')
+    parent = os.path.dirname(os.path.abspath(config_path))
+    os.makedirs(parent, mode=0o700, exist_ok=True)
+    seen = set()
+    lines = []
+    if os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8", errors="replace") as rf:
+            for raw_line in rf:
+                st = raw_line.lstrip()
+                if not st or st.startswith("#") or "=" not in raw_line:
+                    lines.append(raw_line if raw_line.endswith("\n") else raw_line + "\n")
+                    continue
+                kp, _ = raw_line.split("=", 1)
+                k = kp.strip()
+                if k in CANONICAL_KEYS:
+                    if k not in seen:
+                        lines.append(f'{k}="{cfg[k]}"\n')
+                        seen.add(k)
+                else:
+                    lines.append(raw_line if raw_line.endswith("\n") else raw_line + "\n")
+    for k in CANONICAL_KEYS:
+        if k not in seen:
+            lines.append(f'{k}="{cfg[k]}"\n')
+    fd, tmp_p = tempfile.mkstemp(prefix=".config.env.", dir=parent)
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as tf:
+        tf.writelines(lines)
+    os.replace(tmp_p, config_path)
+    settings_bin = "/usr/bin/vielotus-settings"
+    if not os.path.exists(settings_bin):
+        settings_bin = os.path.abspath(sys.argv[0])
     im_flag = "--vni" if cfg["INPUT_METHOD"] == "vni" else "--telex"
-    subprocess.Popen(["/usr/bin/vielotus-settings", im_flag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.Popen([settings_bin, im_flag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 frm = ttk.Frame(root, padding=16)
 frm.pack(fill="both", expand=True)
-ttk.Label(frm, text="🌸 Sen Việt (VieLotusIM v2.0.3)", font=("Sans", 13, "bold")).pack(anchor="w")
+ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.2)", font=("Sans", 13, "bold")).pack(anchor="w")
 ttk.Label(frm, text="Kiểu gõ Tiếng Việt (tự động lưu & áp dụng):").pack(anchor="w", pady=(10, 4))
 ttk.Radiobutton(frm, text="Telex Tự Do (s f r x j w — vieetj → việt)", variable=im_var, value="telex", command=apply_changes).pack(anchor="w")
 ttk.Radiobutton(frm, text="VNI Chuẩn (phím số 1–9 — vie65t → việt)", variable=im_var, value="vni", command=apply_changes).pack(anchor="w")
 ttk.Separator(frm, orient="horizontal").pack(fill="x", pady=10)
-ttk.Checkbutton(frm, text="Gõ tắt phụ âm (Quick Telex: cc=ch, gg=gi, kk=kh)", variable=qt_var, command=apply_changes).pack(anchor="w")
-ttk.Checkbutton(frm, text="Phụ âm cuối mở rộng (f, j, w, z)", variable=rc_var, command=apply_changes).pack(anchor="w")
-ttk.Checkbutton(frm, text="Gõ tắt thông minh (vn → Việt Nam)", variable=mc_var, command=apply_changes).pack(anchor="w")
-ttk.Checkbutton(frm, text="Bảo vệ Code & Terminal (IDE / CLI)", variable=dv_var, command=apply_changes).pack(anchor="w")
+ttk.Checkbutton(frm, text="Gõ tắt phụ âm đầu (Quick Telex: cc=ch, gg=gi, kk=kh)", variable=qt_var, command=apply_changes).pack(anchor="w")
+ttk.Checkbutton(frm, text="Gõ tắt phụ âm cuối (Relaxed Coda: -g=-ng, -h=-nh, -k=-ch)", variable=rc_var, command=apply_changes).pack(anchor="w")
+ttk.Checkbutton(frm, text="Bảng gõ tắt thông minh (dc → được, tphcm → TP. Hồ Chí Minh)", variable=mc_var, command=apply_changes).pack(anchor="w")
+ttk.Checkbutton(frm, text="Chế độ Code (tự ngắt dấu trong `code`)", variable=dv_var, command=apply_changes).pack(anchor="w")
 root.mainloop()
 TK_PYEOF
         exit 0
@@ -1305,7 +3462,7 @@ if command -v zenity >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" 
         "${VNI_TRUE}" "vni" "VNI (Gõ dấu bằng phím số 1–9)" \
         --hide-column=2 2>/dev/null || true)
     if [ -n "${CHOICE}" ]; then
-        save_and_apply "${CHOICE}"
+        save_and_apply "${CHOICE}" "1"
         zenity --notification --text="Sen Việt: Đã kích hoạt kiểu gõ $(echo "${CHOICE}" | tr 'a-z' 'A-Z')" 2>/dev/null || true
     fi
     exit 0
@@ -1313,7 +3470,8 @@ fi
 
 echo "🌸 === Sen Việt (VieLotusIM) cho Linux (Fcitx5 & IBus) ==="
 echo "Trạng thái: Đã kích hoạt (${INPUT_METHOD})"
-echo "  • Chuyển sang Telex : vielotus-settings --telex"
-echo "  • Chuyển sang VNI   : vielotus-settings --vni"
-echo "  • Kiểm tra cấu hình : vielotus-settings --status"
+echo "  • Chuyển sang Telex   : vielotus-settings --telex"
+echo "  • Chuyển sang VNI     : vielotus-settings --vni"
+echo "  • Kiểm tra cấu hình   : vielotus-settings --status"
+echo "  • Chẩn đoán hệ thống  : vielotus-settings --doctor"
 echo "  • Khởi động lại Fcitx5: fcitx5 -r -d"

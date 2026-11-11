@@ -7,6 +7,7 @@
   <summary>Bộ gõ tiếng Việt thế hệ mới cho Linux (IBus &amp; Fcitx5)</summary>
   <description>
     <p>Sen Việt (VieLotusIM) là bộ gõ tiếng Việt thuần khiết với lõi xử lý song ngữ thông minh Anh–Việt (Smart Bilingual) và gõ dấu tự do Telex / VNI, hỗ trợ đồng thời cả IBus và Fcitx5 trên Ubuntu, Debian, Linux Mint và Pop!_OS.</p>
+    <p>Lưu ý sau khi cài lần đầu trên Ubuntu / GNOME (Wayland): Bộ cài tự động nạp và thêm Sen Việt (🇻🇳 tex) vào nguồn gõ. Nếu thanh trên cùng chưa hiện biểu tượng bộ gõ hoặc Cài đặt Bàn phím chỉ hiện chữ thường vielotus, bạn chỉ cần Đăng xuất (Log Out) rồi Đăng nhập lại 1 lần duy nhất để GNOME Shell làm mới danh mục IBus.</p>
   </description>
   <launchable type="desktop-id">vielotus.desktop</launchable>
   <url type="homepage">https://stevedat.github.io/VieLotus-IM/</url>

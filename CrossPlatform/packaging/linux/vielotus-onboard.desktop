@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Sen Việt Input Method Auto-Onboarding
+Comment=Automatically registers and activates Sen Việt (Telex) on first desktop login
+Exec=/usr/bin/vielotus-settings --auto-onboard
+Icon=vielotus
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

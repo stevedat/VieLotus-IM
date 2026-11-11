@@ -59,12 +59,12 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
 - Run the installer and press **`Win + Space`** to select **Sen Việt**.
 
 ### 3. Linux (Ubuntu / Debian / Mint / Fedora / Arch / openSUSE — `amd64` & `arm64`)
-- **Ubuntu Official Launchpad PPA (`Ubuntu 22.04 LTS & 24.04 LTS` — `amd64` & `arm64`)**:
+- **Ubuntu Official Launchpad PPA (`Ubuntu 22.04 LTS, 24.04 LTS, 26.04 LTS & 26.10` — `amd64` & `arm64`)**:
   ```bash
-  sudo add-apt-repository ppa:stevedat/vielotus
+  sudo rm -f /etc/apt/sources.list.d/vielotus.list   # Clean legacy v1.x static APT file if upgrading
+  sudo add-apt-repository -y ppa:stevedat/vielotus
   sudo apt update
-  sudo apt install ibus-vielotus     # GNOME / Ubuntu default (IBus)
-  # or: sudo apt install fcitx5-vielotus  # KDE Plasma / Wayland (Fcitx5)
+  sudo apt install -y vielotus   # Installs IBus/Fcitx5 plugins + GTK3 Settings GUI (Synaptic/APT auto-updated)
   ```
 - **Universal one-line installer (Auto-detects `apt`, `dnf`, `pacman`, `zypper` & `x86_64` / `aarch64`)**:
   ```bash
@@ -79,7 +79,8 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
   sudo apt update && sudo apt install ./vielotus_2.0.2_amd64.deb   # or ./vielotus_2.0.2_arm64.deb
   ```
 - **Arch Linux / Manjaro (`PKGBUILD`)**: `cd CrossPlatform/packaging/arch && makepkg -si`
-- **Quick CLI controls**: `vielotus-settings` (GTK3 GUI) · `vielotus-settings --telex` · `vielotus-settings --vni` · `vielotus-settings --status`.
+- **Quick CLI controls**: `vielotus-settings` (GTK3 GUI) · `vielotus-settings --telex` · `vielotus-settings --vni` · `vielotus-settings --doctor`.
+- **First-install note on Ubuntu / GNOME (Wayland)**: The installer auto-reloads IBus and registers **Sen Việt (`🇻🇳 tex`)** immediately (`Super + Space` to switch). If GNOME Shell's top bar still caches the old input list or Settings temporarily displays raw `vielotus`, simply **Log Out and Log In once** (or click **Riêng Linux ⚙ → Tự sửa & Kích hoạt** in `Sen Việt`).
 
 ### 4. iOS / iPadOS & Android
 - **iOS & iPadOS**: Install from the [App Store](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799) → **Settings → General → Keyboard → Keyboards → Add New Keyboard... → Sen Việt**.
