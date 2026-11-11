@@ -17,10 +17,12 @@
 #include <fcitx/inputmethodengine.h>
 #include <fcitx/instance.h>
 #include <fcitx/menu.h>
+#include <ctime>
 #include <filesystem>
 #include <memory>
 #include <string>
 #include "vielotus.h"
+#include "vielotus_linux_common.h"
 
 namespace fcitx {
 
@@ -39,7 +41,7 @@ FCITX_CONFIGURATION(
     OptionWithAnnotation<VieLotusGrammarMode, VieLotusGrammarModeI18NAnnotation>
         grammarProfile{this, "GrammarProfile",
                        _("Chế độ đặt dấu (Grammar Profile)"),
-                       VieLotusGrammarMode::SenFlex};
+                       VieLotusGrammarMode::Classic};
     Option<bool> smartBilingual{
         this, "SmartBilingual",
         _("Song ngữ thông minh Anh-Việt (Smart Bilingual)"), true};
@@ -49,6 +51,18 @@ FCITX_CONFIGURATION(
     Option<bool> quickTelex{
         this, "QuickTelex",
         _("Gõ tắt phụ âm (Quick Telex: cc=ch, gg=gi, kk=kh...)"), false};
+    Option<bool> relaxedCoda{
+        this, "RelaxedCoda",
+        _("Gõ vần tốc ký cuối từ (Relaxed Coda: -g→-ng, -h, -k)"), false};
+    Option<bool> macroEnabled{
+        this, "MacroEnabled",
+        _("Gõ tắt thông minh (Smart Macro)"), false};
+    Option<bool> developerMode{
+        this, "DeveloperMode",
+        _("Chế độ lập trình viên: bỏ qua trong `code`"), false};
+    Option<bool> preeditUnderline{
+        this, "PreeditUnderline",
+        _("Hiện gạch chân khi đang gõ (Preedit Underline)"), false};
 );
 
 class VieLotusEngine;
@@ -69,12 +83,16 @@ public:
     vielotus_session_t session() const { return session_; }
 
 private:
+    bool prepareWordStartFromSurrounding(uint32_t sym, uint64_t t0Us);
+    void syncArmedWordFromText(const std::string& textStr, size_t cursorCp, size_t anchorCp);
+
     VieLotusEngine* engine_;
     InputContext* ic_;
     vielotus_session_t session_;
     int32_t inputMethod_{VIELOTUS_INPUT_TELEX};
     bool replayedAfterBackspace_{false};
     bool preeditVisible_{false};
+    vl_dev_code_state_t devCodeState_{};
 };
 
 class VieLotusEngine : public InputMethodEngineV2 {
@@ -106,10 +124,13 @@ public:
 
     Instance* instance() const { return instance_; }
     const VieLotusConfig& config() const { return config_; }
+    vl_presentation_mode_t resolvePresentationMode(InputContext* ic) const;
 
 private:
+    void ensureConfigPaths();
     void loadUserEnvConfig();
     bool reloadUserEnvConfigIfChanged();
+    void reloadAuxiliaryDataIfChanged();
     void saveUserEnvConfig() const;
     void applyConfigToAllContexts();
 
@@ -117,8 +138,14 @@ private:
     VieLotusConfig config_;
     int32_t envInputMethod_{VIELOTUS_INPUT_TELEX};
     bool hasEnvInputMethod_{false};
+    std::string cachedConfigDir_;
     std::string cachedEnvPath_;
-    std::filesystem::file_time_type envConfigMtime_{};
+    std::string cachedMacrosPath_;
+    std::string cachedRulesPath_;
+    time_t envConfigMtime_{0};
+    time_t macrosMtime_{0};
+    bool macrosHadFile_{false};
+    vl_presentation_rules_t presentationRules_{};
     FactoryFor<VieLotusState> factory_;
     std::unique_ptr<SimpleAction> settingsAction_;
     std::vector<ScopedConnection> connections_;

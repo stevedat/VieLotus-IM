@@ -1,6 +1,6 @@
 # Maintainer: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
 pkgname=vielotus
-pkgver=2.0.1
+pkgver=2.0.2
 pkgrel=1
 pkgdesc="Sen Việt (VieLotusIM) — Next-Gen Vietnamese Input Method for IBus & Fcitx5 (Pure C++20 Native Engine)"
 arch=('x86_64' 'aarch64')
@@ -18,7 +18,8 @@ build() {
 
     cmake -S CrossPlatform/capi-native -B build-core \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/usr
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DVIELOTUS_INSTALL_DEV=ON
     cmake --build build-core
 
     cmake -S CrossPlatform/fcitx5-vielotus -B build-fcitx5 \
@@ -46,9 +47,14 @@ package() {
     DESTDIR="${pkgdir}" cmake --install build-ibus
 
     install -Dm644 Resources/typing-modes.yml \
+        "${pkgdir}/usr/share/vielotus/typing-modes.yml"
+    install -Dm644 Resources/typing-modes.yml \
         "${pkgdir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml"
     install -Dm755 CrossPlatform/packaging/linux/vielotus-settings \
         "${pkgdir}/usr/bin/vielotus-settings"
+    ln -sf vielotus-settings "${pkgdir}/usr/bin/vielotus"
+    install -Dm644 CrossPlatform/packaging/linux/vielotus-settings.1 \
+        "${pkgdir}/usr/share/man/man1/vielotus-settings.1"
     install -Dm644 CrossPlatform/packaging/linux/vielotus.desktop \
         "${pkgdir}/usr/share/applications/vielotus.desktop"
     install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml \

@@ -59,12 +59,12 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
 - Chạy bộ cài và nhấn **`Win + Space`** để chuyển sang **Sen Việt**.
 
 ### 3. Linux (Ubuntu / Debian / Mint / Fedora / Arch / openSUSE — `amd64` & `arm64`)
-- **Kho Launchpad PPA chính thức cho Ubuntu (`Ubuntu 22.04 LTS & 24.04 LTS` — `amd64` & `arm64`)**:
+- **Kho Launchpad PPA chính thức cho Ubuntu (`Ubuntu 22.04 LTS, 24.04 LTS, 26.04 LTS & 26.10` — `amd64` & `arm64`)**:
   ```bash
-  sudo add-apt-repository ppa:stevedat/vielotus
+  sudo rm -f /etc/apt/sources.list.d/vielotus.list   # Dọn nguồn APT tĩnh v1.x cũ (nếu từng cài bản 1.1.1)
+  sudo add-apt-repository -y ppa:stevedat/vielotus
   sudo apt update
-  sudo apt install ibus-vielotus     # GNOME / Ubuntu mặc định (IBus)
-  # hoặc: sudo apt install fcitx5-vielotus  # KDE Plasma / Wayland (Fcitx5)
+  sudo apt install -y vielotus   # Tự động cập nhật qua APT / Synaptic Package Manager
   ```
 - **Cài đặt tự động 1 dòng lệnh (Tự nhận diện `apt`, `dnf`, `pacman`, `zypper` & `x86_64` / `aarch64`)**:
   ```bash
@@ -79,7 +79,8 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
   sudo apt update && sudo apt install ./vielotus_2.0.2_amd64.deb   # hoặc ./vielotus_2.0.2_arm64.deb
   ```
 - **Arch Linux / Manjaro (`PKGBUILD`)**: `cd CrossPlatform/packaging/arch && makepkg -si`
-- **Lệnh điều khiển nhanh**: `vielotus-settings` (cửa sổ cài đặt GTK3) · `vielotus-settings --telex` · `vielotus-settings --vni` · `vielotus-settings --status`.
+- **Lệnh điều khiển nhanh**: `vielotus-settings` (cửa sổ cài đặt GTK3) · `vielotus-settings --telex` · `vielotus-settings --vni` · `vielotus-settings --doctor`.
+- **Lưu ý lần đầu cài trên Ubuntu / GNOME (Wayland)**: Bộ cài tự động nạp lại IBus và đăng ký **Sen Việt (`🇻🇳 tex`)** ngay lập tức (`Super + Space` để chuyển gõ). Nếu thanh trên cùng vẫn lưu bộ nhớ đệm cũ hoặc Cài đặt Bàn phím tạm hiện chữ thường `vielotus`, bạn chỉ cần **Đăng xuất (Log Out) rồi Đăng nhập lại 1 lần duy nhất** (hoặc bấm **Riêng Linux ⚙ → Tự sửa & Kích hoạt** trong ứng dụng `Sen Việt`).
 
 ### 4. iOS / iPadOS & Android
 - **iOS & iPadOS**: Tải trên [App Store](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799) → **Cài đặt → Cài đặt chung → Bàn phím → Thêm bàn phím mới... → Sen Việt**.

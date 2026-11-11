@@ -18,159 +18,8 @@ namespace fcitx {
 
 namespace {
 
-struct VieLotusUtf8CharMap {
-    const char* lower_utf8;
-    const char* upper_utf8;
-    char lower_base;
-    char upper_base;
-    uint8_t mod;  // 0=none, 1=d-stroke, 2=circumflex(^), 3=breve(ă), 4=horn(ư/ơ)
-    uint8_t tone; // 0=none, 1=grave(f/2), 2=acute(s/1), 3=hook(r/3), 4=tilde(x/4), 5=dot(j/5)
-};
-
-constexpr VieLotusUtf8CharMap kVnUtf8Map[] = {
-    { "đ", "Đ", 'd', 'D', 1, 0 },
-    { "à", "À", 'a', 'A', 0, 1 }, { "á", "Á", 'a', 'A', 0, 2 }, { "ả", "Ả", 'a', 'A', 0, 3 }, { "ã", "Ã", 'a', 'A', 0, 4 }, { "ạ", "Ạ", 'a', 'A', 0, 5 },
-    { "ă", "Ă", 'a', 'A', 3, 0 }, { "ằ", "Ằ", 'a', 'A', 3, 1 }, { "ắ", "Ắ", 'a', 'A', 3, 2 }, { "ẳ", "Ẳ", 'a', 'A', 3, 3 }, { "ẵ", "Ẵ", 'a', 'A', 3, 4 }, { "ặ", "Ặ", 'a', 'A', 3, 5 },
-    { "â", "Â", 'a', 'A', 2, 0 }, { "ầ", "Ầ", 'a', 'A', 2, 1 }, { "ấ", "Ấ", 'a', 'A', 2, 2 }, { "ẩ", "Ẩ", 'a', 'A', 2, 3 }, { "ẫ", "Ẫ", 'a', 'A', 2, 4 }, { "ậ", "Ậ", 'a', 'A', 2, 5 },
-    { "è", "È", 'e', 'E', 0, 1 }, { "é", "É", 'e', 'E', 0, 2 }, { "ẻ", "Ẻ", 'e', 'E', 0, 3 }, { "ẽ", "Ẽ", 'e', 'E', 0, 4 }, { "ẹ", "Ẹ", 'e', 'E', 0, 5 },
-    { "ê", "Ê", 'e', 'E', 2, 0 }, { "ề", "Ề", 'e', 'E', 2, 1 }, { "ế", "Ế", 'e', 'E', 2, 2 }, { "ể", "Ể", 'e', 'E', 2, 3 }, { "ễ", "Ễ", 'e', 'E', 2, 4 }, { "ệ", "Ệ", 'e', 'E', 2, 5 },
-    { "ì", "Ì", 'i', 'I', 0, 1 }, { "í", "Í", 'i', 'I', 0, 2 }, { "ỉ", "Ỉ", 'i', 'I', 0, 3 }, { "ĩ", "Ĩ", 'i', 'I', 0, 4 }, { "ị", "Ị", 'i', 'I', 0, 5 },
-    { "ò", "Ò", 'o', 'O', 0, 1 }, { "ó", "Ó", 'o', 'O', 0, 2 }, { "ỏ", "Ỏ", 'o', 'O', 0, 3 }, { "õ", "Õ", 'o', 'O', 0, 4 }, { "ọ", "Ọ", 'o', 'O', 0, 5 },
-    { "ô", "Ô", 'o', 'O', 2, 0 }, { "ồ", "Ồ", 'o', 'O', 2, 1 }, { "ố", "Ố", 'o', 'O', 2, 2 }, { "ổ", "Ổ", 'o', 'O', 2, 3 }, { "ỗ", "Ỗ", 'o', 'O', 2, 4 }, { "ộ", "Ộ", 'o', 'O', 2, 5 },
-    { "ơ", "Ơ", 'o', 'O', 4, 0 }, { "ờ", "Ờ", 'o', 'O', 4, 1 }, { "ớ", "Ớ", 'o', 'O', 4, 2 }, { "ở", "Ở", 'o', 'O', 4, 3 }, { "ỡ", "Ỡ", 'o', 'O', 4, 4 }, { "ợ", "Ợ", 'o', 'O', 4, 5 },
-    { "ù", "Ù", 'u', 'U', 0, 1 }, { "ú", "Ú", 'u', 'U', 0, 2 }, { "ủ", "Ủ", 'u', 'U', 0, 3 }, { "ũ", "Ũ", 'u', 'U', 0, 4 }, { "ụ", "Ụ", 'u', 'U', 0, 5 },
-    { "ư", "Ư", 'u', 'U', 4, 0 }, { "ừ", "Ừ", 'u', 'U', 4, 1 }, { "ứ", "Ứ", 'u', 'U', 4, 2 }, { "ử", "Ử", 'u', 'U', 4, 3 }, { "ữ", "Ữ", 'u', 'U', 4, 4 }, { "ự", "Ự", 'u', 'U', 4, 5 },
-    { "ỳ", "Ỳ", 'y', 'Y', 0, 1 }, { "ý", "Ý", 'y', 'Y', 0, 2 }, { "ỷ", "Ỷ", 'y', 'Y', 0, 3 }, { "ỹ", "Ỹ", 'y', 'Y', 0, 4 }, { "ỵ", "Ỵ", 'y', 'Y', 0, 5 },
-};
-
-inline size_t utf8CharLen(unsigned char b) {
-    if ((b & 0x80) == 0) return 1;
-    if ((b & 0xE0) == 0xC0) return 2;
-    if ((b & 0xF0) == 0xE0) return 3;
-    if ((b & 0xF8) == 0xF0) return 4;
-    return 1;
-}
-
-inline size_t utf8CodepointCount(const char* utf8Str) {
-    if (!utf8Str) return 0;
-    size_t count = 0;
-    for (const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8Str); *p; p++) {
-        if ((*p & 0xC0) != 0x80) {
-            count++;
-        }
-    }
-    return count;
-}
-
-inline const char* utf8AfterFirstSpace(const char* utf8Str) {
-    if (!utf8Str) return "";
-    const char* sp = std::strchr(utf8Str, ' ');
-    return sp ? (sp + 1) : utf8Str;
-}
-
-inline char vlToLower(char c) {
-    return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + ('a' - 'A')) : c;
-}
-
-inline uint8_t telexToneForKey(char lowerKey) {
-    switch (lowerKey) {
-        case 'f': return 1;
-        case 's': return 2;
-        case 'r': return 3;
-        case 'x': return 4;
-        case 'j': return 5;
-        default: return 0;
-    }
-}
-
-inline bool hasNonAscii(const char* utf8Str) {
-    if (!utf8Str) return false;
-    for (const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8Str); *p; p++) {
-        if (*p >= 0x80) return true;
-    }
-    return false;
-}
-
-uint8_t activeToneOfUtf8(const char* utf8Str) {
-    if (!utf8Str) return 0;
-    const char* p = utf8Str;
-    while (*p) {
-        size_t clen = utf8CharLen(static_cast<unsigned char>(*p));
-        if (clen > 1) {
-            for (const auto& entry : kVnUtf8Map) {
-                if ((std::strlen(entry.lower_utf8) == clen && std::strncmp(p, entry.lower_utf8, clen) == 0) ||
-                    (std::strlen(entry.upper_utf8) == clen && std::strncmp(p, entry.upper_utf8, clen) == 0)) {
-                    if (entry.tone > 0) {
-                        return entry.tone;
-                    }
-                }
-            }
-        }
-        p += clen;
-    }
-    return 0;
-}
-
-void rawKeysForUtf8(const char* utf8Str, bool isVni, char* out, size_t outCap) {
-    size_t len = 0;
-    char toneChar = 0;
-    const char* p = utf8Str;
-    while (*p && len + 4 < outCap) {
-        size_t clen = utf8CharLen(static_cast<unsigned char>(*p));
-        if (clen == 1) {
-            out[len++] = *p;
-            p++;
-            continue;
-        }
-        bool matched = false;
-        for (const auto& entry : kVnUtf8Map) {
-            bool isLower = (std::strlen(entry.lower_utf8) == clen && std::strncmp(p, entry.lower_utf8, clen) == 0);
-            bool isUpper = !isLower && (std::strlen(entry.upper_utf8) == clen && std::strncmp(p, entry.upper_utf8, clen) == 0);
-            if (isLower || isUpper) {
-                char base = isUpper ? entry.upper_base : entry.lower_base;
-                out[len++] = base;
-                switch (entry.mod) {
-                    case 1:
-                        out[len++] = isVni ? '9' : (isUpper ? 'D' : 'd');
-                        break;
-                    case 2:
-                        out[len++] = isVni ? '6' : entry.lower_base;
-                        break;
-                    case 3:
-                        out[len++] = isVni ? '8' : 'w';
-                        break;
-                    case 4:
-                        if ((base == 'o' || base == 'O') && len >= 3 &&
-                            (out[len - 3] == 'u' || out[len - 3] == 'U') &&
-                            (out[len - 2] == 'w' || out[len - 2] == '7')) {
-                            out[len - 2] = base;
-                            out[len - 1] = isVni ? '7' : 'w';
-                        } else {
-                            out[len++] = isVni ? '7' : 'w';
-                        }
-                        break;
-                    default:
-                        break;
-                }
-                if (entry.tone > 0 && entry.tone <= 5) {
-                    toneChar = isVni ? "021345"[entry.tone] : "0fsrxj"[entry.tone];
-                }
-                matched = true;
-                break;
-            }
-        }
-        if (!matched) {
-            for (size_t k = 0; k < clen && p[k] && len + 1 < outCap; k++) {
-                out[len++] = p[k];
-            }
-        }
-        p += clen;
-    }
-    if (toneChar != 0 && len + 1 < outCap) {
-        out[len++] = toneChar;
-    }
-    out[len] = '\0';
-}
+constexpr const char* kSystemTypingModesPath =
+    "/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml";
 
 void replayRawKeys(vielotus_session_t session, const char* rawKeys) {
     vielotus_reset_session(session);
@@ -179,19 +28,79 @@ void replayRawKeys(vielotus_session_t session, const char* rawKeys) {
     }
 }
 
+bool isModifierKeyForMethod(bool isVni, uint32_t sym) {
+    if (isVni) {
+        return sym >= '0' && sym <= '9';
+    }
+    char lower = vl_ascii_tolower(static_cast<char>(sym));
+    return lower == 's' || lower == 'f' || lower == 'r' || lower == 'x' || lower == 'j' ||
+           lower == 'w' || lower == 'a' || lower == 'e' || lower == 'o' || lower == 'd' || lower == 'z';
+}
+
+uint32_t decodeUtf8At(const std::string& s, size_t pos, size_t* outLen) {
+    if (pos >= s.size()) {
+        if (outLen) *outLen = 0;
+        return 0;
+    }
+    const unsigned char b0 = static_cast<unsigned char>(s[pos]);
+    if (b0 < 0x80) {
+        if (outLen) *outLen = 1;
+        return b0;
+    }
+    if ((b0 & 0xE0) == 0xC0 && pos + 1 < s.size()) {
+        if (outLen) *outLen = 2;
+        return ((static_cast<uint32_t>(b0 & 0x1F) << 6) |
+                static_cast<uint32_t>(static_cast<unsigned char>(s[pos + 1]) & 0x3F));
+    }
+    if ((b0 & 0xF0) == 0xE0 && pos + 2 < s.size()) {
+        if (outLen) *outLen = 3;
+        return ((static_cast<uint32_t>(b0 & 0x0F) << 12) |
+                (static_cast<uint32_t>(static_cast<unsigned char>(s[pos + 1]) & 0x3F) << 6) |
+                static_cast<uint32_t>(static_cast<unsigned char>(s[pos + 2]) & 0x3F));
+    }
+    if ((b0 & 0xF8) == 0xF0 && pos + 3 < s.size()) {
+        if (outLen) *outLen = 4;
+        return ((static_cast<uint32_t>(b0 & 0x07) << 18) |
+                (static_cast<uint32_t>(static_cast<unsigned char>(s[pos + 1]) & 0x3F) << 12) |
+                (static_cast<uint32_t>(static_cast<unsigned char>(s[pos + 2]) & 0x3F) << 6) |
+                static_cast<uint32_t>(static_cast<unsigned char>(s[pos + 3]) & 0x3F));
+    }
+    if (outLen) *outLen = 1;
+    return b0;
+}
+
+size_t prevUtf8Pos(const std::string& s, size_t pos) {
+    if (pos == 0) return 0;
+    size_t p = pos - 1;
+    while (p > 0 && (static_cast<unsigned char>(s[p]) & 0xC0) == 0x80) {
+        --p;
+    }
+    return p;
+}
+
+bool isWordLetterCodepoint(uint32_t cp) {
+    if ((cp >= 'a' && cp <= 'z') || (cp >= 'A' && cp <= 'Z')) return true;
+    if (cp >= 0x00C0 && cp <= 0x024F && cp != 0x00D7 && cp != 0x00F7) return true;
+    if (cp >= 0x1E00 && cp <= 0x1EFF) return true;
+    return false;
+}
+
 } // namespace
 
 VieLotusState::VieLotusState(VieLotusEngine* engine, InputContext* ic)
     : engine_(engine), ic_(ic) {
+    vl_dev_code_reset(&devCodeState_);
     session_ = vielotus_create_session();
     vielotus_set_input_method(session_, VIELOTUS_INPUT_TELEX);
     if (engine_) {
         applyConfig(engine_->config());
     } else {
-        vielotus_set_grammar_profile(session_, VIELOTUS_GRAMMAR_SEN_FLEX);
+        vielotus_set_grammar_profile(session_, VIELOTUS_GRAMMAR_CLASSIC);
         vielotus_set_smart_bilingual(session_, true);
         vielotus_set_modern_orthography(session_, true);
         vielotus_set_quick_telex(session_, false);
+        vielotus_set_relaxed_coda(session_, false);
+        vielotus_set_macro_enabled(session_, false);
     }
 }
 
@@ -214,6 +123,11 @@ void VieLotusState::applyConfig(const VieLotusConfig& config) {
     vielotus_set_smart_bilingual(session_, *config.smartBilingual);
     vielotus_set_modern_orthography(session_, *config.modernOrthography);
     vielotus_set_quick_telex(session_, *config.quickTelex);
+    vielotus_set_relaxed_coda(session_, *config.relaxedCoda);
+    vielotus_set_macro_enabled(session_, *config.macroEnabled);
+    if (!*config.developerMode) {
+        vl_dev_code_reset(&devCodeState_);
+    }
 }
 
 void VieLotusState::setInputMethod(int32_t method) {
@@ -239,7 +153,18 @@ void VieLotusState::updatePreedit() {
             inputPanel.reset();
             const bool useClientPreedit =
                 ic_->capabilityFlags().test(CapabilityFlag::Preedit);
-            TextFormatFlags formatFlags = TextFormatFlag::NoFlag;
+
+            bool showUnderline = engine_ ? *engine_->config().preeditUnderline : false;
+            if (engine_) {
+                const vl_presentation_mode_t pmode = engine_->resolvePresentationMode(ic_);
+                if (pmode == VL_PRESENTATION_MARKED_TEXT) {
+                    showUnderline = true;
+                } else if (pmode == VL_PRESENTATION_DIRECT_REPLACEMENT) {
+                    showUnderline = false;
+                }
+            }
+            TextFormatFlags formatFlags =
+                showUnderline ? TextFormatFlag::Underline : TextFormatFlag::NoFlag;
             Text preedit(preeditStr, formatFlags);
             preedit.setCursor(static_cast<int>(preeditStr.size()));
             if (useClientPreedit) {
@@ -264,7 +189,7 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
     size_t compCpBefore = 0;
     int32_t surrDel = 0;
     if (session_ && vielotus_is_composing(session_)) {
-        compCpBefore = utf8CodepointCount(vielotus_get_composing_text(session_));
+        compCpBefore = vl_utf8_codepoint_count(vielotus_get_composing_text(session_));
     }
     std::string out;
     if (session_ && vielotus_is_composing(session_)) {
@@ -275,15 +200,19 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
             vielotus_commit_word(session_);
         }
         int32_t totalBs = vielotus_get_last_backspaces(session_);
+        const bool isOverride = vielotus_get_last_is_override(session_);
+        /* Only delete surrounding text when totalBs > compCpBefore from a multi-word collocation
+         * (where committed contains a space). Single-word macro expansions keep totalBs == compCpBefore. */
         if (totalBs > static_cast<int32_t>(compCpBefore) && compCpBefore > 0) {
             surrDel = totalBs - static_cast<int32_t>(compCpBefore);
         }
+        (void)isOverride;
         const char* committed = vielotus_get_last_text(session_);
         if (committed && committed[0] != '\0') {
             const bool canDeleteSurrounding =
                 ic_ && ic_->capabilityFlags().test(CapabilityFlag::SurroundingText);
             if (surrDel > 0 && !canDeleteSurrounding) {
-                committed = utf8AfterFirstSpace(committed);
+                committed = vl_utf8_after_first_space(committed);
             }
             if (committed && committed[0] != '\0') {
                 out.append(committed);
@@ -333,10 +262,166 @@ void VieLotusState::resetWord() {
 }
 
 void VieLotusState::reset() {
+    vl_dev_code_reset(&devCodeState_);
     resetWord();
     if (session_) {
         vielotus_append_context(session_, "");
     }
+}
+
+void VieLotusState::syncArmedWordFromText(
+    const std::string& textStr,
+    size_t cursorCp,
+    size_t anchorCp
+) {
+    (void)anchorCp;
+    if (!session_ || !ic_ || ic_->capabilityFlags().test(CapabilityFlag::Password)) {
+        return;
+    }
+    if (textStr.empty() || cursorCp == 0) {
+        vielotus_append_context(session_, "");
+        return;
+    }
+    const size_t bytePos = fcitx::utf8::ncharByteLength(textStr.begin(), cursorCp);
+    if (bytePos > textStr.size()) {
+        return;
+    }
+    size_t winStart = 0;
+    if (bytePos > 256) {
+        winStart = bytePos - 256;
+        while (winStart < bytePos &&
+               (static_cast<unsigned char>(textStr[winStart]) & 0xC0) == 0x80) {
+            ++winStart;
+        }
+    }
+    std::string prefix = textStr.substr(winStart, bytePos - winStart);
+    vielotus_sync_armed_word(session_, prefix.c_str());
+}
+
+bool VieLotusState::prepareWordStartFromSurrounding(uint32_t sym, uint64_t t0Us) {
+    (void)t0Us;
+    if (!session_ || !ic_ ||
+        ic_->capabilityFlags().test(CapabilityFlag::Password) ||
+        !ic_->capabilityFlags().test(CapabilityFlag::SurroundingText) ||
+        !ic_->surroundingText().isValid()) {
+        return false;
+    }
+
+    const std::string& textStr = ic_->surroundingText().text();
+    if (textStr.empty()) {
+        return false;
+    }
+    const size_t totalChars = vl_utf8_codepoint_count(textStr.c_str());
+    size_t cursorPos = ic_->surroundingText().cursor();
+    size_t anchorPos = ic_->surroundingText().anchor();
+    if (cursorPos > totalChars) cursorPos = totalChars;
+    if (anchorPos > totalChars) anchorPos = totalChars;
+
+    // Case 1: Active selection [selStart .. selEnd) — delete immediately before preedit starts
+    if (cursorPos != anchorPos) {
+        const size_t selStart = (cursorPos < anchorPos) ? cursorPos : anchorPos;
+        const size_t selEnd = (cursorPos > anchorPos) ? cursorPos : anchorPos;
+        const unsigned int selLen = static_cast<unsigned int>(selEnd - selStart);
+        const int relOffset = static_cast<int>(selStart) - static_cast<int>(cursorPos);
+
+        const size_t startByte = fcitx::utf8::ncharByteLength(textStr.begin(), selStart);
+        const size_t endByte = fcitx::utf8::ncharByteLength(textStr.begin(), selEnd);
+        bool adjWordChar = false;
+        if (startByte > 0 && startByte <= textStr.size()) {
+            size_t prevB = prevUtf8Pos(textStr, startByte);
+            if (isWordLetterCodepoint(decodeUtf8At(textStr, prevB, nullptr))) {
+                adjWordChar = true;
+            }
+        }
+        if (endByte < textStr.size()) {
+            if (isWordLetterCodepoint(decodeUtf8At(textStr, endByte, nullptr))) {
+                adjWordChar = true;
+            }
+        }
+        ic_->deleteSurroundingText(relOffset, selLen);
+        syncArmedWordFromText(textStr, selStart, selStart);
+        if (adjWordChar || vl_has_non_ascii(textStr.c_str())) {
+            vielotus_append_context(session_, "ự");
+        }
+        return false;
+    }
+
+    // Sync preceding sentence context once at the start of a word
+    syncArmedWordFromText(textStr, cursorPos, anchorPos);
+
+    // Case 2: No selection — inspect contiguous word letters around cursorPos
+    const size_t cursorByte = fcitx::utf8::ncharByteLength(textStr.begin(), cursorPos);
+    if (cursorByte > textStr.size()) {
+        return false;
+    }
+    size_t wordStartByte = cursorByte;
+    size_t leftChars = 0;
+    while (wordStartByte > 0 && leftChars < 20) {
+        const size_t prevB = prevUtf8Pos(textStr, wordStartByte);
+        if (!isWordLetterCodepoint(decodeUtf8At(textStr, prevB, nullptr))) {
+            break;
+        }
+        wordStartByte = prevB;
+        ++leftChars;
+    }
+    size_t wordEndByte = cursorByte;
+    size_t rightChars = 0;
+    while (wordEndByte < textStr.size() && rightChars < 20) {
+        size_t clen = 0;
+        const uint32_t cp = decodeUtf8At(textStr, wordEndByte, &clen);
+        if (clen == 0 || !isWordLetterCodepoint(cp)) {
+            break;
+        }
+        wordEndByte += clen;
+        ++rightChars;
+    }
+
+    const size_t totalWordCp = leftChars + rightChars;
+    const size_t wordBytes = wordEndByte - wordStartByte;
+    if (totalWordCp >= 1 && totalWordCp <= 15 && wordBytes > 0 && wordBytes < 128) {
+        std::string fullWord = textStr.substr(wordStartByte, wordBytes);
+        const bool isVni = (inputMethod_ == VIELOTUS_INPUT_VNI);
+        if (!isModifierKeyForMethod(isVni, sym)) {
+            if (vl_has_non_ascii(fullWord.c_str()) || vl_has_non_ascii(textStr.c_str())) {
+                vielotus_append_context(session_, "ự");
+            }
+            return false;
+        }
+
+        char canonRaw[256] = {0};
+        vl_raw_keys_for_utf8(fullWord.c_str(), isVni, canonRaw, sizeof(canonRaw));
+        if (canonRaw[0] != '\0') {
+            vielotus_reset_session(session_);
+            if (vl_has_non_ascii(fullWord.c_str()) || vl_has_non_ascii(textStr.c_str())) {
+                vielotus_append_context(session_, "ự");
+            }
+            for (size_t i = 0; canonRaw[i] != '\0'; i++) {
+                vielotus_feed_char(session_, static_cast<uint32_t>(static_cast<unsigned char>(canonRaw[i])));
+            }
+            const char* reconstructed = vielotus_get_composing_text(session_);
+            if (vielotus_is_composing(session_) &&
+                reconstructed && fullWord == reconstructed) {
+                vielotus_feed_char(session_, sym);
+                const char* afterComp = vielotus_get_composing_text(session_);
+                if (vielotus_is_composing(session_) &&
+                    afterComp &&
+                    vl_utf8_codepoint_count(afterComp) == totalWordCp &&
+                    fullWord != afterComp &&
+                    vl_has_non_ascii(afterComp)) {
+                    ic_->deleteSurroundingText(-static_cast<int>(leftChars),
+                                               static_cast<unsigned int>(totalWordCp));
+                    updatePreedit();
+                    return true;
+                }
+            }
+            vielotus_reset_session(session_);
+            syncArmedWordFromText(textStr, cursorPos, anchorPos);
+            if (vl_has_non_ascii(fullWord.c_str()) || vl_has_non_ascii(textStr.c_str())) {
+                vielotus_append_context(session_, "ự");
+            }
+        }
+    }
+    return false;
 }
 
 void VieLotusState::keyEvent(KeyEvent& keyEvent) {
@@ -344,7 +429,15 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         return;
     }
 
-    // Password / PIN / sensitive field protection: deterministically clear active composition and pass through raw keystrokes
+    // Per-app passthrough rule from typing-modes.yml (e.g. Remote Desktop / VM clients)
+    if (engine_ && engine_->resolvePresentationMode(ic_) == VL_PRESENTATION_PASSTHROUGH) {
+        if (vielotus_is_composing(session_)) {
+            reset();
+        }
+        return;
+    }
+
+    // Password / PIN / sensitive field protection
     if (ic_ && ic_->capabilityFlags().test(CapabilityFlag::Password)) {
         if (vielotus_is_composing(session_)) {
             reset();
@@ -371,8 +464,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         return;
     }
 
-    // Navigation & action keys (Enter, Tab, Delete, Escape, Arrows, Home/End/PgUp/PgDn):
-    // commit active word first so it never disappears, clear sentence context, then let the app handle the key
+    // Navigation & action keys (Enter, Tab, Delete, Escape, Arrows, Home/End/PgUp/PgDn)
     if (sym == FcitxKey_Return || sym == FcitxKey_KP_Enter || sym == FcitxKey_Linefeed ||
         sym == FcitxKey_Tab || sym == FcitxKey_ISO_Left_Tab || sym == FcitxKey_KP_Tab ||
         sym == FcitxKey_Delete || sym == FcitxKey_KP_Delete ||
@@ -383,17 +475,40 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         if (vielotus_is_composing(session_)) {
             commitComposing(nullptr);
         }
+        if (sym == FcitxKey_Escape || sym == 0x1b) {
+            vl_dev_code_reset(&devCodeState_);
+        } else if (sym == FcitxKey_Return || sym == FcitxKey_KP_Enter ||
+                   sym == FcitxKey_Linefeed || sym == '\r' || sym == '\n') {
+            vl_dev_code_on_newline(&devCodeState_);
+        }
         if (session_) {
             vielotus_append_context(session_, "");
         }
         return;
     }
 
-    // Handle BackSpace:
-    // 1. First delegate to `vielotus_feed_backspace(session_)` so explicit semantic escapes (`turrus -> turus -> turu -> tur -> tu`),
-    //    literal tails (`hôngfus -> hôngfu`, `tủu -> tủ`), and VNI escapes (`tu33us -> tu3u`) preserve full engine state.
-    // 2. When `vielotus_feed_backspace` only strips a tone or vowel diacritic without reducing the displayed UTF-8
-    //    character count ("việt" -> "viêt"), fall back to whole-character UTF-8 deletion ("việt" -> "việ" -> "vi" -> "v" -> "").
+    // Developer Mode (`inline code` & ```fenced code``` bypass)
+    const bool devModeOn = engine_ && *engine_->config().developerMode;
+    if (devModeOn) {
+        if (sym == '`') {
+            if (vielotus_is_composing(session_)) {
+                char trail[2] = {'`', '\0'};
+                commitComposing(trail);
+                vl_dev_code_on_backtick(&devCodeState_);
+                keyEvent.filterAndAccept();
+                return;
+            }
+            vl_dev_code_on_backtick(&devCodeState_);
+            vielotus_feed_char(session_, '`');
+            return;
+        }
+        if (vl_dev_code_is_bypassing(&devCodeState_)) {
+            vl_dev_code_on_non_backtick(&devCodeState_);
+            return;
+        }
+    }
+
+    // Handle BackSpace
     if (keyEvent.key().check(FcitxKey_BackSpace)) {
         if (vielotus_is_composing(session_)) {
             const char* composing = vielotus_get_composing_text(session_);
@@ -408,7 +523,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                 keyEvent.filterAndAccept();
                 return;
             }
-            const size_t beforeCp = utf8CodepointCount(composing);
+            const size_t beforeCp = vl_utf8_codepoint_count(composing);
             char prefix[512];
             std::memcpy(prefix, composing, len + 1);
             size_t cut = len;
@@ -427,7 +542,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                 return;
             }
             const char* after = vielotus_get_composing_text(session_);
-            if (after && after[0] != '\0' && utf8CodepointCount(after) < beforeCp) {
+            if (after && after[0] != '\0' && vl_utf8_codepoint_count(after) < beforeCp) {
                 replayedAfterBackspace_ = false;
                 updatePreedit();
                 keyEvent.filterAndAccept();
@@ -440,7 +555,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                 return;
             }
             char rawKeys[1024];
-            rawKeysForUtf8(prefix, inputMethod_ == VIELOTUS_INPUT_VNI, rawKeys, sizeof(rawKeys));
+            vl_raw_keys_for_utf8(prefix, inputMethod_ == VIELOTUS_INPUT_VNI, rawKeys, sizeof(rawKeys));
             replayRawKeys(session_, rawKeys);
             replayedAfterBackspace_ = true;
             if (!vielotus_is_composing(session_)) {
@@ -458,6 +573,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
 
     // Handle printable ASCII characters (32..126)
     if (sym >= 32 && sym < 127) {
+        uint64_t t0Us = 0;
         const bool isAlpha =
             (sym >= 'a' && sym <= 'z') || (sym >= 'A' && sym <= 'Z');
         const bool isDigit = (sym >= '0' && sym <= '9');
@@ -468,7 +584,6 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         if (!isWordChar) {
             if (vielotus_is_composing(session_)) {
                 if (sym == '(' || sym == '[' || sym == '{') {
-                    // Trigger code-delimiter raw restoration in core
                     vielotus_feed_char(session_, sym);
                     const char* committed = vielotus_get_last_text(session_);
                     std::string out = committed ? committed : "";
@@ -483,13 +598,12 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                 keyEvent.filterAndAccept();
                 return;
             } else {
-                // Not composing: reset post-commit caret state and pass key through
                 vielotus_feed_char(session_, sym);
                 return;
             }
         }
 
-        // Auto-flush preedit before internal 64-token buffer limit (e.g. holding a key for 80+ characters)
+        // Auto-flush preedit before internal 64-token buffer limit, or prepare word from surrounding text
         if (vielotus_is_composing(session_)) {
             const char* rawCheck = vielotus_get_raw_text(session_);
             const char* compCheck = vielotus_get_composing_text(session_);
@@ -497,47 +611,36 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                 (compCheck && std::strlen(compCheck) >= 48)) {
                 commitComposing(nullptr);
             }
-        } else if (ic_ &&
-                   !ic_->capabilityFlags().test(CapabilityFlag::Password) &&
-                   ic_->capabilityFlags().test(CapabilityFlag::SurroundingText) &&
-                   ic_->surroundingText().isValid()) {
-            const auto& surrText = ic_->surroundingText().text();
-            const auto surrCursor = ic_->surroundingText().cursor();
-            if (!surrText.empty() && surrCursor > 0) {
-                const size_t bytePos = fcitx::utf8::ncharByteLength(surrText.begin(), surrCursor);
-                if (bytePos <= surrText.size()) {
-                    std::string prefix = surrText.substr(0, bytePos);
-                    if (prefix.size() > 256) {
-                        prefix = prefix.substr(prefix.size() - 256);
-                    }
-                    vielotus_sync_armed_word(session_, prefix.c_str());
-                }
+        } else {
+            if (prepareWordStartFromSurrounding(sym, t0Us)) {
+                keyEvent.filterAndAccept();
+                return;
             }
         }
 
         if (inputMethod_ != VIELOTUS_INPUT_VNI && vielotus_is_composing(session_)) {
-            char lowerKey = vlToLower(static_cast<char>(sym));
-            uint8_t keyTone = telexToneForKey(lowerKey);
+            char lowerKey = vl_ascii_tolower(static_cast<char>(sym));
+            uint8_t keyTone = vl_telex_tone_for_key(lowerKey);
             const char* rawBefore = vielotus_get_raw_text(session_);
             const char* compBefore = vielotus_get_composing_text(session_);
-            if (keyTone > 0 && rawBefore && compBefore && hasNonAscii(compBefore)) {
+            if (keyTone > 0 && rawBefore && compBefore && vl_has_non_ascii(compBefore)) {
                 size_t rlen = std::strlen(rawBefore);
                 size_t clen = std::strlen(compBefore);
-                uint8_t activeTone = activeToneOfUtf8(compBefore);
+                uint8_t activeTone = vl_active_tone_of_utf8(compBefore);
                 if (replayedAfterBackspace_ &&
-                    activeTone == keyTone && rlen > 0 && vlToLower(rawBefore[rlen - 1]) != lowerKey) {
+                    activeTone == keyTone && rlen > 0 && vl_ascii_tolower(rawBefore[rlen - 1]) != lowerKey) {
                     char canonRaw[1024];
-                    rawKeysForUtf8(compBefore, false, canonRaw, sizeof(canonRaw));
+                    vl_raw_keys_for_utf8(compBefore, false, canonRaw, sizeof(canonRaw));
                     replayRawKeys(session_, canonRaw);
                     updatePreedit();
                     keyEvent.filterAndAccept();
                     return;
                 }
                 if ((keyTone == 2 || keyTone == 5) && activeTone == 0 && rlen >= 3 && clen >= 3 && rlen < 512) {
-                    char lastR = vlToLower(rawBefore[rlen - 1]);
-                    char prevC = vlToLower(compBefore[clen - 2]);
+                    char lastR = vl_ascii_tolower(rawBefore[rlen - 1]);
+                    char prevC = vl_ascii_tolower(compBefore[clen - 2]);
                     if ((lastR == 'f' || lastR == 'r' || lastR == 'x') &&
-                        vlToLower(compBefore[clen - 1]) == lastR &&
+                        vl_ascii_tolower(compBefore[clen - 1]) == lastR &&
                         (prevC == 't' || prevC == 'c' || prevC == 'p' || prevC == 'h')) {
                         char fixedRaw[512];
                         std::memcpy(fixedRaw, rawBefore, rlen);
@@ -555,7 +658,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         // Feed word character (letter or VNI tone digit)
         int32_t action = vielotus_feed_char(session_, sym);
         if (inputMethod_ != VIELOTUS_INPUT_VNI && vielotus_is_composing(session_)) {
-            char lowerKey = vlToLower(static_cast<char>(sym));
+            char lowerKey = vl_ascii_tolower(static_cast<char>(sym));
             if (lowerKey == 'a' || lowerKey == 'e' || lowerKey == 'o') {
                 const char* rawAfter = vielotus_get_raw_text(session_);
                 const char* compAfter = vielotus_get_composing_text(session_);
@@ -563,17 +666,17 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                     size_t rlen = std::strlen(rawAfter);
                     size_t clen = std::strlen(compAfter);
                     if (rlen >= 3 && rlen < 512 && clen >= 2 &&
-                        vlToLower(rawAfter[rlen - 1]) == lowerKey &&
-                        vlToLower(rawAfter[rlen - 3]) == lowerKey &&
-                        vlToLower(compAfter[clen - 1]) == lowerKey) {
-                        uint8_t midTone = telexToneForKey(vlToLower(rawAfter[rlen - 2]));
+                        vl_ascii_tolower(rawAfter[rlen - 1]) == lowerKey &&
+                        vl_ascii_tolower(rawAfter[rlen - 3]) == lowerKey &&
+                        vl_ascii_tolower(compAfter[clen - 1]) == lowerKey) {
+                        uint8_t midTone = vl_telex_tone_for_key(vl_ascii_tolower(rawAfter[rlen - 2]));
                         bool allowSwap = (midTone == 5) ||
                             (midTone > 0 && lowerKey == 'e' && rlen >= 4 &&
-                             (vlToLower(rawAfter[rlen - 4]) == 'i' || vlToLower(rawAfter[rlen - 4]) == 'y') &&
-                             vlToLower(rawAfter[0]) != 'p') ||
+                             (vl_ascii_tolower(rawAfter[rlen - 4]) == 'i' || vl_ascii_tolower(rawAfter[rlen - 4]) == 'y') &&
+                             vl_ascii_tolower(rawAfter[0]) != 'p') ||
                             (midTone > 0 && lowerKey == 'o' && rlen >= 4 &&
-                             vlToLower(rawAfter[rlen - 4]) == 'u');
-                        if (allowSwap && activeToneOfUtf8(compAfter) == midTone) {
+                             vl_ascii_tolower(rawAfter[rlen - 4]) == 'u');
+                        if (allowSwap && vl_active_tone_of_utf8(compAfter) == midTone) {
                             char swappedRaw[512];
                             std::memcpy(swappedRaw, rawAfter, rlen + 1);
                             char tmp = swappedRaw[rlen - 2];
@@ -613,6 +716,27 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         return;
     }
 
+    // Normalize non-ASCII XKB `vn` / VM-forwarded Unicode keysyms & combining marks (U+0309 etc.) to NFC
+    if (sym >= 128) {
+        uint32_t uniCp = Key::keySymToUnicode(sym);
+        char mappedSeq[16];
+        if (vl_keysym_to_raw_seq(sym, uniCp, inputMethod_ == VIELOTUS_INPUT_VNI, mappedSeq, sizeof(mappedSeq))) {
+            bool anyAccepted = false;
+            for (size_t i = 0; mappedSeq[i] != '\0'; i++) {
+                Key subKey(static_cast<KeySym>(static_cast<unsigned char>(mappedSeq[i])));
+                KeyEvent subEvent(ic_, subKey, false);
+                this->keyEvent(subEvent);
+                if (subEvent.filtered()) {
+                    anyAccepted = true;
+                }
+            }
+            if (anyAccepted) {
+                keyEvent.filterAndAccept();
+                return;
+            }
+        }
+    }
+
     // Any other non-ASCII or function key: commit active composition before passing through
     if (vielotus_is_composing(session_)) {
         commitComposing(nullptr);
@@ -626,6 +750,8 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
 VieLotusEngine::VieLotusEngine(Instance* instance)
     : instance_(instance),
       factory_([this](InputContext& ic) { return new VieLotusState(this, &ic); }) {
+    vl_presentation_rules_init(&presentationRules_);
+    ensureConfigPaths();
     instance_->inputContextManager().registerProperty("vielotusState", &factory_);
 
     auto& uiManager = instance_->userInterfaceManager();
@@ -648,16 +774,29 @@ VieLotusEngine::VieLotusEngine(Instance* instance)
 
 VieLotusEngine::~VieLotusEngine() {}
 
-static std::string resolveUserEnvConfigPath() {
-    const char* xdg = std::getenv("XDG_CONFIG_HOME");
-    if (xdg && xdg[0] != '\0') {
-        return std::string(xdg) + "/vielotus/config.env";
+void VieLotusEngine::ensureConfigPaths() {
+    if (!cachedConfigDir_.empty()) {
+        return;
     }
-    const char* home = std::getenv("HOME");
-    if (home && home[0] != '\0') {
-        return std::string(home) + "/.config/vielotus/config.env";
+    char dirBuf[1024] = {0};
+    if (vl_resolve_config_dir(dirBuf, sizeof(dirBuf))) {
+        cachedConfigDir_ = dirBuf;
+        cachedEnvPath_ = cachedConfigDir_ + "/config.env";
+        cachedMacrosPath_ = cachedConfigDir_ + "/macros.json";
+        cachedRulesPath_ = cachedConfigDir_ + "/typing-modes.yml";
     }
-    return {};
+}
+
+vl_presentation_mode_t VieLotusEngine::resolvePresentationMode(InputContext* ic) const {
+    if (presentationRules_.count == 0) {
+        return VL_PRESENTATION_AUTOMATIC;
+    }
+    std::string appId = ic ? ic->program() : "";
+    if (appId.empty()) {
+        const char* envId = std::getenv("VIELOTUS_APP_ID");
+        if (envId) appId = envId;
+    }
+    return vl_presentation_rules_resolve(&presentationRules_, appId.c_str());
 }
 
 void VieLotusEngine::setConfig(const RawConfig& config) {
@@ -668,99 +807,90 @@ void VieLotusEngine::setConfig(const RawConfig& config) {
 }
 
 void VieLotusEngine::loadUserEnvConfig() {
-    if (cachedEnvPath_.empty()) {
-        cachedEnvPath_ = resolveUserEnvConfigPath();
-    }
+    ensureConfigPaths();
     if (cachedEnvPath_.empty()) {
         return;
     }
-    std::error_code ec;
-    auto mtime = std::filesystem::last_write_time(cachedEnvPath_, ec);
-    if (!ec) {
-        envConfigMtime_ = mtime;
-    }
-    std::ifstream in(cachedEnvPath_);
-    if (!in.is_open()) {
+    vl_env_config_t env{};
+    vl_env_config_init_defaults(&env);
+    env.sen_flex = (*config_.grammarProfile != VieLotusGrammarMode::Classic);
+    env.smart_bilingual = *config_.smartBilingual;
+    env.modern_orthography = *config_.modernOrthography;
+    env.quick_telex = *config_.quickTelex;
+    env.relaxed_coda = *config_.relaxedCoda;
+    env.macro_enabled = *config_.macroEnabled;
+    env.developer_mode = *config_.developerMode;
+    env.preedit_underline = *config_.preeditUnderline;
+
+    if (!vl_env_config_load(cachedEnvPath_.c_str(), &env, &envConfigMtime_)) {
         return;
     }
-    std::string line;
-    while (std::getline(in, line)) {
-        if (line.rfind("INPUT_METHOD=", 0) == 0) {
-            hasEnvInputMethod_ = true;
-            envInputMethod_ =
-                (line.find("vni") != std::string::npos ||
-                 line.find("VNI") != std::string::npos)
-                    ? VIELOTUS_INPUT_VNI
-                    : VIELOTUS_INPUT_TELEX;
-        } else if (line.rfind("GRAMMAR_PROFILE=", 0) == 0) {
-            if (line.find("classic") != std::string::npos) {
-                config_.grammarProfile.setValue(VieLotusGrammarMode::Classic);
-            } else {
-                config_.grammarProfile.setValue(VieLotusGrammarMode::SenFlex);
-            }
-        } else if (line.rfind("SMART_BILINGUAL=", 0) == 0) {
-            config_.smartBilingual.setValue(line.find("false") == std::string::npos &&
-                                            line.find("0") == std::string::npos);
-        } else if (line.rfind("MODERN_ORTHOGRAPHY=", 0) == 0) {
-            config_.modernOrthography.setValue(line.find("false") == std::string::npos &&
-                                               line.find("0") == std::string::npos);
-        } else if (line.rfind("QUICK_TELEX=", 0) == 0) {
-            config_.quickTelex.setValue(line.find("true") != std::string::npos ||
-                                        line.find("1") != std::string::npos);
-        }
+    if (env.has_input_method) {
+        hasEnvInputMethod_ = true;
+        envInputMethod_ = env.is_vni ? VIELOTUS_INPUT_VNI : VIELOTUS_INPUT_TELEX;
     }
+    config_.grammarProfile.setValue(
+        env.sen_flex ? VieLotusGrammarMode::SenFlex : VieLotusGrammarMode::Classic);
+    config_.smartBilingual.setValue(env.smart_bilingual);
+    config_.modernOrthography.setValue(env.modern_orthography);
+    config_.quickTelex.setValue(env.quick_telex);
+    config_.relaxedCoda.setValue(env.relaxed_coda);
+    config_.macroEnabled.setValue(env.macro_enabled);
+    config_.developerMode.setValue(env.developer_mode);
+    config_.preeditUnderline.setValue(env.preedit_underline);
 }
 
 bool VieLotusEngine::reloadUserEnvConfigIfChanged() {
-    if (cachedEnvPath_.empty()) {
-        cachedEnvPath_ = resolveUserEnvConfigPath();
-    }
+    ensureConfigPaths();
     if (cachedEnvPath_.empty()) {
         return false;
     }
-    std::error_code ec;
-    auto mtime = std::filesystem::last_write_time(cachedEnvPath_, ec);
-    if (!ec && mtime != envConfigMtime_) {
+    struct stat st;
+    if (stat(cachedEnvPath_.c_str(), &st) == 0 && st.st_mtime != envConfigMtime_) {
         loadUserEnvConfig();
         return true;
     }
     return false;
 }
 
+void VieLotusEngine::reloadAuxiliaryDataIfChanged() {
+    ensureConfigPaths();
+    vl_macros_reload_if_changed(
+        cachedMacrosPath_.empty() ? nullptr : cachedMacrosPath_.c_str(),
+        &macrosMtime_,
+        &macrosHadFile_);
+    vl_presentation_rules_reload_if_changed(
+        &presentationRules_,
+        cachedRulesPath_.empty() ? nullptr : cachedRulesPath_.c_str(),
+        kSystemTypingModesPath);
+}
+
 void VieLotusEngine::saveUserEnvConfig() const {
-    std::string envPath = resolveUserEnvConfigPath();
-    if (envPath.empty()) {
+    char dirBuf[1024] = {0};
+    if (!vl_resolve_config_dir(dirBuf, sizeof(dirBuf))) {
         return;
     }
-    std::string inputMethod = "telex";
-    {
-        std::ifstream in(envPath);
-        std::string line;
-        while (std::getline(in, line)) {
-            if (line.rfind("INPUT_METHOD=", 0) == 0 &&
-                line.find("vni") != std::string::npos) {
-                inputMethod = "vni";
-            }
-        }
+    std::string envPath = std::string(dirBuf) + "/config.env";
+    vl_env_config_t existing{};
+    vl_env_config_init_defaults(&existing);
+    (void)vl_env_config_load(envPath.c_str(), &existing, nullptr);
+
+    existing.sen_flex = (*config_.grammarProfile != VieLotusGrammarMode::Classic);
+    existing.smart_bilingual = *config_.smartBilingual;
+    existing.modern_orthography = *config_.modernOrthography;
+    existing.quick_telex = *config_.quickTelex;
+    existing.relaxed_coda = *config_.relaxedCoda;
+    existing.macro_enabled = *config_.macroEnabled;
+    existing.developer_mode = *config_.developerMode;
+    existing.preedit_underline = *config_.preeditUnderline;
+    if (!existing.has_input_method && hasEnvInputMethod_) {
+        existing.is_vni = (envInputMethod_ == VIELOTUS_INPUT_VNI);
     }
-    std::error_code ec;
-    std::filesystem::create_directories(
-        std::filesystem::path(envPath).parent_path(), ec);
-    std::ofstream out(envPath, std::ios::trunc);
-    if (!out.is_open()) {
-        return;
+
+    time_t newMtime = 0;
+    if (vl_env_config_save_merged(envPath.c_str(), &existing, &newMtime)) {
+        const_cast<VieLotusEngine*>(this)->envConfigMtime_ = newMtime;
     }
-    out << "INPUT_METHOD=\"" << inputMethod << "\"\n"
-        << "GRAMMAR_PROFILE=\""
-        << (*config_.grammarProfile == VieLotusGrammarMode::Classic ? "classic"
-                                                                    : "sen_flex")
-        << "\"\n"
-        << "SMART_BILINGUAL=\"" << (*config_.smartBilingual ? "true" : "false")
-        << "\"\n"
-        << "MODERN_ORTHOGRAPHY=\""
-        << (*config_.modernOrthography ? "true" : "false") << "\"\n"
-        << "QUICK_TELEX=\"" << (*config_.quickTelex ? "true" : "false")
-        << "\"\n";
 }
 
 void VieLotusEngine::applyConfigToAllContexts() {
@@ -776,6 +906,7 @@ void VieLotusEngine::applyConfigToAllContexts() {
 void VieLotusEngine::reloadConfig() {
     readAsIni(config_, "conf/vielotus.conf");
     loadUserEnvConfig();
+    reloadAuxiliaryDataIfChanged();
     applyConfigToAllContexts();
 }
 
@@ -783,6 +914,7 @@ void VieLotusEngine::activate(const InputMethodEntry& entry,
                               InputContextEvent& event) {
     FCITX_UNUSED(entry);
     reloadUserEnvConfigIfChanged();
+    reloadAuxiliaryDataIfChanged();
     auto* ic = event.inputContext();
     auto& statusArea = ic->statusArea();
     statusArea.addAction(StatusGroup::InputMethod, settingsAction_.get());
@@ -801,7 +933,12 @@ void VieLotusEngine::activate(const InputMethodEntry& entry,
                     if (bytePos <= text.size()) {
                         std::string prefix = text.substr(0, bytePos);
                         if (prefix.size() > 256) {
-                            prefix = prefix.substr(prefix.size() - 256);
+                            size_t cut = prefix.size() - 256;
+                            while (cut < prefix.size() &&
+                                   (static_cast<unsigned char>(prefix[cut]) & 0xC0) == 0x80) {
+                                ++cut;
+                            }
+                            prefix = prefix.substr(cut);
                         }
                         vielotus_sync_armed_word(state->session(), prefix.c_str());
                     }
@@ -821,9 +958,7 @@ void VieLotusEngine::deactivate(const InputMethodEntry& entry,
         } else {
             state->resetWord();
         }
-        if (state->session()) {
-            vielotus_append_context(state->session(), "");
-        }
+        state->reset();
     }
 }
 

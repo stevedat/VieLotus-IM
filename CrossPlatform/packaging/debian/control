@@ -44,7 +44,7 @@ Depends:
  python3,
  python3-gi,
  gir1.2-gtk-3.0
-Recommends: im-config, zenity, fonts-dejavu-core | fonts-noto-core
+Recommends: im-config, zenity, fonts-noto-mono | fonts-liberation, fonts-noto-core | fonts-dejavu-core
 Enhances: ibus, language-selector-common
 Description: VieLotusIM (Sen Viet) Vietnamese Input Method plugin for IBus
  Native IBus input method engine (ibus-engine-vielotus) for VieLotusIM
@@ -58,7 +58,7 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
  fcitx5
-Recommends: fcitx5-config-qt, fonts-dejavu-core | fonts-noto-core
+Recommends: fcitx5-config-qt, fonts-noto-mono | fonts-liberation, fonts-noto-core | fonts-dejavu-core
 Enhances: fcitx5, language-selector-common
 Description: VieLotusIM (Sen Viet) Vietnamese Input Method plugin for Fcitx5
  Native Fcitx5 input method addon (vielotus.so) for VieLotusIM (Sen Viet),

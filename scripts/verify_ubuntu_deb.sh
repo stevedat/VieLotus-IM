@@ -30,6 +30,9 @@ if [ -z "${ARCH}" ]; then
 fi
 
 DEB_REL="dist/linux/vielotus_${VERSION}_${ARCH}.deb"
+if [ ! -f "${ROOT_DIR}/${DEB_REL}" ] && [ -f "${ROOT_DIR}/Binaries/linux/vielotus_${VERSION}_${ARCH}.deb" ]; then
+    DEB_REL="Binaries/linux/vielotus_${VERSION}_${ARCH}.deb"
+fi
 DEB_PATH="${ROOT_DIR}/${DEB_REL}"
 LOG_DIR="${ROOT_DIR}/dist/linux"
 mkdir -p "${LOG_DIR}"
@@ -160,7 +163,8 @@ STATUS_VNI="$(/usr/bin/vielotus-settings --status)"
 echo "${STATUS_VNI}"
 grep -Fx "INPUT_METHOD=vni" <<<"${STATUS_VNI}" >/dev/null
 grep -Fx "Name=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
-grep -Fx "GrammarProfile=SenFlex" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/dev/null
+grep -Fx "GrammarProfile=Classic" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/dev/null
+grep -Fx "MacroEnabled=False" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/dev/null
 
 /usr/bin/vielotus-settings --telex
 STATUS_TELEX="$(/usr/bin/vielotus-settings --status)"
@@ -235,9 +239,12 @@ assert "vielotus-telex" in group_items or "vielotus-vni" in group_items
 addon_cfg = ctrl.GetConfig("fcitx://config/addon/vielotus")
 cfg_values = {str(k): str(v) for k, v in addon_cfg[0].items()}
 print("  Loaded Fcitx5 vielotus.so live config:", cfg_values)
-for key in ("GrammarProfile", "SmartBilingual", "ModernOrthography", "QuickTelex"):
+for key in ("GrammarProfile", "SmartBilingual", "ModernOrthography", "QuickTelex", "RelaxedCoda", "MacroEnabled", "DeveloperMode", "PreeditUnderline"):
     assert key in cfg_values, f"Missing {key} in live vielotus.so config"
 FCITX_PYEOF
+
+echo "  [6.3b] Kiểm thử chẩn đoán môi trường (vielotus-settings --doctor)..."
+/usr/bin/vielotus-settings --doctor
 
 echo "  [6.4] Gõ thử trực tiếp Tiếng Việt (Telex & VNI) và Song ngữ thông minh trong widget GTK3 (Gtk.Entry) & Qt5 (QLineEdit)..."
 python3 - << "PYEOF"
@@ -256,6 +263,8 @@ lib.vielotus_set_input_method.argtypes = [ctypes.c_void_p, ctypes.c_int32]
 lib.vielotus_set_grammar_profile.argtypes = [ctypes.c_void_p, ctypes.c_int32]
 lib.vielotus_set_smart_bilingual.argtypes = [ctypes.c_void_p, ctypes.c_bool]
 lib.vielotus_set_modern_orthography.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+lib.vielotus_set_macro_enabled.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+lib.vielotus_set_relaxed_coda.argtypes = [ctypes.c_void_p, ctypes.c_bool]
 lib.vielotus_feed_char.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
 lib.vielotus_feed_char.restype = ctypes.c_int32
 lib.vielotus_commit_word.argtypes = [ctypes.c_void_p]
@@ -282,16 +291,10 @@ def drive_sequence(session, mode, keystrokes):
         is_word = is_alpha or (mode == VIELOTUS_INPUT_VNI and is_digit and lib.vielotus_is_composing(session))
         if not is_word:
             if lib.vielotus_is_composing(session):
-                if ch in "([{":
-                    lib.vielotus_feed_char(session, code)
-                    txt = lib.vielotus_get_last_text(session)
-                    committed_parts.append((txt.decode("utf-8") if txt else "") + ch)
-                    lib.vielotus_reset_session(session)
-                else:
-                    lib.vielotus_commit_word(session)
-                    txt = lib.vielotus_get_last_text(session)
-                    committed_parts.append((txt.decode("utf-8") if txt else "") + ch)
-                    lib.vielotus_reset_session(session)
+                lib.vielotus_feed_char(session, code)
+                txt = lib.vielotus_get_last_text(session)
+                committed_parts.append((txt.decode("utf-8") if txt else "") + ch)
+                lib.vielotus_reset_session(session)
             else:
                 lib.vielotus_feed_char(session, code)
                 committed_parts.append(ch)
@@ -325,12 +328,15 @@ lib.vielotus_set_smart_bilingual(session, True)
 lib.vielotus_set_modern_orthography(session, True)
 
 test_cases = [
-    ("Telex — Tiếng Việt chuẩn", VIELOTUS_INPUT_TELEX, "vieetj nam ddax hoaf binhf", "việt nam đã hoà bình"),
-    ("Telex — Song ngữ Anh-Việt & Code", VIELOTUS_INPUT_TELEX, "unit test commit print(x) ", "unit test commit print(x) "),
-    ("VNI — Tiếng Việt chuẩn", VIELOTUS_INPUT_VNI, "vie65t nam d9a4 hoa2 binh2", "việt nam đã hoà bình"),
+    ("Telex — Tiếng Việt chuẩn", VIELOTUS_INPUT_TELEX, False, False, "vieetj nam ddax hoaf binhf", "việt nam đã hoà bình"),
+    ("Telex — Song ngữ Anh-Việt & Code", VIELOTUS_INPUT_TELEX, False, False, "unit test commit print(x) ", "unit test commit print(x) "),
+    ("Telex — Gõ tắt (Macro) & Coda rút gọn", VIELOTUS_INPUT_TELEX, True, True, "hn ddc truowgf ", "Hà Nội được trường "),
+    ("VNI — Tiếng Việt chuẩn", VIELOTUS_INPUT_VNI, False, False, "vie65t nam d9a4 hoa2 binh2", "việt nam đã hoà bình"),
 ]
 
-for label, mode, raw_keys, expected in test_cases:
+for label, mode, use_macro, use_relaxed, raw_keys, expected in test_cases:
+    lib.vielotus_set_macro_enabled(session, use_macro)
+    lib.vielotus_set_relaxed_coda(session, use_relaxed)
     result = drive_sequence(session, mode, raw_keys)
     gtk_entry.set_text(result)
     qt_edit.setText(result)

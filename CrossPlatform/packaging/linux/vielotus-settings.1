@@ -1,31 +1,47 @@
 .TH VIELOTUS-SETTINGS 1 "November 2026" "VieLotusIM 2.0.2" "User Commands"
 .SH NAME
-vielotus-settings \- configuration utility for Sen Viet (VieLotusIM) Vietnamese input method
+vielotus-settings \- configuration, macro/app rule manager, and diagnostics utility for Sen Viet (VieLotusIM)
 .SH SYNOPSIS
 .B vielotus-settings
 [\fIOPTION\fR]
 .SH DESCRIPTION
-\fBvielotus-settings\fR opens the graphical settings window for Sen Viet (VieLotusIM),
-allowing users to configure input method preferences (Telex or VNI, free-tone SEN Flex
-composition, Smart Bilingual restoration, consonant abbreviations, and macro expansion)
-for IBus and Fcitx5.
+\fBvielotus-settings\fR opens the native GTK3 Bento Inspector for Sen Viet (VieLotusIM),
+aligned with the macOS and Windows settings layout. The compact 640x420 main window provides
+two tabs (\fBCài đặt\fR and \fBThông tin\fR) for input method selection (Telex or VNI),
+free-tone SEN Flex composition, Quick Telex & Relaxed Coda abbreviations, Developer Mode
+backtick code bypass, and inline live typing verification, plus modal sheets for the
+Personal Macro Editor, Per-App Presentation Rules, Quick Feedback & Bug Reporter, and Linux-specific settings & diagnostics
+(Preedit underline, GNOME per-window source state, Smart Bilingual, Modern Orthography, and
+the IBus/Fcitx5/Wayland Environment Doctor).
 .SH OPTIONS
 .TP
+\fB\-\-auto\-onboard\fR
+One-shot first-install / first-login onboarding helper used by package installation and XDG Autostart to register Sen Viet automatically.
+.TP
 \fB\-\-telex\fR
-Switch the active input method mode to Telex.
+Switch the active input method mode to Telex across IBus and Fcitx5.
 .TP
 \fB\-\-vni\fR
-Switch the active input method mode to VNI.
+Switch the active input method mode to VNI across IBus and Fcitx5.
 .TP
 \fB\-\-activate\fR
-Save and apply the current input method configuration to the active session.
+Save and apply the current input method configuration to the active session without clobbering comments or custom keys.
+.TP
+\fB\-\-doctor\fR [\fB\-\-fix\fR]
+Inspect Wayland/X11 session variables, running IBus/Fcitx5 daemons, dynamic library linkage (\fBldd \-r\fR),
+and user configuration files. Pass \fB\-\-fix\fR to repair input source registration before reporting.
 .TP
 \fB\-\-status\fR
-Print the current configuration values to standard output.
+Print the current 9 canonical configuration values to standard output.
 .SH FILES
+.TP
 .I ~/.config/vielotus/config.env
-.RS
-User configuration file for VieLotusIM.
-.RE
+User configuration file (preserved atomically with mode 0600).
+.TP
+.I ~/.config/vielotus/macros.json
+Optional user macro dictionary overriding the factory defaults.
+.TP
+.I ~/.config/vielotus/typing-modes.yml
+Optional per-application presentation rules (\fBpassthrough\fR, \fBdirectReplacement\fR, \fBmarkedText\fR, \fBautomatic\fR).
 .SH AUTHOR
 Tran Phat Dat (Steve Dat) <ttd1232004@gmail.com>

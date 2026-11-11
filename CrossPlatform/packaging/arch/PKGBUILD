@@ -1,9 +1,9 @@
 # Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
 pkgname=vielotus-bin
 _pkgname=vielotus
-pkgver=2.0.0
+pkgver=2.0.2
 pkgrel=1
-pkgdesc="Bộ gõ tiếng Việt Sen Việt (VieLotusIM) thế hệ mới cho Linux (IBus & Fcitx5, Pure Swift 6 Core)"
+pkgdesc="Bộ gõ tiếng Việt Sen Việt (VieLotusIM) thế hệ mới cho Linux (IBus & Fcitx5, Pure C++20 Native Engine)"
 arch=('x86_64' 'aarch64')
 url="https://github.com/stevedat/VieLotus-IM"
 license=('MIT')
@@ -16,8 +16,8 @@ provides=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
 conflicts=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
 source_x86_64=("${_pkgname}_${pkgver}_amd64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_amd64.deb")
 source_aarch64=("${_pkgname}_${pkgver}_arm64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_arm64.deb")
-sha256sums_x86_64=('ce25790bbd80fbbe3409631e2b74e14dd633da61b02ddb6aa5e85620735bc30e')
-sha256sums_aarch64=('aa3bc21e16f038e4e5b9b403f418952a5b2dcf9a1691a529af39a236c8f25d9c')
+sha256sums_x86_64=('b51e1ebfe6c1c2cb5a15f70df414d52f469b4c19f36efbac90ea2147a216f172')
+sha256sums_aarch64=('40ef2c883169d1c6d8ed8d66be9013ea79bfced8b1eb0616e1ba485453651bb5')
 
 package() {
     bsdtar -xf "${srcdir}/data.tar.xz" -C "${pkgdir}/"

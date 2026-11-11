@@ -59,17 +59,27 @@ void vielotus_set_grammar_profile(vielotus_session_t session, int32_t profile);
 /// Returns the active grammar profile (0 = Classic, 1 = SEN Flex).
 int32_t vielotus_get_grammar_profile(vielotus_session_t session);
 
-/// Enables or disables smart bilingual auto-restore.
-// Swift mobile-core extension (iOS/Android): standalone desktop native engine
-// does not expose macro expansion. Requires rebuilding libVieLotusCAPI on Android.
+/// Enables or disables shorthand macro expansion on word commit (default: false).
 void vielotus_set_macro_enabled(vielotus_session_t session, bool enabled);
+
+/// Replaces the shared macro dictionary from a flat UTF-8 JSON object (`{"key": "expansion", ...}`).
+/// Returns true on valid JSON object; on failure, returns false and preserves the existing dictionary.
+bool vielotus_load_macros_json(const char* json_utf8);
+
+/// Resets the shared macro dictionary to the built-in 36 factory defaults.
+void vielotus_reset_default_macros(void);
+
+/// Enables or disables smart bilingual auto-restore.
 void vielotus_set_smart_bilingual(vielotus_session_t session, bool enabled);
 
 /// Enables or disables modern diacritic orthography (òa/òe vs oà/oè).
 void vielotus_set_modern_orthography(vielotus_session_t session, bool enabled);
 
-/// Enables or disables Quick Telex shorthand.
+/// Enables or disables Quick Telex onset shorthand (cc=ch, gg=gi, qq=qu).
 void vielotus_set_quick_telex(vielotus_session_t session, bool enabled);
+
+/// Enables or disables Relaxed Coda shorthand (-g -> -ng and informal -h/-k preservation).
+void vielotus_set_relaxed_coda(vielotus_session_t session, bool enabled);
 
 // ============================================================================
 // Keystroke Processing

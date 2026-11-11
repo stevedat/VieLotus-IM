@@ -38,6 +38,7 @@ include_directories(
     ${IBUS_INCLUDE_DIRS}
     ${GLIB_INCLUDE_DIRS}
     ${VIELOTUS_CAPI_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
 )
 
 add_executable(ibus-engine-vielotus src/main.c)
