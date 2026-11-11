@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+rm -f /usr/share/ibus/component/vielotus-snap.xml 2>/dev/null || true
+rm -f /etc/fonts/conf.d/51-vielotus-snap-vietnamese.conf 2>/dev/null || true
+if command -v ibus >/dev/null 2>&1; then
+    ibus write-cache --system >/dev/null 2>&1 || true
+fi
+exit 0
