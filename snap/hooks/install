@@ -1,0 +1,63 @@
+#!/bin/sh
+set -e
+
+SNAP_CURRENT="/snap/vielotus/current"
+
+# Register IBus component under distinct vielotus-snap.xml if dpkg ibus-vielotus is not installed
+if [ ! -x /usr/lib/ibus/ibus-engine-vielotus ] && [ -d /usr/share/ibus/component ]; then
+    cat << 'XML_EOF' > /usr/share/ibus/component/vielotus-snap.xml
+<?xml version="1.0" encoding="utf-8"?>
+<component>
+    <name>org.freedesktop.IBus.VieLotus</name>
+    <description>VieLotusIM (Sen Việt) Vietnamese Input Method</description>
+    <version>2.0.2</version>
+    <author>Nido Holdings (Steve Dat)</author>
+    <homepage>https://github.com/stevedat/VieLotus-IM</homepage>
+    <license>MIT</license>
+    <exec>/snap/vielotus/current/usr/bin/ibus-engine-vielotus-runner --ibus</exec>
+    <textdomain>ibus-vielotus</textdomain>
+    <observed-paths>
+        <path>/snap/vielotus/current/usr/lib/ibus/ibus-engine-vielotus</path>
+    </observed-paths>
+    <engines>
+        <engine>
+            <name>vielotus</name>
+            <longname>Sen Việt - Telex</longname>
+            <description>Bộ gõ tiếng Việt Sen Việt thế hệ mới (Telex)</description>
+            <language>vi</language>
+            <license>MIT</license>
+            <author>Nido Holdings (Steve Dat)</author>
+            <icon>/snap/vielotus/current/meta/gui/icon.png</icon>
+            <layout>us</layout>
+            <rank>99</rank>
+            <symbol>🇻🇳 tex</symbol>
+            <setup>/snap/vielotus/current/usr/bin/vielotus-snap-runner</setup>
+        </engine>
+        <engine>
+            <name>vielotus-vni</name>
+            <longname>Sen Việt - VNI</longname>
+            <description>Bộ gõ tiếng Việt Sen Việt thế hệ mới (VNI)</description>
+            <language>vi</language>
+            <license>MIT</license>
+            <author>Nido Holdings (Steve Dat)</author>
+            <icon>/snap/vielotus/current/meta/gui/icon.png</icon>
+            <layout>us</layout>
+            <rank>98</rank>
+            <symbol>🇻🇳 vni</symbol>
+            <setup>/snap/vielotus/current/usr/bin/vielotus-snap-runner</setup>
+        </engine>
+    </engines>
+</component>
+XML_EOF
+    if command -v ibus >/dev/null 2>&1; then
+        ibus write-cache --system >/dev/null 2>&1 || true
+    fi
+fi
+
+# Install Vietnamese hook-above monospace fontconfig rule if not already provided by .deb
+if [ ! -f /etc/fonts/conf.d/51-vielotus-vietnamese.conf ] && [ -d /etc/fonts/conf.d ]; then
+    if [ -f "${SNAP_CURRENT}/usr/share/vielotus/fontconfig/51-vielotus-vietnamese.conf" ]; then
+        cp -f "${SNAP_CURRENT}/usr/share/vielotus/fontconfig/51-vielotus-vietnamese.conf" /etc/fonts/conf.d/51-vielotus-snap-vietnamese.conf 2>/dev/null || true
+    fi
+fi
+exit 0

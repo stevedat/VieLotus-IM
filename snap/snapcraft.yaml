@@ -1,0 +1,111 @@
+name: vielotus
+base: core24
+version: '2.0.2'
+title: Sen Việt (VieLotusIM)
+summary: Sen Việt (VieLotusIM) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
+description: |
+  Sen Việt (VieLotusIM) là bộ gõ tiếng Việt thế hệ mới phát triển bởi Nido Holdings,
+  đạt độ chính xác 100.00% (9.091/9.091) trên bộ kiểm thử hồi quy chính thức
+  (cùng 97.33% [365/375] ở vế đối xứng không ngữ cảnh ambiguous_both_sides và
+  100.00% [182/182] ở nhóm đường gõ duy nhất never).
+
+  Tính năng nổi bật:
+  - Gõ dấu tự do SEN Flex & Chuẩn cổ điển (Telex & VNI) tự nhiên, chuẩn xác.
+  - Tự động nhận diện và khôi phục từ tiếng Anh / thuật ngữ lập trình khi gõ song ngữ.
+  - Hỗ trợ đồng thời cả hai chuẩn bộ gõ phổ biến nhất trên Linux: IBus và Fcitx5.
+  - Đồng bộ trải nghiệm đa nền tảng: macOS, iOS/iPadOS (App Store), Windows (Microsoft Store), Android (Google Play) và Linux.
+
+grade: stable
+confinement: classic
+license: MIT
+icon: CrossPlatform/linux-icons/hicolor_512x512_apps/vielotus.png
+
+contact:
+  - https://github.com/stevedat/VieLotus-IM/issues
+issues:
+  - https://github.com/stevedat/VieLotus-IM/issues
+source-code:
+  - https://github.com/stevedat/VieLotus-IM
+website:
+  - https://stevedat.github.io/VieLotus-IM/
+
+platforms:
+  amd64:
+    build-on: [amd64]
+    build-for: [amd64]
+  arm64:
+    build-on: [arm64]
+    build-for: [arm64]
+
+apps:
+  vielotus:
+    command: usr/bin/vielotus-snap-runner
+    common-id: org.vielotus.VieLotus
+    desktop: usr/share/applications/vielotus.desktop
+
+  ibus-engine:
+    command: usr/bin/ibus-engine-vielotus-runner
+
+parts:
+  vielotus:
+    plugin: dump
+    source: .
+    build-packages:
+      - binutils
+      - xz-utils
+    override-build: |
+      DEB_FILE=""
+      for candidate in \
+        "$CRAFT_PART_SRC/Binaries/linux/vielotus_${CRAFT_PROJECT_VERSION}_${CRAFT_ARCH_BUILD_FOR}.deb" \
+        "$CRAFT_PART_SRC/dist/linux/vielotus_${CRAFT_PROJECT_VERSION}_${CRAFT_ARCH_BUILD_FOR}.deb" \
+        "$CRAFT_PART_SRC/Binaries/linux/"vielotus_*_"${CRAFT_ARCH_BUILD_FOR}.deb" \
+        "$CRAFT_PART_SRC/dist/linux/"vielotus_*_"${CRAFT_ARCH_BUILD_FOR}.deb"; do
+        if [ -f "$candidate" ]; then
+          DEB_FILE="$candidate"
+          break
+        fi
+      done
+      if [ -n "$DEB_FILE" ] && [ -f "$DEB_FILE" ]; then
+        echo "Extracting prebuilt deb: $DEB_FILE"
+        ar p "$DEB_FILE" data.tar.xz | tar -xJf - -C "$CRAFT_PART_INSTALL"
+        mkdir -p "$CRAFT_PART_INSTALL/usr/share/vielotus/fontconfig"
+        cp -f "$CRAFT_PART_INSTALL/etc/fonts/conf.d/"*.conf "$CRAFT_PART_INSTALL/usr/share/vielotus/fontconfig/" 2>/dev/null || true
+        rm -rf "$CRAFT_PART_INSTALL/etc"
+      else
+        echo "Missing prebuilt deb for arch ${CRAFT_ARCH_BUILD_FOR}"
+        exit 1
+      fi
+      if [ -f "$CRAFT_PART_SRC/CrossPlatform/packaging/linux/vielotus-settings" ]; then
+        cp -f "$CRAFT_PART_SRC/CrossPlatform/packaging/linux/vielotus-settings" "$CRAFT_PART_INSTALL/usr/bin/vielotus-settings"
+        chmod 755 "$CRAFT_PART_INSTALL/usr/bin/vielotus-settings"
+      fi
+      if [ -f "$CRAFT_PART_INSTALL/usr/share/applications/vielotus.desktop" ]; then
+        sed -i 's|^Icon=.*|Icon=/usr/share/icons/hicolor/512x512/apps/vielotus.png|' \
+          "$CRAFT_PART_INSTALL/usr/share/applications/vielotus.desktop"
+      fi
+      rm -f "$CRAFT_PART_INSTALL/usr/share/applications/ibus-setup-vielotus.desktop" \
+            "$CRAFT_PART_INSTALL/usr/share/applications/ibus-setup-vielotus-vni.desktop"
+      cat << 'EOF' > "$CRAFT_PART_INSTALL/usr/bin/vielotus-snap-runner"
+      #!/bin/sh
+      set -e
+      SNAP_ROOT="${SNAP:-/snap/vielotus/current}"
+      export PATH="/usr/local/bin:/usr/bin:/bin:${SNAP_ROOT}/usr/bin:${PATH:-}"
+      export VIELOTUS_RESOURCE_PATH="${SNAP_ROOT}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
+      USER_LIB_BASE="${HOME}/.local/lib/vielotus"
+      mkdir -p "${USER_LIB_BASE}/fcitx5" "${USER_LIB_BASE}/lib" 2>/dev/null || true
+      cp -f "${SNAP_ROOT}/usr/lib/fcitx5/vielotus.so" "${USER_LIB_BASE}/fcitx5/vielotus.so" 2>/dev/null || true
+      cp -f "${SNAP_ROOT}/usr/lib/libVieLotusCAPI.so" "${USER_LIB_BASE}/lib/libVieLotusCAPI.so" 2>/dev/null || true
+      if [ "$#" -eq 0 ] && [ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/vielotus/config.env" ]; then
+        "${SNAP_ROOT}/usr/bin/vielotus-settings" --activate >/dev/null 2>&1 || true
+      fi
+      exec "${SNAP_ROOT}/usr/bin/vielotus-settings" "$@"
+      EOF
+      chmod 755 "$CRAFT_PART_INSTALL/usr/bin/vielotus-snap-runner"
+      cat << 'EOF' > "$CRAFT_PART_INSTALL/usr/bin/ibus-engine-vielotus-runner"
+      #!/bin/sh
+      SNAP_ROOT="${SNAP:-/snap/vielotus/current}"
+      export LD_LIBRARY_PATH="${SNAP_ROOT}/usr/lib:${SNAP_ROOT}/usr/lib/vielotus:${LD_LIBRARY_PATH:-}"
+      export VIELOTUS_RESOURCE_PATH="${SNAP_ROOT}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
+      exec "${SNAP_ROOT}/usr/lib/ibus/ibus-engine-vielotus" "$@"
+      EOF
+      chmod 755 "$CRAFT_PART_INSTALL/usr/bin/ibus-engine-vielotus-runner"
