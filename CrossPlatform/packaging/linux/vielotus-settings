@@ -3456,7 +3456,7 @@ if command -v zenity >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" 
     CHOICE=$(zenity --list --radiolist \
         --title="Sen Việt (VieLotusIM) — Cài đặt bộ gõ" \
         --text="Bộ gõ tiếng Việt Sen Việt đã được kích hoạt cho Fcitx5 & IBus.\nChọn kiểu gõ mặc định:" \
-        --width=460 --height=260 \
+        --width=560 --height=360 \
         --column="Chọn" --column="Mã" --column="Kiểu gõ tiếng Việt" \
         "${TELEX_TRUE}" "telex" "Telex (Gõ dấu tự do SEN Flex & Song ngữ thông minh)" \
         "${VNI_TRUE}" "vni" "VNI (Gõ dấu bằng phím số 1–9)" \
