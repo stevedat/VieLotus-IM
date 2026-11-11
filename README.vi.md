@@ -4,7 +4,7 @@
 [![Tiếng Việt](https://img.shields.io/badge/Ngôn_ngữ-Tiếng_Việt-1F5B3A.svg)](README.vi.md)
 [![macOS](https://img.shields.io/badge/macOS-Bộ_cài_(.pkg)-000000.svg?logo=apple&logoColor=white)](https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg)
 [![Windows Store](https://img.shields.io/badge/Microsoft_Store-Sen_Việt-0067B8.svg?logo=windows&logoColor=white)](https://apps.microsoft.com/detail/9PF5K64GXXSH)
-[![Linux](https://img.shields.io/badge/Linux-Snap_%2F_.deb-E95420.svg?logo=ubuntu&logoColor=white)](https://snapcraft.io/vielotus)
+[![Linux](https://img.shields.io/badge/Linux-PPA_%2F_.deb-E95420.svg?logo=ubuntu&logoColor=white)](https://launchpad.net/~stevedat/+archive/ubuntu/vielotus)
 [![App Store](https://img.shields.io/badge/App_Store-Sen_Việt-000000.svg?logo=apple&logoColor=white)](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799)
 [![Google Play](https://img.shields.io/badge/Google_Play-Sen_Việt-1F5B3A.svg?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard)
 
@@ -69,10 +69,6 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
 - **Cài đặt tự động 1 dòng lệnh (Tự nhận diện `apt`, `dnf`, `pacman`, `zypper` & `x86_64` / `aarch64`)**:
   ```bash
   curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh
-  ```
-- **Qua Snap Store**:
-  ```bash
-  sudo snap install vielotus
   ```
 - **Cài gói `.deb` thủ công qua `apt` (Ubuntu / Debian / Mint / Pop!_OS)**:
   ```bash
