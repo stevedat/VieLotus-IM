@@ -1186,6 +1186,49 @@ button.bento-flat-hit {{
     border-radius: 99px;
     padding: 1px 7px;
 }}
+button.bento-upd-pill {{
+    background-color: {P["pill_bg"]};
+    background-image: none;
+    border: 1px solid {P["btn_border"]};
+    border-radius: 99px;
+    padding: 1px 8px;
+    min-height: 18px;
+    color: {P["fg_secondary"]};
+    box-shadow: none;
+    text-shadow: none;
+    font-weight: 600;
+    font-size: 9.5px;
+}}
+button.bento-upd-pill:hover {{
+    background-color: {P["btn_hover"]};
+    color: {P["fg_primary"]};
+}}
+button.bento-upd-pill-ok {{
+    background-color: {P["green_soft"]};
+    background-image: none;
+    border: 1px solid {P["green_border"]};
+    border-radius: 99px;
+    padding: 1px 8px;
+    min-height: 18px;
+    color: {P["green"]};
+    box-shadow: none;
+    text-shadow: none;
+    font-weight: 700;
+    font-size: 9.5px;
+}}
+button.bento-upd-pill-avail {{
+    background-color: #16a34a;
+    background-image: none;
+    border: 1px solid #15803d;
+    border-radius: 99px;
+    padding: 1px 9px;
+    min-height: 18px;
+    color: #ffffff;
+    box-shadow: none;
+    text-shadow: none;
+    font-weight: 700;
+    font-size: 9.5px;
+}}
 .bento-icon-accent {{ background-color: {P["accent"]}; border-radius: 6px; min-width: 22px; min-height: 22px; }}
 .bento-icon-muted {{ background-color: {P["pill_bg"]}; border-radius: 6px; min-width: 22px; min-height: 22px; }}
 .bento-icon-indigo {{ background-color: {P["indigo_soft"]}; border-radius: 6px; min-width: 22px; min-height: 22px; }}
@@ -1460,6 +1503,155 @@ ver_lbl.set_markup(f"<span size='8500' weight='bold' foreground='{P['accent']}'>
 ver_box.pack_start(ver_lbl, False, False, 0)
 brand_top.pack_start(title_lbl, False, False, 0)
 brand_top.pack_start(ver_box, False, False, 0)
+
+btn_upd_pill = Gtk.Button(label="↻ Kiểm tra cập nhật")
+btn_upd_pill.set_can_focus(False)
+btn_upd_pill.set_valign(Gtk.Align.CENTER)
+btn_upd_pill.get_style_context().add_class("bento-upd-pill")
+brand_top.pack_start(btn_upd_pill, False, False, 0)
+
+_upd_state = {"status": "idle", "version": "", "busy": False}
+
+def _set_upd_pill_ui(status, ver=""):
+    _upd_state["status"] = status
+    if ver:
+        _upd_state["version"] = ver
+    ctx = btn_upd_pill.get_style_context()
+    for cls in ("bento-upd-pill", "bento-upd-pill-ok", "bento-upd-pill-avail"):
+        ctx.remove_class(cls)
+    if status == "checking":
+        btn_upd_pill.set_label("⏳ Đang kiểm tra...")
+        ctx.add_class("bento-upd-pill")
+    elif status == "up_to_date":
+        btn_upd_pill.set_label("✓ Bản mới nhất")
+        ctx.add_class("bento-upd-pill-ok")
+    elif status == "available":
+        btn_upd_pill.set_label(f"⬇ Cập nhật v{ver}")
+        ctx.add_class("bento-upd-pill-avail")
+    elif status == "downloading":
+        btn_upd_pill.set_label("⏳ Đang tải gói...")
+        ctx.add_class("bento-upd-pill")
+    elif status == "installing":
+        btn_upd_pill.set_label("⚙ Đang cài đặt...")
+        ctx.add_class("bento-upd-pill")
+    elif status == "error":
+        btn_upd_pill.set_label("⚠ Thử lại cập nhật")
+        ctx.add_class("bento-upd-pill")
+    else:
+        btn_upd_pill.set_label("↻ Kiểm tra cập nhật")
+        ctx.add_class("bento-upd-pill")
+    btn_upd_pill.queue_draw()
+    return False
+
+def _start_gtk_update_worker(do_install=False):
+    if _upd_state["busy"]:
+        return
+    _upd_state["busy"] = True
+    _set_upd_pill_ui("downloading" if do_install else "checking", _upd_state["version"])
+    import hashlib, threading, urllib.request
+
+    def _worker():
+        try:
+            if not do_install:
+                req = urllib.request.Request(
+                    "https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest",
+                    headers={
+                        "Accept": "application/vnd.github+json",
+                        "User-Agent": "VieLotusIM/2.0.2 (Linux; SettingsUpdater)",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                tag = str(data.get("tag_name", "")).strip().lstrip("vV").split("-")[0]
+                if not tag:
+                    raise RuntimeError("empty tag")
+                r_parts = [int(x) for x in tag.split(".") if x.isdigit()]
+                l_parts = [2, 0, 2]
+                n = max(len(r_parts), len(l_parts))
+                is_newer = False
+                for i in range(n):
+                    rv = r_parts[i] if i < len(r_parts) else 0
+                    lv = l_parts[i] if i < len(l_parts) else 0
+                    if rv != lv:
+                        is_newer = rv > lv
+                        break
+                _upd_state["busy"] = False
+                if is_newer:
+                    GLib.idle_add(_set_upd_pill_ui, "available", tag)
+                else:
+                    GLib.idle_add(_set_upd_pill_ui, "up_to_date", tag)
+                return
+
+            ver = _upd_state["version"] or "2.0.2"
+            mach = platform.machine().lower()
+            deb_arch = "arm64" if mach in ("aarch64", "arm64") else "amd64"
+            deb_name = f"vielotus_{ver}_{deb_arch}.deb"
+            base_dl = f"https://github.com/stevedat/VieLotus-IM/releases/download/v{ver}"
+
+            cs_req = urllib.request.Request(
+                f"{base_dl}/checksums.sha256",
+                headers={"User-Agent": "VieLotusIM/2.0.2 (Linux; SettingsUpdater)"},
+            )
+            with urllib.request.urlopen(cs_req, timeout=15) as cs_resp:
+                cs_text = cs_resp.read().decode("utf-8", errors="replace")
+
+            expected_sha = ""
+            for ln in cs_text.splitlines():
+                parts = ln.strip().split()
+                if len(parts) >= 2 and os.path.basename(parts[-1].lstrip("*./")) == deb_name:
+                    cand = parts[0].lower()
+                    if len(cand) == 64:
+                        expected_sha = cand
+                        break
+            if len(expected_sha) != 64:
+                raise RuntimeError("missing sha256")
+
+            deb_req = urllib.request.Request(
+                f"{base_dl}/{deb_name}",
+                headers={"User-Agent": "VieLotusIM/2.0.2 (Linux; SettingsUpdater)"},
+            )
+            with urllib.request.urlopen(deb_req, timeout=120) as deb_resp:
+                deb_bytes = deb_resp.read()
+
+            actual_sha = hashlib.sha256(deb_bytes).hexdigest().lower()
+            if actual_sha != expected_sha:
+                raise RuntimeError("sha256 mismatch")
+
+            tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
+            os.chmod(tmp_dir, 0o755)
+            deb_path = os.path.join(tmp_dir, deb_name)
+            with open(deb_path, "wb") as df:
+                df.write(deb_bytes)
+            os.chmod(deb_path, 0o644)
+
+            GLib.idle_add(_set_upd_pill_ui, "installing", ver)
+            pkexec_bin = shutil.which("pkexec")
+            apt_bin = shutil.which("apt-get")
+            rc = 1
+            if pkexec_bin and apt_bin:
+                rc = subprocess.call([pkexec_bin, apt_bin, "install", "-y", "--allow-downgrades", deb_path])
+            try:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            except Exception:
+                pass
+            _upd_state["busy"] = False
+            if rc == 0:
+                GLib.idle_add(_set_upd_pill_ui, "up_to_date", ver)
+            else:
+                GLib.idle_add(_set_upd_pill_ui, "available", ver)
+        except Exception:
+            _upd_state["busy"] = False
+            GLib.idle_add(_set_upd_pill_ui, "error", "")
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+
+btn_upd_pill.connect(
+    "clicked",
+    lambda *_: _start_gtk_update_worker(do_install=(_upd_state["status"] == "available")),
+)
+if not smoke_mode:
+    GLib.timeout_add(350, lambda: (_start_gtk_update_worker(False), False)[1])
 
 sub_lbl = Gtk.Label()
 sub_lbl.set_markup(
@@ -3330,6 +3522,94 @@ case "${1:-}" in
         run_gtk_settings "1"
         echo "✅ GTK3 Settings GUI smoke test PASSED."
         exit 0
+        ;;
+    --check-update|--update)
+        DO_INSTALL="0"
+        [ "${1:-}" = "--update" ] && DO_INSTALL="1"
+        python3 - "${DO_INSTALL}" <<'UPD_PYEOF'
+import hashlib, json, os, platform, shutil, subprocess, sys, tempfile, urllib.request
+
+do_install = sys.argv[1] == "1"
+local_ver = "2.0.2"
+print(f"✦ Đang kiểm tra bản cập nhật Sen Việt (hiện tại: v{local_ver})...")
+try:
+    req = urllib.request.Request(
+        "https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": f"VieLotusIM/{local_ver} (Linux; CLIUpdater)",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=12) as resp:
+        rel = json.loads(resp.read().decode("utf-8", errors="replace"))
+except Exception as exc:
+    print(f"✗ Không thể kết nối GitHub Releases: {exc}")
+    sys.exit(1)
+
+remote_ver = str(rel.get("tag_name", "")).strip().lstrip("vV").split("-")[0]
+r_parts = [int(x) for x in remote_ver.split(".") if x.isdigit()]
+l_parts = [int(x) for x in local_ver.split(".") if x.isdigit()]
+is_newer = False
+for i in range(max(len(r_parts), len(l_parts))):
+    rv = r_parts[i] if i < len(r_parts) else 0
+    lv = l_parts[i] if i < len(l_parts) else 0
+    if rv != lv:
+        is_newer = rv > lv
+        break
+
+if not is_newer:
+    print(f"✓ Bạn đang sử dụng phiên bản mới nhất (v{local_ver}).")
+    sys.exit(0)
+
+print(f"⬇ Phát hiện phiên bản mới: v{remote_ver}!")
+if not do_install:
+    print("  Chạy 'vielotus-settings --update' để tự động tải về, xác thực SHA-256 và cài đặt.")
+    sys.exit(0)
+
+mach = platform.machine().lower()
+deb_arch = "arm64" if mach in ("aarch64", "arm64") else "amd64"
+deb_name = f"vielotus_{remote_ver}_{deb_arch}.deb"
+base_dl = f"https://github.com/stevedat/VieLotus-IM/releases/download/v{remote_ver}"
+
+print(f"• Đang tải bảng mã kiểm tra SHA-256 và gói {deb_name}...")
+with urllib.request.urlopen(f"{base_dl}/checksums.sha256", timeout=15) as r_cs:
+    cs_text = r_cs.read().decode("utf-8", errors="replace")
+
+expected_sha = ""
+for ln in cs_text.splitlines():
+    parts = ln.strip().split()
+    if len(parts) >= 2 and os.path.basename(parts[-1].lstrip("*./")) == deb_name:
+        expected_sha = parts[0].lower()
+        break
+
+if len(expected_sha) != 64:
+    print(f"✗ Không tìm thấy mã SHA-256 cho {deb_name} trong checksums.sha256.")
+    sys.exit(1)
+
+with urllib.request.urlopen(f"{base_dl}/{deb_name}", timeout=120) as r_deb:
+    deb_bytes = r_deb.read()
+
+actual_sha = hashlib.sha256(deb_bytes).hexdigest().lower()
+if actual_sha != expected_sha:
+    print(f"✗ Mã băm SHA-256 không khớp ({actual_sha} != {expected_sha}). Đã huỷ cài đặt!")
+    sys.exit(1)
+
+print(f"✓ Đã xác thực SHA-256 khớp 100% ({actual_sha[:16]}...). Đang cài đặt...")
+tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
+os.chmod(tmp_dir, 0o755)
+deb_path = os.path.join(tmp_dir, deb_name)
+with open(deb_path, "wb") as df:
+    df.write(deb_bytes)
+os.chmod(deb_path, 0o644)
+
+cmd = ["sudo", "apt-get", "install", "-y", "--allow-downgrades", deb_path]
+if os.geteuid() == 0:
+    cmd = ["apt-get", "install", "-y", "--allow-downgrades", deb_path]
+rc = subprocess.call(cmd)
+shutil.rmtree(tmp_dir, ignore_errors=True)
+sys.exit(rc)
+UPD_PYEOF
+        exit $?
         ;;
 esac
 

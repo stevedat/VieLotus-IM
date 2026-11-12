@@ -2991,6 +2991,14 @@ final class VieLotusIMController: IMKInputController {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        let updateItem = NSMenuItem(
+            title: "Kiểm tra cập nhật...",
+            action: #selector(checkForUpdatesFromMenu),
+            keyEquivalent: ""
+        )
+        updateItem.target = self
+        menu.addItem(updateItem)
+
         let feedbackItem = NSMenuItem(
             title: "Gửi góp ý & Báo lỗi...",
             action: #selector(openFeedback),
@@ -3034,6 +3042,13 @@ final class VieLotusIMController: IMKInputController {
 
     @objc private func openSettings() {
         SettingsWindowManager.shared.showSettingsWindow()
+    }
+
+    @objc private func checkForUpdatesFromMenu() {
+        SettingsWindowManager.shared.showSettingsWindow()
+        Task { @MainActor in
+            await UpdateManager.shared.checkForUpdates(userInitiated: true)
+        }
     }
 
     @objc private func openFeedback() {

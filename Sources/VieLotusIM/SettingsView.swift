@@ -19,6 +19,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @ObservedObject var prefs = Preferences.shared
+    @ObservedObject private var updater = UpdateManager.shared
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: SettingsTab = .settings
     @State private var showingMacroEditor = false
@@ -87,6 +88,8 @@ struct SettingsView: View {
                             .foregroundColor(.accentColor)
                             .clipShape(Capsule())
                             .help("Phiên bản chi tiết: v\(AppInfo.appVersion)")
+
+                        headerUpdatePill
                     }
                     Text("Thuần chuẩn Apple • 100% Offline • Không quyền Trợ năng")
                         .font(.system(size: 11))
@@ -219,6 +222,9 @@ struct SettingsView: View {
             if !prefs.enforceABCBaseLayout { prefs.enforceABCBaseLayout = true }
             macroCount = MacroEngine.shared.getMacroEntries().count
             tisStatus = InputSourceDoctor.inspect()
+            Task {
+                await updater.checkIfNeededOnSettingsOpen()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: MacroEngine.macrosDidChangeNotification)) { _ in
             macroCount = MacroEngine.shared.getMacroEntries().count
@@ -945,6 +951,126 @@ struct SettingsView: View {
         .padding(.horizontal, 18)
         .padding(.top, 12)
         .padding(.bottom, 8)
+    }
+
+    @ViewBuilder
+    private var headerUpdatePill: some View {
+        switch updater.status {
+        case .idle:
+            Button {
+                Task { await updater.checkForUpdates(userInitiated: true) }
+            } label: {
+                HStack(spacing: 3.5) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 9, weight: .semibold))
+                    Text("Kiểm tra cập nhật")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 1.5)
+                .background(isDark ? Color.white.opacity(0.08) : Color.secondary.opacity(0.10))
+                .foregroundColor(.secondary)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("Kiểm tra phiên bản mới từ GitHub Releases (có xác thực SHA-256)")
+
+        case .checking:
+            HStack(spacing: 4) {
+                Image(systemName: "hourglass")
+                    .font(.system(size: 9, weight: .semibold))
+                Text("Đang kiểm tra...")
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 1.5)
+            .background(isDark ? Color.white.opacity(0.08) : Color.secondary.opacity(0.10))
+            .foregroundColor(.secondary)
+            .clipShape(Capsule())
+
+        case .upToDate:
+            Button {
+                Task { await updater.checkForUpdates(userInitiated: true) }
+            } label: {
+                HStack(spacing: 3.5) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 9.5, weight: .semibold))
+                    Text("Bản mới nhất")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 1.5)
+                .background(Color.green.opacity(isDark ? 0.20 : 0.12))
+                .foregroundColor(.green)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("Đang dùng bản mới nhất • Bấm để kiểm tra lại")
+
+        case .updateAvailable(let manifest):
+            Button {
+                Task { await updater.downloadAndInstallUpdate() }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 9.5, weight: .bold))
+                    Text("Cập nhật v\(manifest.version)")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+                .background(Color.green)
+                .foregroundColor(.white)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("Tải về VieLotusIM.pkg v\(manifest.version), đối chiếu SHA-256 và cài đặt tự động")
+
+        case .downloading(let progress):
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 9.5, weight: .semibold))
+                Text("Đang tải \(Int(progress * 100))%...")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 1.5)
+            .background(Color.accentColor.opacity(0.16))
+            .foregroundColor(.accentColor)
+            .clipShape(Capsule())
+
+        case .installing:
+            HStack(spacing: 4) {
+                Image(systemName: "gearshape.2.fill")
+                    .font(.system(size: 9.5, weight: .semibold))
+                Text("Đang cài đặt...")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 1.5)
+            .background(Color.accentColor.opacity(0.16))
+            .foregroundColor(.accentColor)
+            .clipShape(Capsule())
+
+        case .error(let message):
+            Button {
+                Task { await updater.checkForUpdates(userInitiated: true) }
+            } label: {
+                HStack(spacing: 3.5) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 9, weight: .semibold))
+                    Text("Thử lại cập nhật")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 1.5)
+                .background(Color.orange.opacity(isDark ? 0.22 : 0.14))
+                .foregroundColor(.orange)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help(message)
+        }
     }
 
     private func aboutFeaturePill(icon: String, text: String, color: Color) -> some View {
