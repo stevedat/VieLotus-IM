@@ -101,17 +101,34 @@ set_target_properties(VieLotusTIP PROPERTIES
     PREFIX ""
 )
 
+set(EMBEDDED_TIP_HEADER "${CMAKE_CURRENT_BINARY_DIR}/EmbeddedTipDll.h")
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_custom_command(
+    OUTPUT "${EMBEDDED_TIP_HEADER}"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/embed_file_to_header.py"
+            "$<TARGET_FILE:VieLotusTIP>"
+            "${EMBEDDED_TIP_HEADER}"
+    DEPENDS VieLotusTIP "${CMAKE_CURRENT_SOURCE_DIR}/embed_file_to_header.py"
+    COMMENT "Embedding VieLotusTIP.dll into EmbeddedTipDll.h for self-provisioning VieLotusSettings.exe & VieLotusLab.exe"
+    VERBATIM
+)
+
 add_executable(VieLotusSettings WIN32
     src/SettingsMain.cpp
+    "${EMBEDDED_TIP_HEADER}"
     VieLotusSettings.rc
     VieLotusSettings.manifest
 )
+
+target_compile_definitions(VieLotusSettings PRIVATE VIELOTUS_HAS_EMBEDDED_TIP=1)
+target_include_directories(VieLotusSettings PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 target_link_libraries(VieLotusSettings PRIVATE
     user32
     shell32
     advapi32
     ole32
+    uuid
 )
 
 set_target_properties(VieLotusSettings PROPERTIES

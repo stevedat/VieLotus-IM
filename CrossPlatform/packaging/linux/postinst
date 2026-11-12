@@ -31,6 +31,12 @@ if command -v fc-cache >/dev/null 2>&1; then
     fc-cache -f >/dev/null 2>&1 || true
 fi
 
+# Terminate any stale running engine workers before re-onboarding so ibus-daemon / fcitx5
+# immediately loads the newly installed binary and shared library
+if command -v pkill >/dev/null 2>&1; then
+    pkill -f ibus-engine-vielotus >/dev/null 2>&1 || true
+fi
+
 # Zero-touch live desktop session onboarding: reload live IBus registry & activate Sen Việt (🇻🇳 tex) immediately
 if [ -x /usr/bin/vielotus-settings ]; then
     for bus_sock in /run/user/[1-9][0-9][0-9]*/bus; do

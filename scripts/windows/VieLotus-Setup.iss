@@ -90,6 +90,8 @@ Name: "{autodesktop}\Cài đặt Sen Việt (VieLotusIM)"; Filename: "{app}\VieL
 ; Grant Read & Execute ACLs to ALL APPLICATION PACKAGES (S-1-15-2-1) and ALL RESTRICTED APPLICATION PACKAGES (S-1-15-2-2)
 ; so Windows 10/11 UWP, WinUI 3 (Notepad, Terminal, Search, Start Menu, Edge, Settings) can load VieLotusTIP.dll
 Filename: "{sys}\icacls.exe"; Parameters: """{app}"" /grant ""*S-1-15-2-1:(OI)(CI)(RX)"" /grant ""*S-1-15-2-2:(OI)(CI)(RX)"" /T /C /Q"; Flags: runhidden
+; Provision vi-VN + Sen Việt TIP into Windows 10/11 WinUserLanguageList (bcp47langs) so the user never has to open Settings -> Language -> Add a keyboard
+Filename: "powershell.exe"; Parameters: "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command ""try {{ $l = Get-WinUserLanguageList; $v = $l | Where-Object {{ $_.LanguageTag -like 'vi*' }}; if (-not $v) {{ $v = New-WinUserLanguageList 'vi-VN'; $l.Add($v) }} else {{ $v = $v[0] }}; $v.InputMethodTips.Clear(); $v.InputMethodTips.Add('042A:{{C7B08E9D-4762-4C97-8B1F-522197A598DE}}{{8E2A7B44-5A1F-4B82-9B7C-123456789ABC}}'); $v.InputMethodTips.Add('042A:{{C7B08E9D-4762-4C97-8B1F-522197A598DE}}{{8E2A7B45-5A1F-4B82-9B7C-123456789ABC}}'); Set-WinUserLanguageList $l -Force }} catch {{}}"""; Flags: runasoriginaluser runhidden
 ; Activate Telex & VNI profiles in Windows Language Bar (Win + Space) for both elevated and interactive user contexts
 Filename: "{sys}\rundll32.exe"; Parameters: """{app}\VieLotusTIP.dll"",ActivateUserProfilesW"; Flags: runhidden
 Filename: "{sys}\rundll32.exe"; Parameters: """{app}\VieLotusTIP.dll"",ActivateUserProfilesW"; Flags: runasoriginaluser runhidden
@@ -111,6 +113,7 @@ begin
   if CurStep = ssInstall then
   begin
     DllPath := ExpandConstant('{app}\VieLotusTIP.dll');
+    DeleteFile(ExpandConstant('{app}\VieLotusCAPI.dll'));
     DeleteFile(ExpandConstant('{app}\VieLotusTIP.old.dll'));
     for I := 1 to 99 do
     begin

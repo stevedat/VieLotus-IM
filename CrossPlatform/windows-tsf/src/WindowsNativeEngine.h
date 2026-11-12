@@ -43,10 +43,20 @@ public:
     void setQuickTelex(bool enabled) { m_quickTelex = enabled; }
     bool getQuickTelex() const { return m_quickTelex; }
 
+    void setRelaxedCoda(bool enabled) { m_relaxedCoda = enabled; }
+    bool getRelaxedCoda() const { return m_relaxedCoda; }
+
+    void setMacroEnabled(bool enabled) { m_macroEnabled = enabled; }
+    bool getMacroEnabled() const { return m_macroEnabled; }
+
+    static bool loadMacrosJson(const char *jsonUtf8);
+    static void resetDefaultMacros();
+
     int32_t feedChar(uint32_t codepoint);
     int32_t feedBackspace();
     int32_t commitWord();
     void syncSurroundingContext(const char *beforeContextUtf8);
+    bool tryRehydrateAndFeed(const wchar_t *precedingWord, int wordLen, uint32_t codepoint);
 
     int32_t getLastBackspaces() const { return m_lastBackspaces; }
     const char *getLastTextUtf8() const { return m_lastTextUtf8; }
@@ -61,6 +71,8 @@ private:
     bool m_modernOrthography{true};
     int32_t m_grammarProfile{1};
     bool m_quickTelex{false};
+    bool m_relaxedCoda{false};
+    bool m_macroEnabled{false};
     bool m_composingFlag{false};
     bool m_activeWordFlag{false};
     int32_t m_lastBackspaces{0};

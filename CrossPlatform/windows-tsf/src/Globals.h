@@ -12,6 +12,7 @@
 #include <msctf.h>
 #include <olectl.h>
 #include <atomic>
+#include <new>
 #include "vielotus.h"
 
 #ifndef TF_CLIENTID_NULL
@@ -34,8 +35,12 @@ public:
 // IID for ITfTextInputProcessorEx: {6E4E2102-F9CD-433D-B496-303CE03A6507}
 extern const GUID IID_ITfTextInputProcessorEx_Compat;
 
-// CLSID for VieLotusTIP: {C7B08E9D-4762-4C97-8B1F-522197A598DC}
+// CLSID for VieLotusTIP: {C7B08E9D-4762-4C97-8B1F-522197A598DE}
 extern const GUID CLSID_VieLotusTIP;
+
+// Legacy CLSIDs (2.0.2-r6 and 2.0.2-r7): {C7B08E9D-4762-4C97-8B1F-522197A598DC}, {C7B08E9D-4762-4C97-8B1F-522197A598DD}
+extern const GUID CLSID_VieLotusTIP_Legacy;
+extern const GUID CLSID_VieLotusTIP_Legacy2;
 
 // Profile GUID for VieLotusTIP (Telex): {8E2A7B44-5A1F-4B82-9B7C-123456789ABC}
 extern const GUID GUID_VieLotusProfile;

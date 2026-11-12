@@ -1,7 +1,10 @@
 #include <windows.h>
 #pragma code_page(65001)
 
+1 24 "VieLotusSettings.manifest"
 101 ICON "../../scripts/windows/assets/VieLotusIM.ico"
+102 RCDATA "../../scripts/windows/assets/app-icon-128x128.png"
+103 RCDATA "../../scripts/windows/assets/VieLotusIM.ico"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 2,0,2,0
