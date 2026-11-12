@@ -808,7 +808,13 @@ fi
 rm -f "${TMP_DEB}" "${TMP_SUMS}"
 
 if [ -x /usr/bin/vielotus-settings ]; then
-    run_as_real_user /usr/bin/vielotus-settings --activate || true
+    BOOTSTRAP_FCITX5="0"
+    if [ -z "${CI:-}" ] && [ -n "${REAL_DISPLAY}${REAL_WAYLAND}" ] && ! printf '%s' "${REAL_DESKTOP}" | grep -qi "gnome"; then
+        if ! pgrep -x ibus-daemon >/dev/null 2>&1 || printf '%s' "${REAL_DESKTOP}" | grep -Eqi 'kde|plasma|hyprland|sway|lxqt'; then
+            BOOTSTRAP_FCITX5="1"
+        fi
+    fi
+    run_as_real_user env VIELOTUS_BOOTSTRAP_FCITX5="${BOOTSTRAP_FCITX5}" /usr/bin/vielotus-settings --activate || true
 fi
 
 SETTINGS_OPENED="0"
