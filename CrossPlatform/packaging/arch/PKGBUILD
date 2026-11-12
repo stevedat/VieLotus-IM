@@ -7,18 +7,18 @@ pkgdesc="Bộ gõ tiếng Việt Sen Việt (VieLotusIM) thế hệ mới cho Li
 arch=('x86_64' 'aarch64')
 url="https://github.com/stevedat/VieLotus-IM"
 license=('MIT')
-depends=('glibc' 'gcc-libs' 'glib2' 'python' 'python-gobject' 'gtk3')
+depends=('glibc' 'gcc-libs' 'glib2' 'python' 'python-gobject' 'gtk3' 'noto-fonts')
 optdepends=(
-    'fcitx5: Fcitx5 input method framework support'
-    'ibus: IBus input method framework support'
+    'fcitx5-im: Fcitx5 input method framework & GTK/Qt modules (recommended for KDE/Hyprland/XFCE)'
+    'ibus: IBus input method framework support (recommended for GNOME)'
 )
 provides=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
 conflicts=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
 source_x86_64=("${_pkgname}_${pkgver}_amd64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_amd64.deb")
 source_aarch64=("${_pkgname}_${pkgver}_arm64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_arm64.deb")
-sha256sums_x86_64=('fe306ade5b85354cbc64acd8cc0e806758d4b5429b22eb0de1750ccf290490c5')
-sha256sums_aarch64=('d0724b043259a59bbe7d46c144b1877ea636389a472e4e15dcb5d318517051f0')
+sha256sums_x86_64=('91baa78751ed5037ff01498a252ab77540a735bcd390c831b208f3cd36a6d7b8')
+sha256sums_aarch64=('64514bd74d82d2d43ed003d1cba213be3767cd2bfece6e1ec07e5eb4a7ca9555')
 
 package() {
-    bsdtar -xf "${srcdir}/data.tar.xz" -C "${pkgdir}/"
+    bsdtar -xf "${srcdir}"/data.tar.* -C "${pkgdir}/"
 }
