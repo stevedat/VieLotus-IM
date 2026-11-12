@@ -6,8 +6,8 @@ pkgdesc="Sen Việt (VieLotusIM) — Next-Gen Vietnamese Input Method for IBus &
 arch=('x86_64' 'aarch64')
 url="https://github.com/stevedat/VieLotus-IM"
 license=('MIT')
-depends=('glibc' 'gcc-libs' 'glib2' 'ibus' 'fcitx5' 'python' 'python-gobject' 'gtk3')
-makedepends=('cmake' 'pkgconf' 'python' 'fcitx5')
+depends=('glibc' 'gcc-libs' 'glib2' 'ibus' 'fcitx5' 'python' 'python-gobject' 'gtk3' 'noto-fonts')
+makedepends=('cmake' 'extra-cmake-modules' 'pkgconf' 'python' 'fcitx5' 'ibus')
 provides=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
 conflicts=('vielotus-bin')
 source=("${pkgname}-${pkgver}.tar.gz::https://github.com/stevedat/VieLotus-IM/archive/refs/tags/v${pkgver}.tar.gz")
@@ -57,6 +57,16 @@ package() {
         "${pkgdir}/usr/share/man/man1/vielotus-settings.1"
     install -Dm644 CrossPlatform/packaging/linux/vielotus.desktop \
         "${pkgdir}/usr/share/applications/vielotus.desktop"
+    install -Dm644 CrossPlatform/packaging/linux/vielotus-onboard.desktop \
+        "${pkgdir}/etc/xdg/autostart/vielotus-onboard.desktop"
+    install -Dm644 CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf \
+        "${pkgdir}/etc/fonts/conf.d/51-vielotus-vietnamese.conf"
     install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml \
         "${pkgdir}/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml"
+    for sz in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
+        if [ -f "CrossPlatform/linux-icons/hicolor_${sz}_apps/vielotus.png" ]; then
+            install -Dm644 "CrossPlatform/linux-icons/hicolor_${sz}_apps/vielotus.png" \
+                "${pkgdir}/usr/share/icons/hicolor/${sz}/apps/vielotus.png"
+        fi
+    done
 }

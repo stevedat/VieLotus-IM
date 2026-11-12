@@ -5,6 +5,25 @@
 # License: MIT / Expat (100% Clean-Room Native Implementation)
 # ==============================================================================
 
+if [ "$(id -u 2>/dev/null || echo 1000)" = "0" ] && [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
+    REAL_UID="$(id -u "${SUDO_USER}" 2>/dev/null || true)"
+    REAL_HOME="$(getent passwd "${SUDO_USER}" 2>/dev/null | cut -d: -f6 || true)"
+    if [ -n "${REAL_UID}" ] && [ -n "${REAL_HOME}" ] && [ -d "${REAL_HOME}" ]; then
+        EXEC_ENV=("HOME=${REAL_HOME}")
+        [ -d "/run/user/${REAL_UID}" ] && EXEC_ENV+=("XDG_RUNTIME_DIR=/run/user/${REAL_UID}")
+        [ -S "/run/user/${REAL_UID}/bus" ] && EXEC_ENV+=("DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${REAL_UID}/bus")
+        [ -n "${DISPLAY:-}" ] && EXEC_ENV+=("DISPLAY=${DISPLAY}")
+        [ -n "${WAYLAND_DISPLAY:-}" ] && EXEC_ENV+=("WAYLAND_DISPLAY=${WAYLAND_DISPLAY}")
+        [ -n "${XDG_CURRENT_DESKTOP:-}" ] && EXEC_ENV+=("XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP}")
+        [ -n "${XDG_SESSION_TYPE:-}" ] && EXEC_ENV+=("XDG_SESSION_TYPE=${XDG_SESSION_TYPE}")
+        if command -v sudo >/dev/null 2>&1; then
+            exec sudo -u "${SUDO_USER}" env "${EXEC_ENV[@]}" "$0" "$@"
+        elif command -v runuser >/dev/null 2>&1; then
+            exec runuser -u "${SUDO_USER}" -- env "${EXEC_ENV[@]}" "$0" "$@"
+        fi
+    fi
+fi
+
 UID_CUR="$(id -u 2>/dev/null || echo 1000)"
 HOME_DIR="${HOME:-}"
 if [ -z "${HOME_DIR}" ] && command -v getent >/dev/null 2>&1; then
@@ -200,9 +219,26 @@ ENV_EOF
 
 load_config
 
+FCITX_WAS_STOPPED_FOR_PROFILE=0
+
+has_fcitx5_vielotus_plugin() {
+    command -v fcitx5 >/dev/null 2>&1 || return 1
+    for _fp in /usr/lib/fcitx5/vielotus.so /usr/lib64/fcitx5/vielotus.so /usr/lib/*-linux-gnu/fcitx5/vielotus.so; do
+        if [ -e "${_fp}" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+is_gnome_desktop() {
+    printf '%s' "${XDG_CURRENT_DESKTOP:-}:${DESKTOP_SESSION:-}" | grep -qi "gnome"
+}
+
 configure_fcitx5_profile() {
     FCITX_IM="$1"
     ACTIVATE_PROFILE="${2:-0}"
+    FCITX_WAS_STOPPED_FOR_PROFILE=0
     FCITX_PROFILE_DIR="${CONFIG_ROOT}/fcitx5"
     FCITX_PROFILE="${FCITX_PROFILE_DIR}/profile"
     mkdir -p "${FCITX_PROFILE_DIR}/conf"
@@ -245,24 +281,78 @@ DeveloperMode=${FCITX_DM}
 PreeditUnderline=${FCITX_PU}
 FCITX_CONF_EOF
 
-    if [ "${ACTIVATE_PROFILE}" = "1" ] && [ -f "${FCITX_PROFILE}" ] && command -v python3 >/dev/null 2>&1; then
-        python3 - "${FCITX_PROFILE}" "${FCITX_IM}" <<'PYEOF' 2>/dev/null || true
-import re, sys
+    if [ "${ACTIVATE_PROFILE}" = "1" ] && command -v python3 >/dev/null 2>&1; then
+        NEED_PROFILE_WRITE=1
+        if [ -f "${FCITX_PROFILE}" ] && grep -q "^Name=${FCITX_IM}\$" "${FCITX_PROFILE}" 2>/dev/null && grep -q "^DefaultIM=${FCITX_IM}\$" "${FCITX_PROFILE}" 2>/dev/null; then
+            NEED_PROFILE_WRITE=0
+        fi
+        if [ "${NEED_PROFILE_WRITE}" = "1" ]; then
+            if pgrep -x fcitx5 >/dev/null 2>&1; then
+                FCITX_WAS_STOPPED_FOR_PROFILE=1
+                if command -v fcitx5-remote >/dev/null 2>&1; then
+                    fcitx5-remote -e >/dev/null 2>&1 || true
+                fi
+                for _w in 1 2 3 4 5 6; do
+                    pgrep -x fcitx5 >/dev/null 2>&1 || break
+                    sleep 0.08
+                done
+                if pgrep -x fcitx5 >/dev/null 2>&1; then
+                    pkill -x fcitx5 >/dev/null 2>&1 || true
+                    sleep 0.1
+                fi
+            fi
+            python3 - "${FCITX_PROFILE}" "${FCITX_IM}" <<'PYEOF' 2>/dev/null || true
+import os, re, sys
 
 profile_path, im_name = sys.argv[1], sys.argv[2]
-with open(profile_path, "r", encoding="utf-8", errors="ignore") as f:
-    text = f.read()
+text = ""
+if os.path.exists(profile_path):
+    with open(profile_path, "r", encoding="utf-8", errors="ignore") as f:
+        text = f.read()
 
-if re.search(r"^Name=vielotus-(telex|vni)$", text, flags=re.M):
+default_profile = f"""[Groups/0]
+# Group Name
+Name=Default
+# Layout
+Default Layout=us
+# Default Input Method
+DefaultIM={im_name}
+
+[Groups/0/Items/0]
+# Name
+Name=keyboard-us
+# Layout
+Layout=
+
+[Groups/0/Items/1]
+# Name
+Name={im_name}
+# Layout
+Layout=
+
+[GroupOrder]
+0=Default
+"""
+
+if "[Groups/0]" not in text:
+    with open(profile_path, "w", encoding="utf-8") as f:
+        f.write(default_profile)
+elif re.search(r"^Name=vielotus-(telex|vni)$", text, flags=re.M):
     text = re.sub(r"^Name=vielotus-(telex|vni)$", f"Name={im_name}", text, count=1, flags=re.M)
-    text = re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", text, count=1, flags=re.M)
+    if re.search(r"^DefaultIM=.*$", text, flags=re.M):
+        text = re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", text, count=1, flags=re.M)
+    else:
+        text = text.replace("[Groups/0]", f"[Groups/0]\nDefaultIM={im_name}", 1)
     with open(profile_path, "w", encoding="utf-8") as f:
         f.write(text)
-elif "[Groups/0]" in text:
+else:
     indices = [int(m) for m in re.findall(r"^\[Groups/0/Items/(\d+)\]", text, flags=re.M)]
     next_idx = (max(indices) + 1) if indices else 0
     new_item = f"\n[Groups/0/Items/{next_idx}]\nName={im_name}\nLayout=\n"
-    text = re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", text, count=1, flags=re.M)
+    if re.search(r"^DefaultIM=.*$", text, flags=re.M):
+        text = re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", text, count=1, flags=re.M)
+    else:
+        text = text.replace("[Groups/0]", f"[Groups/0]\nDefaultIM={im_name}", 1)
     if "[GroupOrder]" in text:
         text = text.replace("[GroupOrder]", new_item.lstrip("\n") + "\n[GroupOrder]", 1)
     else:
@@ -270,6 +360,76 @@ elif "[Groups/0]" in text:
     with open(profile_path, "w", encoding="utf-8") as f:
         f.write(text)
 PYEOF
+        fi
+    fi
+}
+
+ensure_fcitx5_session_ready() {
+    FCITX_IM_TARGET="$1"
+    ACTIVATE_NOW="${2:-0}"
+    has_fcitx5_vielotus_plugin || return 0
+
+    SHOULD_DRIVE_FCITX5=0
+    if [ "${FCITX_WAS_STOPPED_FOR_PROFILE:-0}" = "1" ] || pgrep -x fcitx5 >/dev/null 2>&1 || [ "${XMODIFIERS:-}" = "@im=fcitx" ] || [ "${GTK_IM_MODULE:-}" = "fcitx" ]; then
+        SHOULD_DRIVE_FCITX5=1
+    elif [ "${ACTIVATE_NOW}" = "1" ] && ! is_gnome_desktop; then
+        if printf '%s' "${XDG_CURRENT_DESKTOP:-}:${DESKTOP_SESSION:-}" | grep -Eqi 'kde|plasma|hyprland|sway|lxqt'; then
+            SHOULD_DRIVE_FCITX5=1
+        elif ! pgrep -x ibus-daemon >/dev/null 2>&1; then
+            SHOULD_DRIVE_FCITX5=1
+        fi
+    fi
+
+    [ "${SHOULD_DRIVE_FCITX5}" = "1" ] || return 0
+
+    # Persist environment.d Fcitx5 hints for non-GNOME sessions (without overriding custom user files)
+    if [ "${ACTIVATE_NOW}" = "1" ] && ! is_gnome_desktop; then
+        mkdir -p "${CONFIG_ROOT}/environment.d" 2>/dev/null || true
+        if ! grep -rq "^XMODIFIERS=" "${CONFIG_ROOT}/environment.d" 2>/dev/null; then
+            cat <<'ENVD_EOF' > "${CONFIG_ROOT}/environment.d/fcitx5-vielotus.conf" 2>/dev/null || true
+XMODIFIERS=@im=fcitx
+QT_IM_MODULE=fcitx
+ENVD_EOF
+        fi
+
+        # Auto-bind KDE Plasma Wayland Virtual Keyboard to Fcitx5 if unset
+        if printf '%s' "${XDG_CURRENT_DESKTOP:-}:${DESKTOP_SESSION:-}" | grep -Eqi 'kde|plasma' && [ -f /usr/share/applications/org.fcitx.Fcitx5.desktop ]; then
+            if command -v kwriteconfig6 >/dev/null 2>&1; then
+                CUR_KWIN_IM="$(kreadconfig6 --file kwinrc --group Wayland --key InputMethod 2>/dev/null || true)"
+                if [ -z "${CUR_KWIN_IM}" ]; then
+                    kwriteconfig6 --file kwinrc --group Wayland --key InputMethod /usr/share/applications/org.fcitx.Fcitx5.desktop >/dev/null 2>&1 || true
+                    if command -v qdbus6 >/dev/null 2>&1; then
+                        qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+                    elif command -v dbus-send >/dev/null 2>&1; then
+                        dbus-send --session --type=method_call --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
+                    fi
+                fi
+            elif command -v kwriteconfig5 >/dev/null 2>&1; then
+                CUR_KWIN_IM="$(kreadconfig5 --file kwinrc --group Wayland --key InputMethod 2>/dev/null || true)"
+                if [ -z "${CUR_KWIN_IM}" ]; then
+                    kwriteconfig5 --file kwinrc --group Wayland --key InputMethod /usr/share/applications/org.fcitx.Fcitx5.desktop >/dev/null 2>&1 || true
+                    command -v qdbus >/dev/null 2>&1 && qdbus org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+                fi
+            fi
+        fi
+    fi
+
+    # Start fcitx5 daemon in live graphical desktop if not yet running
+    if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && ! pgrep -x fcitx5 >/dev/null 2>&1; then
+        fcitx5 -d >/dev/null 2>&1 || true
+        if command -v fcitx5-remote >/dev/null 2>&1; then
+            for _rw in 1 2 3 4 5 6 7 8 9 10; do
+                fcitx5-remote >/dev/null 2>&1 && break
+                sleep 0.12
+            done
+        fi
+    fi
+
+    if pgrep -x fcitx5 >/dev/null 2>&1 && command -v fcitx5-remote >/dev/null 2>&1; then
+        fcitx5-remote -r >/dev/null 2>&1 || true
+        if [ "${ACTIVATE_NOW}" = "1" ]; then
+            fcitx5-remote -s "${FCITX_IM_TARGET}" >/dev/null 2>&1 || true
+        fi
     fi
 }
 
@@ -481,20 +641,9 @@ save_and_apply() {
         FCITX_IM_ID="vielotus-vni"
     fi
 
-    # 1. Update Fcitx5 addon config file
+    # 1. Update Fcitx5 addon config file & ensure Fcitx5 session/Wayland virtual keyboard is ready
     configure_fcitx5_profile "${FCITX_IM_ID}" "${ACTIVATE_SOURCES}" || true
-
-    # Reload/switch Fcitx5 if running
-    if command -v fcitx5 >/dev/null 2>&1; then
-        if pgrep -x fcitx5 >/dev/null 2>&1 || [ "${XMODIFIERS:-}" = "@im=fcitx" ] || [ "${GTK_IM_MODULE:-}" = "fcitx" ]; then
-            if command -v fcitx5-remote >/dev/null 2>&1; then
-                fcitx5-remote -r >/dev/null 2>&1 || true
-                if [ "${ACTIVATE_SOURCES}" = "1" ]; then
-                    fcitx5-remote -s "${FCITX_IM_ID}" >/dev/null 2>&1 || true
-                fi
-            fi
-        fi
-    fi
+    ensure_fcitx5_session_ready "${FCITX_IM_ID}" "${ACTIVATE_SOURCES}" || true
 
     # 2. Ensure live ibus-daemon has loaded vielotus.xml before binding GNOME Input Sources
     REBIND_FLAG="${FORCE_REBIND_ARG}"
@@ -3454,7 +3603,10 @@ case "${1:-}" in
     --auto-onboard)
         ONBOARD_MARKER="${CONFIG_DIR}/.onboarded"
         load_config
+        FCITX_ONBOARD_IM="vielotus-telex"
+        [ "${INPUT_METHOD}" = "vni" ] && FCITX_ONBOARD_IM="vielotus-vni"
         if [ -f "${ONBOARD_MARKER}" ]; then
+            ensure_fcitx5_session_ready "${FCITX_ONBOARD_IM}" "1" || true
             reload_live_ibus_if_needed
             repair_and_sync_gnome_sources "vielotus" "1" "${IBUS_WAS_RELOADED:-0}"
             exit 0
@@ -3595,17 +3747,32 @@ if actual_sha != expected_sha:
     sys.exit(1)
 
 print(f"✓ Đã xác thực SHA-256 khớp 100% ({actual_sha[:16]}...). Đang cài đặt...")
+if shutil.which("apt-get") and shutil.which("dpkg"):
+    tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
+    os.chmod(tmp_dir, 0o755)
+    deb_path = os.path.join(tmp_dir, deb_name)
+    with open(deb_path, "wb") as df:
+        df.write(deb_bytes)
+    os.chmod(deb_path, 0o644)
+    cmd = ["sudo", "apt-get", "install", "-y", "--allow-downgrades", deb_path]
+    if os.geteuid() == 0:
+        cmd = ["apt-get", "install", "-y", "--allow-downgrades", deb_path]
+    rc = subprocess.call(cmd)
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+    sys.exit(rc)
+
+with urllib.request.urlopen("https://stevedat.github.io/VieLotus-IM/install.sh", timeout=20) as r_sh:
+    sh_bytes = r_sh.read()
 tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
 os.chmod(tmp_dir, 0o755)
-deb_path = os.path.join(tmp_dir, deb_name)
-with open(deb_path, "wb") as df:
-    df.write(deb_bytes)
-os.chmod(deb_path, 0o644)
-
-cmd = ["sudo", "apt-get", "install", "-y", "--allow-downgrades", deb_path]
-if os.geteuid() == 0:
-    cmd = ["apt-get", "install", "-y", "--allow-downgrades", deb_path]
-rc = subprocess.call(cmd)
+sh_path = os.path.join(tmp_dir, "install.sh")
+with open(sh_path, "wb") as sf:
+    sf.write(sh_bytes)
+os.chmod(sh_path, 0o755)
+env_upd = dict(os.environ)
+env_upd["VIELOTUS_VERSION"] = remote_ver
+env_upd["VIELOTUS_NO_OPEN_SETTINGS"] = "1"
+rc = subprocess.call(["sh", sh_path], env=env_upd)
 shutil.rmtree(tmp_dir, ignore_errors=True)
 sys.exit(rc)
 UPD_PYEOF
@@ -3613,8 +3780,14 @@ UPD_PYEOF
         ;;
 esac
 
-# Load current configuration, ensure live IBus knows vielotus, and auto-repair GNOME Input Sources
+# Load current configuration, ensure live Fcitx5 / IBus session is ready, and auto-repair GNOME Input Sources
 load_config
+FCITX_STARTUP_IM="vielotus-telex"
+[ "${INPUT_METHOD}" = "vni" ] && FCITX_STARTUP_IM="vielotus-vni"
+if ! is_gnome_desktop; then
+    configure_fcitx5_profile "${FCITX_STARTUP_IM}" "1" || true
+    ensure_fcitx5_session_ready "${FCITX_STARTUP_IM}" "1" || true
+fi
 reload_live_ibus_if_needed
 repair_and_sync_gnome_sources "vielotus" "1" "${IBUS_WAS_RELOADED:-0}"
 

@@ -165,7 +165,7 @@ uninstall_vielotus() {
         while IFS= read -r installed_path || [ -n "${installed_path}" ]; do
             case "${installed_path}" in
                 ''|\#*) continue ;;
-                /usr/*|/etc/ld.so.conf.d/vielotus.conf)
+                /usr/*|/etc/ld.so.conf.d/vielotus.conf|/etc/fonts/conf.d/*vielotus*|/etc/xdg/autostart/vielotus*)
                     if [ -f "${installed_path}" ] || [ -L "${installed_path}" ]; then
                         ${SUDO} rm -f "${installed_path}" 2>/dev/null || true
                     fi
@@ -219,8 +219,12 @@ uninstall_vielotus() {
         fi
     done
     ${SUDO} rm -rf /usr/lib/vielotus /usr/share/vielotus /usr/share/doc/vielotus 2>/dev/null || true
-    rm -f "${HOME}/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf" 2>/dev/null || true
-    ${SUDO} rm -f /home/*/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf 2>/dev/null || true
+    rm -f "${HOME}/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf" \
+          "${HOME}/.config/fontconfig/conf.d/51-vielotus-vietnamese.conf" \
+          "${HOME}/.config/environment.d/fcitx5-vielotus.conf" 2>/dev/null || true
+    ${SUDO} rm -f /home/*/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf \
+                  /home/*/.config/fontconfig/conf.d/51-vielotus-vietnamese.conf \
+                  /home/*/.config/environment.d/fcitx5-vielotus.conf 2>/dev/null || true
     for sz in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
         ${SUDO} rm -f "/usr/share/icons/hicolor/${sz}/apps/vielotus.png" 2>/dev/null || true
     done
@@ -352,8 +356,14 @@ try_native_cmake_build() {
     if [ -n "${VIELOTUS_SOURCE_DIR:-}" ] && [ -d "${VIELOTUS_SOURCE_DIR}/CrossPlatform/capi-native" ]; then
         SRC_ROOT="${VIELOTUS_SOURCE_DIR}"
     else
-        TAR_URL="https://github.com/stevedat/VieLotus-IM/archive/refs/tags/v${src_ver}.tar.gz"
-        if ! download_file "${TAR_URL}" "${build_ws}/src.tar.gz" 2>/dev/null; then
+        PRIMARY_TAR_URL="https://github.com/stevedat/VieLotus-IM/archive/refs/heads/main.tar.gz"
+        FALLBACK_TAR_URL="https://github.com/stevedat/VieLotus-IM/archive/refs/tags/v${src_ver}.tar.gz"
+        if [ "${VIELOTUS_VERSION_PINNED:-0}" = "1" ]; then
+            PRIMARY_TAR_URL="https://github.com/stevedat/VieLotus-IM/archive/refs/tags/v${src_ver}.tar.gz"
+            FALLBACK_TAR_URL="https://github.com/stevedat/VieLotus-IM/archive/refs/heads/main.tar.gz"
+        fi
+        if ! download_file "${PRIMARY_TAR_URL}" "${build_ws}/src.tar.gz" 2>/dev/null && \
+           ! download_file "${FALLBACK_TAR_URL}" "${build_ws}/src.tar.gz" 2>/dev/null; then
             rm -rf "${build_ws}"
             return 1
         fi
@@ -432,7 +442,8 @@ try_native_cmake_build() {
              "${STAGE_DIR}/usr/share/applications" \
              "${STAGE_DIR}/usr/share/metainfo" \
              "${STAGE_DIR}/usr/share/man/man1" \
-             "${STAGE_DIR}/usr/share/vielotus" \
+             "${STAGE_DIR}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources" \
+             "${STAGE_DIR}/etc/fonts/conf.d" \
              "${STAGE_DIR}/etc/xdg/autostart"
 
     cp "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus-settings" "${STAGE_DIR}/usr/bin/vielotus-settings"
@@ -442,6 +453,9 @@ try_native_cmake_build() {
     if [ -f "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus-onboard.desktop" ]; then
         cp "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus-onboard.desktop" "${STAGE_DIR}/etc/xdg/autostart/vielotus-onboard.desktop"
     fi
+    if [ -f "${SRC_ROOT}/CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf" ]; then
+        cp "${SRC_ROOT}/CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf" "${STAGE_DIR}/etc/fonts/conf.d/51-vielotus-vietnamese.conf"
+    fi
     cp "${SRC_ROOT}/CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml" "${STAGE_DIR}/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml"
     if [ -f "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus-settings.1" ]; then
         cp "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus-settings.1" "${STAGE_DIR}/usr/share/man/man1/vielotus-settings.1"
@@ -449,6 +463,7 @@ try_native_cmake_build() {
     for tm_candidate in "${SRC_ROOT}/Resources/typing-modes.yml" "${SRC_ROOT}/Sources/VieLotusCore/Resources/typing-modes.yml"; do
         if [ -f "${tm_candidate}" ]; then
             cp "${tm_candidate}" "${STAGE_DIR}/usr/share/vielotus/typing-modes.yml"
+            cp "${tm_candidate}" "${STAGE_DIR}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml"
             break
         fi
     done
@@ -538,6 +553,10 @@ SUDO=""
 if [ "$(id -u)" -ne 0 ]; then
     if command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
+        if ! ${SUDO} -n true >/dev/null 2>&1 && [ -c /dev/tty ]; then
+            echo "🔐 Cần quyền quản trị (sudo) để cài đặt bộ gõ Sen Việt vào hệ thống..."
+            ${SUDO} -v </dev/tty || exit 1
+        fi
     else
         echo "❌ Vui lòng chạy lệnh với quyền root hoặc cài đặt sudo."
         exit 1
@@ -548,8 +567,10 @@ if [ "${ACTION_MODE}" = "uninstall" ]; then
     uninstall_vielotus
 fi
 
+VIELOTUS_VERSION_PINNED="0"
 if [ -n "${VIELOTUS_VERSION:-}" ]; then
     VERSION="${VIELOTUS_VERSION#v}"
+    VIELOTUS_VERSION_PINNED="1"
 else
     LATEST_TAG=""
     if command -v curl >/dev/null 2>&1 && [ -z "${VIELOTUS_DEB_PATH:-}" ]; then
@@ -600,7 +621,54 @@ echo "🌸 === Cài đặt Sen Việt (VieLotusIM v${VERSION}) cho Linux (${DEB_
 
 # Clean up any legacy user-local Snap export overrides (~/.local/lib/vielotus)
 REAL_USER="${SUDO_USER:-$(id -un)}"
+REAL_UID="$(id -u "${REAL_USER}" 2>/dev/null || id -u)"
 REAL_HOME="$(getent passwd "${REAL_USER}" 2>/dev/null | cut -d: -f6 || echo "${HOME}")"
+REAL_XDG_RUNTIME="${XDG_RUNTIME_DIR:-}"
+if [ -z "${REAL_XDG_RUNTIME}" ] && [ -d "/run/user/${REAL_UID}" ]; then
+    REAL_XDG_RUNTIME="/run/user/${REAL_UID}"
+fi
+REAL_DBUS="${DBUS_SESSION_BUS_ADDRESS:-}"
+if [ -z "${REAL_DBUS}" ] && [ -n "${REAL_XDG_RUNTIME}" ] && [ -S "${REAL_XDG_RUNTIME}/bus" ]; then
+    REAL_DBUS="unix:path=${REAL_XDG_RUNTIME}/bus"
+fi
+REAL_WAYLAND="${WAYLAND_DISPLAY:-}"
+if [ -z "${REAL_WAYLAND}" ] && [ -n "${REAL_XDG_RUNTIME}" ]; then
+    for _wsock in "${REAL_XDG_RUNTIME}"/wayland-[0-9]*; do
+        if [ -S "${_wsock}" ]; then
+            REAL_WAYLAND="$(basename "${_wsock}")"
+            break
+        fi
+    done
+fi
+REAL_DISPLAY="${DISPLAY:-}"
+if [ -z "${REAL_DISPLAY}" ] && [ -S /tmp/.X11-unix/X0 ]; then
+    REAL_DISPLAY=":0"
+fi
+REAL_DESKTOP="${XDG_CURRENT_DESKTOP:-}"
+if [ -z "${REAL_DESKTOP}" ] && command -v systemctl >/dev/null 2>&1 && [ "$(id -u)" -eq 0 ] && [ "${REAL_USER}" != "root" ]; then
+    REAL_DESKTOP="$(systemctl --user -M "${REAL_USER}@" show-environment 2>/dev/null | sed -n 's/^XDG_CURRENT_DESKTOP=//p' | head -n 1 || true)"
+fi
+
+run_as_real_user() {
+    if [ "$(id -u)" -ne 0 ] || [ -z "${REAL_USER}" ] || [ "${REAL_USER}" = "root" ]; then
+        "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo -u "${REAL_USER}" env \
+            HOME="${REAL_HOME}" \
+            XDG_RUNTIME_DIR="${REAL_XDG_RUNTIME}" \
+            DBUS_SESSION_BUS_ADDRESS="${REAL_DBUS}" \
+            WAYLAND_DISPLAY="${REAL_WAYLAND}" \
+            DISPLAY="${REAL_DISPLAY}" \
+            XDG_CURRENT_DESKTOP="${REAL_DESKTOP}" \
+            "$@"
+    elif command -v su >/dev/null 2>&1; then
+        su -s /bin/sh "${REAL_USER}" -c \
+            "HOME='${REAL_HOME}' XDG_RUNTIME_DIR='${REAL_XDG_RUNTIME}' DBUS_SESSION_BUS_ADDRESS='${REAL_DBUS}' WAYLAND_DISPLAY='${REAL_WAYLAND}' DISPLAY='${REAL_DISPLAY}' XDG_CURRENT_DESKTOP='${REAL_DESKTOP}' $*"
+    else
+        "$@"
+    fi
+}
+
 if [ -n "${REAL_HOME}" ] && [ -d "${REAL_HOME}" ]; then
     rm -rf "${REAL_HOME}/.local/lib/vielotus" 2>/dev/null || ${SUDO} rm -rf "${REAL_HOME}/.local/lib/vielotus" 2>/dev/null || true
     rm -f "${REAL_HOME}/.config/environment.d/90-vielotus.conf" 2>/dev/null || ${SUDO} rm -f "${REAL_HOME}/.config/environment.d/90-vielotus.conf" 2>/dev/null || true
@@ -685,21 +753,32 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
         nohup ${SUDO} fc-cache -f >/dev/null 2>&1 &
     fi
 elif command -v pacman >/dev/null 2>&1; then
-    echo "📦 Phát hiện hệ sinh thái Arch Linux / Manjaro (pacman)..."
-    ${SUDO} pacman -S --needed --noconfirm python-gobject gtk3 2>/dev/null || true
-    if [ "${VIELOTUS_BUILD_FROM_SOURCE:-0}" = "1" ]; then
-        ${SUDO} pacman -S --needed --noconfirm base-devel cmake pkgconf python ibus fcitx5 2>/dev/null || true
+    echo "📦 Phát hiện hệ sinh thái Arch Linux / Manjaro / CachyOS / EndeavourOS (pacman)..."
+    ARCH_BUILD_SRC="${VIELOTUS_BUILD_FROM_SOURCE:-1}"
+    ARCH_FCITX_PKGS="fcitx5-im"
+    if printf '%s' "${REAL_DESKTOP}" | grep -qi "gnome"; then
+        ARCH_FCITX_PKGS="fcitx5"
     fi
-    if ! try_native_cmake_build "${VERSION}"; then
+    ARCH_PKGS="python python-gobject gtk3 noto-fonts ibus ${ARCH_FCITX_PKGS}"
+    if [ "${ARCH_BUILD_SRC}" = "1" ]; then
+        ARCH_PKGS="${ARCH_PKGS} gcc make cmake extra-cmake-modules pkgconf"
+    fi
+    echo "⬇️  Đang kiểm tra & cài đặt các gói phụ trợ hệ thống (pacman)..."
+    ${SUDO} pacman -S --needed --noconfirm ${ARCH_PKGS} >/dev/null 2>&1 || \
+        ${SUDO} pacman -Sy --needed --noconfirm ${ARCH_PKGS} || true
+    if [ "${ARCH_BUILD_SRC}" != "1" ] || ! try_native_cmake_build "${VERSION}"; then
         fetch_and_verify_deb
         extract_deb_to_root "${TMP_DEB}"
     fi
     finalize_linux_integration
+    if command -v fc-cache >/dev/null 2>&1; then
+        nohup ${SUDO} fc-cache -f </dev/null >/dev/null 2>&1 &
+    fi
 elif command -v dnf >/dev/null 2>&1; then
     echo "📦 Phát hiện hệ sinh thái Fedora / RHEL (dnf)..."
     ${SUDO} dnf install -y python3-gobject gtk3 2>/dev/null || true
     if [ "${VIELOTUS_BUILD_FROM_SOURCE:-0}" = "1" ]; then
-        ${SUDO} dnf install -y cmake gcc-c++ pkgconf-pkg-config python3 ibus-devel glib2-devel fcitx5-devel 2>/dev/null || true
+        ${SUDO} dnf install -y cmake extra-cmake-modules gcc-c++ pkgconf-pkg-config python3 ibus-devel glib2-devel fcitx5-devel 2>/dev/null || true
     fi
     if ! try_native_cmake_build "${VERSION}"; then
         fetch_and_verify_deb
@@ -710,7 +789,7 @@ elif command -v zypper >/dev/null 2>&1; then
     echo "📦 Phát hiện hệ sinh thái openSUSE (zypper)..."
     ${SUDO} zypper --non-interactive install python3-gobject typelib-1_0-Gtk-3_0 2>/dev/null || true
     if [ "${VIELOTUS_BUILD_FROM_SOURCE:-0}" = "1" ]; then
-        ${SUDO} zypper --non-interactive install cmake gcc-c++ pkgconf-pkg-config python3 ibus-devel glib2-devel fcitx5-devel 2>/dev/null || true
+        ${SUDO} zypper --non-interactive install cmake extra-cmake-modules gcc-c++ pkgconf-pkg-config python3 ibus-devel glib2-devel fcitx5-devel 2>/dev/null || true
     fi
     if ! try_native_cmake_build "${VERSION}"; then
         fetch_and_verify_deb
@@ -729,24 +808,31 @@ fi
 rm -f "${TMP_DEB}" "${TMP_SUMS}"
 
 if [ -x /usr/bin/vielotus-settings ]; then
-    /usr/bin/vielotus-settings --activate || true
+    run_as_real_user /usr/bin/vielotus-settings --activate || true
 fi
 
-if command -v fcitx5 >/dev/null 2>&1 && pgrep -x fcitx5 >/dev/null 2>&1; then
-    fcitx5 -r -d >/dev/null 2>&1 || true
+SETTINGS_OPENED="0"
+if [ "${VIELOTUS_NO_OPEN_SETTINGS:-0}" != "1" ] && [ -z "${CI:-}" ] && [ -x /usr/bin/vielotus-settings ]; then
+    if [ -n "${REAL_DISPLAY}${REAL_WAYLAND}" ]; then
+        ( run_as_real_user nohup /usr/bin/vielotus-settings </dev/null >/dev/null 2>&1 & ) || true
+        SETTINGS_OPENED="1"
+    fi
 fi
 
 echo ""
 echo "======================================================================"
 echo "✅ Cài đặt & kích hoạt Sen Việt (VieLotusIM v${VERSION}) hoàn tất!"
 echo "  • Kiến trúc CPU                 : ${DEB_ARCH} (${ARCH_RAW})"
+if [ "${SETTINGS_OPENED}" = "1" ]; then
+    echo "  • Cửa sổ Cài đặt Sen Việt       : Đã tự động mở — chọn Telex / VNI và gõ ngay!"
+fi
 echo "  • Đổi bộ gõ nhanh trên màn hình : Super + Space / Ctrl + Space"
 echo "  • Mở ứng dụng cài đặt (GUI)     : Tìm 'Sen Việt' trong Menu ứng dụng (hoặc gõ: vielotus)"
 echo "  • Chuyển sang kiểu gõ Telex     : vielotus --telex"
 echo "  • Chuyển sang kiểu gõ VNI       : vielotus --vni"
 echo "  • Chẩn đoán môi trường Linux    : vielotus --doctor"
 echo "  • Lưu ý lần đầu cài (Wayland)   : Nếu thanh trên cùng chưa hiện '🇻🇳 tex' hoặc"
-echo "                                    Settings chỉ hiện 'vielotus', hãy Log Out & Log In 1 lần."
+echo "                                    ứng dụng đang mở chưa nhận bộ gõ, hãy Log Out & Log In 1 lần."
 echo "  • Gỡ cài đặt sạch               : sh install.sh --uninstall"
 echo "======================================================================"
 }
