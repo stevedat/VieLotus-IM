@@ -223,7 +223,7 @@ FCITX_WAS_STOPPED_FOR_PROFILE=0
 
 has_fcitx5_vielotus_plugin() {
     command -v fcitx5 >/dev/null 2>&1 || return 1
-    for _fp in /usr/lib/fcitx5/vielotus.so /usr/lib64/fcitx5/vielotus.so /usr/lib/*-linux-gnu/fcitx5/vielotus.so; do
+    for _fp in /usr/lib/fcitx5/vielotus.so /usr/lib64/fcitx5/vielotus.so /usr/lib/*-linux-*/fcitx5/vielotus.so; do
         if [ -e "${_fp}" ]; then
             return 0
         fi
@@ -3742,35 +3742,36 @@ if not do_install:
     sys.exit(0)
 
 mach = platform.machine().lower()
-deb_arch = "arm64" if mach in ("aarch64", "arm64") else "amd64"
-deb_name = f"vielotus_{remote_ver}_{deb_arch}.deb"
-base_dl = f"https://github.com/stevedat/VieLotus-IM/releases/download/v{remote_ver}"
+has_deb_arch = mach in ("x86_64", "amd64", "aarch64", "arm64")
+if shutil.which("apt-get") and shutil.which("dpkg") and has_deb_arch:
+    deb_arch = "arm64" if mach in ("aarch64", "arm64") else "amd64"
+    deb_name = f"vielotus_{remote_ver}_{deb_arch}.deb"
+    base_dl = f"https://github.com/stevedat/VieLotus-IM/releases/download/v{remote_ver}"
 
-print(f"• Đang tải bảng mã kiểm tra SHA-256 và gói {deb_name}...")
-with urllib.request.urlopen(f"{base_dl}/checksums.sha256", timeout=15) as r_cs:
-    cs_text = r_cs.read().decode("utf-8", errors="replace")
+    print(f"• Đang tải bảng mã kiểm tra SHA-256 và gói {deb_name}...")
+    with urllib.request.urlopen(f"{base_dl}/checksums.sha256", timeout=15) as r_cs:
+        cs_text = r_cs.read().decode("utf-8", errors="replace")
 
-expected_sha = ""
-for ln in cs_text.splitlines():
-    parts = ln.strip().split()
-    if len(parts) >= 2 and os.path.basename(parts[-1].lstrip("*./")) == deb_name:
-        expected_sha = parts[0].lower()
-        break
+    expected_sha = ""
+    for ln in cs_text.splitlines():
+        parts = ln.strip().split()
+        if len(parts) >= 2 and os.path.basename(parts[-1].lstrip("*./")) == deb_name:
+            expected_sha = parts[0].lower()
+            break
 
-if len(expected_sha) != 64:
-    print(f"✗ Không tìm thấy mã SHA-256 cho {deb_name} trong checksums.sha256.")
-    sys.exit(1)
+    if len(expected_sha) != 64:
+        print(f"✗ Không tìm thấy mã SHA-256 cho {deb_name} trong checksums.sha256.")
+        sys.exit(1)
 
-with urllib.request.urlopen(f"{base_dl}/{deb_name}", timeout=120) as r_deb:
-    deb_bytes = r_deb.read()
+    with urllib.request.urlopen(f"{base_dl}/{deb_name}", timeout=120) as r_deb:
+        deb_bytes = r_deb.read()
 
-actual_sha = hashlib.sha256(deb_bytes).hexdigest().lower()
-if actual_sha != expected_sha:
-    print(f"✗ Mã băm SHA-256 không khớp ({actual_sha} != {expected_sha}). Đã huỷ cài đặt!")
-    sys.exit(1)
+    actual_sha = hashlib.sha256(deb_bytes).hexdigest().lower()
+    if actual_sha != expected_sha:
+        print(f"✗ Mã băm SHA-256 không khớp ({actual_sha} != {expected_sha}). Đã huỷ cài đặt!")
+        sys.exit(1)
 
-print(f"✓ Đã xác thực SHA-256 khớp 100% ({actual_sha[:16]}...). Đang cài đặt...")
-if shutil.which("apt-get") and shutil.which("dpkg"):
+    print(f"✓ Đã xác thực SHA-256 khớp 100% ({actual_sha[:16]}...). Đang cài đặt...")
     tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
     os.chmod(tmp_dir, 0o755)
     deb_path = os.path.join(tmp_dir, deb_name)
@@ -3784,6 +3785,7 @@ if shutil.which("apt-get") and shutil.which("dpkg"):
     shutil.rmtree(tmp_dir, ignore_errors=True)
     sys.exit(rc)
 
+print(f"• Đang cập nhật bản địa cho kiến trúc {mach} qua trình cài đặt chuẩn...")
 with urllib.request.urlopen("https://stevedat.github.io/VieLotus-IM/install.sh", timeout=20) as r_sh:
     sh_bytes = r_sh.read()
 tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
