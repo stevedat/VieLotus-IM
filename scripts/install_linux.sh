@@ -4,13 +4,15 @@
 # & macOS One-Line Installer / Uninstaller
 #
 # Supported Linux Distros:
-#   • Ubuntu, Debian, Linux Mint, Pop!_OS, Zorin, Elementary, Kali (apt / dpkg)
+#   • Ubuntu, Debian, Raspberry Pi OS, Mint, Pop!_OS, Zorin, Kali (apt / dpkg)
+#   • Arch Linux, Arch ARM, Arch RISC-V, Manjaro, EndeavourOS, CachyOS (pacman)
 #   • Fedora, RHEL, CentOS Stream, Rocky, AlmaLinux (dnf)
-#   • Arch Linux, Manjaro, EndeavourOS, CachyOS, Garuda (pacman)
 #   • openSUSE Tumbleweed / Leap (zypper)
+#   • Alpine Linux / postmarketOS (apk) & Void Linux (xbps)
 # Supported Architectures:
-#   • x86_64 / amd64
-#   • aarch64 / arm64
+#   • Prebuilt fast-path + Native source : x86_64 / amd64, aarch64 / arm64
+#   • Automatic Native C++20 source build: armv7l / armhf (Raspberry Pi 32-bit),
+#     riscv64 (RISC-V), i686 / i386 (x86 32-bit), ppc64le, s390x, loongarch64
 #
 # Usage:
 #   Install   : curl -fsSL https://stevedat.github.io/VieLotus-IM/install.sh | sh
@@ -209,10 +211,10 @@ uninstall_vielotus() {
         ${SUDO} rm -f "${p}" 2>/dev/null || true
     done
     for multi_p in \
-        /usr/lib/*-linux-gnu/libVieLotusCAPI.so \
-        /usr/lib/*-linux-gnu/libVieLotusCAPI.so.0 \
-        /usr/lib/*-linux-gnu/libVieLotusCAPI.so.0.* \
-        /usr/lib/*-linux-gnu/fcitx5/vielotus.so
+        /usr/lib/*-linux-*/libVieLotusCAPI.so \
+        /usr/lib/*-linux-*/libVieLotusCAPI.so.0 \
+        /usr/lib/*-linux-*/libVieLotusCAPI.so.0.* \
+        /usr/lib/*-linux-*/fcitx5/vielotus.so
     do
         if [ -e "${multi_p}" ] || [ -L "${multi_p}" ]; then
             ${SUDO} rm -f "${multi_p}" 2>/dev/null || true
@@ -265,20 +267,20 @@ verify_installed_elf_links() {
     fi
 
     # Check Fcitx5 plugin ABI compatibility on non-Debian distros (soname guard)
-    for fcitx_plugin in /usr/lib64/fcitx5/vielotus.so /usr/lib/fcitx5/vielotus.so; do
+    for fcitx_plugin in /usr/lib64/fcitx5/vielotus.so /usr/lib/fcitx5/vielotus.so /usr/lib/*-linux-*/fcitx5/vielotus.so; do
         if [ -e "${fcitx_plugin}" ]; then
             LDD_OUT="$(LC_ALL=C ldd -r "${fcitx_plugin}" 2>&1 || true)"
             if printf '%s\n' "${LDD_OUT}" | grep -E -q 'not found|undefined symbol:'; then
                 echo "⚠️  Phát hiện khác biệt ABI Fcitx5 trên bản phân phối hiện tại đối với ${fcitx_plugin}."
                 echo "   → Tạm gỡ plugin Fcitx5 nhị phân để bảo vệ tiến trình fcitx5 (IBus vẫn hoạt động bình thường)."
                 echo "   → Mẹo: chạy lại với VIELOTUS_BUILD_FROM_SOURCE=1 để biên dịch C++20 trực tiếp theo ABI máy bạn."
-                ${SUDO} rm -f /usr/lib64/fcitx5/vielotus.so /usr/lib/fcitx5/vielotus.so 2>/dev/null || true
+                ${SUDO} rm -f /usr/lib64/fcitx5/vielotus.so /usr/lib/fcitx5/vielotus.so /usr/lib/*-linux-*/fcitx5/vielotus.so 2>/dev/null || true
                 break
             fi
         fi
     done
 
-    for core_bin in /usr/lib/ibus/ibus-engine-vielotus /usr/lib/libVieLotusCAPI.so /usr/lib64/libVieLotusCAPI.so; do
+    for core_bin in /usr/lib/ibus/ibus-engine-vielotus /usr/libexec/ibus-engine-vielotus /usr/lib/libVieLotusCAPI.so /usr/lib64/libVieLotusCAPI.so /usr/lib/*-linux-*/libVieLotusCAPI.so; do
         if [ -e "${core_bin}" ]; then
             LDD_CORE="$(LC_ALL=C ldd -r "${core_bin}" 2>&1 || true)"
             if printf '%s\n' "${LDD_CORE}" | grep -E -q 'not found|undefined symbol:'; then
@@ -343,6 +345,15 @@ try_native_cmake_build() {
     fi
     if [ -d /usr/lib64/cmake/Fcitx5Core ] || [ -d /usr/lib/cmake/Fcitx5Core ] || [ -d /usr/share/cmake/Fcitx5Core ]; then
         HAS_FCITX5_DEV=1
+    elif command -v pkg-config >/dev/null 2>&1 && pkg-config --exists Fcitx5Core 2>/dev/null; then
+        HAS_FCITX5_DEV=1
+    else
+        for _fcm in /usr/lib/*-linux-*/cmake/Fcitx5Core; do
+            if [ -d "${_fcm}" ]; then
+                HAS_FCITX5_DEV=1
+                break
+            fi
+        done
     fi
     if [ "${HAS_IBUS_DEV}" = "0" ] && [ "${HAS_FCITX5_DEV}" = "0" ]; then
         return 1
@@ -384,13 +395,23 @@ try_native_cmake_build() {
         return 1
     fi
 
-    echo "🛠️  Đang biên dịch C++20 bản địa (Native ABI) trực tiếp từ mã nguồn MIT..."
+    echo "🛠️  Đang biên dịch C++20 bản địa (Native ABI cho $(uname -m)) trực tiếp từ mã nguồn MIT..."
     LIBDIR_REL="lib"
-    if [ -d /usr/lib64 ] && [ ! -L /usr/lib64 ]; then
-        LIBDIR_REL="lib64"
+    if command -v dpkg-architecture >/dev/null 2>&1; then
+        MULTIARCH_TRIPLET="$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || true)"
+        if [ -n "${MULTIARCH_TRIPLET}" ] && [ -d "/usr/lib/${MULTIARCH_TRIPLET}" ]; then
+            LIBDIR_REL="lib/${MULTIARCH_TRIPLET}"
+        fi
+    elif [ -d /usr/lib64 ] && [ ! -L /usr/lib64 ]; then
+        case "$(uname -m)" in
+            x86_64|amd64|aarch64|arm64|riscv64|ppc64*|s390x|loongarch64|mips64*)
+                LIBDIR_REL="lib64"
+                ;;
+        esac
     fi
     STAGE_DIR="${build_ws}/rootfs"
-    mkdir -p "${STAGE_DIR}"
+    mkdir -p "${STAGE_DIR}/etc/ld.so.conf.d"
+    printf '/usr/%s\n' "${LIBDIR_REL}" > "${STAGE_DIR}/etc/ld.so.conf.d/vielotus.conf"
 
     if ! (
         cmake -S "${SRC_ROOT}/CrossPlatform/capi-native" -B "${build_ws}/build-core" \
@@ -602,22 +623,39 @@ if [ "${OS_NAME}" = "Darwin" ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# Linux Architecture Detection (x86_64/amd64 & aarch64/arm64)
+# Linux Architecture Detection (Multi-Arch: Prebuilt Fast-Path + Native C++20)
 # ------------------------------------------------------------------------------
+HAS_PREBUILT_DEB="0"
 case "${ARCH_RAW}" in
     x86_64|amd64)
         DEB_ARCH="amd64"
+        HAS_PREBUILT_DEB="1"
         ;;
     aarch64|arm64)
         DEB_ARCH="arm64"
+        HAS_PREBUILT_DEB="1"
+        ;;
+    armv7*|armv6*|armhf|armel)
+        DEB_ARCH="armhf"
+        ;;
+    riscv64)
+        DEB_ARCH="riscv64"
+        ;;
+    i686|i586|i386|x86)
+        DEB_ARCH="i386"
+        ;;
+    ppc64le|ppc64el)
+        DEB_ARCH="ppc64el"
         ;;
     *)
-        echo "❌ Kiến trúc CPU chưa hỗ trợ tự động: ${ARCH_RAW} (Hỗ trợ: x86_64/amd64 và aarch64/arm64)"
-        exit 1
+        DEB_ARCH="${ARCH_RAW}"
         ;;
 esac
+if [ "${HAS_PREBUILT_DEB}" = "0" ]; then
+    VIELOTUS_BUILD_FROM_SOURCE="1"
+fi
 
-echo "🌸 === Cài đặt Sen Việt (VieLotusIM v${VERSION}) cho Linux (${DEB_ARCH}) ==="
+echo "🌸 === Cài đặt Sen Việt (VieLotusIM v${VERSION}) cho Linux (${DEB_ARCH} / ${ARCH_RAW}) ==="
 
 # Clean up any legacy user-local Snap export overrides (~/.local/lib/vielotus)
 REAL_USER="${SUDO_USER:-$(id -un)}"
@@ -724,12 +762,17 @@ fetch_and_verify_deb() {
     rm -f "${TMP_SUMS}"
 }
 
+abort_missing_build_deps() {
+    echo "❌ Không thể biên dịch C++20 bản địa trên kiến trúc ${ARCH_RAW}."
+    echo "   Vui lòng cài đặt: cmake, extra-cmake-modules, g++/clang++, pkgconf, python3, ibus-dev và/hoặc fcitx5-dev rồi chạy lại."
+    exit 1
+}
+
 if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
-    echo "📦 Phát hiện hệ sinh thái Debian / Ubuntu (apt)..."
-    fetch_and_verify_deb
+    echo "📦 Phát hiện hệ sinh thái Debian / Ubuntu / Raspberry Pi OS (apt)..."
     # Remove any sandboxed Snap installation so native /usr/bin/vielotus & system IBus/Fcitx5 take precedence
     if command -v snap >/dev/null 2>&1 && snap list vielotus >/dev/null 2>&1; then
-        echo "🧹 Đang gỡ bản Snap cũ để đồng bộ sang gói hệ thống (.deb) chuẩn..."
+        echo "🧹 Đang gỡ bản Snap cũ để đồng bộ sang gói hệ thống chuẩn..."
         for chg_id in $(snap changes 2>/dev/null | awk '/vielotus/ && ($2=="Doing" || $2=="Do") {print $1}'); do
             ${SUDO} snap abort "${chg_id}" >/dev/null 2>&1 || true
         done
@@ -746,11 +789,42 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
         ${SUDO} rm -f /etc/apt/sources.list.d/vielotus.list /etc/apt/sources.list.d/vielotus.sources 2>/dev/null || true
     fi
     ${SUDO} rm -f /var/cache/apt/archives/vielotus* 2>/dev/null || true
-    ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
-    ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-gi gir1.2-gtk-3.0 zenity fonts-noto-core fonts-noto-mono fonts-liberation 2>/dev/null || true
-    ${SUDO} env DEBIAN_FRONTEND=noninteractive dpkg -i --force-overwrite "${TMP_DEB}" || ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -f -y
+
+    if [ "${HAS_PREBUILT_DEB}" = "1" ] && [ "${VIELOTUS_BUILD_FROM_SOURCE:-0}" != "1" ]; then
+        fetch_and_verify_deb
+        ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
+        ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-gi gir1.2-gtk-3.0 zenity fonts-noto-core fonts-noto-mono fonts-liberation 2>/dev/null || true
+        ${SUDO} env DEBIAN_FRONTEND=noninteractive dpkg -i --force-overwrite "${TMP_DEB}" || ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -f -y
+    else
+        echo "⬇️  Đang cài đặt các gói phụ trợ & trình biên dịch C++20 cho ${ARCH_RAW} (apt)..."
+        APT_FCITX_PKGS="fcitx5 fcitx5-frontend-gtk3 fcitx5-frontend-qt5 fcitx5-config-qt"
+        if printf '%s' "${REAL_DESKTOP}" | grep -qi "gnome"; then
+            APT_FCITX_PKGS="fcitx5"
+        fi
+        ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
+        ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl tar build-essential cmake extra-cmake-modules pkg-config \
+            python3 python3-gi gir1.2-gtk-3.0 zenity \
+            fonts-noto-core fonts-noto-mono fonts-liberation \
+            ibus libibus-1.0-dev libglib2.0-dev \
+            ${APT_FCITX_PKGS} fcitx5-modules-dev libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev 2>/dev/null || \
+        ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl tar build-essential cmake extra-cmake-modules pkgconf \
+            python3 python3-gi gir1.2-gtk-3.0 \
+            ibus libibus-1.0-dev libglib2.0-dev \
+            fcitx5 fcitx5-modules-dev libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev || true
+        if ! try_native_cmake_build "${VERSION}"; then
+            if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
+                fetch_and_verify_deb
+                ${SUDO} env DEBIAN_FRONTEND=noninteractive dpkg -i --force-overwrite "${TMP_DEB}" || ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -f -y
+            else
+                abort_missing_build_deps
+            fi
+        fi
+        finalize_linux_integration
+    fi
     if command -v fc-cache >/dev/null 2>&1; then
-        nohup ${SUDO} fc-cache -f >/dev/null 2>&1 &
+        nohup ${SUDO} fc-cache -f </dev/null >/dev/null 2>&1 &
     fi
 elif command -v pacman >/dev/null 2>&1; then
     echo "📦 Phát hiện hệ sinh thái Arch Linux / Manjaro / CachyOS / EndeavourOS (pacman)..."
@@ -767,40 +841,89 @@ elif command -v pacman >/dev/null 2>&1; then
     ${SUDO} pacman -S --needed --noconfirm ${ARCH_PKGS} >/dev/null 2>&1 || \
         ${SUDO} pacman -Sy --needed --noconfirm ${ARCH_PKGS} || true
     if [ "${ARCH_BUILD_SRC}" != "1" ] || ! try_native_cmake_build "${VERSION}"; then
-        fetch_and_verify_deb
-        extract_deb_to_root "${TMP_DEB}"
+        if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
+            fetch_and_verify_deb
+            extract_deb_to_root "${TMP_DEB}"
+        else
+            abort_missing_build_deps
+        fi
     fi
     finalize_linux_integration
     if command -v fc-cache >/dev/null 2>&1; then
         nohup ${SUDO} fc-cache -f </dev/null >/dev/null 2>&1 &
     fi
 elif command -v dnf >/dev/null 2>&1; then
-    echo "📦 Phát hiện hệ sinh thái Fedora / RHEL (dnf)..."
-    ${SUDO} dnf install -y python3-gobject gtk3 2>/dev/null || true
-    if [ "${VIELOTUS_BUILD_FROM_SOURCE:-0}" = "1" ]; then
-        ${SUDO} dnf install -y cmake extra-cmake-modules gcc-c++ pkgconf-pkg-config python3 ibus-devel glib2-devel fcitx5-devel 2>/dev/null || true
+    echo "📦 Phát hiện hệ sinh thái Fedora / RHEL / Rocky / AlmaLinux (dnf)..."
+    DNF_BUILD_SRC="${VIELOTUS_BUILD_FROM_SOURCE:-1}"
+    DNF_FCITX_PKGS="fcitx5 fcitx5-autostart fcitx5-gtk fcitx5-qt fcitx5-configtool"
+    if printf '%s' "${REAL_DESKTOP}" | grep -qi "gnome"; then
+        DNF_FCITX_PKGS="fcitx5"
     fi
-    if ! try_native_cmake_build "${VERSION}"; then
-        fetch_and_verify_deb
-        extract_deb_to_root "${TMP_DEB}"
+    ${SUDO} dnf install -y python3 python3-gobject gtk3 google-noto-sans-fonts ibus ${DNF_FCITX_PKGS} 2>/dev/null || \
+        ${SUDO} dnf install -y python3 python3-gobject gtk3 ibus fcitx5 2>/dev/null || true
+    if [ "${DNF_BUILD_SRC}" = "1" ]; then
+        echo "⬇️  Đang kiểm tra trình biên dịch C++20 bản địa (dnf)..."
+        ${SUDO} dnf install -y cmake extra-cmake-modules gcc-c++ make pkgconf-pkg-config ibus-devel glib2-devel fcitx5-devel 2>/dev/null || true
+    fi
+    if [ "${DNF_BUILD_SRC}" != "1" ] || ! try_native_cmake_build "${VERSION}"; then
+        if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
+            fetch_and_verify_deb
+            extract_deb_to_root "${TMP_DEB}"
+        else
+            abort_missing_build_deps
+        fi
     fi
     finalize_linux_integration
 elif command -v zypper >/dev/null 2>&1; then
     echo "📦 Phát hiện hệ sinh thái openSUSE (zypper)..."
-    ${SUDO} zypper --non-interactive install python3-gobject typelib-1_0-Gtk-3_0 2>/dev/null || true
-    if [ "${VIELOTUS_BUILD_FROM_SOURCE:-0}" = "1" ]; then
-        ${SUDO} zypper --non-interactive install cmake extra-cmake-modules gcc-c++ pkgconf-pkg-config python3 ibus-devel glib2-devel fcitx5-devel 2>/dev/null || true
+    ZYPPER_BUILD_SRC="${VIELOTUS_BUILD_FROM_SOURCE:-1}"
+    ${SUDO} zypper --non-interactive install python3 python3-gobject typelib-1_0-Gtk-3_0 google-noto-sans-fonts ibus fcitx5 fcitx5-configtool 2>/dev/null || \
+        ${SUDO} zypper --non-interactive install python3 python3-gobject typelib-1_0-Gtk-3_0 ibus fcitx5 2>/dev/null || true
+    if [ "${ZYPPER_BUILD_SRC}" = "1" ]; then
+        echo "⬇️  Đang kiểm tra trình biên dịch C++20 bản địa (zypper)..."
+        ${SUDO} zypper --non-interactive install cmake extra-cmake-modules gcc-c++ make pkgconf-pkg-config ibus-devel glib2-devel fcitx5-devel 2>/dev/null || true
     fi
+    if [ "${ZYPPER_BUILD_SRC}" != "1" ] || ! try_native_cmake_build "${VERSION}"; then
+        if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
+            fetch_and_verify_deb
+            extract_deb_to_root "${TMP_DEB}"
+        else
+            abort_missing_build_deps
+        fi
+    fi
+    finalize_linux_integration
+elif command -v apk >/dev/null 2>&1; then
+    echo "📦 Phát hiện hệ sinh thái Alpine Linux / postmarketOS (apk - musl)..."
+    ${SUDO} apk add --no-cache ca-certificates curl tar python3 py3-gobject3 gtk+3.0 font-noto \
+        build-base cmake extra-cmake-modules pkgconf ibus ibus-dev glib-dev fcitx5 fcitx5-dev 2>/dev/null || \
+    ${SUDO} apk add --no-cache ca-certificates curl tar python3 py3-gobject3 gtk+3.0 \
+        build-base cmake extra-cmake-modules pkgconf ibus ibus-dev glib-dev || true
     if ! try_native_cmake_build "${VERSION}"; then
-        fetch_and_verify_deb
-        extract_deb_to_root "${TMP_DEB}"
+        abort_missing_build_deps
+    fi
+    finalize_linux_integration
+elif command -v xbps-install >/dev/null 2>&1; then
+    echo "📦 Phát hiện hệ sinh thái Void Linux (xbps)..."
+    ${SUDO} xbps-install -Sy curl tar python3 python3-gobject gtk+3 noto-fonts-ttf \
+        base-devel cmake extra-cmake-modules pkg-config ibus ibus-devel glib-devel fcitx5 libfcitx5-devel 2>/dev/null || true
+    if ! try_native_cmake_build "${VERSION}"; then
+        if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
+            fetch_and_verify_deb
+            extract_deb_to_root "${TMP_DEB}"
+        else
+            abort_missing_build_deps
+        fi
     fi
     finalize_linux_integration
 else
-    echo "📦 Cài đặt trực tiếp vào /usr (Generic Linux)..."
+    echo "📦 Cài đặt trực tiếp vào /usr (Generic Linux — ${ARCH_RAW})..."
     if ! try_native_cmake_build "${VERSION}"; then
-        fetch_and_verify_deb
-        extract_deb_to_root "${TMP_DEB}"
+        if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
+            fetch_and_verify_deb
+            extract_deb_to_root "${TMP_DEB}"
+        else
+            abort_missing_build_deps
+        fi
     fi
     finalize_linux_integration
 fi
