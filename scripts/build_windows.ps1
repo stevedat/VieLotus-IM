@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # Sen Việt (VieLotusIM) - Windows Native TSF Build & Packaging Script (PowerShell)
 # Builds Universal x64 + ARM64 VieLotusTIP.dll & Inno Setup Installers
 # ==============================================================================
@@ -6,7 +6,7 @@
 param (
     [string]$Configuration = "Release",
     [string]$Version = "2.0.2",
-    [string]$MsixVersion = "2.0.4.0",
+    [string]$MsixVersion = "2.0.5.0",
     [ValidateSet("x64", "arm64", "all")]
     [string]$Arch = "all",
     [switch]$SkipTests = $false
@@ -139,29 +139,33 @@ foreach ($extraArch in @("x64", "arm64")) {
     }
 }
 
-# 4. Check for Inno Setup Compiler (ISCC.exe) and package installers
-$isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-if (Get-Command ISCC -ErrorAction SilentlyContinue) {
-    $iscc = "ISCC"
-} elseif (Test-Path $isccPath) {
-    $iscc = $isccPath
-} else {
-    $iscc = $null
+# 4. Embed dual-arch (x64 + ARM64) VieLotusTIP.dll into VieLotusSettings.exe and stage native Win32 Setup Installers
+if ((Test-Path "$binStagingDir\x64\VieLotusTIP.dll") -and (Test-Path "$binStagingDir\arm64\VieLotusTIP.dll") -and (Get-Command python -ErrorAction SilentlyContinue)) {
+    foreach ($rebuildArch in @("x64", "arm64")) {
+        $tsfBuildDir = "$rootDir\build-tsf-$rebuildArch"
+        if (Test-Path $tsfBuildDir) {
+            python "$tsfSourceDir\embed_file_to_header.py" --x64 "$binStagingDir\x64\VieLotusTIP.dll" --arm64 "$binStagingDir\arm64\VieLotusTIP.dll" "$tsfBuildDir\EmbeddedTipDll.h"
+            cmake --build $tsfBuildDir --config $Configuration --target VieLotusSettings
+            $rebuiltSettings = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusSettings.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($rebuiltSettings) {
+                Copy-Item $rebuiltSettings.FullName -Destination "$binStagingDir\$rebuildArch\VieLotusSettings.exe" -Force
+            }
+        }
+    }
+    if (Test-Path "$binStagingDir\x64\VieLotusSettings.exe") {
+        Copy-Item "$binStagingDir\x64\VieLotusSettings.exe" -Destination "$binStagingDir\VieLotusSettings.exe" -Force
+    }
 }
 
-if ($iscc -and (Test-Path "$binStagingDir\VieLotusTIP.dll")) {
-    $installersToBuild = if ($Arch -eq "all") { @("x64", "arm64") } else { @($Arch) }
-    foreach ($instArch in $installersToBuild) {
-        Write-Host "📦 Bước 4 ($instArch): Đóng gói VieLotus-Setup-$instArch.exe (v$Version) qua Inno Setup..." -ForegroundColor Green
-        & $iscc "/DMyAppVersion=$Version" "/DMyAppArch=$instArch" "$windowsDir\VieLotus-Setup.iss"
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "❌ Lỗi: Inno Setup đóng gói ($instArch) thất bại (exit code $LASTEXITCODE)."
-            exit $LASTEXITCODE
-        }
-        Write-Host "✅ Tạo bộ cài đặt thành công tại: $distWindowsDir\VieLotus-Setup-$instArch.exe" -ForegroundColor Cyan
+$installersToBuild = if ($Arch -eq "all") { @("x64", "arm64") } else { @($Arch) }
+foreach ($instArch in $installersToBuild) {
+    if (Test-Path "$binStagingDir\$instArch\VieLotusSettings.exe") {
+        Copy-Item "$binStagingDir\$instArch\VieLotusSettings.exe" -Destination "$distWindowsDir\VieLotus-Setup-$instArch.exe" -Force
+        Write-Host "✅ Tạo bộ cài đặt Native Win32 Setup Wizard thành công tại: $distWindowsDir\VieLotus-Setup-$instArch.exe" -ForegroundColor Cyan
     }
-} else {
-    Write-Host "ℹ️  Cấu trúc staging đã sẵn sàng tại: $binStagingDir" -ForegroundColor Yellow
+}
+if (Test-Path "$distWindowsDir\VieLotus-Setup-x64.exe") {
+    Copy-Item "$distWindowsDir\VieLotus-Setup-x64.exe" -Destination "$distWindowsDir\VieLotus-Store-Setup.exe" -Force
 }
 
 # 5. Package Microsoft Store MSIX & MSIXBundle (Partner Center: NidoHoldings.SenVitVieLotusIM)

@@ -64,18 +64,23 @@ private:
 
     bool m_isVietnameseMode{true};
     bool m_isVniMode{false};
+    bool m_inProfileSync{false};
     bool m_isRemoteProcess{false};
     bool m_hasManualProcessOverride{false};
     bool m_manualProcessVietnameseMode{true};
     uint32_t m_lastPrefsRevision{0};
     LONG m_lastEditShifted{0};
     HRESULT m_lastEditSetTextHr{S_OK};
+    HWND m_lastWin32EditHwnd{nullptr};
+    DWORD m_lastWin32EditCaret{0xFFFFFFFFu};
     std::wstring m_currentExeName{};
 
     void InitSession();
     void CleanSession();
     void ReleaseCompositionRefs();
     void EndActiveComposition(ITfContext *pic);
+    void SyncWin32EditCaretBeforeKey();
+    bool TryRehydrateWin32EditBeforeFeed(uint32_t codePoint);
     void ApplyVniMode(bool isVni, bool persistToRegistry);
     void ReloadUserPreferences();
     void SyncActiveLanguageProfile();

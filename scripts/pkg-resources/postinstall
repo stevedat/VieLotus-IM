@@ -52,20 +52,24 @@ run_as_user pkill -9 VieLotusIM 2>/dev/null
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 "$LSREGISTER" -f "$APP" 2>/dev/null
 
-# Register TIS input source
+# Register TIS input source and sync HIToolbox enabled/selected sources
 if ! run_as_user "$DIR/register-source" "$APP"; then
     echo "postinstall: register-source failed" >&2
 fi
+
+# Refresh macOS TextInputMenuAgent and pre-warm VieLotusIM server so typing works immediately
+run_as_user killall TextInputMenuAgent 2>/dev/null || true
+if [ -x "$APP/Contents/MacOS/VieLotusIM" ]; then
+    run_as_user "$APP/Contents/MacOS/VieLotusIM" >/dev/null 2>&1 &
+fi
+
 # Clean up temporary previous backups
 rm -rf "$APP.previous" 2>/dev/null || true
 if [ -n "$target" ] && [ -d "$target/VieLotusIM.app.previous" ]; then
     rm -rf "$target/VieLotusIM.app.previous" 2>/dev/null || true
 fi
 
-# Send user notification with quick activation hint
-run_as_user osascript -e 'display notification "Nhấn dấu \"+\" trong Nguồn nhập để thêm Sen Việt và \"-\" để xoá bộ gõ cũ của Apple." with title "Sen Việt đã sẵn sàng" subtitle "Cài đặt thành công"' 2>/dev/null || true
-
-# Open Keyboard settings for user to add
-run_as_user open "x-apple.systempreferences:com.apple.Keyboard-Settings.extension" 2>/dev/null
+# Send user notification confirming zero-step activation
+run_as_user osascript -e 'display notification "Bộ gõ Sen Việt đã được tự động thêm và kích hoạt trên thanh Menu — bạn có thể gõ tiếng Việt ngay!" with title "Sen Việt đã sẵn sàng" subtitle "Cài đặt & kích hoạt tự động thành công"' 2>/dev/null || true
 
 exit 0

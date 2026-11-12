@@ -1,9 +1,11 @@
 #include "VieLotusTIP.h"
 #include "EditSession.h"
 #include "Register.h"
+#include <shellapi.h>
 #include <vector>
 
 #define VI_LANGID 0x042A
+#define EN_US_LANGID 0x0409
 
 #ifndef TF_PROFILETYPE_INPUTPROCESSOR
 #define TF_PROFILETYPE_INPUTPROCESSOR 1
@@ -47,6 +49,10 @@ struct VieLotusCApi {
     void (*sync_armed_word)(vielotus_session_t, const char *){nullptr};
 
     VieLotusCApi() {
+#if defined(VIELOTUS_EMBEDDED_ENGINE)
+        // Always use the statically embedded WindowsNativeEngine so a stale VieLotusCAPI.dll on disk can never override it.
+        return;
+#else
         WCHAR dllPath[MAX_PATH] = {0};
         if (GetModuleFileNameW(g_hInst, dllPath, MAX_PATH) == 0) {
             return;
@@ -95,6 +101,7 @@ struct VieLotusCApi {
                   set_input_method && set_grammar_profile && set_smart_bilingual &&
                   set_modern_orthography && feed_char && feed_backspace &&
                   commit_word && get_last_backspaces && get_last_text && is_composing;
+#endif
     }
 };
 
@@ -220,6 +227,22 @@ enum class PassiveKeyKind {
     NonAsciiOrDeadKey
 };
 
+static HKL GetUsQwertyHkl() {
+    static HKL s_hklUs = nullptr;
+    if (!s_hklUs) {
+        s_hklUs = LoadKeyboardLayoutW(L"00000409", KLF_NOTELLSHELL);
+        if (!s_hklUs) {
+            s_hklUs = reinterpret_cast<HKL>(static_cast<ULONG_PTR>(0x04090409));
+        }
+    }
+    return s_hklUs;
+}
+
+static bool IsCurrentThreadLegacyVntcHkl() {
+    const uintptr_t hkl = reinterpret_cast<uintptr_t>(GetKeyboardLayout(0));
+    return (((hkl >> 16) & 0xFFFFu) == 0x042Au);
+}
+
 static PassiveKeyKind TranslatePassiveKey(WPARAM wParam, LPARAM lParam, WCHAR &outCh) {
     outCh = 0;
     if (wParam == VK_SPACE) {
@@ -231,8 +254,9 @@ static PassiveKeyKind TranslatePassiveKey(WPARAM wParam, LPARAM lParam, WCHAR &o
         return PassiveKeyKind::None;
     }
     WCHAR chBuf[4] = {0};
-    // Flag 0x04 (Windows 10 1607+): inspect character without mutating kernel/thread dead-key state.
-    int res = ToUnicode(static_cast<UINT>(wParam), (HIWORD(lParam) & 0xFF), keyState, chBuf, 4, 0x04);
+    // Flag 0x04 (Windows 10 1607+): inspect character using US QWERTY layout (00000409)
+    // so legacy KBDVNTC.DLL (0x042A042A) never maps '1'..'0' or '['/']' to 'ă','â','ê','đ','ư','ơ'.
+    int res = ToUnicodeEx(static_cast<UINT>(wParam), (HIWORD(lParam) & 0xFF), keyState, chBuf, 4, 0x04, GetUsQwertyHkl());
     if (res == 1 && chBuf[0] >= 32 && chBuf[0] <= 126) {
         outCh = chBuf[0];
         return PassiveKeyKind::AsciiPrintable;
@@ -341,6 +365,8 @@ void CVieLotusTIP::ReloadUserPreferences() {
     m_nativeEngine.setSmartBilingual(prefs.smartBilingual);
     m_nativeEngine.setModernOrthography(prefs.modernOrthography);
     m_nativeEngine.setQuickTelex(prefs.quickTelex);
+    m_nativeEngine.setRelaxedCoda(prefs.relaxedCoda);
+    m_nativeEngine.setMacroEnabled(prefs.macroEnabled);
 #endif
 
     const auto &api = GetCApi();
@@ -371,19 +397,45 @@ void CVieLotusTIP::InitSession() {
 }
 
 void CVieLotusTIP::SyncActiveLanguageProfile() {
+    if (m_inProfileSync) {
+        return;
+    }
+    m_inProfileSync = true;
+
+    bool desiredVni = m_isVniMode;
+    LoadPersistedVniPreference(desiredVni);
+    if (m_isVniMode != desiredVni) {
+        ApplyVniMode(desiredVni, false);
+    }
+
     ITfInputProcessorProfiles *pProfiles = nullptr;
     if (FAILED(CoCreateInstance(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER, IID_ITfInputProcessorProfiles, reinterpret_cast<void **>(&pProfiles))) || !pProfiles) {
+        m_inProfileSync = false;
         return;
     }
 
     ITfInputProcessorProfileMgr *pProfileMgr = nullptr;
     pProfiles->QueryInterface(IID_ITfInputProcessorProfileMgr, reinterpret_cast<void **>(&pProfileMgr));
 
-    // 1. If the user explicitly clicked Telex/VNI inside VieLotusSettings, apply it and sync TSF profile
-    bool settingsVni = false;
-    if (ConsumeSettingsVniOverride(settingsVni)) {
-        const GUID &targetGuid = settingsVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
-        ApplyVniMode(settingsVni, true);
+    // Consume legacy flag if set
+    bool unusedOverride = false;
+    ConsumeSettingsVniOverride(unusedOverride);
+
+    // Check if the current thread's active TSF profile already matches the user's persisted preference
+    bool activeMatchesDesired = false;
+    if (pProfileMgr) {
+        TF_INPUTPROCESSORPROFILE activeProfile{};
+        if (SUCCEEDED(pProfileMgr->GetActiveProfile(GUID_TFCAT_TIP_KEYBOARD, &activeProfile)) &&
+            IsEqualCLSID(activeProfile.clsid, CLSID_VieLotusTIP)) {
+            const GUID &expectedGuid = desiredVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
+            if (IsEqualGUID(activeProfile.guidProfile, expectedGuid)) {
+                activeMatchesDesired = true;
+            }
+        }
+    }
+
+    if (!activeMatchesDesired) {
+        const GUID &targetGuid = desiredVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
         pProfiles->SetDefaultLanguageProfile(VI_LANGID, CLSID_VieLotusTIP, targetGuid);
         pProfiles->ActivateLanguageProfile(CLSID_VieLotusTIP, VI_LANGID, targetGuid);
         if (pProfileMgr) {
@@ -393,57 +445,21 @@ void CVieLotusTIP::SyncActiveLanguageProfile() {
                 CLSID_VieLotusTIP,
                 targetGuid,
                 nullptr,
-                TF_IPPMF_FORPROCESS | TF_IPPMF_ENABLEPROFILE
+                TF_IPPMF_FORSESSION | TF_IPPMF_FORPROCESS | TF_IPPMF_ENABLEPROFILE | 0x00000004
             );
-            pProfileMgr->Release();
         }
-        pProfiles->Release();
-        return;
     }
-
-    // 2. Otherwise, query the active TSF profile selected via Windows Taskbar / Win+Space
-    bool resolved = false;
-    bool isVni = m_isVniMode;
 
     if (pProfileMgr) {
-        TF_INPUTPROCESSORPROFILE activeProfile{};
-        if (SUCCEEDED(pProfileMgr->GetActiveProfile(GUID_TFCAT_TIP_KEYBOARD, &activeProfile)) &&
-            IsEqualCLSID(activeProfile.clsid, CLSID_VieLotusTIP)) {
-            if (IsEqualGUID(activeProfile.guidProfile, GUID_VieLotusProfileVNI)) {
-                isVni = true;
-                resolved = true;
-            } else if (IsEqualGUID(activeProfile.guidProfile, GUID_VieLotusProfile)) {
-                isVni = false;
-                resolved = true;
-            }
-        }
         pProfileMgr->Release();
     }
-
-    if (!resolved) {
-        LANGID langId = VI_LANGID;
-        GUID guidProfile{};
-        if (SUCCEEDED(pProfiles->GetActiveLanguageProfile(CLSID_VieLotusTIP, &langId, &guidProfile))) {
-            if (IsEqualGUID(guidProfile, GUID_VieLotusProfileVNI)) {
-                isVni = true;
-                resolved = true;
-            } else if (IsEqualGUID(guidProfile, GUID_VieLotusProfile)) {
-                isVni = false;
-                resolved = true;
-            }
-        }
-    }
-
-    if (resolved && m_isVniMode != isVni) {
-        const GUID &activeGuid = isVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
-        pProfiles->SetDefaultLanguageProfile(VI_LANGID, CLSID_VieLotusTIP, activeGuid);
-        ApplyVniMode(isVni, true);
-    }
-
     pProfiles->Release();
+    m_inProfileSync = false;
 }
 
 void CVieLotusTIP::ResetComposingSession() {
+    m_lastWin32EditHwnd = nullptr;
+    m_lastWin32EditCaret = 0xFFFFFFFFu;
 #if defined(VIELOTUS_EMBEDDED_ENGINE)
     m_nativeEngine.reset();
 #endif
@@ -457,6 +473,8 @@ void CVieLotusTIP::ResetComposingSession() {
 }
 
 void CVieLotusTIP::ClearWordStateSession() {
+    m_lastWin32EditHwnd = nullptr;
+    m_lastWin32EditCaret = 0xFFFFFFFFu;
 #if defined(VIELOTUS_EMBEDDED_ENGINE)
     m_nativeEngine.clearWordState();
 #endif
@@ -604,6 +622,106 @@ void CVieLotusTIP::ReleaseCompositionRefs() {
     }
 }
 
+namespace {
+
+bool IsClassicWin32EditControl(HWND hwnd) {
+    if (!hwnd || !IsWindow(hwnd)) return false;
+    WCHAR clsName[64] = {0};
+    if (GetClassNameW(hwnd, clsName, 64) <= 0) return false;
+    return _wcsicmp(clsName, L"edit") == 0;
+}
+
+} // namespace
+
+void CVieLotusTIP::SyncWin32EditCaretBeforeKey() {
+    if (!IsComposingSession() && !HasActiveWordSession()) {
+        return;
+    }
+    HWND hFocus = GetFocus();
+    if (!IsClassicWin32EditControl(hFocus)) {
+        return;
+    }
+    DWORD dwStart = 0, dwEnd = 0;
+    SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+    if (dwStart != dwEnd ||
+        (m_lastWin32EditHwnd == hFocus &&
+         m_lastWin32EditCaret != 0xFFFFFFFFu &&
+         dwStart != m_lastWin32EditCaret)) {
+        ResetComposingSession();
+    }
+}
+
+bool CVieLotusTIP::TryRehydrateWin32EditBeforeFeed(uint32_t codePoint) {
+#if defined(VIELOTUS_EMBEDDED_ENGINE)
+    if (HasActiveWordSession() || m_session != nullptr) {
+        return false;
+    }
+    HWND hFocus = GetFocus();
+    if (!IsClassicWin32EditControl(hFocus)) {
+        return false;
+    }
+    DWORD dwStart = 0, dwEnd = 0;
+    SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+    if (dwStart != dwEnd || dwStart == 0 || dwStart > 2048) {
+        return false;
+    }
+
+    WCHAR buf[2052] = {0};
+    LRESULT copied = SendMessageW(hFocus, WM_GETTEXT, static_cast<WPARAM>(dwStart + 2), reinterpret_cast<LPARAM>(buf));
+    if (copied < static_cast<LRESULT>(dwStart)) {
+        return false;
+    }
+
+    const WCHAR prevImmediate = buf[dwStart - 1];
+    if ((prevImmediate >= L'0' && prevImmediate <= L'9') ||
+        prevImmediate == L'/' || prevImmediate == L'_' || prevImmediate == L'\\') {
+        const DWORD sliceStart = (dwStart > 32) ? (dwStart - 32) : 0;
+        std::wstring slice(buf + sliceStart, buf + dwStart);
+        SyncSurroundingContextSession(slice);
+        return false;
+    }
+
+    const WCHAR chAfter = buf[dwStart];
+    const bool boundaryAfter =
+        (chAfter == L'\0' || chAfter == L' ' || chAfter == L'\t' ||
+         chAfter == L'\r' || chAfter == L'\n' || chAfter == L'.' ||
+         chAfter == L',' || chAfter == L'!' || chAfter == L'?' ||
+         chAfter == L';' || chAfter == L':' || chAfter == L')' ||
+         chAfter == L']' || chAfter == L'}');
+    if (!boundaryAfter) {
+        return false;
+    }
+
+    DWORD tokStart = dwStart;
+    while (tokStart > 0 && (dwStart - tokStart) < 8) {
+        WCHAR c = buf[tokStart - 1];
+        if ((c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') || c > 0x7F) {
+            --tokStart;
+        } else {
+            break;
+        }
+    }
+    const int wordLen = static_cast<int>(dwStart - tokStart);
+    if (wordLen < 1 || wordLen > 6) {
+        return false;
+    }
+    if (tokStart > 0) {
+        const WCHAR prevCh = buf[tokStart - 1];
+        const bool cleanBefore =
+            (prevCh == L' ' || prevCh == L'\t' || prevCh == L'\r' || prevCh == L'\n' ||
+             prevCh == L'(' || prevCh == L'[' || prevCh == L'{' || prevCh == L'"' ||
+             (prevCh >= L'0' && prevCh <= L'9'));
+        if (!cleanBefore) {
+            return false;
+        }
+    }
+    return m_nativeEngine.tryRehydrateAndFeed(buf + tokStart, wordLen, codePoint);
+#else
+    (void)codePoint;
+    return false;
+#endif
+}
+
 void CVieLotusTIP::EndActiveComposition(ITfContext *pic) {
     if (!m_pComposition) {
         ReleaseCompositionRefs();
@@ -627,10 +745,14 @@ void CVieLotusTIP::EndActiveComposition(ITfContext *pic) {
     );
     if (pEdit) {
         HRESULT hrSession = S_OK;
-        targetCtx->RequestEditSession(m_tfClientId, pEdit, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hrSession);
+        HRESULT hrReq = targetCtx->RequestEditSession(m_tfClientId, pEdit, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hrSession);
+        if (FAILED(hrReq) || FAILED(hrSession)) {
+            ReleaseCompositionRefs();
+        }
         pEdit->Release();
+    } else {
+        ReleaseCompositionRefs();
     }
-    ReleaseCompositionRefs();
     targetCtx->Release();
 }
 
@@ -638,6 +760,42 @@ void CVieLotusTIP::ExecuteEditSession(ITfContext *pic, int32_t backspaces, const
     m_lastEditShifted = 0;
     m_lastEditSetTextHr = S_OK;
     if (!pic) return;
+
+    HWND hFocus = GetFocus();
+    if (IsClassicWin32EditControl(hFocus)) {
+        if (m_pComposition) {
+            EndActiveComposition(pic);
+        }
+        DWORD dwStart = 0, dwEnd = 0;
+        SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+        if (dwStart < dwEnd) {
+            SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(text.c_str()));
+            m_lastEditShifted = 0;
+            m_lastEditSetTextHr = S_OK;
+        } else {
+            const DWORD reqBs = (backspaces > 0) ? static_cast<DWORD>(backspaces) : 0;
+            const DWORD bsToApply = (dwStart >= reqBs) ? reqBs : dwStart;
+            if (bsToApply > 0) {
+                SendMessageW(
+                    hFocus,
+                    EM_SETSEL,
+                    static_cast<WPARAM>(dwStart - bsToApply),
+                    static_cast<LPARAM>(dwEnd)
+                );
+            }
+            if (bsToApply > 0 || !text.empty()) {
+                SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(text.c_str()));
+            }
+            m_lastEditShifted = -static_cast<LONG>(bsToApply);
+            m_lastEditSetTextHr = S_OK;
+        }
+        DWORD afterStart = 0, afterEnd = 0;
+        SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&afterStart), reinterpret_cast<LPARAM>(&afterEnd));
+        m_lastWin32EditHwnd = hFocus;
+        m_lastWin32EditCaret = (afterStart == afterEnd) ? afterStart : 0xFFFFFFFFu;
+        return;
+    }
+
     const bool keepComposition = !bCommit && HasActiveWordSession();
     CEditSession *pEdit = new (std::nothrow) CEditSession(
         pic,
@@ -802,6 +960,8 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
         return S_OK;
     }
 
+    SyncWin32EditCaretBeforeKey();
+
     const bool isComposing = IsComposingSession();
     const bool hasActiveWord = HasActiveWordSession();
 
@@ -834,6 +994,13 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
                 *pfEaten = TRUE;
                 return S_OK;
             }
+            // If the current thread's HKL still uses legacy KBDVNTC.DLL (0x042A042A),
+            // eat all non-space printable ASCII keys so Windows TranslateMessage never maps
+            // '1'..'0' or '['/']'/'=' to 'ă','â','ê','ô','̀','̉','̃','́','̣','đ','ư','ơ','₫'.
+            if (wParam != VK_SPACE && IsCurrentThreadLegacyVntcHkl()) {
+                *pfEaten = TRUE;
+                return S_OK;
+            }
             if (hasActiveWord) {
                 const bool isVniDigit = m_isVniMode && (ch >= L'0' && ch <= L'9');
                 const bool isBoundary = IsEngineBoundaryPunctuation(ch);
@@ -847,7 +1014,13 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
                 EndActiveComposition(pic);
                 return S_OK;
             }
-            // Idle (!hasActiveWord): passively track leading '/', digits '0'..'9', and tech delimiters '_', '\'
+            // Idle (!hasActiveWord): if in VNI mode on a classic Win32 Edit control, eat VNI digits '0'..'9'
+            // so OnKeyDown can attempt post-navigation word rehydration (or insert the literal digit).
+            if (m_isVniMode && (ch >= L'0' && ch <= L'9') && IsClassicWin32EditControl(GetFocus())) {
+                *pfEaten = TRUE;
+                return S_OK;
+            }
+            // Otherwise passively track leading '/', digits '0'..'9', and tech delimiters '_', '\'
             // while leaving *pfEaten = FALSE so the host app receives the native key event untouched.
             FeedCharSession(static_cast<uint32_t>(ch));
             return S_OK;
@@ -877,7 +1050,21 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
     if (wParam == 'S' && hasCtrl && hasShift && !hasAlt && !hasWin) {
         ResetComposingSession();
         EndActiveComposition(pic);
-        ShowVieLotusSettingsDialog(GetForegroundWindow());
+        HWND hExisting = FindWindowW(L"VieLotusBentoSettingsWndClass", nullptr);
+        if (hExisting && IsWindow(hExisting)) {
+            ShowWindow(hExisting, SW_SHOW);
+            ShowWindow(hExisting, SW_RESTORE);
+            SetForegroundWindow(hExisting);
+            PostMessageW(hExisting, WM_USER + 101, 0, 0);
+        } else {
+            WCHAR settingsExe[MAX_PATH] = {};
+            if (ExpandEnvironmentStringsW(L"%ProgramW6432%\\VieLotusIM\\VieLotusSettings.exe", settingsExe, MAX_PATH) > 0 &&
+                GetFileAttributesW(settingsExe) != INVALID_FILE_ATTRIBUTES) {
+                ShellExecuteW(nullptr, L"open", settingsExe, L"--settings", nullptr, SW_SHOWNORMAL);
+            } else {
+                ShowVieLotusSettingsDialog(GetForegroundWindow(), false);
+            }
+        }
         ReloadUserPreferences();
         *pfEaten = TRUE;
         return S_OK;
@@ -932,6 +1119,8 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
         return S_OK;
     }
 
+    SyncWin32EditCaretBeforeKey();
+
     // Backspace handling
     if (wParam == VK_BACK) {
         if (IsComposingSession()) {
@@ -964,17 +1153,20 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
         return S_OK;
     }
 
-    // Translate virtual key to character
+    // Translate virtual key to character using standard US QWERTY (00000409)
+    // so legacy KBDVNTC.DLL (0x042A042A) never turns '1'..'0' or '['/']' into 'ă','â','ê','đ','ư','ơ'.
     BYTE keyState[256];
     if (!GetKeyboardState(keyState)) {
         return S_OK;
     }
     WCHAR chBuf[4] = {0};
-    int toAsciiRes = ToUnicode(static_cast<UINT>(wParam), HIWORD(lParam) & 0xFF, keyState, chBuf, 4, 0);
+    int toAsciiRes = ToUnicodeEx(static_cast<UINT>(wParam), HIWORD(lParam) & 0xFF, keyState, chBuf, 4, 0, GetUsQwertyHkl());
 
     if (toAsciiRes == 1 && chBuf[0] >= 32 && chBuf[0] <= 126) {
         uint32_t codePoint = static_cast<uint32_t>(chBuf[0]);
-        int32_t action = FeedCharSession(codePoint);
+        int32_t action = TryRehydrateWin32EditBeforeFeed(codePoint)
+            ? VIELOTUS_ACTION_REPLACE
+            : FeedCharSession(codePoint);
 
         if (action == VIELOTUS_ACTION_COMMIT) {
             const char *committed = GetLastCommitDiffTextSession();
@@ -994,7 +1186,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
         } else {
             // CONSUMED or PASS_THROUGH after OnTestKeyDown ate the key: insert character directly
             std::wstring wText(1, chBuf[0]);
-            ExecuteEditSession(pic, 0, wText, false);
+            ExecuteEditSession(pic, 0, wText, !IsComposingSession());
             *pfEaten = TRUE;
             return S_OK;
         }
@@ -1003,7 +1195,7 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
         // clear Vietnamese word state and insert the translated UTF-16 sequence so the character is never swallowed.
         ClearWordStateSession();
         std::wstring wText(chBuf, static_cast<size_t>(toAsciiRes));
-        ExecuteEditSession(pic, 0, wText, false);
+        ExecuteEditSession(pic, 0, wText, true);
         *pfEaten = TRUE;
         return S_OK;
     }
@@ -1073,10 +1265,11 @@ STDMETHODIMP CVieLotusTIP::OnPopContext(ITfContext *pic) {
 
 STDMETHODIMP CVieLotusTIP::OnActivated(REFCLSID clsid, REFGUID guidProfile, BOOL fActivated) {
     if (fActivated && IsEqualCLSID(clsid, CLSID_VieLotusTIP)) {
+        const bool persistChoice = !m_inProfileSync;
         if (IsEqualGUID(guidProfile, GUID_VieLotusProfileVNI)) {
-            ApplyVniMode(true, true);
+            ApplyVniMode(true, persistChoice);
         } else if (IsEqualGUID(guidProfile, GUID_VieLotusProfile)) {
-            ApplyVniMode(false, true);
+            ApplyVniMode(false, persistChoice);
         }
     }
     return S_OK;

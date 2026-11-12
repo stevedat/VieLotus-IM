@@ -2,6 +2,13 @@
 
 namespace {
 
+bool IsClassicWin32EditHwnd(HWND hwnd) {
+    if (!hwnd || !IsWindow(hwnd)) return false;
+    WCHAR clsName[64] = {0};
+    if (GetClassNameW(hwnd, clsName, 64) <= 0) return false;
+    return _wcsicmp(clsName, L"edit") == 0;
+}
+
 bool IsWin32EditOrRichEditHwnd(HWND hwnd) {
     if (!hwnd || !IsWindow(hwnd)) return false;
     WCHAR clsName[64] = {0};
@@ -114,6 +121,42 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
     // Pure composition-termination session (e.g. before non-eaten Enter/Tab/Arrow key)
     if (m_backspaces == 0 && m_insertText.empty() && !m_bKeepComposition) {
         SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+        m_executed = true;
+        return S_OK;
+    }
+
+    // Classic Win32 "Edit" controls do not implement ITextStoreACP; CUAS wraps them with an IMM32
+    // composition buffer that delays WM_CHAR delivery until EndComposition, causing caret races
+    // when arrow keys or mouse clicks occur mid-word. Always mutate classic Win32 Edit controls
+    // synchronously via EM_GETSEL / EM_SETSEL / EM_REPLACESEL without opening an ITfComposition.
+    HWND hFocusTop = GetFocus();
+    if (IsClassicWin32EditHwnd(hFocusTop)) {
+        SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+        DWORD dwStart = 0, dwEnd = 0;
+        SendMessageW(hFocusTop, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+        if (dwStart < dwEnd) {
+            m_wasEmpty = false;
+            SendMessageW(hFocusTop, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(m_insertText.c_str()));
+            m_actualShifted = 0;
+            m_hrSetText = S_OK;
+        } else {
+            m_wasEmpty = true;
+            const DWORD reqBs = (m_backspaces > 0) ? static_cast<DWORD>(m_backspaces) : 0;
+            const DWORD bsToApply = (dwStart >= reqBs) ? reqBs : dwStart;
+            if (bsToApply > 0) {
+                SendMessageW(
+                    hFocusTop,
+                    EM_SETSEL,
+                    static_cast<WPARAM>(dwStart - bsToApply),
+                    static_cast<LPARAM>(dwEnd)
+                );
+            }
+            if (bsToApply > 0 || !m_insertText.empty()) {
+                SendMessageW(hFocusTop, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(m_insertText.c_str()));
+            }
+            m_actualShifted = -static_cast<LONG>(bsToApply);
+            m_hrSetText = S_OK;
+        }
         m_executed = true;
         return S_OK;
     }

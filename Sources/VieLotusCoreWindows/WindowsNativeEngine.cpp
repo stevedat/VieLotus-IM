@@ -243,7 +243,8 @@ bool prefersEnglishByOrthographicCase(
     if (!isEscape && hasInternalUpperAfterLower) {
         if (isContextEnglishCollisionWord(rawLower, rawLen) ||
             isUnconditionalEnglishWord(rawLower, rawLen) ||
-            (rawLen >= 3 && rawLower[rawLen - 2] == L'o' && rawLower[rawLen - 1] == L's')) {
+            (rawLen >= 3 && rawLower[rawLen - 2] == L'o' && rawLower[rawLen - 1] == L's') ||
+            (rawLen == 4 && rawLower[1] == L'a' && rawLower[2] == L'a' && rawWord[3] == L'S')) {
             return true;
         }
     }
@@ -755,6 +756,7 @@ struct NativeEngineState {
     bool m_precededByMacroDelimiter{false};
     bool m_afterDigit{false};
     bool m_precededByLeadingSlash{false};
+    bool m_inSubwordEval{false};
     uint32_t m_pendingBoundaryCp{0};
     wchar_t m_prevCollisionDisplayed[16]{};
     int m_prevCollisionDisplayedLen{0};
@@ -929,6 +931,7 @@ struct NativeEngineState {
     bool hasVietnameseTransformation() const;
     bool isValidVietnameseSyllable() const;
     bool shouldRestoreRawEnglish() const;
+    bool tryComposeMixedCaseCompound(wchar_t *outBuf, int maxLen) const;
     int composeOutputWord(wchar_t *outBuf, int maxLen) const;
     bool applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool isUpper);
     bool applyVniCharacter(wchar_t ch);
@@ -938,6 +941,7 @@ struct NativeEngineState {
     int32_t commitWord();
     void appendContextWord(const char *contextWord);
     void syncSurroundingContext(const char *beforeContextUtf8);
+    bool tryRehydrateAndFeed(const wchar_t *precedingWord, int wordLen, uint32_t codepoint);
 };
 
 void NativeEngineState::saveUndoSnapshot() {
@@ -1489,12 +1493,130 @@ bool isVietnameseCompoundContinuationAfterStarter(
     return false;
 }
 
+bool isPostDigitTechnicalUnitSuffix(const wchar_t *lower, int len) {
+    if (len < 2 || len > 5) return false;
+    auto eq = [&](const wchar_t *lit, int litLen) {
+        return len == litLen && std::wmemcmp(lower, lit, static_cast<size_t>(litLen)) == 0;
+    };
+    return eq(L"us", 2) || eq(L"as", 2) || eq(L"es", 2) || eq(L"is", 2) || eq(L"os", 2) ||
+           eq(L"ex", 2) || eq(L"mos", 3) || eq(L"deg", 3) || eq(L"rad", 3) || eq(L"rem", 3) ||
+           eq(L"sec", 3) || eq(L"min", 3) || eq(L"hrs", 3) || eq(L"yrs", 3) ||
+           eq(L"degs", 4) || eq(L"rads", 4) || eq(L"rems", 4) || eq(L"secs", 4) ||
+           eq(L"mins", 4) || eq(L"turn", 4) || eq(L"turns", 5);
+}
+
+int partitionMixedCaseSubwords(const wchar_t *raw, int rawLen, int segStarts[16], int segLens[16]) {
+    if (rawLen < 4 || rawLen >= WindowsNativeEngine::kMaxWordTokens) return 0;
+    bool hasUpper = false;
+    bool hasLower = false;
+    bool restAllLower = true;
+    for (int i = 0; i < rawLen; ++i) {
+        const wchar_t c = raw[i];
+        if (c >= L'A' && c <= L'Z') {
+            hasUpper = true;
+            if (i > 0) restAllLower = false;
+        } else if (c >= L'a' && c <= L'z') {
+            hasLower = true;
+        } else {
+            return 0;
+        }
+    }
+    if (!hasUpper || !hasLower) return 0;
+    if (raw[0] >= L'A' && raw[0] <= L'Z' && restAllLower) return 0;
+
+    int segCount = 0;
+    int curStart = 0;
+    int i = 0;
+
+    int leadUpper = 0;
+    while (leadUpper < rawLen && raw[leadUpper] >= L'A' && raw[leadUpper] <= L'Z') {
+        ++leadUpper;
+    }
+    if (leadUpper >= 3 && leadUpper < rawLen && raw[leadUpper] >= L'a' && raw[leadUpper] <= L'z') {
+        int splitAt = leadUpper - 1;
+        if (leadUpper >= 4 && raw[leadUpper - 2] == L'D' && raw[leadUpper - 1] == L'D') {
+            splitAt = leadUpper - 2;
+        }
+        if (splitAt >= 2) {
+            segStarts[segCount] = 0;
+            segLens[segCount] = splitAt;
+            ++segCount;
+            curStart = splitAt;
+            i = splitAt;
+        }
+    }
+
+    bool curSegHasVowel = false;
+    for (; i < rawLen; ++i) {
+        const wchar_t c = raw[i];
+        const bool isUpper = (c >= L'A' && c <= L'Z');
+        if (i > curStart && isUpper && (raw[i - 1] >= L'a' && raw[i - 1] <= L'z') && curSegHasVowel) {
+            if (segCount >= 15) return 0;
+            segStarts[segCount] = curStart;
+            segLens[segCount] = i - curStart;
+            ++segCount;
+            curStart = i;
+            curSegHasVowel = NativeEngineState::isAsciiBaseVowel(toLowerAscii(c));
+        } else {
+            if (NativeEngineState::isAsciiBaseVowel(toLowerAscii(c))) {
+                curSegHasVowel = true;
+            }
+        }
+    }
+    if (curStart < rawLen) {
+        if (segCount >= 16) return 0;
+        segStarts[segCount] = curStart;
+        segLens[segCount] = rawLen - curStart;
+        ++segCount;
+    }
+    if (segCount < 2) return 0;
+    for (int s = 0; s < segCount; ++s) {
+        const int len = segLens[s];
+        if (len < 2) return 0;
+        const wchar_t *seg = raw + segStarts[s];
+        bool allUpper = true;
+        bool allLower = true;
+        bool hasVowel = false;
+        for (int j = 0; j < len; ++j) {
+            const wchar_t c = seg[j];
+            if (!(c >= L'A' && c <= L'Z')) allUpper = false;
+            if (!(c >= L'a' && c <= L'z')) allLower = false;
+            if (NativeEngineState::isAsciiBaseVowel(toLowerAscii(c))) hasVowel = true;
+        }
+        if (allUpper) continue;
+        if (!hasVowel) return 0;
+        if (s == 0 && allLower) continue;
+        if (!(seg[0] >= L'A' && seg[0] <= L'Z')) return 0;
+        const int tailStart = (len >= 3 && seg[0] == L'D' && seg[1] == L'D') ? 2 : 1;
+        for (int j = tailStart; j < len; ++j) {
+            if (!(seg[j] >= L'a' && seg[j] <= L'z')) return 0;
+        }
+    }
+    return segCount;
+}
+
 bool NativeEngineState::shouldRestoreRawEnglish() const {
     if (!m_smartBilingual || !hasVietnameseTransformation() || m_suppressEnglishRestoreAfterBackspace) return false;
 
     wchar_t rawLower[kMaxWordTokens]{};
     for (int i = 0; i < m_rawLen; ++i) {
         rawLower[i] = toLowerAscii(m_rawWord[i]);
+    }
+
+    if (m_afterDigit) {
+        bool rawHasAsciiVowel = false;
+        for (int i = 0; i < m_rawLen; ++i) {
+            if (isAsciiBaseVowel(rawLower[i])) {
+                rawHasAsciiVowel = true;
+                break;
+            }
+        }
+        const bool isCurrencyStrokeD =
+            (m_rawLen == 2 && rawLower[0] == L'd' && rawLower[1] == L'd');
+        if ((!rawHasAsciiVowel && !isCurrencyStrokeD) ||
+            isPostDigitTechnicalUnitSuffix(rawLower, m_rawLen)) {
+            return true;
+        }
     }
 
     if (m_rawLen == 3 && m_rawWord[0] == L'c' && m_rawWord[1] == L'o' && m_rawWord[2] == L's') {
@@ -1579,7 +1701,101 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
     return false;
 }
 
+bool NativeEngineState::tryComposeMixedCaseCompound(wchar_t *outBuf, int maxLen) const {
+    if (m_inSubwordEval || !m_smartBilingual || m_inputMethod != InputMethod::Telex ||
+        m_precededByTechDelimiter || m_precededByLeadingSlash ||
+        m_suppressEnglishRestoreAfterBackspace || isValidVietnameseSyllable()) {
+        return false;
+    }
+
+    int segStarts[16]{};
+    int segLens[16]{};
+    const int segCount = partitionMixedCaseSubwords(m_rawWord, m_rawLen, segStarts, segLens);
+    if (segCount < 2) return false;
+
+    wchar_t combined[kMaxWordTokens]{};
+    int combinedLen = 0;
+    bool compoundHasNonAscii = false;
+
+    for (int s = 0; s < segCount; ++s) {
+        const wchar_t *segPtr = m_rawWord + segStarts[s];
+        const int segLen = segLens[s];
+        bool segAllCaps = true;
+        for (int j = 0; j < segLen; ++j) {
+            if (!(segPtr[j] >= L'A' && segPtr[j] <= L'Z')) {
+                segAllCaps = false;
+                break;
+            }
+        }
+        if (segAllCaps) {
+            if (combinedLen + segLen >= kMaxWordTokens) return false;
+            for (int j = 0; j < segLen; ++j) {
+                combined[combinedLen++] = segPtr[j];
+            }
+            continue;
+        }
+
+        wchar_t segLower[kMaxWordTokens]{};
+        for (int j = 0; j < segLen; ++j) {
+            segLower[j] = toLowerAscii(segPtr[j]);
+        }
+        if (isEnglishContextAnchor(segLower, segLen) || isSpacePrefixStarter(segLower, segLen)) {
+            if (combinedLen + segLen >= kMaxWordTokens) return false;
+            for (int j = 0; j < segLen; ++j) {
+                combined[combinedLen++] = segPtr[j];
+            }
+            continue;
+        }
+
+        NativeEngineState sub{};
+        sub.m_inputMethod = m_inputMethod;
+        sub.m_grammarProfile = m_grammarProfile;
+        sub.m_smartBilingual = true;
+        sub.m_modernOrthography = m_modernOrthography;
+        sub.m_quickTelex = m_quickTelex;
+        sub.m_relaxedCoda = false;
+        sub.m_inEnglishContext = true;
+        sub.m_lastWordWasEnglishAnchor = true;
+        sub.m_inSubwordEval = true;
+        for (int j = 0; j < segLen; ++j) {
+            sub.feedChar(static_cast<uint32_t>(segPtr[j]));
+        }
+
+        bool segHasNonAscii = false;
+        for (int j = 0; j < sub.m_displayedLen; ++j) {
+            if (sub.m_displayed[j] > 0x7F) {
+                segHasNonAscii = true;
+                break;
+            }
+        }
+        if (segHasNonAscii) {
+            if (!sub.isValidVietnameseSyllable()) {
+                return false;
+            }
+            compoundHasNonAscii = true;
+        }
+        if (combinedLen + sub.m_displayedLen >= kMaxWordTokens) return false;
+        for (int j = 0; j < sub.m_displayedLen; ++j) {
+            combined[combinedLen++] = sub.m_displayed[j];
+        }
+    }
+
+    if (!compoundHasNonAscii || combinedLen <= 0 || combinedLen >= maxLen) {
+        return false;
+    }
+    for (int i = 0; i < combinedLen; ++i) {
+        outBuf[i] = combined[i];
+    }
+    outBuf[combinedLen] = 0;
+    return true;
+}
+
 int NativeEngineState::composeOutputWord(wchar_t *outBuf, int maxLen) const {
+    if (tryComposeMixedCaseCompound(outBuf, maxLen)) {
+        int len = 0;
+        while (len < maxLen - 1 && outBuf[len] != 0) ++len;
+        return len;
+    }
     wchar_t rawLower[kMaxWordTokens]{};
     for (int i = 0; i < m_rawLen; ++i) {
         rawLower[i] = toLowerAscii(m_rawWord[i]);
@@ -2540,11 +2756,11 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
     }
 
     if (isWordBoundaryDelimiter(codepoint)) {
-        m_afterDigit = false;
         const bool wasInLeadingSlash = m_precededByLeadingSlash;
         m_pendingBoundaryCp = codepoint;
         if (m_displayedLen > 0) {
             int32_t act = commitWord();
+            m_afterDigit = false;
             m_pendingBoundaryCp = 0;
             m_precededByLeadingSlash = (codepoint == '/' && wasInLeadingSlash);
             m_precededByMacroDelimiter = isMacroTechnicalDelimiter(codepoint);
@@ -2561,6 +2777,7 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
             }
             return act;
         }
+        m_afterDigit = false;
         m_pendingBoundaryCp = 0;
         m_prevCollisionDisplayedLen = 0;
         m_prevCollisionRawLen = 0;
@@ -2593,10 +2810,6 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
         m_lastBackspaces = 0;
         m_lastTextUtf8[0] = '\0';
         return static_cast<int32_t>(Action::PassThrough);
-    }
-
-    if (m_tokenLen == 0 && m_afterDigit) {
-        m_literalLock = true;
     }
 
     wchar_t priorDisplayed[kMaxWordTokens]{};
@@ -2873,6 +3086,113 @@ int32_t NativeEngineState::feedBackspace() {
     wchar_t priorDisplayed[kMaxWordTokens]{};
     const int priorLen = m_displayedLen;
     for (int i = 0; i < priorLen; ++i) priorDisplayed[i] = m_displayed[i];
+
+    wchar_t mixedCompoundBuf[kMaxWordTokens]{};
+    if (tryComposeMixedCaseCompound(mixedCompoundBuf, kMaxWordTokens)) {
+        int segStarts[16]{};
+        int segLens[16]{};
+        const int segCount = partitionMixedCaseSubwords(m_rawWord, m_rawLen, segStarts, segLens);
+        if (segCount >= 2) {
+            const int lastStart = segStarts[segCount - 1];
+            const int lastLen = segLens[segCount - 1];
+            wchar_t newRaw[kMaxWordTokens]{};
+            int newRawLen = 0;
+            for (int i = 0; i < lastStart && newRawLen < kMaxWordTokens - 1; ++i) {
+                newRaw[newRawLen++] = m_rawWord[i];
+            }
+            bool lastAllCaps = true;
+            for (int j = 0; j < lastLen; ++j) {
+                if (!(m_rawWord[lastStart + j] >= L'A' && m_rawWord[lastStart + j] <= L'Z')) {
+                    lastAllCaps = false;
+                    break;
+                }
+            }
+            bool lastDirectPop = lastAllCaps;
+            if (!lastDirectPop) {
+                wchar_t lastLower[kMaxWordTokens]{};
+                for (int j = 0; j < lastLen; ++j) {
+                    lastLower[j] = toLowerAscii(m_rawWord[lastStart + j]);
+                }
+                if (isEnglishContextAnchor(lastLower, lastLen) || isSpacePrefixStarter(lastLower, lastLen)) {
+                    lastDirectPop = true;
+                }
+            }
+            if (lastDirectPop) {
+                for (int j = 0; j < lastLen - 1 && newRawLen < kMaxWordTokens - 1; ++j) {
+                    newRaw[newRawLen++] = m_rawWord[lastStart + j];
+                }
+            } else {
+                NativeEngineState sub{};
+                sub.m_inputMethod = m_inputMethod;
+                sub.m_grammarProfile = m_grammarProfile;
+                sub.m_smartBilingual = true;
+                sub.m_modernOrthography = m_modernOrthography;
+                sub.m_quickTelex = m_quickTelex;
+                sub.m_relaxedCoda = false;
+                sub.m_inEnglishContext = true;
+                sub.m_lastWordWasEnglishAnchor = true;
+                sub.m_inSubwordEval = true;
+                for (int j = 0; j < lastLen; ++j) {
+                    sub.feedChar(static_cast<uint32_t>(m_rawWord[lastStart + j]));
+                }
+                sub.feedBackspace();
+                for (int j = 0; j < sub.m_rawLen && newRawLen < kMaxWordTokens - 1; ++j) {
+                    newRaw[newRawLen++] = sub.m_rawWord[j];
+                }
+            }
+            newRaw[newRawLen] = 0;
+            const bool savedEngCtx = m_inEnglishContext;
+            const bool savedVnCtx = m_inVietnameseContext;
+            const bool savedHadVn = m_hadVietnameseInSentence;
+            const bool savedAfterDigit = m_afterDigit;
+            const bool savedTechDelim = m_precededByTechDelimiter;
+            const bool savedMacroDelim = m_precededByMacroDelimiter;
+            clearWordState();
+            m_inEnglishContext = savedEngCtx;
+            m_inVietnameseContext = savedVnCtx;
+            m_hadVietnameseInSentence = savedHadVn;
+            m_afterDigit = savedAfterDigit;
+            m_precededByTechDelimiter = savedTechDelim;
+            m_precededByMacroDelimiter = savedMacroDelim;
+            for (int i = 0; i < newRawLen; ++i) {
+                feedChar(static_cast<uint32_t>(newRaw[i]));
+            }
+            return emitIncrementalReplacement(priorDisplayed, priorLen, m_displayed, m_displayedLen);
+        }
+    } else if (m_smartBilingual && m_inputMethod == InputMethod::Telex && !m_literalLock &&
+               m_rawLen >= 3 && m_rawLen + 1 < kMaxWordTokens) {
+        int probeStarts[16]{};
+        int probeLens[16]{};
+        if (partitionMixedCaseSubwords(m_rawWord, m_rawLen, probeStarts, probeLens) < 2) {
+            wchar_t probe[kMaxWordTokens]{};
+            for (int i = 0; i < m_rawLen; ++i) probe[i] = m_rawWord[i];
+            probe[m_rawLen] = L'a';
+            probe[m_rawLen + 1] = 0;
+            if (partitionMixedCaseSubwords(probe, m_rawLen + 1, probeStarts, probeLens) >= 2) {
+                wchar_t newRaw[kMaxWordTokens]{};
+                const int newRawLen = m_rawLen - 1;
+                for (int i = 0; i < newRawLen; ++i) newRaw[i] = m_rawWord[i];
+                newRaw[newRawLen] = 0;
+                const bool savedEngCtx = m_inEnglishContext;
+                const bool savedVnCtx = m_inVietnameseContext;
+                const bool savedHadVn = m_hadVietnameseInSentence;
+                const bool savedAfterDigit = m_afterDigit;
+                const bool savedTechDelim = m_precededByTechDelimiter;
+                const bool savedMacroDelim = m_precededByMacroDelimiter;
+                clearWordState();
+                m_inEnglishContext = savedEngCtx;
+                m_inVietnameseContext = savedVnCtx;
+                m_hadVietnameseInSentence = savedHadVn;
+                m_afterDigit = savedAfterDigit;
+                m_precededByTechDelimiter = savedTechDelim;
+                m_precededByMacroDelimiter = savedMacroDelim;
+                for (int i = 0; i < newRawLen; ++i) {
+                    feedChar(static_cast<uint32_t>(newRaw[i]));
+                }
+                return emitIncrementalReplacement(priorDisplayed, priorLen, m_displayed, m_displayedLen);
+            }
+        }
+    }
 
     // 0. If there is a literal tail (e.g. 'rônz' -> 'rôn', 'nhũngw' -> 'nhũng'), pop from literalTail first
     if (m_literalTailLen > 0) {
@@ -3262,9 +3582,13 @@ int32_t NativeEngineState::commitWord() {
 
     const bool wasInEnglishContextBeforeCommit = m_inEnglishContext;
     const bool wasTunHeadBeforeCommit = m_lastWordWasTunCollocationHead;
-    const bool wasBilingualRestore = (m_smartBilingual && hasVietnameseTransformation() && shouldRestoreRawEnglish());
     wchar_t finalWord[kMaxWordTokens]{};
     const int finalLen = composeOutputWord(finalWord, kMaxWordTokens);
+    bool finalMatchesRaw = (finalLen == m_rawLen);
+    for (int i = 0; finalMatchesRaw && i < finalLen; ++i) {
+        if (finalWord[i] != m_rawWord[i]) finalMatchesRaw = false;
+    }
+    const bool wasBilingualRestore = finalMatchesRaw && (m_smartBilingual && hasVietnameseTransformation() && shouldRestoreRawEnglish());
     const int32_t bs = static_cast<int32_t>(m_displayedLen);
 
     int commonCommitPrefix = 0;
@@ -3763,6 +4087,151 @@ void WindowsNativeEngine::syncSurroundingContext(const char *beforeContextUtf8) 
     impl->syncSurroundingContext(beforeContextUtf8);
 }
 
+static bool decodePrecomposedVnChar(wchar_t ch, SyllableToken &outTok, int &outTone) {
+    outTok = {};
+    outTone = 0;
+    if (ch == 0x0111) { // đ
+        outTok.baseLower = L'd';
+        outTok.isUpper = false;
+        outTok.shape = 4;
+        return true;
+    }
+    if (ch == 0x0110) { // Đ
+        outTok.baseLower = L'd';
+        outTok.isUpper = true;
+        outTok.shape = 4;
+        return true;
+    }
+    static constexpr wchar_t kRowBaseLower[12] = {
+        L'a', L'a', L'a', L'e', L'e', L'i', L'o', L'o', L'o', L'u', L'u', L'y'
+    };
+    static constexpr int kRowShape[12] = {
+        0,    3,    1,    0,    1,    0,    0,    1,    2,    0,    2,    0
+    };
+    for (int r = 0; r < 12; ++r) {
+        for (int c = 0; c < 6; ++c) {
+            if (ch == kLowerVowelTable[r][c]) {
+                outTok.baseLower = kRowBaseLower[r];
+                outTok.isUpper = false;
+                outTok.shape = kRowShape[r];
+                outTone = c;
+                return true;
+            }
+            if (ch == kUpperVowelTable[r][c]) {
+                outTok.baseLower = kRowBaseLower[r];
+                outTok.isUpper = true;
+                outTok.shape = kRowShape[r];
+                outTone = c;
+                return true;
+            }
+        }
+    }
+    if (ch >= L'a' && ch <= L'z') {
+        outTok.baseLower = ch;
+        outTok.isUpper = false;
+        outTok.shape = 0;
+        return true;
+    }
+    if (ch >= L'A' && ch <= L'Z') {
+        outTok.baseLower = static_cast<wchar_t>(ch + (L'a' - L'A'));
+        outTok.isUpper = true;
+        outTok.shape = 0;
+        return true;
+    }
+    return false;
+}
+
+bool NativeEngineState::tryRehydrateAndFeed(const wchar_t *precedingWord, int wordLen, uint32_t codepoint) {
+    if (!precedingWord || wordLen < 1 || wordLen > 6 || m_displayedLen > 0) {
+        return false;
+    }
+    SyllableToken toks[8]{};
+    int wordTone = 0;
+    bool hasPreExistingVn = false;
+    for (int i = 0; i < wordLen; ++i) {
+        int t = 0;
+        if (!decodePrecomposedVnChar(precedingWord[i], toks[i], t)) {
+            return false;
+        }
+        if (precedingWord[i] > 0x7F) {
+            hasPreExistingVn = true;
+        }
+        if (t != 0) {
+            if (wordTone != 0) {
+                return false;
+            }
+            wordTone = t;
+        }
+    }
+
+    NativeEngineState temp = *this;
+    temp.clearWordState();
+    for (int i = 0; i < wordLen; ++i) {
+        temp.m_tokens[i] = toks[i];
+    }
+    temp.m_tokenLen = wordLen;
+    temp.m_tone = wordTone;
+    temp.rebuildCanonicalRawFromTokens();
+    temp.m_suppressEnglishRestoreAfterBackspace = hasPreExistingVn;
+    temp.m_displayedLen = temp.composeOutputWord(temp.m_displayed, kMaxWordTokens);
+    if (temp.m_displayedLen != wordLen || std::wmemcmp(temp.m_displayed, precedingWord, wordLen) != 0) {
+        return false;
+    }
+
+    int32_t act = temp.feedChar(codepoint);
+    if (act != static_cast<int32_t>(Action::Replace) ||
+        temp.m_displayedLen != wordLen ||
+        std::wmemcmp(temp.m_displayed, precedingWord, wordLen) == 0 ||
+        !temp.isValidVietnameseSyllable() ||
+        !temp.hasVietnameseTransformation() ||
+        temp.shouldRestoreRawEnglish()) {
+        return false;
+    }
+
+    if (!hasPreExistingVn) {
+        wchar_t rawLower[kMaxWordTokens]{};
+        for (int i = 0; i < temp.m_rawLen; ++i) {
+            rawLower[i] = toLowerAscii(temp.m_rawWord[i]);
+        }
+        if (isUnconditionalEnglishWord(rawLower, temp.m_rawLen) ||
+            isContextEnglishCollisionWord(rawLower, temp.m_rawLen) ||
+            isExtendedEnglishEscapeWord(rawLower, temp.m_rawLen) ||
+            isDefaultNoContextShortEnglishWord(rawLower, temp.m_rawLen)) {
+            return false;
+        }
+    }
+
+    int commonPrefix = 0;
+    while (commonPrefix < wordLen && precedingWord[commonPrefix] == temp.m_displayed[commonPrefix]) {
+        ++commonPrefix;
+    }
+    temp.m_lastBackspaces = wordLen - commonPrefix;
+    encodeWideToUtf8(
+        temp.m_displayed + commonPrefix,
+        wordLen - commonPrefix,
+        temp.m_lastTextUtf8,
+        sizeof(temp.m_lastTextUtf8)
+    );
+    *this = temp;
+    return true;
+}
+
+bool WindowsNativeEngine::tryRehydrateAndFeed(const wchar_t *precedingWord, int wordLen, uint32_t codepoint) {
+    auto *impl = getImpl(m_opaqueState);
+    impl->m_inputMethod = m_inputMethod;
+    impl->m_smartBilingual = m_smartBilingual;
+    impl->m_modernOrthography = m_modernOrthography;
+    impl->m_grammarProfile = m_grammarProfile;
+    impl->m_quickTelex = m_quickTelex;
+    impl->m_relaxedCoda = m_relaxedCoda;
+    impl->m_macroEnabled = m_macroEnabled;
+    if (!impl->tryRehydrateAndFeed(precedingWord, wordLen, codepoint)) {
+        return false;
+    }
+    syncOut(this, impl, m_lastBackspaces, m_lastTextUtf8, m_lastCommitDiffBackspaces, m_lastCommitDiffTextUtf8, m_composingFlag, m_activeWordFlag);
+    return true;
+}
+
 } // namespace vielotus_win
 
 #if defined(_WIN32)
@@ -4101,5 +4570,5 @@ VIELOTUS_CAPI_EXPORT const char *vielotus_get_version(void) {
 }
 
 VIELOTUS_CAPI_EXPORT const char *vielotus_get_build_stamp(void) {
-    return "2.0.2-r5 (PureTSF+CUAS+LabTrace)";
+    return "2.0.2-r11 (PureTSF+Tray+Feedback)";
 }
