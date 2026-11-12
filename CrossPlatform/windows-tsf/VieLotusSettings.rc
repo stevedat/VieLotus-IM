@@ -1,7 +1,9 @@
 #include <windows.h>
 #pragma code_page(65001)
 
+#ifdef VIELOTUS_RC_EMBED_MANIFEST
 1 24 "VieLotusSettings.manifest"
+#endif
 101 ICON "../../scripts/windows/assets/VieLotusIM.ico"
 102 RCDATA "../../scripts/windows/assets/app-icon-128x128.png"
 103 RCDATA "../../scripts/windows/assets/VieLotusIM.ico"
