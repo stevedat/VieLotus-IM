@@ -235,6 +235,29 @@ is_gnome_desktop() {
     printf '%s' "${XDG_CURRENT_DESKTOP:-}:${DESKTOP_SESSION:-}" | grep -qi "gnome"
 }
 
+is_non_gnome_fcitx_desktop() {
+    is_gnome_desktop && return 1
+    if [ "${VIELOTUS_BOOTSTRAP_FCITX5:-0}" = "1" ]; then
+        return 0
+    fi
+    if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}${SWAYSOCK:-}${I3SOCK:-}" ]; then
+        return 0
+    fi
+    printf '%s' "${XDG_CURRENT_DESKTOP:-}:${DESKTOP_SESSION:-}" | grep -Eqi 'kde|plasma|hyprland|sway|xfce|lxqt|lxde|cinnamon|mate|budgie|cosmic|i3|openbox|awesome|bspwm|niri|river|wayfire'
+}
+
+should_manage_fcitx5_profile() {
+    [ -f "${CONFIG_ROOT}/fcitx5/profile" ] && return 0
+    has_fcitx5_vielotus_plugin || return 1
+    if pgrep -x fcitx5 >/dev/null 2>&1 || [ "${XMODIFIERS:-}" = "@im=fcitx" ] || [ "${GTK_IM_MODULE:-}" = "fcitx" ] || [ "${QT_IM_MODULE:-}" = "fcitx" ]; then
+        return 0
+    fi
+    if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && is_non_gnome_fcitx_desktop; then
+        return 0
+    fi
+    return 1
+}
+
 configure_fcitx5_profile() {
     FCITX_IM="$1"
     ACTIVATE_PROFILE="${2:-0}"
@@ -281,7 +304,7 @@ DeveloperMode=${FCITX_DM}
 PreeditUnderline=${FCITX_PU}
 FCITX_CONF_EOF
 
-    if [ "${ACTIVATE_PROFILE}" = "1" ] && command -v python3 >/dev/null 2>&1; then
+    if [ "${ACTIVATE_PROFILE}" = "1" ] && should_manage_fcitx5_profile && command -v python3 >/dev/null 2>&1; then
         NEED_PROFILE_WRITE=1
         if [ -f "${FCITX_PROFILE}" ] && grep -q "^Name=${FCITX_IM}\$" "${FCITX_PROFILE}" 2>/dev/null && grep -q "^DefaultIM=${FCITX_IM}\$" "${FCITX_PROFILE}" 2>/dev/null; then
             NEED_PROFILE_WRITE=0
@@ -370,10 +393,10 @@ ensure_fcitx5_session_ready() {
     has_fcitx5_vielotus_plugin || return 0
 
     SHOULD_DRIVE_FCITX5=0
-    if [ "${FCITX_WAS_STOPPED_FOR_PROFILE:-0}" = "1" ] || pgrep -x fcitx5 >/dev/null 2>&1 || [ "${XMODIFIERS:-}" = "@im=fcitx" ] || [ "${GTK_IM_MODULE:-}" = "fcitx" ]; then
+    if [ "${FCITX_WAS_STOPPED_FOR_PROFILE:-0}" = "1" ] || pgrep -x fcitx5 >/dev/null 2>&1 || [ "${XMODIFIERS:-}" = "@im=fcitx" ] || [ "${GTK_IM_MODULE:-}" = "fcitx" ] || [ "${QT_IM_MODULE:-}" = "fcitx" ]; then
         SHOULD_DRIVE_FCITX5=1
-    elif [ "${ACTIVATE_NOW}" = "1" ] && ! is_gnome_desktop; then
-        if printf '%s' "${XDG_CURRENT_DESKTOP:-}:${DESKTOP_SESSION:-}" | grep -Eqi 'kde|plasma|hyprland|sway|lxqt'; then
+    elif [ "${ACTIVATE_NOW}" = "1" ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && is_non_gnome_fcitx_desktop; then
+        if printf '%s' "${XDG_CURRENT_DESKTOP:-}:${DESKTOP_SESSION:-}" | grep -Eqi 'kde|plasma|hyprland|sway|lxqt|cosmic|niri|river|wayfire' || [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}${SWAYSOCK:-}" ]; then
             SHOULD_DRIVE_FCITX5=1
         elif ! pgrep -x ibus-daemon >/dev/null 2>&1; then
             SHOULD_DRIVE_FCITX5=1
