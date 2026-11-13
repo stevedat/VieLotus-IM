@@ -405,39 +405,83 @@ ensure_fcitx5_session_ready() {
 
     [ "${SHOULD_DRIVE_FCITX5}" = "1" ] || return 0
 
-    # Persist environment.d Fcitx5 hints for non-GNOME sessions (without overriding custom user files)
+    IS_KDE_WAYLAND=0
+    if printf '%s' "${XDG_CURRENT_DESKTOP:-}:${DESKTOP_SESSION:-}" | grep -Eqi 'kde|plasma'; then
+        if [ "${XDG_SESSION_TYPE:-}" = "wayland" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+            IS_KDE_WAYLAND=1
+        fi
+    fi
+
+    # Persist environment.d Fcitx5 hints for non-GNOME sessions (without overriding custom user files).
+    # On KDE Plasma Wayland, NEVER set QT_IM_MODULE=fcitx globally so native Qt6/GTK4 apps use
+    # KWin's Wayland text-input-v3 protocol; only XMODIFIERS=@im=fcitx is needed for XWayland.
     if [ "${ACTIVATE_NOW}" = "1" ] && ! is_gnome_desktop; then
         mkdir -p "${CONFIG_ROOT}/environment.d" 2>/dev/null || true
-        if ! grep -rq "^XMODIFIERS=" "${CONFIG_ROOT}/environment.d" 2>/dev/null; then
-            cat <<'ENVD_EOF' > "${CONFIG_ROOT}/environment.d/fcitx5-vielotus.conf" 2>/dev/null || true
+        ENVD_FILE="${CONFIG_ROOT}/environment.d/fcitx5-vielotus.conf"
+        if [ "${IS_KDE_WAYLAND}" = "1" ]; then
+            if [ -f "${ENVD_FILE}" ] && grep -q "^QT_IM_MODULE=fcitx" "${ENVD_FILE}" 2>/dev/null; then
+                printf 'XMODIFIERS=@im=fcitx\n' > "${ENVD_FILE}" 2>/dev/null || true
+            elif ! grep -rq "^XMODIFIERS=" "${CONFIG_ROOT}/environment.d" 2>/dev/null; then
+                printf 'XMODIFIERS=@im=fcitx\n' > "${ENVD_FILE}" 2>/dev/null || true
+            fi
+        elif ! grep -rq "^XMODIFIERS=" "${CONFIG_ROOT}/environment.d" 2>/dev/null; then
+            cat <<'ENVD_EOF' > "${ENVD_FILE}" 2>/dev/null || true
 XMODIFIERS=@im=fcitx
 QT_IM_MODULE=fcitx
 ENVD_EOF
         fi
 
-        # Auto-bind KDE Plasma Wayland Virtual Keyboard to Fcitx5 if unset
-        if printf '%s' "${XDG_CURRENT_DESKTOP:-}:${DESKTOP_SESSION:-}" | grep -Eqi 'kde|plasma' && [ -f /usr/share/applications/org.fcitx.Fcitx5.desktop ]; then
-            if command -v kwriteconfig6 >/dev/null 2>&1; then
-                CUR_KWIN_IM="$(kreadconfig6 --file kwinrc --group Wayland --key InputMethod 2>/dev/null || true)"
-                if [ -z "${CUR_KWIN_IM}" ]; then
-                    kwriteconfig6 --file kwinrc --group Wayland --key InputMethod /usr/share/applications/org.fcitx.Fcitx5.desktop >/dev/null 2>&1 || true
-                    if command -v qdbus6 >/dev/null 2>&1; then
-                        qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
-                    elif command -v dbus-send >/dev/null 2>&1; then
-                        dbus-send --session --type=method_call --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
+        # Auto-bind KDE Plasma Wayland Virtual Keyboard to Fcitx5 (preferring fcitx5-wayland-launcher.desktop)
+        if [ "${IS_KDE_WAYLAND}" = "1" ]; then
+            FCITX_KWIN_DESKTOP=""
+            if [ -f /usr/share/applications/fcitx5-wayland-launcher.desktop ]; then
+                FCITX_KWIN_DESKTOP="/usr/share/applications/fcitx5-wayland-launcher.desktop"
+            elif [ -f /usr/share/applications/org.fcitx.Fcitx5.desktop ]; then
+                FCITX_KWIN_DESKTOP="/usr/share/applications/org.fcitx.Fcitx5.desktop"
+            fi
+            if [ -n "${FCITX_KWIN_DESKTOP}" ]; then
+                KWIN_CHANGED=0
+                if command -v kwriteconfig6 >/dev/null 2>&1; then
+                    CUR_KWIN_IM="$(kreadconfig6 --file kwinrc --group Wayland --key InputMethod 2>/dev/null || true)"
+                    CUR_KWIN_VK="$(kreadconfig6 --file kwinrc --group Wayland --key VirtualKeyboardEnabled 2>/dev/null || true)"
+                    if [ -z "${CUR_KWIN_IM}" ] || [ ! -f "${CUR_KWIN_IM}" ]; then
+                        kwriteconfig6 --notify --file kwinrc --group Wayland --key InputMethod "${FCITX_KWIN_DESKTOP}" >/dev/null 2>&1 || \
+                            kwriteconfig6 --file kwinrc --group Wayland --key InputMethod "${FCITX_KWIN_DESKTOP}" >/dev/null 2>&1 || true
+                        KWIN_CHANGED=1
                     fi
-                fi
-            elif command -v kwriteconfig5 >/dev/null 2>&1; then
-                CUR_KWIN_IM="$(kreadconfig5 --file kwinrc --group Wayland --key InputMethod 2>/dev/null || true)"
-                if [ -z "${CUR_KWIN_IM}" ]; then
-                    kwriteconfig5 --file kwinrc --group Wayland --key InputMethod /usr/share/applications/org.fcitx.Fcitx5.desktop >/dev/null 2>&1 || true
-                    command -v qdbus >/dev/null 2>&1 && qdbus org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+                    if [ "${CUR_KWIN_VK}" = "false" ] || [ -z "${CUR_KWIN_VK}" ]; then
+                        kwriteconfig6 --notify --file kwinrc --group Wayland --key VirtualKeyboardEnabled true >/dev/null 2>&1 || \
+                            kwriteconfig6 --file kwinrc --group Wayland --key VirtualKeyboardEnabled true >/dev/null 2>&1 || true
+                        KWIN_CHANGED=1
+                    fi
+                    if [ "${KWIN_CHANGED}" = "1" ] || ! pgrep -x fcitx5 >/dev/null 2>&1; then
+                        if command -v qdbus6 >/dev/null 2>&1; then
+                            qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+                        elif command -v dbus-send >/dev/null 2>&1; then
+                            dbus-send --session --type=method_call --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
+                        fi
+                    fi
+                elif command -v kwriteconfig5 >/dev/null 2>&1; then
+                    CUR_KWIN_IM="$(kreadconfig5 --file kwinrc --group Wayland --key InputMethod 2>/dev/null || true)"
+                    if [ -z "${CUR_KWIN_IM}" ] || [ ! -f "${CUR_KWIN_IM}" ]; then
+                        kwriteconfig5 --file kwinrc --group Wayland --key InputMethod "${FCITX_KWIN_DESKTOP}" >/dev/null 2>&1 || true
+                        command -v qdbus >/dev/null 2>&1 && qdbus org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+                    fi
                 fi
             fi
         fi
     fi
 
-    # Start fcitx5 daemon in live graphical desktop if not yet running
+    # On KDE Wayland, give KWin / fcitx5-wayland-launcher up to ~1.8s to spawn fcitx5 with WAYLAND_SOCKET
+    # before falling back to fcitx5 -d (prevents "Fcitx should be launched by KWin under KDE Wayland" race).
+    if [ "${IS_KDE_WAYLAND}" = "1" ] && [ -n "${WAYLAND_DISPLAY:-}" ] && ! pgrep -x fcitx5 >/dev/null 2>&1; then
+        for _kw in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            pgrep -x fcitx5 >/dev/null 2>&1 && break
+            sleep 0.15
+        done
+    fi
+
+    # Start fcitx5 daemon in live graphical desktop if still not running
     if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && ! pgrep -x fcitx5 >/dev/null 2>&1; then
         fcitx5 -d >/dev/null 2>&1 || true
         if command -v fcitx5-remote >/dev/null 2>&1; then
@@ -781,51 +825,89 @@ ibus_bin = find_first([
 is_kde = any(k in desktop.upper() for k in ("KDE", "PLASMA"))
 is_gnome = "GNOME" in desktop.upper()
 
+if is_kde and session_type == "wayland" and qt_im.strip().lower() == "fcitx":
+    warnings += 1
+    print("  ⚠ Lưu ý KDE Wayland: QT_IM_MODULE=fcitx đang bật; nên để trống để Qt6 dùng trực tiếp giao thức Wayland text-input-v3 của KWin.")
+
 ldd_bin = shutil.which("ldd")
-healthy_plugins = 0
-for label, path, required in (
-    ("Thư viện lõi C-ABI", core_so, True),
-    ("Plugin Fcitx5", fcitx_so, False),
-    ("Engine IBus", ibus_bin, False),
-):
+def inspect_elf_link(path):
     if not path:
-        if required:
-            errors += 1
-            print(f"• {label:<24} : ✗ Không tìm thấy trên hệ thống")
-        elif label == "Plugin Fcitx5" and is_kde:
+        return None
+    if not ldd_bin:
+        return ""
+    try:
+        env = dict(os.environ)
+        env["LC_ALL"] = "C"
+        out = subprocess.check_output([ldd_bin, "-r", path], stderr=subprocess.STDOUT, env=env, timeout=4).decode("utf-8", errors="replace")
+        bad = [ln.strip() for ln in out.splitlines() if "not found" in ln or "undefined symbol:" in ln]
+        return "; ".join(bad[:2]) if bad else ""
+    except Exception as exc:
+        return str(exc)
+
+core_issue = inspect_elf_link(core_so)
+fcitx_issue = inspect_elf_link(fcitx_so)
+ibus_issue = inspect_elf_link(ibus_bin)
+
+fcitx_healthy = bool(fcitx_so) and fcitx_issue == ""
+ibus_healthy = bool(ibus_bin) and ibus_issue == ""
+healthy_plugins = (1 if fcitx_healthy else 0) + (1 if ibus_healthy else 0)
+
+# 1. Core C-ABI library
+if not core_so:
+    errors += 1
+    print(f"• {'Thư viện lõi C-ABI':<24} : ✗ Không tìm thấy trên hệ thống")
+elif core_issue:
+    errors += 1
+    print(f"• {'Thư viện lõi C-ABI':<24} : ✗ Lỗi liên kết động tại {core_so} ({core_issue})")
+else:
+    print(f"• {'Thư viện lõi C-ABI':<24} : ✓ Khỏe mạnh ({core_so})")
+
+# 2. Fcitx5 plugin
+if fcitx_healthy:
+    print(f"• {'Plugin Fcitx5':<24} : ✓ Khỏe mạnh ({fcitx_so})")
+elif not fcitx_so:
+    if is_kde or (fcitx_up and not ibus_up):
+        if ibus_healthy:
             warnings += 1
-            print(f"• {label:<24} : ⚠ Chưa cài đặt (KDE Plasma cần plugin này để gõ)")
-        elif label == "Engine IBus" and is_gnome:
-            warnings += 1
-            print(f"• {label:<24} : ⚠ Chưa cài đặt (GNOME cần engine này để gõ)")
+            print(f"• {'Plugin Fcitx5':<24} : ⚠ Chưa cài đặt (KDE Plasma / Fcitx5 cần plugin này để gõ)")
         else:
-            print(f"• {label:<24} : - Chưa cài đặt")
-        continue
-    ldd_issue = ""
-    if ldd_bin:
-        try:
-            env = dict(os.environ)
-            env["LC_ALL"] = "C"
-            out = subprocess.check_output([ldd_bin, "-r", path], stderr=subprocess.STDOUT, env=env, timeout=4).decode("utf-8", errors="replace")
-            bad = [ln.strip() for ln in out.splitlines() if "not found" in ln or "undefined symbol:" in ln]
-            if bad:
-                ldd_issue = "; ".join(bad[:2])
-        except Exception as exc:
-            ldd_issue = str(exc)
-    if ldd_issue:
-        if label == "Engine IBus" and is_kde and not ibus_up and "libibus" in ldd_issue:
-            warnings += 1
-            print(f"• {label:<24} : ⚠ Chưa có thư viện IBus ({ldd_issue}) — bình thường trên KDE vì KDE ưu tiên Fcitx5")
-        elif label == "Plugin Fcitx5" and is_gnome and not fcitx_up and "fcitx" in ldd_issue:
-            warnings += 1
-            print(f"• {label:<24} : ⚠ Chưa có thư viện Fcitx5 ({ldd_issue}) — bình thường trên GNOME vì GNOME ưu tiên IBus")
-        else:
             errors += 1
-            print(f"• {label:<24} : ✗ Lỗi liên kết động tại {path} ({ldd_issue})")
+            print(f"• {'Plugin Fcitx5':<24} : ✗ Chưa cài đặt (KDE Plasma / Fcitx5 cần plugin này để gõ)")
+    elif ibus_healthy:
+        print(f"• {'Plugin Fcitx5':<24} : • Không dùng trên phiên này (IBus đang đảm nhiệm)")
     else:
-        print(f"• {label:<24} : ✓ Khỏe mạnh ({path})")
-        if label in ("Plugin Fcitx5", "Engine IBus"):
-            healthy_plugins += 1
+        print(f"• {'Plugin Fcitx5':<24} : - Chưa cài đặt")
+else:
+    if ibus_healthy and not fcitx_up and is_gnome and "fcitx" in fcitx_issue.lower():
+        print(f"• {'Plugin Fcitx5':<24} : • Không kích hoạt trên GNOME (IBus đang hoạt động khỏe mạnh)")
+    else:
+        errors += 1
+        print(f"• {'Plugin Fcitx5':<24} : ✗ Lỗi liên kết động tại {fcitx_so} ({fcitx_issue})")
+
+# 3. IBus engine
+if ibus_healthy:
+    print(f"• {'Engine IBus':<24} : ✓ Khỏe mạnh ({ibus_bin})")
+elif not ibus_bin:
+    if is_gnome or (ibus_up and not fcitx_up):
+        if fcitx_healthy:
+            warnings += 1
+            print(f"• {'Engine IBus':<24} : ⚠ Chưa cài đặt (GNOME cần engine này để gõ)")
+        else:
+            errors += 1
+            print(f"• {'Engine IBus':<24} : ✗ Chưa cài đặt (GNOME cần engine này để gõ)")
+    elif fcitx_healthy:
+        print(f"• {'Engine IBus':<24} : • Không dùng trên phiên này (Fcitx5 đang đảm nhiệm)")
+    else:
+        print(f"• {'Engine IBus':<24} : - Chưa cài đặt")
+else:
+    if fcitx_healthy and not ibus_up and not is_gnome and "libibus" in ibus_issue.lower():
+        print(f"• {'Engine IBus':<24} : • Không dùng trên {desktop} (Fcitx5 đang hoạt động khỏe mạnh)")
+    elif is_kde and not ibus_up and "libibus" in ibus_issue.lower():
+        warnings += 1
+        print(f"• {'Engine IBus':<24} : ⚠ Chưa cài thư viện IBus ({ibus_issue}) — KDE ưu tiên dùng Plugin Fcitx5")
+    else:
+        errors += 1
+        print(f"• {'Engine IBus':<24} : ✗ Lỗi liên kết động tại {ibus_bin} ({ibus_issue})")
 
 if healthy_plugins == 0 and errors == 0:
     errors += 1
@@ -950,13 +1032,50 @@ if gsettings_bin and ("gnome" in desktop.lower() or "ubuntu" in desktop.lower())
     except Exception:
         pass
 
+# KDE Plasma Wayland KWin Virtual Keyboard check
+if is_kde and session_type == "wayland":
+    kwin_im = ""
+    for kr_bin in ("kreadconfig6", "kreadconfig5"):
+        kr_path = shutil.which(kr_bin)
+        if kr_path:
+            try:
+                kwin_im = subprocess.check_output(
+                    [kr_path, "--file", "kwinrc", "--group", "Wayland", "--key", "InputMethod"],
+                    stderr=subprocess.DEVNULL,
+                    timeout=2,
+                ).decode("utf-8", errors="replace").strip()
+                if kwin_im:
+                    break
+            except Exception:
+                pass
+    if not kwin_im:
+        kwinrc_path = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "kwinrc")
+        if os.path.isfile(kwinrc_path):
+            try:
+                in_wl = False
+                with open(kwinrc_path, "r", encoding="utf-8", errors="ignore") as kf:
+                    for raw_ln in kf:
+                        s = raw_ln.strip()
+                        if s.startswith("[") and s.endswith("]"):
+                            in_wl = (s == "[Wayland]")
+                        elif in_wl and s.startswith("InputMethod") and "=" in s:
+                            kwin_im = s.split("=", 1)[1].strip()
+                            break
+            except Exception:
+                pass
+    if "fcitx5" in kwin_im.lower():
+        print(f"• Bàn phím ảo KWin Wayland : ✓ Đã liên kết Fcitx5 ({os.path.basename(kwin_im)})")
+    else:
+        warnings += 1
+        print("• Bàn phím ảo KWin Wayland : ⚠ Chưa liên kết Fcitx5 trong KWin Wayland (bấm 'Tự sửa & Kích hoạt' hoặc mở Virtual Keyboard)")
+
 print("----------------------------------------------------------------------")
 if errors == 0 and warnings == 0:
     print("✓ Kết luận: Hệ thống Sen Việt hoạt động hoàn hảo (0 lỗi, 0 cảnh báo).")
     if is_gnome:
         print("  ℹ Lưu ý GNOME Wayland: Nếu vừa mới cài mà thanh trên cùng chưa hiện '🇻🇳 tex' hoặc Settings hiện chữ 'vielotus', hãy Log Out & Log In 1 lần.")
     elif is_kde:
-        print("  ℹ Lưu ý KDE Plasma: Đảm bảo đã chọn Fcitx 5 trong KDE System Settings → Virtual Keyboard.")
+        print("  ℹ Lưu ý KDE Wayland: Nếu ứng dụng mở sẵn trước khi cài chưa nhận gõ tiếng Việt, hãy mở lại ứng dụng đó (hoặc Log Out & Log In 1 lần).")
 elif errors == 0:
     print(f"• Kết luận: Hoạt động ổn định ({warnings} lưu ý nhỏ). Gợi ý: bấm 'Tự sửa & Kích hoạt' hoặc Log Out & Log In 1 lần.")
     if is_kde and not fcitx_so:
@@ -3919,7 +4038,7 @@ if os.path.exists(config_path):
                 cfg[k.strip()] = v.strip().strip('"').strip("'")
 
 root = tk.Tk()
-root.title("Sen Việt (VieLotusIM v2.0.3) — Cài đặt")
+root.title("Sen Việt (VieLotusIM v2.0.2) — Cài đặt")
 root.geometry("460x320")
 root.resizable(False, False)
 
@@ -3970,7 +4089,7 @@ def apply_changes(*_):
 
 frm = ttk.Frame(root, padding=16)
 frm.pack(fill="both", expand=True)
-ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.3)", font=("Sans", 13, "bold")).pack(anchor="w")
+ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.2)", font=("Sans", 13, "bold")).pack(anchor="w")
 ttk.Label(frm, text="Kiểu gõ Tiếng Việt (tự động lưu & áp dụng):").pack(anchor="w", pady=(10, 4))
 ttk.Radiobutton(frm, text="Telex Tự Do (s f r x j w — vieetj → việt)", variable=im_var, value="telex", command=apply_changes).pack(anchor="w")
 ttk.Radiobutton(frm, text="VNI Chuẩn (phím số 1–9 — vie65t → việt)", variable=im_var, value="vni", command=apply_changes).pack(anchor="w")

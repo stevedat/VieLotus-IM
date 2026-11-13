@@ -258,7 +258,34 @@ CLEAN_GNOME_PY
     exit 0
 }
 
+FCITX5_ABI_MISMATCH="0"
+
+has_host_fcitx5_libs() {
+    if command -v fcitx5 >/dev/null 2>&1; then
+        return 0
+    fi
+    for _fl in /usr/lib64/libFcitx5Core.so* /usr/lib/libFcitx5Core.so* /usr/lib/*-linux-*/libFcitx5Core.so*; do
+        if [ -e "${_fl}" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+has_host_ibus_libs() {
+    if command -v ibus-daemon >/dev/null 2>&1; then
+        return 0
+    fi
+    for _il in /usr/lib64/libibus-1.0.so* /usr/lib/libibus-1.0.so* /usr/lib/*-linux-*/libibus-1.0.so*; do
+        if [ -e "${_il}" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 verify_installed_elf_links() {
+    FCITX5_ABI_MISMATCH="0"
     if ! command -v ldd >/dev/null 2>&1; then
         return 0
     fi
@@ -266,21 +293,33 @@ verify_installed_elf_links() {
         ${SUDO} ldconfig >/dev/null 2>&1 || true
     fi
 
-    # Check Fcitx5 plugin ABI compatibility on non-Debian distros (soname guard)
-    for fcitx_plugin in /usr/lib64/fcitx5/vielotus.so /usr/lib/fcitx5/vielotus.so /usr/lib/*-linux-*/fcitx5/vielotus.so; do
-        if [ -e "${fcitx_plugin}" ]; then
-            LDD_OUT="$(LC_ALL=C ldd -r "${fcitx_plugin}" 2>&1 || true)"
-            if printf '%s\n' "${LDD_OUT}" | grep -E -q 'not found|undefined symbol:'; then
-                echo "⚠️  Phát hiện khác biệt ABI Fcitx5 trên bản phân phối hiện tại đối với ${fcitx_plugin}."
-                echo "   → Tạm gỡ plugin Fcitx5 nhị phân để bảo vệ tiến trình fcitx5 (IBus vẫn hoạt động bình thường)."
-                echo "   → Mẹo: chạy lại với VIELOTUS_BUILD_FROM_SOURCE=1 để biên dịch C++20 trực tiếp theo ABI máy bạn."
-                ${SUDO} rm -f /usr/lib64/fcitx5/vielotus.so /usr/lib/fcitx5/vielotus.so /usr/lib/*-linux-*/fcitx5/vielotus.so 2>/dev/null || true
-                break
-            fi
-        fi
-    done
+    HAS_HOST_FCITX5="0"
+    if has_host_fcitx5_libs; then
+        HAS_HOST_FCITX5="1"
+    fi
+    HAS_HOST_IBUS="0"
+    if has_host_ibus_libs; then
+        HAS_HOST_IBUS="1"
+    fi
 
-    for core_bin in /usr/lib/ibus/ibus-engine-vielotus /usr/libexec/ibus-engine-vielotus /usr/lib/libVieLotusCAPI.so /usr/lib64/libVieLotusCAPI.so /usr/lib/*-linux-*/libVieLotusCAPI.so; do
+    # Check Fcitx5 plugin ABI compatibility ONLY when Fcitx5 is actually installed on the host.
+    # Never delete vielotus.so merely because fcitx5 hasn't been installed yet.
+    if [ "${HAS_HOST_FCITX5}" = "1" ]; then
+        for fcitx_plugin in /usr/lib64/fcitx5/vielotus.so /usr/lib/fcitx5/vielotus.so /usr/lib/*-linux-*/fcitx5/vielotus.so; do
+            if [ -e "${fcitx_plugin}" ]; then
+                LDD_OUT="$(LC_ALL=C ldd -r "${fcitx_plugin}" 2>&1 || true)"
+                if printf '%s\n' "${LDD_OUT}" | grep -E -q 'not found|undefined symbol:'; then
+                    FCITX5_ABI_MISMATCH="1"
+                    echo "⚠️  Phát hiện khác biệt ABI Fcitx5 trên bản phân phối hiện tại đối với ${fcitx_plugin}."
+                    echo "   → Tạm gỡ plugin Fcitx5 nhị phân không khớp ABI để tránh xung đột tiến trình fcitx5."
+                    ${SUDO} rm -f /usr/lib64/fcitx5/vielotus.so /usr/lib/fcitx5/vielotus.so /usr/lib/*-linux-*/fcitx5/vielotus.so 2>/dev/null || true
+                    break
+                fi
+            fi
+        done
+    fi
+
+    for core_bin in /usr/lib/libVieLotusCAPI.so /usr/lib64/libVieLotusCAPI.so /usr/lib/*-linux-*/libVieLotusCAPI.so; do
         if [ -e "${core_bin}" ]; then
             LDD_CORE="$(LC_ALL=C ldd -r "${core_bin}" 2>&1 || true)"
             if printf '%s\n' "${LDD_CORE}" | grep -E -q 'not found|undefined symbol:'; then
@@ -289,6 +328,18 @@ verify_installed_elf_links() {
             fi
         fi
     done
+
+    if [ "${HAS_HOST_IBUS}" = "1" ] || [ "${HAS_HOST_FCITX5}" = "0" ]; then
+        for ibus_bin in /usr/lib/ibus/ibus-engine-vielotus /usr/libexec/ibus-engine-vielotus; do
+            if [ -e "${ibus_bin}" ]; then
+                LDD_IBUS="$(LC_ALL=C ldd -r "${ibus_bin}" 2>&1 || true)"
+                if printf '%s\n' "${LDD_IBUS}" | grep -E -q 'not found|undefined symbol:'; then
+                    echo "⚠️  Cảnh báo liên kết động tại ${ibus_bin}:"
+                    printf '%s\n' "${LDD_IBUS}" | grep -E 'not found|undefined symbol:' | head -n 4 || true
+                fi
+            fi
+        done
+    fi
 }
 
 install_staging_rootfs_with_manifest() {
@@ -308,10 +359,19 @@ install_staging_rootfs_with_manifest() {
         ${SUDO} cp -a "${staging_root}/etc" /
     fi
 
-    if [ -d /usr/lib64 ]; then
+    if [ -e /usr/lib/libVieLotusCAPI.so ] && [ ! -e /usr/lib/libVieLotusCAPI.so.0 ]; then
+        ${SUDO} ln -sf libVieLotusCAPI.so /usr/lib/libVieLotusCAPI.so.0
+        echo "/usr/lib/libVieLotusCAPI.so.0" >> "${manifest_tmp}"
+    fi
+
+    if [ -d /usr/lib64 ] && [ ! -L /usr/lib64 ]; then
         if [ -e /usr/lib/libVieLotusCAPI.so ] && [ ! -e /usr/lib64/libVieLotusCAPI.so ]; then
             ${SUDO} ln -sf /usr/lib/libVieLotusCAPI.so /usr/lib64/libVieLotusCAPI.so
             echo "/usr/lib64/libVieLotusCAPI.so" >> "${manifest_tmp}"
+        fi
+        if [ -e /usr/lib/libVieLotusCAPI.so ] && [ ! -e /usr/lib64/libVieLotusCAPI.so.0 ]; then
+            ${SUDO} ln -sf /usr/lib/libVieLotusCAPI.so /usr/lib64/libVieLotusCAPI.so.0
+            echo "/usr/lib64/libVieLotusCAPI.so.0" >> "${manifest_tmp}"
         fi
         if [ -e /usr/lib/fcitx5/vielotus.so ] && [ ! -e /usr/lib64/fcitx5/vielotus.so ]; then
             ${SUDO} mkdir -p /usr/lib64/fcitx5
@@ -328,6 +388,35 @@ install_staging_rootfs_with_manifest() {
     ${SUDO} cp "${manifest_tmp}" /usr/share/vielotus/install.manifest
     ${SUDO} chmod 0644 /usr/share/vielotus/install.manifest
     rm -f "${manifest_tmp}"
+}
+
+refresh_settings_script_from_main() {
+    if [ "${VIELOTUS_VERSION_PINNED:-0}" = "1" ] || [ -n "${VIELOTUS_DEB_PATH:-}" ] || [ "${VIELOTUS_REQUIRE_SHA256:-0}" = "1" ]; then
+        return 0
+    fi
+    tmp_vs="/tmp/vielotus-settings-refresh-$$"
+    rm -f "${tmp_vs}"
+    if [ -n "${VIELOTUS_SOURCE_DIR:-}" ] && [ -f "${VIELOTUS_SOURCE_DIR}/CrossPlatform/packaging/linux/vielotus-settings" ]; then
+        cp "${VIELOTUS_SOURCE_DIR}/CrossPlatform/packaging/linux/vielotus-settings" "${tmp_vs}" 2>/dev/null || return 0
+    else
+        download_file "https://raw.githubusercontent.com/stevedat/VieLotus-IM/main/CrossPlatform/packaging/linux/vielotus-settings" "${tmp_vs}" 2>/dev/null || {
+            rm -f "${tmp_vs}"
+            return 0
+        }
+    fi
+    if ! head -n 1 "${tmp_vs}" 2>/dev/null | grep -q '^#!/usr/bin/env bash'; then
+        rm -f "${tmp_vs}"
+        return 0
+    fi
+    if command -v bash >/dev/null 2>&1 && ! bash -n "${tmp_vs}" >/dev/null 2>&1; then
+        rm -f "${tmp_vs}"
+        return 0
+    fi
+    ${SUDO} mkdir -p /usr/bin
+    ${SUDO} cp "${tmp_vs}" /usr/bin/vielotus-settings
+    ${SUDO} chmod 0755 /usr/bin/vielotus-settings
+    ${SUDO} ln -sf vielotus-settings /usr/bin/vielotus
+    rm -f "${tmp_vs}"
 }
 
 try_native_cmake_build() {
@@ -547,6 +636,7 @@ PYEOF
 
     install_staging_rootfs_with_manifest "${work_dir}/rootfs"
     rm -rf "${work_dir}"
+    refresh_settings_script_from_main
     verify_installed_elf_links
 }
 
@@ -682,9 +772,20 @@ REAL_DISPLAY="${DISPLAY:-}"
 if [ -z "${REAL_DISPLAY}" ] && [ -S /tmp/.X11-unix/X0 ]; then
     REAL_DISPLAY=":0"
 fi
-REAL_DESKTOP="${XDG_CURRENT_DESKTOP:-}"
+REAL_DESKTOP="${XDG_CURRENT_DESKTOP:-${DESKTOP_SESSION:-}}"
 if [ -z "${REAL_DESKTOP}" ] && command -v systemctl >/dev/null 2>&1 && [ "$(id -u)" -eq 0 ] && [ "${REAL_USER}" != "root" ]; then
     REAL_DESKTOP="$(systemctl --user -M "${REAL_USER}@" show-environment 2>/dev/null | sed -n 's/^XDG_CURRENT_DESKTOP=//p' | head -n 1 || true)"
+fi
+if [ -z "${REAL_DESKTOP}" ] && command -v pgrep >/dev/null 2>&1; then
+    if pgrep -x plasmashell >/dev/null 2>&1 || pgrep -x kwin_wayland >/dev/null 2>&1 || pgrep -x kwin_x11 >/dev/null 2>&1; then
+        REAL_DESKTOP="KDE"
+    elif pgrep -x gnome-shell >/dev/null 2>&1; then
+        REAL_DESKTOP="GNOME"
+    elif pgrep -x Hyprland >/dev/null 2>&1; then
+        REAL_DESKTOP="Hyprland"
+    elif pgrep -x sway >/dev/null 2>&1; then
+        REAL_DESKTOP="sway"
+    fi
 fi
 
 run_as_real_user() {
@@ -793,6 +894,7 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
         ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
         ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-gi gir1.2-gtk-3.0 zenity fonts-noto-core fonts-noto-mono fonts-liberation 2>/dev/null || true
         ${SUDO} env DEBIAN_FRONTEND=noninteractive dpkg -i --force-overwrite "${TMP_DEB}" || ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -f -y
+        refresh_settings_script_from_main
     else
         echo "⬇️  Đang cài đặt các gói phụ trợ & trình biên dịch C++20 cho ${ARCH_RAW} (apt)..."
         APT_FCITX_PKGS="fcitx5 fcitx5-frontend-gtk3 fcitx5-frontend-qt5 fcitx5-config-qt"
@@ -814,6 +916,7 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
         if ! try_native_cmake_build "${VERSION}"; then
             if [ "${HAS_PREBUILT_DEB}" = "1" ] && fetch_and_verify_deb; then
                 ${SUDO} env DEBIAN_FRONTEND=noninteractive dpkg -i --force-overwrite "${TMP_DEB}" || ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -f -y
+                refresh_settings_script_from_main
             else
                 abort_missing_build_deps
             fi
@@ -825,21 +928,155 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
     fi
 elif command -v pacman >/dev/null 2>&1; then
     echo "📦 Phát hiện hệ sinh thái Arch Linux / Manjaro / CachyOS / EndeavourOS (pacman)..."
-    ARCH_BUILD_SRC="${VIELOTUS_BUILD_FROM_SOURCE:-1}"
-    ARCH_FCITX_PKGS="fcitx5-im"
+    IS_ARCH_LIVE="0"
+    if [ -d /run/archiso ] || [ -d /run/miso ]; then
+        IS_ARCH_LIVE="1"
+    fi
+    ARCH_DB_SYNCED="0"
+    arch_install_pkgs() {
+        [ "$#" -gt 0 ] || return 0
+        _has_sync_db="0"
+        for _db in /var/lib/pacman/sync/*.db; do
+            if [ -f "${_db}" ]; then
+                _has_sync_db="1"
+                break
+            fi
+        done
+        if [ "${_has_sync_db}" = "1" ]; then
+            if ${SUDO} pacman -S --needed --noconfirm "$@" >/dev/null 2>&1; then
+                return 0
+            fi
+        fi
+        if [ "${IS_ARCH_LIVE}" = "1" ]; then
+            if [ "${ARCH_DB_SYNCED}" = "0" ]; then
+                ${SUDO} pacman -Sy --noconfirm >/dev/null 2>&1 || ${SUDO} pacman -Sy --noconfirm || true
+                ARCH_DB_SYNCED="1"
+            fi
+            ${SUDO} pacman -S --needed --noconfirm "$@"
+        else
+            if [ "${ARCH_DB_SYNCED}" = "0" ]; then
+                ARCH_DB_SYNCED="1"
+                ${SUDO} pacman -Syu --needed --noconfirm "$@" || ${SUDO} pacman -Sy --needed --noconfirm "$@"
+            else
+                ${SUDO} pacman -S --needed --noconfirm "$@"
+            fi
+        fi
+    }
+
+    echo "⬇️  Đang kiểm tra & cài đặt các gói phụ trợ còn thiếu (pacman)..."
+    # Stage 1: Install ONLY genuinely missing UI prerequisites (never partial-upgrade preinstalled gtk3/python)
+    ARCH_UI_PKGS=""
+    if ! command -v python3 >/dev/null 2>&1; then
+        ARCH_UI_PKGS="${ARCH_UI_PKGS} python"
+    fi
+    if ! python3 -c "import gi; gi.require_version('Gtk', '3.0')" >/dev/null 2>&1; then
+        if ! pacman -Qi python-gobject >/dev/null 2>&1; then
+            ARCH_UI_PKGS="${ARCH_UI_PKGS} python-gobject"
+        fi
+        if ! pacman -Qi gtk3 >/dev/null 2>&1; then
+            ARCH_UI_PKGS="${ARCH_UI_PKGS} gtk3"
+        fi
+    fi
+    if ! pacman -Qi noto-fonts >/dev/null 2>&1 && \
+       [ ! -f /usr/share/fonts/TTF/NotoSansMono-Regular.ttf ] && \
+       [ ! -f /usr/share/fonts/noto/NotoSansMono-Regular.ttf ]; then
+        ARCH_UI_PKGS="${ARCH_UI_PKGS} noto-fonts"
+    fi
+    if [ -n "${ARCH_UI_PKGS}" ]; then
+        arch_install_pkgs ${ARCH_UI_PKGS} || {
+            if ! pacman -Qi python-gobject >/dev/null 2>&1; then
+                arch_install_pkgs python-gobject || true
+            fi
+        }
+    fi
+
+    # Stage 2: Install desktop-appropriate Input Method framework in an isolated transaction
     if printf '%s' "${REAL_DESKTOP}" | grep -qi "gnome"; then
-        ARCH_FCITX_PKGS="fcitx5"
+        if ! pacman -Qi ibus >/dev/null 2>&1; then
+            arch_install_pkgs ibus || true
+        fi
+        if [ "${IS_ARCH_LIVE}" = "0" ] && ! pacman -Qi fcitx5 >/dev/null 2>&1; then
+            arch_install_pkgs fcitx5 || true
+        fi
+    else
+        ARCH_FCITX_MISSING=""
+        for _fp in fcitx5 fcitx5-configtool fcitx5-gtk fcitx5-qt; do
+            if ! pacman -Qi "${_fp}" >/dev/null 2>&1; then
+                ARCH_FCITX_MISSING="${ARCH_FCITX_MISSING} ${_fp}"
+            fi
+        done
+        if [ -n "${ARCH_FCITX_MISSING}" ]; then
+            if ! arch_install_pkgs ${ARCH_FCITX_MISSING}; then
+                # Live ISO fallback if fcitx5-qt hits a qt6-base version skew
+                ARCH_FCITX_CORE_MISSING=""
+                for _fp in fcitx5 fcitx5-configtool fcitx5-gtk; do
+                    if ! pacman -Qi "${_fp}" >/dev/null 2>&1; then
+                        ARCH_FCITX_CORE_MISSING="${ARCH_FCITX_CORE_MISSING} ${_fp}"
+                    fi
+                done
+                if [ -n "${ARCH_FCITX_CORE_MISSING}" ]; then
+                    arch_install_pkgs ${ARCH_FCITX_CORE_MISSING} || arch_install_pkgs fcitx5 || true
+                fi
+                if ! pacman -Qi fcitx5-qt >/dev/null 2>&1; then
+                    arch_install_pkgs qt6-base fcitx5-qt >/dev/null 2>&1 || true
+                fi
+            fi
+        fi
+        if [ "${IS_ARCH_LIVE}" = "0" ] && ! pacman -Qi ibus >/dev/null 2>&1; then
+            arch_install_pkgs ibus >/dev/null 2>&1 || true
+        fi
     fi
-    ARCH_PKGS="python python-gobject gtk3 noto-fonts ibus ${ARCH_FCITX_PKGS}"
-    if [ "${ARCH_BUILD_SRC}" = "1" ]; then
-        ARCH_PKGS="${ARCH_PKGS} gcc make cmake extra-cmake-modules pkgconf"
+
+    # Stage 3: Native C++20 source build (skipped on low-cowspace Live ISO unless needed for ABI)
+    arch_ensure_build_deps() {
+        if ! command -v g++ >/dev/null 2>&1 && ! command -v clang++ >/dev/null 2>&1 && ! command -v c++ >/dev/null 2>&1; then
+            arch_install_pkgs gcc || arch_install_pkgs clang || true
+        fi
+        _arch_btools=""
+        for _bt in make cmake extra-cmake-modules pkgconf; do
+            if ! pacman -Qi "${_bt}" >/dev/null 2>&1; then
+                _arch_btools="${_arch_btools} ${_bt}"
+            fi
+        done
+        if [ -n "${_arch_btools}" ]; then
+            arch_install_pkgs ${_arch_btools} || true
+        fi
+    }
+
+    ROOT_FREE_KB="$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}')"
+    case "${ROOT_FREE_KB}" in
+        ''|*[!0-9]*) ROOT_FREE_KB="" ;;
+    esac
+    if [ -n "${VIELOTUS_BUILD_FROM_SOURCE:-}" ]; then
+        WANT_ARCH_SRC="${VIELOTUS_BUILD_FROM_SOURCE}"
+    elif [ "${IS_ARCH_LIVE}" = "1" ] && [ -n "${ROOT_FREE_KB}" ] && [ "${ROOT_FREE_KB}" -lt 1572864 ]; then
+        if (command -v g++ >/dev/null 2>&1 || command -v clang++ >/dev/null 2>&1) && \
+           command -v cmake >/dev/null 2>&1 && pacman -Qi extra-cmake-modules >/dev/null 2>&1; then
+            WANT_ARCH_SRC="1"
+        else
+            WANT_ARCH_SRC="0"
+        fi
+    else
+        WANT_ARCH_SRC="1"
     fi
-    echo "⬇️  Đang kiểm tra & cài đặt các gói phụ trợ hệ thống (pacman)..."
-    ${SUDO} pacman -S --needed --noconfirm ${ARCH_PKGS} >/dev/null 2>&1 || \
-        ${SUDO} pacman -Sy --needed --noconfirm ${ARCH_PKGS} || true
-    if [ "${ARCH_BUILD_SRC}" != "1" ] || ! try_native_cmake_build "${VERSION}"; then
+
+    ARCH_INSTALLED_OK="0"
+    if [ "${WANT_ARCH_SRC}" = "1" ]; then
+        arch_ensure_build_deps
+        if try_native_cmake_build "${VERSION}"; then
+            ARCH_INSTALLED_OK="1"
+        fi
+    fi
+
+    if [ "${ARCH_INSTALLED_OK}" != "1" ]; then
         if [ "${HAS_PREBUILT_DEB}" = "1" ] && fetch_and_verify_deb; then
             extract_deb_to_root "${TMP_DEB}"
+            ARCH_INSTALLED_OK="1"
+            if [ "${FCITX5_ABI_MISMATCH}" = "1" ]; then
+                echo "🔄 Đang biên dịch bổ sung plugin Fcitx5 bản địa theo ABI hiện tại của máy..."
+                arch_ensure_build_deps
+                try_native_cmake_build "${VERSION}" || true
+            fi
         else
             abort_missing_build_deps
         fi
