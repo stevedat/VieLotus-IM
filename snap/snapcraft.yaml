@@ -56,9 +56,7 @@ parts:
     override-build: |
       DEB_FILE=""
       for candidate in \
-        "$CRAFT_PART_SRC/Binaries/linux/vielotus_${CRAFT_PROJECT_VERSION}_${CRAFT_ARCH_BUILD_FOR}.deb" \
         "$CRAFT_PART_SRC/dist/linux/vielotus_${CRAFT_PROJECT_VERSION}_${CRAFT_ARCH_BUILD_FOR}.deb" \
-        "$CRAFT_PART_SRC/Binaries/linux/"vielotus_*_"${CRAFT_ARCH_BUILD_FOR}.deb" \
         "$CRAFT_PART_SRC/dist/linux/"vielotus_*_"${CRAFT_ARCH_BUILD_FOR}.deb"; do
         if [ -f "$candidate" ]; then
           DEB_FILE="$candidate"

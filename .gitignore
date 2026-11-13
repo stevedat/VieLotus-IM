@@ -10,9 +10,10 @@ DerivedData/
 *.xcodeproj/
 *.xcworkspace/
 
-# Local build outputs (except official prebuilt Binaries/)
+# Local build & installer outputs (desktop installers live on GitHub Releases only)
+Binaries/
+dist/
 *.pkg
-!Binaries/*.pkg
 *.dmg
 *.zip
 *.ipa

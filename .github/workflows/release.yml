@@ -153,8 +153,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify prebuilt binary SHA-256 checksums
-        run: shasum -a 256 -c Binaries/checksums.sha256
+      - name: Verify prebuilt XCFramework SHA-256 checksum
+        run: shasum -a 256 -c Frameworks/checksums.sha256
 
       - name: Extract release version
         id: version
@@ -237,12 +237,7 @@ jobs:
           NOTARIZE: ${{ steps.notary.outputs.enabled }}
           NOTARY_KEYCHAIN_PROFILE: "notarytool-profile"
         run: |
-          if [ "${{ steps.notary.outputs.enabled }}" = "1" ] || [ ! -f Binaries/VieLotusIM.pkg ]; then
-            ./scripts/build_pkg.sh "${{ steps.version.outputs.version }}"
-          else
-            mkdir -p .build/dist
-            cp Binaries/VieLotusIM.pkg .build/dist/VieLotusIM.pkg
-          fi
+          ./scripts/build_pkg.sh "${{ steps.version.outputs.version }}"
 
       - name: Download freshly built Windows Release Installers
         uses: actions/download-artifact@v4
@@ -259,17 +254,8 @@ jobs:
 
       - name: Stage Windows & Linux Release Installers and Generate Checksums
         run: |
-          if [ ! -f .build/dist/VieLotus-Setup-x64.exe ]; then
-            cp Binaries/windows/VieLotus-Setup-x64.exe .build/dist/
-            cp Binaries/windows/VieLotus-Setup-arm64.exe .build/dist/
-          fi
-          if [ -f .build/dist/VieLotus-Setup-x64.exe ]; then
+          if [ ! -f .build/dist/VieLotus-Store-Setup.exe ] && [ -f .build/dist/VieLotus-Setup-x64.exe ]; then
             cp .build/dist/VieLotus-Setup-x64.exe .build/dist/VieLotus-Store-Setup.exe
-          elif [ -f Binaries/windows/VieLotus-Store-Setup.exe ]; then
-            cp Binaries/windows/VieLotus-Store-Setup.exe .build/dist/
-          fi
-          if ! ls .build/dist/vielotus_*.deb >/dev/null 2>&1; then
-            cp Binaries/linux/vielotus_*.deb .build/dist/
           fi
           cd .build/dist
           shasum -a 256 VieLotusIM.pkg VieLotus-Store-Setup.exe VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe vielotus_*.deb > checksums.sha256

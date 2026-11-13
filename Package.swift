@@ -8,8 +8,8 @@
 // To build the macOS IMK shell:
 //   swift build --product VieLotusIM
 //
-// To verify prebuilt binary integrity:
-//   shasum -a 256 -c Binaries/checksums.sha256
+// To verify prebuilt XCFramework integrity:
+//   shasum -a 256 -c Frameworks/checksums.sha256
 // =============================================================================
 import PackageDescription
 

@@ -1053,17 +1053,17 @@
 
           <h3 data-i18n="s6.repro_title">Tự tay kiểm chứng hộp đen trong 30 giây (Open-Core Verification)</h3>
           <p data-i18n="s6.p2">
-            Sen Việt được phát hành theo mô hình <strong>Open-Core</strong>: toàn bộ mã nguồn phần vỏ hệ thống (<code>Sources/VieLotusIM</code>, <code>CrossPlatform/</code>) được mở công khai theo giấy phép MIT để bất kỳ kỹ sư bảo mật nào cũng xác minh được tính chất <em>Zero CGEventTap / Zero Keylogging</em>, đi kèm công cụ dòng lệnh đã biên dịch <code>VieLotusCLI</code> để kiểm chứng độc lập toàn bộ 9.091 ca kiểm thử và bài đo 250.000 phím:
+            Sen Việt được phát hành theo mô hình <strong>Open-Core</strong>: toàn bộ mã nguồn phần vỏ hệ thống (<code>Sources/VieLotusIM</code>, <code>CrossPlatform/</code>) và lõi C++20 máy tính để bàn (<code>Sources/VieLotusCoreWindows</code>) được mở công khai theo giấy phép MIT để bất kỳ kỹ sư bảo mật nào cũng xác minh được tính chất <em>Zero CGEventTap / Zero Keylogging</em>, đối chiếu bảng băm từ điển tất định và tự biên dịch từ mã nguồn:
           </p>
 
-          <pre class="code-block"><code><span class="code-comment"># 1. Kiểm tra chữ ký băm SHA-256 của các binary phát hành</span>
-shasum -a 256 -c Binaries/checksums.sha256
+          <pre class="code-block"><code><span class="code-comment"># 1. Kiểm tra chữ ký băm SHA-256 của XCFramework tiền biên dịch (macOS)</span>
+shasum -a 256 -c Frameworks/checksums.sha256
 
-<span class="code-comment"># 2. Chạy toàn bộ 9.091 ca kiểm thử chính + 1.049 ca đối xứng không ngữ cảnh</span>
-./Binaries/VieLotusCLI --benchmark
+<span class="code-comment"># 2. Kiểm chứng tính tất định của bảng băm từ điển C++20 (FNV-1a 64-bit)</span>
+python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py --check
 
-<span class="code-comment"># 3. Chạy cổng kiểm định 3 tiến trình độc lập + đo độ trễ đuôi p99 (250.000 phím)</span>
-./scripts/benchmark_ratchet.sh --with-latency
+<span class="code-comment"># 3. Tự biên dịch phần vỏ InputMethodKit macOS từ mã nguồn</span>
+swift build --product VieLotusIM
 
 <span class="code-comment"># 4. Xác minh mã nguồn vỏ không chứa bất kỳ lời gọi CGEventTap nào</span>
 grep -rn "CGEvent" Sources/VieLotusIM/</code></pre>
@@ -1320,7 +1320,7 @@ grep -rn "CGEvent" Sources/VieLotusIM/</code></pre>
         's6.mem': 'Ổn định < 30 MB RSS (0 rò rỉ)',
         's6.r4_note': 'Chạy 3 tiến trình độc lập, lấy kết quả thấp nhất',
         's6.repro_title': 'Tự tay kiểm chứng hộp đen trong 30 giây (Open-Core Verification)',
-        's6.p2': 'Sen Việt được phát hành theo mô hình Open-Core: toàn bộ mã nguồn phần vỏ hệ thống (Sources/VieLotusIM, CrossPlatform/) được mở công khai theo giấy phép MIT để bất kỳ kỹ sư bảo mật nào cũng xác minh được tính chất Zero CGEventTap / Zero Keylogging, đi kèm công cụ dòng lệnh đã biên dịch VieLotusCLI để kiểm chứng độc lập toàn bộ 9.091 ca kiểm thử và bài đo 250.000 phím:',
+        's6.p2': 'Sen Việt được phát hành theo mô hình Open-Core: toàn bộ mã nguồn phần vỏ hệ thống (Sources/VieLotusIM, CrossPlatform/) và lõi C++20 máy tính để bàn (Sources/VieLotusCoreWindows) được mở công khai theo giấy phép MIT để bất kỳ kỹ sư bảo mật nào cũng xác minh được tính chất Zero CGEventTap / Zero Keylogging, đối chiếu bảng băm từ điển tất định và tự biên dịch từ mã nguồn:',
         'footer.copy': 'Sen Việt — Báo cáo nghiên cứu & kiểm định kỹ thuật mở cho cộng đồng.'
       },
       en: {
@@ -1429,7 +1429,7 @@ grep -rn "CGEvent" Sources/VieLotusIM/</code></pre>
         's6.mem': 'Steady < 30 MB RSS (0 leaks)',
         's6.r4_note': 'Worst-of-3 separate OS processes',
         's6.repro_title': '30-second independent black-box verification (Open-Core)',
-        's6.p2': 'Sen Việt uses an Open-Core model: the full platform shell source code (Sources/VieLotusIM, CrossPlatform/) is MIT-licensed so security auditors can verify Zero CGEventTap / Zero Keylogging, paired with the prebuilt VieLotusCLI binary so anyone can independently reproduce the 9,091-case regression matrix and 250,000-keystroke stress benchmark:',
+        's6.p2': 'Sen Việt uses an Open-Core model: the full platform shell source code (Sources/VieLotusIM, CrossPlatform/) and desktop C++20 engine (Sources/VieLotusCoreWindows) are MIT-licensed so security auditors can verify Zero CGEventTap / Zero Keylogging, audit deterministic lexicon hashes, and build directly from source:',
         'footer.copy': 'Sen Việt — Open technical research & empirical verification report.'
       }
     };

@@ -740,11 +740,9 @@ fetch_and_verify_deb() {
 
     PRIMARY_URL="https://github.com/stevedat/VieLotus-IM/releases/download/v${VERSION}/${DEB_FILE}"
     FALLBACK_URL="https://github.com/stevedat/VieLotus-IM/releases/latest/download/${DEB_FILE}"
-    RAW_REPO_URL="https://raw.githubusercontent.com/stevedat/VieLotus-IM/main/Binaries/linux/${DEB_FILE}"
 
     SUMS_PRIMARY="https://github.com/stevedat/VieLotus-IM/releases/download/v${VERSION}/checksums.sha256"
     SUMS_FALLBACK="https://github.com/stevedat/VieLotus-IM/releases/latest/download/checksums.sha256"
-    SUMS_RAW="https://raw.githubusercontent.com/stevedat/VieLotus-IM/main/Binaries/checksums.sha256"
 
     echo "⬇️  Đang tải gói cài đặt (${DEB_FILE})..."
     SUMS_FETCHED="0"
@@ -753,8 +751,8 @@ fetch_and_verify_deb() {
     elif download_file "${FALLBACK_URL}" "${TMP_DEB}" 2>/dev/null; then
         download_file "${SUMS_FALLBACK}" "${TMP_SUMS}" 2>/dev/null && SUMS_FETCHED="1" || true
     else
-        download_file "${RAW_REPO_URL}" "${TMP_DEB}"
-        download_file "${SUMS_RAW}" "${TMP_SUMS}" 2>/dev/null && SUMS_FETCHED="1" || true
+        rm -f "${TMP_SUMS}"
+        return 1
     fi
 
     STRICT_SHA="${VIELOTUS_REQUIRE_SHA256:-${SUMS_FETCHED}}"
@@ -790,8 +788,7 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
     fi
     ${SUDO} rm -f /var/cache/apt/archives/vielotus* 2>/dev/null || true
 
-    if [ "${HAS_PREBUILT_DEB}" = "1" ] && [ "${VIELOTUS_BUILD_FROM_SOURCE:-0}" != "1" ]; then
-        fetch_and_verify_deb
+    if [ "${HAS_PREBUILT_DEB}" = "1" ] && [ "${VIELOTUS_BUILD_FROM_SOURCE:-0}" != "1" ] && fetch_and_verify_deb; then
         ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
         ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-gi gir1.2-gtk-3.0 zenity fonts-noto-core fonts-noto-mono fonts-liberation 2>/dev/null || true
         ${SUDO} env DEBIAN_FRONTEND=noninteractive dpkg -i --force-overwrite "${TMP_DEB}" || ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -f -y
@@ -814,8 +811,7 @@ if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
             ibus libibus-1.0-dev libglib2.0-dev \
             fcitx5 fcitx5-modules-dev libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev || true
         if ! try_native_cmake_build "${VERSION}"; then
-            if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
-                fetch_and_verify_deb
+            if [ "${HAS_PREBUILT_DEB}" = "1" ] && fetch_and_verify_deb; then
                 ${SUDO} env DEBIAN_FRONTEND=noninteractive dpkg -i --force-overwrite "${TMP_DEB}" || ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -f -y
             else
                 abort_missing_build_deps
@@ -841,8 +837,7 @@ elif command -v pacman >/dev/null 2>&1; then
     ${SUDO} pacman -S --needed --noconfirm ${ARCH_PKGS} >/dev/null 2>&1 || \
         ${SUDO} pacman -Sy --needed --noconfirm ${ARCH_PKGS} || true
     if [ "${ARCH_BUILD_SRC}" != "1" ] || ! try_native_cmake_build "${VERSION}"; then
-        if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
-            fetch_and_verify_deb
+        if [ "${HAS_PREBUILT_DEB}" = "1" ] && fetch_and_verify_deb; then
             extract_deb_to_root "${TMP_DEB}"
         else
             abort_missing_build_deps
@@ -866,8 +861,7 @@ elif command -v dnf >/dev/null 2>&1; then
         ${SUDO} dnf install -y cmake extra-cmake-modules gcc-c++ make pkgconf-pkg-config ibus-devel glib2-devel fcitx5-devel 2>/dev/null || true
     fi
     if [ "${DNF_BUILD_SRC}" != "1" ] || ! try_native_cmake_build "${VERSION}"; then
-        if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
-            fetch_and_verify_deb
+        if [ "${HAS_PREBUILT_DEB}" = "1" ] && fetch_and_verify_deb; then
             extract_deb_to_root "${TMP_DEB}"
         else
             abort_missing_build_deps
@@ -884,8 +878,7 @@ elif command -v zypper >/dev/null 2>&1; then
         ${SUDO} zypper --non-interactive install cmake extra-cmake-modules gcc-c++ make pkgconf-pkg-config ibus-devel glib2-devel fcitx5-devel 2>/dev/null || true
     fi
     if [ "${ZYPPER_BUILD_SRC}" != "1" ] || ! try_native_cmake_build "${VERSION}"; then
-        if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
-            fetch_and_verify_deb
+        if [ "${HAS_PREBUILT_DEB}" = "1" ] && fetch_and_verify_deb; then
             extract_deb_to_root "${TMP_DEB}"
         else
             abort_missing_build_deps
@@ -907,8 +900,7 @@ elif command -v xbps-install >/dev/null 2>&1; then
     ${SUDO} xbps-install -Sy curl tar python3 python3-gobject gtk+3 noto-fonts-ttf \
         base-devel cmake extra-cmake-modules pkg-config ibus ibus-devel glib-devel fcitx5 libfcitx5-devel 2>/dev/null || true
     if ! try_native_cmake_build "${VERSION}"; then
-        if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
-            fetch_and_verify_deb
+        if [ "${HAS_PREBUILT_DEB}" = "1" ] && fetch_and_verify_deb; then
             extract_deb_to_root "${TMP_DEB}"
         else
             abort_missing_build_deps
@@ -918,8 +910,7 @@ elif command -v xbps-install >/dev/null 2>&1; then
 else
     echo "📦 Cài đặt trực tiếp vào /usr (Generic Linux — ${ARCH_RAW})..."
     if ! try_native_cmake_build "${VERSION}"; then
-        if [ "${HAS_PREBUILT_DEB}" = "1" ]; then
-            fetch_and_verify_deb
+        if [ "${HAS_PREBUILT_DEB}" = "1" ] && fetch_and_verify_deb; then
             extract_deb_to_root "${TMP_DEB}"
         else
             abort_missing_build_deps

@@ -32,8 +32,8 @@ DEB_ARCH="amd64"
 %endif
 
 DEB_FILE="%{_topdir}/SOURCES/vielotus_%{version}_${DEB_ARCH}.deb"
-if [ ! -f "${DEB_FILE}" ] && [ -f "Binaries/linux/vielotus_%{version}_${DEB_ARCH}.deb" ]; then
-    DEB_FILE="Binaries/linux/vielotus_%{version}_${DEB_ARCH}.deb"
+if [ ! -f "${DEB_FILE}" ] && [ -f "dist/linux/vielotus_%{version}_${DEB_ARCH}.deb" ]; then
+    DEB_FILE="dist/linux/vielotus_%{version}_${DEB_ARCH}.deb"
 fi
 
 mkdir -p "%{_builddir}/deb_extract"

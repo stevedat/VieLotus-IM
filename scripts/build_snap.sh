@@ -24,10 +24,7 @@ fi
 
 build_arch_snap() {
     local arch="$1"
-    local deb_file="${ROOT_DIR}/Binaries/linux/vielotus_${VERSION}_${arch}.deb"
-    if [ ! -f "${deb_file}" ]; then
-        deb_file="${DIST_LINUX}/vielotus_${VERSION}_${arch}.deb"
-    fi
+    local deb_file="${DIST_LINUX}/vielotus_${VERSION}_${arch}.deb"
     local prime_dir="${SNAP_STAGE_BASE}/prime-${arch}"
     local out_snap="${DIST_LINUX}/vielotus_${VERSION}_${arch}.snap"
 

@@ -72,7 +72,7 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
   ```
 - **Manual `.deb` install via `apt` (Ubuntu / Debian / Mint / Pop!_OS)**:
   ```bash
-  sudo apt update && sudo apt install ./vielotus_2.0.2_amd64.deb   # or ./vielotus_2.0.2_arm64.deb
+  sudo apt update && sudo apt install ./vielotus_2.0.3_amd64.deb   # or ./vielotus_2.0.3_arm64.deb
   ```
 - **Arch Linux / Manjaro (`PKGBUILD`)**: `cd CrossPlatform/packaging/arch && makepkg -si`
 - **Quick CLI controls**: `vielotus-settings` (GTK3 GUI) · `vielotus-settings --telex` · `vielotus-settings --vni` · `vielotus-settings --doctor`.
@@ -84,6 +84,42 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
 
 ---
 
+## Open-Core Architecture & Building from Source
+
+VieLotusIM follows a **transparent Open-Core model** designed so security researchers, Linux package maintainers, and developers can audit OS permissions and build working binaries directly from this repository across all three desktop platforms:
+
+| Platform | OS Integration Layer (Shell & UI) | Linguistic Engine Core | Openness & Build-from-Source Status |
+| :--- | :--- | :--- | :--- |
+| **Linux**<br>(`IBus` & `Fcitx5`) | **100% Open Source (MIT)**<br>`CrossPlatform/ibus-vielotus/`<br>`CrossPlatform/fcitx5-vielotus/`<br>`CrossPlatform/capi-native/` | **100% Open Source C++20 (MIT / Debian DFSG #2)**<br>`Sources/VieLotusCoreWindows/` + canonical UTF-8 NFC wordlists (`lexicon/*.txt`) + deterministic FNV-1a generator (`generate_lexicon_hashes.py`) | **100% Open Source (Zero binary blobs)**.<br>Compiles entirely from source via Debian `dpkg-buildpackage`, Launchpad PPA builders, or standard `cmake` + `ninja`. |
+| **Windows**<br>(`Win32 TSF`) | **100% Open Source (MIT)**<br>`CrossPlatform/windows-tsf/` | **100% Open Source C++20 (MIT)**<br>`Sources/VieLotusCoreWindows/` (unobfuscated C++20 implementation) | **100% Open Source (Zero binary blobs)**.<br>Compiles the TSF DLLs and installers directly from source via CMake / MSVC (`./scripts/build_windows.ps1`). |
+| **macOS**<br>(`InputMethodKit`) | **100% Open Source (MIT)**<br>`Sources/VieLotusIM/` (`IMKServer`, `IMKInputController`, Settings UI, `DiagnosticLogger`) & `Sources/VieLotusTrace/` | Prebuilt Universal XCFramework (`arm64` + `x86_64`)<br>`Frameworks/VieLotusCore.xcframework` (shared Swift 6 core with the commercial iOS / iPadOS App Store edition) | **100% Security-Auditable Open-Core**.<br>Every line of macOS OS integration is open source to verify **0 `CGEventTap` hooks**, **0 Accessibility permissions**, **0 keystroke logging**, and **0 network calls**, and builds `VieLotusIM.app` via `swift build`. |
+
+### Build from Source Commands
+
+1. **Verify Prebuilt XCFramework Checksum (`SHA-256`)**:
+   ```bash
+   shasum -a 256 -c Frameworks/checksums.sha256
+   ```
+2. **macOS (`VieLotusIM.app` Universal `arm64` + `x86_64`)**:
+   ```bash
+   swift build -c release --product VieLotusIM
+   ./scripts/build_imk.sh
+   ```
+3. **Linux (100% from C/C++20 Source — Debian/Ubuntu `.deb` or CMake)**:
+   ```bash
+   # Option 1: Full Debian / Ubuntu package build (regenerates lexicon tables from lexicon/*.txt)
+   dpkg-buildpackage -us -uc -b
+
+   # Option 2: Direct CMake shared library build
+   cmake -B build/capi -S CrossPlatform/capi-native -DCMAKE_BUILD_TYPE=Release && cmake --build build/capi
+   ```
+4. **Windows (`Win32 TSF` `x64` & `ARM64` from C++20 Source)**:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
+   ```
+
+---
+
 ## License
 
-Licensed under the [MIT License](LICENSE). Maintained by **Steve Dat** ([@stevedat](https://github.com/stevedat)).
+Released under the **[MIT License](LICENSE) (Open-Core Model)**: all source code in this repository (100% of the Linux & Windows input methods and the full macOS `InputMethodKit` shell) along with the bundled `VieLotusCore.xcframework` binary may be freely used, built from source, modified, and redistributed under the terms of the MIT License. Maintained by **Steve Dat** ([@stevedat](https://github.com/stevedat)).
