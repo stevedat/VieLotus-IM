@@ -30,9 +30,6 @@ if [ -z "${ARCH}" ]; then
 fi
 
 DEB_REL="dist/linux/vielotus_${VERSION}_${ARCH}.deb"
-if [ ! -f "${ROOT_DIR}/${DEB_REL}" ] && [ -f "${ROOT_DIR}/Binaries/linux/vielotus_${VERSION}_${ARCH}.deb" ]; then
-    DEB_REL="Binaries/linux/vielotus_${VERSION}_${ARCH}.deb"
-fi
 DEB_PATH="${ROOT_DIR}/${DEB_REL}"
 LOG_DIR="${ROOT_DIR}/dist/linux"
 mkdir -p "${LOG_DIR}"

@@ -73,9 +73,12 @@ The high-throughput endurance suite drives **250,000 continuous keystrokes** acr
 The 9,091-case regression dataset and internal CLI harness are maintained in the private core repository. In the Open-Core repository, you can verify cryptographic integrity of the prebuilt artifacts and compile the macOS InputMethodKit shell from source:
 
 ```bash
-# 1. Verify SHA-256 integrity of all prebuilt frameworks and binaries
-shasum -a 256 -c Binaries/checksums.sha256
+# 1. Verify SHA-256 integrity of the prebuilt macOS XCFramework
+shasum -a 256 -c Frameworks/checksums.sha256
 
-# 2. Compile VieLotusIM from source against VieLotusCore.xcframework
+# 2. Verify deterministic C++20 lexicon FNV-1a table reproducibility
+python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py --check
+
+# 3. Compile VieLotusIM from source against VieLotusCore.xcframework
 swift build --product VieLotusIM
 ```

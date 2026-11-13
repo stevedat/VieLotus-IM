@@ -19,8 +19,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify prebuilt binary SHA-256 checksums
-        run: shasum -a 256 -c Binaries/checksums.sha256
+      - name: Verify prebuilt XCFramework SHA-256 checksum
+        run: shasum -a 256 -c Frameworks/checksums.sha256
 
       - name: Build Open-Core targets
         run: swift build --configuration release
@@ -117,32 +117,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify prebuilt Windows installers (x64 & ARM64)
-        shell: pwsh
-        run: |
-          foreach ($installer in @("Binaries\windows\VieLotus-Setup-x64.exe", "Binaries\windows\VieLotus-Setup-arm64.exe")) {
-            if (-not (Test-Path $installer)) {
-              Write-Error "Missing $installer"
-              exit 1
-            }
-            $item = Get-Item $installer
-            Write-Host "Verified $($item.Name) ($($item.Length) bytes)"
-          }
-
       - name: Build Windows TSF COM Shell, Inno Setup Installers & Microsoft Store MSIX (x64 & ARM64)
         shell: pwsh
         run: |
           ./scripts/build_windows.ps1 -Version 2.0.2 -Arch all -SkipTests
-          Copy-Item dist/windows/VieLotus-Setup-x64.exe Binaries/windows/VieLotus-Setup-x64.exe -Force
-          Copy-Item dist/windows/VieLotus-Setup-arm64.exe Binaries/windows/VieLotus-Setup-arm64.exe -Force
+          foreach ($installer in @("dist\windows\VieLotus-Setup-x64.exe", "dist\windows\VieLotus-Setup-arm64.exe")) {
+            if (-not (Test-Path $installer)) {
+              Write-Error "Missing built installer: $installer"
+              exit 1
+            }
+            $item = Get-Item $installer
+            if ($item.Length -le 0) {
+              Write-Error "Empty installer: $installer"
+              exit 1
+            }
+            Write-Host "Verified $($item.Name) ($($item.Length) bytes)"
+          }
 
       - name: Upload Windows build artifacts (x64 & ARM64)
         uses: actions/upload-artifact@v4
         with:
           name: VieLotus-Windows
           path: |
-            Binaries/windows/VieLotus-Setup-x64.exe
-            Binaries/windows/VieLotus-Setup-arm64.exe
+            dist/windows/VieLotus-Setup-x64.exe
+            dist/windows/VieLotus-Setup-arm64.exe
             scripts/windows/bin/x64/*
             scripts/windows/bin/arm64/*
             dist/windows/msix/*
