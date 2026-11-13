@@ -192,6 +192,7 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
         compCpBefore = vl_utf8_codepoint_count(vielotus_get_composing_text(session_));
     }
     std::string out;
+    bool canDeleteSurrounding = false;
     if (session_ && vielotus_is_composing(session_)) {
         if (trailingAscii && trailingAscii[0] != '\0' && trailingAscii[1] == '\0') {
             uint32_t cp = static_cast<uint32_t>(static_cast<unsigned char>(trailingAscii[0]));
@@ -205,12 +206,21 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
          * (where committed contains a space). Single-word macro expansions keep totalBs == compCpBefore. */
         if (totalBs > static_cast<int32_t>(compCpBefore) && compCpBefore > 0) {
             surrDel = totalBs - static_cast<int32_t>(compCpBefore);
+            if (surrDel > 0 && ic_ &&
+                ic_->capabilityFlags().test(CapabilityFlag::SurroundingText) &&
+                ic_->surroundingText().isValid()) {
+                const std::string& surrStr = ic_->surroundingText().text();
+                const size_t totalSurrChars = vl_utf8_codepoint_count(surrStr.c_str());
+                size_t curPos = ic_->surroundingText().cursor();
+                if (curPos > totalSurrChars) {
+                    curPos = totalSurrChars;
+                }
+                canDeleteSurrounding = (curPos >= static_cast<size_t>(surrDel));
+            }
         }
         (void)isOverride;
         const char* committed = vielotus_get_last_text(session_);
         if (committed && committed[0] != '\0') {
-            const bool canDeleteSurrounding =
-                ic_ && ic_->capabilityFlags().test(CapabilityFlag::SurroundingText);
             if (surrDel > 0 && !canDeleteSurrounding) {
                 committed = vl_utf8_after_first_space(committed);
             }
@@ -224,7 +234,7 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
     }
 
     if (!out.empty()) {
-        if (surrDel > 0 && ic_ && ic_->capabilityFlags().test(CapabilityFlag::SurroundingText)) {
+        if (surrDel > 0 && canDeleteSurrounding) {
             if (preeditVisible_) {
                 preeditVisible_ = false;
                 ic_->inputPanel().reset();
@@ -407,7 +417,9 @@ bool VieLotusState::prepareWordStartFromSurrounding(uint32_t sym, uint64_t t0Us)
                     afterComp &&
                     vl_utf8_codepoint_count(afterComp) == totalWordCp &&
                     fullWord != afterComp &&
-                    vl_has_non_ascii(afterComp)) {
+                    vl_has_non_ascii(afterComp) &&
+                    cursorPos >= leftChars &&
+                    (cursorPos - leftChars + totalWordCp) <= totalChars) {
                     ic_->deleteSurroundingText(-static_cast<int>(leftChars),
                                                static_cast<unsigned int>(totalWordCp));
                     updatePreedit();

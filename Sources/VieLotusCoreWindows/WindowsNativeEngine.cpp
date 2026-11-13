@@ -793,6 +793,7 @@ struct NativeEngineState {
         m_lastTextUtf8[0] = '\0';
         m_lastCommitDiffBackspaces = 0;
         m_lastCommitDiffTextUtf8[0] = '\0';
+        m_afterDigit = false;
     }
 
     bool isComposing() const {
@@ -959,6 +960,7 @@ void NativeEngineState::saveUndoSnapshot() {
 }
 
 void NativeEngineState::setInputMethod(InputMethod method) {
+    m_afterDigit = false;
     if (m_inputMethod != method) {
         m_inputMethod = method;
         clearWordState();
@@ -1180,6 +1182,14 @@ bool NativeEngineState::isValidVietnameseSyllable() const {
 
     if (m_literalTailLen > 0) return false;
 
+    if (m_tone == 0 && (m_tokenLen == 3 || m_tokenLen == 4) &&
+        m_tokens[0].baseLower == L'u' && m_tokens[0].shape == 2 &&
+        m_tokens[1].baseLower == L'c' && m_tokens[1].shape == 0 &&
+        m_tokens[2].baseLower == L'l' && m_tokens[2].shape == 0 &&
+        (m_tokenLen == 3 || (m_tokens[3].baseLower == L'n' && m_tokens[3].shape == 0))) {
+        return true;
+    }
+
     int vLen = vEnd - vStart + 1;
     if (vLen > 3) return false;
 
@@ -1251,7 +1261,24 @@ bool NativeEngineState::isValidVietnameseSyllable() const {
             else if (v2 == L'u' && s1 == 0 && s2 == 0 && effectiveCodaLen == 0) validPair = true;
         } else if (v1 == L'o') {
             if (v2 == L'a' && s1 == 0 && (s2 == 0 || s2 == 3)) validPair = true;
-            else if (v2 == L'e' && s1 == 0 && s2 == 0) validPair = true;
+            else if (v2 == L'e' && s1 == 0 && s2 == 0 &&
+                     (effectiveCodaLen == 0 || (effectiveCodaLen == 1 && (effectiveCoda[0] == L'n' || effectiveCoda[0] == L't')))) {
+                if (initLen == 0) {
+                    validPair = true;
+                } else if (initLen == 1) {
+                    const wchar_t c0 = initStr[0];
+                    validPair = !hasStrokeD && (c0 == L'h' || c0 == L'l' || c0 == L't' || c0 == L'x');
+                } else if (initLen == 2) {
+                    validPair = (initStr[0] == L'c' && initStr[1] == L'h') ||
+                                (initStr[0] == L'k' && initStr[1] == L'h') ||
+                                (initStr[0] == L'n' && initStr[1] == L'g') ||
+                                (initStr[0] == L'n' && initStr[1] == L'h') ||
+                                (initStr[0] == L't' && initStr[1] == L'h') ||
+                                (initStr[0] == L'q' && initStr[1] == L'u');
+                } else if (initLen == 3) {
+                    validPair = (initStr[0] == L'n' && initStr[1] == L'g' && initStr[2] == L'h');
+                }
+            }
             else if (v2 == L'i' && (s1 == 0 || s1 == 1 || s1 == 2) && s2 == 0 && effectiveCodaLen == 0) validPair = true;
             else if (v2 == L'o' && s1 == 0 && s2 == 0 && isValidDoubleOCoda(effectiveCoda, effectiveCodaLen)) validPair = true;
         } else if (v1 == L'u') {
@@ -2982,7 +3009,12 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
                 int vS = -1, vE = -1;
                 bool hC = false;
                 findVowelCluster(vS, vE, hC);
+                const int savedToneForExtend = m_tone;
+                if (!hasCodaNow && !isAsciiBaseVowel(lowerCh)) {
+                    m_tone = 0;
+                }
                 bool validExtended = isValidVietnameseSyllable();
+                m_tone = savedToneForExtend;
                 --m_tokenLen;
                 if (!validExtended) {
                     lockOverflowToTail = true;
@@ -3336,6 +3368,7 @@ int32_t NativeEngineState::feedBackspace() {
 
 int32_t NativeEngineState::commitWord() {
     if (m_displayedLen == 0) {
+        m_afterDigit = false;
         m_armedAfterSpace = false;
         m_hasUndoSnapshot = false;
         m_lastBackspaces = 0;
@@ -3869,6 +3902,7 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
             utf8Eq(contextWord, "cụt");
         m_prevTurnCanBecomeTun = false;
         m_precededByTechDelimiter = false;
+        m_afterDigit = false;
         m_prevCollisionDisplayedLen = 0;
         m_prevCollisionRawLen = 0;
         return;
@@ -3888,6 +3922,7 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
     m_lastWordWasTunCollocationHead = temp.m_lastWordWasTunCollocationHead;
     m_prevTurnCanBecomeTun = false;
     m_precededByTechDelimiter = temp.m_precededByTechDelimiter;
+    m_afterDigit = false;
     m_prevCollisionDisplayedLen = 0;
     m_prevCollisionRawLen = 0;
 }

@@ -309,13 +309,38 @@ static void ibus_vielotus_engine_reset_internal(IBusVieLotusEngine *vl_engine) {
 }
 
 
+static gboolean ibus_vielotus_can_delete_surrounding_before_cursor(IBusEngine *engine, int32_t surr_del) {
+    if (!engine || surr_del <= 0 || !(engine->client_capabilities & IBUS_CAP_SURROUNDING_TEXT)) {
+        return FALSE;
+    }
+    IBusText *surr_text = NULL;
+    guint cursor_pos = 0;
+    guint anchor_pos = 0;
+    ibus_engine_get_surrounding_text(engine, &surr_text, &cursor_pos, &anchor_pos);
+    if (!surr_text) {
+        return FALSE;
+    }
+    const gchar *text_str = ibus_text_get_text(surr_text);
+    if (!text_str || text_str[0] == '\0') {
+        return FALSE;
+    }
+    glong total_chars = g_utf8_strlen(text_str, -1);
+    if (total_chars <= 0) {
+        return FALSE;
+    }
+    if ((glong)cursor_pos > total_chars) {
+        cursor_pos = (guint)total_chars;
+    }
+    return cursor_pos >= (guint)surr_del;
+}
+
 static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const char *trailing_ascii) {
     IBusEngine *engine = (IBusEngine *)vl_engine;
     char buf[1024];
     buf[0] = '\0';
     size_t comp_cp_before = 0;
     int32_t surr_del = 0;
-    const gboolean has_surr_cap = (engine->client_capabilities & IBUS_CAP_SURROUNDING_TEXT) != 0;
+    gboolean can_delete_surr = FALSE;
 
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
         const char *comp_str = vielotus_get_composing_text(vl_engine->session);
@@ -333,10 +358,11 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
         int32_t total_bs = vielotus_get_last_backspaces(vl_engine->session);
         if (total_bs > (int32_t)comp_cp_before && comp_cp_before > 0) {
             surr_del = total_bs - (int32_t)comp_cp_before;
+            can_delete_surr = ibus_vielotus_can_delete_surrounding_before_cursor(engine, surr_del);
         }
         const char *committed = vielotus_get_last_text(vl_engine->session);
         if (committed && committed[0] != '\0') {
-            if (surr_del > 0 && !has_surr_cap) {
+            if (surr_del > 0 && !can_delete_surr) {
                 committed = vl_utf8_after_first_space(committed);
             }
             snprintf(buf, sizeof(buf), "%s", committed);
@@ -351,7 +377,7 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
     }
 
     if (buf[0] != '\0') {
-        if (surr_del > 0 && has_surr_cap) {
+        if (surr_del > 0 && can_delete_surr) {
             ibus_vielotus_clear_preedit(engine);
             ibus_engine_delete_surrounding_text(engine, -surr_del, (guint)surr_del);
         }
@@ -925,7 +951,9 @@ static gboolean ibus_vielotus_prepare_word_start_from_surrounding(
                     after_comp &&
                     vl_utf8_codepoint_count(after_comp) == total_word_cp &&
                     strcmp(after_comp, full_word) != 0 &&
-                    vl_has_non_ascii(after_comp)) {
+                    vl_has_non_ascii(after_comp) &&
+                    cursor_pos >= left_chars &&
+                    (cursor_pos - left_chars + total_word_cp) <= (guint)total_chars) {
                     ibus_engine_delete_surrounding_text(engine, -(gint)left_chars, total_word_cp);
                     ibus_vielotus_update_preedit(vl_engine);
                     return TRUE;
