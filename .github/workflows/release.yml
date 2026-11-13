@@ -33,7 +33,8 @@ jobs:
             VERSION="${TAG#v}"
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
-            VERSION="2.0.2"
+            VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
+            VERSION="${VERSION:-2.0.2}"
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -82,7 +83,8 @@ jobs:
             VERSION="${TAG#v}"
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
-            VERSION="2.0.2"
+            VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
+            VERSION="${VERSION:-2.0.2}"
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -153,9 +155,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify prebuilt XCFramework SHA-256 checksum
-        run: shasum -a 256 -c Frameworks/checksums.sha256
-
       - name: Extract release version
         id: version
         run: |
@@ -167,8 +166,9 @@ jobs:
             VERSION="${TAG#v}"
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
-            VERSION="2.0.2"
-            TAG="v2.0.2"
+            VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist)"
+            VERSION="${VERSION:-2.0.2}"
+            TAG="v${VERSION}"
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
@@ -218,7 +218,7 @@ jobs:
             echo "enabled=0" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build and Sign universal App bundle
+      - name: Build and Sign universal App bundle (SwiftPM SHA-256 verified XCFramework)
         run: |
           ./scripts/build_imk.sh "${{ steps.version.outputs.version }}"
 
@@ -252,13 +252,35 @@ jobs:
           path: .build/dist/
           merge-multiple: true
 
-      - name: Stage Windows & Linux Release Installers and Generate Checksums
+      - name: Stage Release Installers, Evergreen Aliases, XCFramework Zip & Checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [ ! -f .build/dist/VieLotus-Store-Setup.exe ] && [ -f .build/dist/VieLotus-Setup-x64.exe ]; then
             cp .build/dist/VieLotus-Setup-x64.exe .build/dist/VieLotus-Store-Setup.exe
           fi
+          cp -f ".build/dist/vielotus_${VERSION}_amd64.deb" .build/dist/vielotus-linux-amd64.deb
+          cp -f ".build/dist/vielotus_${VERSION}_arm64.deb" .build/dist/vielotus-linux-arm64.deb
+          XCF_URL="$(sed -n 's/.*url: "\([^"]*VieLotusCore\.xcframework\.zip\)".*/\1/p' Package.swift | head -n 1)"
+          if [ -n "$XCF_URL" ]; then
+            curl -fsSL "$XCF_URL" -o .build/dist/VieLotusCore.xcframework.zip
+          else
+            XCF_DIR="$(find .build/artifacts -name 'VieLotusCore.xcframework' -type d | head -n 1)"
+            ditto -c -k --sequesterRsrc --keepParent "$XCF_DIR" .build/dist/VieLotusCore.xcframework.zip
+          fi
           cd .build/dist
-          shasum -a 256 VieLotusIM.pkg VieLotus-Store-Setup.exe VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe vielotus_*.deb > checksums.sha256
+          shasum -a 256 \
+            VieLotusIM.pkg \
+            VieLotus-Store-Setup.exe \
+            VieLotus-Setup-x64.exe \
+            VieLotus-Setup-arm64.exe \
+            "vielotus_${VERSION}_amd64.deb" \
+            "vielotus_${VERSION}_arm64.deb" \
+            vielotus-linux-amd64.deb \
+            vielotus-linux-arm64.deb \
+            VieLotusCore.xcframework.zip > checksums.sha256
+          cp -f checksums.sha256 SHA256SUMS.txt
           cat checksums.sha256
 
       - name: Prepare Release Notes Body
@@ -266,25 +288,43 @@ jobs:
           COMMIT_SHA=$(git rev-parse HEAD)
           SHORT_SHA=$(git rev-parse --short HEAD)
           BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          VER="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          REPO="${{ github.repository }}"
 
           cat > release_notes.md <<EOF
-          ### 🌸 Sen Việt (VieLotusIM) v${{ steps.version.outputs.version }} — Multi-Platform Desktop Release
+          ## 🌸 Sen Việt (VieLotusIM) ${TAG} — Multi-Platform Desktop Release
 
-          - **Git Commit:** [\`${SHORT_SHA}\`](https://github.com/${{ github.repository }}/commit/${COMMIT_SHA})
+          - **Git Commit:** [\`${SHORT_SHA}\`](https://github.com/${REPO}/commit/${COMMIT_SHA})
           - **Build Timestamp:** ${BUILD_DATE}
-          - **macOS:** \`VieLotusIM.pkg\` (Universal Apple Silicon & Intel)
-          - **Windows (Microsoft Store Signed & Offline Installers — x64 & ARM64):** \`VieLotus-Store-Setup.exe\` (Signed by Microsoft Corporation), \`VieLotus-Setup-x64.exe\`, \`VieLotus-Setup-arm64.exe\` (Universal Native Windows Text Services Framework COM Installer)
-          - **Linux (Debian/Ubuntu All-in-One \`amd64\` & \`arm64\`):** \`vielotus_${{ steps.version.outputs.version }}_amd64.deb\`, \`vielotus_${{ steps.version.outputs.version }}_arm64.deb\` (IBus & Fcitx5 + Core Engine)
 
-          #### 📊 Chỉ số kiểm thử hồi quy chính thức (Benchmark Regression Matrix)
+          | Hệ điều hành / Platform | Bộ cài trực tiếp / Direct Download | Ghi chú |
+          | :--- | :--- | :--- |
+          | **macOS 13+ (Universal \`arm64\` & \`x86_64\`)** | [\`VieLotusIM.pkg\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotusIM.pkg) | Apple Developer ID Signed & Notarized (\`InputMethodKit\`) |
+          | **Windows 10/11 (\`x64\` — Store Signed)** | [\`VieLotus-Store-Setup.exe\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotus-Store-Setup.exe) | Signed by Microsoft Corporation (Pure Win32 TSF COM) |
+          | **Windows 10/11 (\`x64\` Offline)** | [\`VieLotus-Setup-x64.exe\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotus-Setup-x64.exe) | Native Win32 Text Services Framework (\`x64\`) |
+          | **Windows 11 ARM (\`ARM64\` Offline)** | [\`VieLotus-Setup-arm64.exe\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotus-Setup-arm64.exe) | Native Win32 Text Services Framework (\`ARM64\`) |
+          | **Linux Debian / Ubuntu (\`amd64\`)** | [\`vielotus-linux-amd64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus-linux-amd64.deb) · [\`vielotus_${VER}_amd64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus_${VER}_amd64.deb) | All-in-One IBus & Fcitx5 + Pure C++20 Engine (\`x86_64\`) |
+          | **Linux Debian / Ubuntu (\`arm64\`)** | [\`vielotus-linux-arm64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus-linux-arm64.deb) · [\`vielotus_${VER}_arm64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus_${VER}_arm64.deb) | All-in-One IBus & Fcitx5 + Pure C++20 Engine (\`aarch64\`) |
+          | **macOS Open-Core SwiftPM SDK** | [\`VieLotusCore.xcframework.zip\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotusCore.xcframework.zip) | Remote SwiftPM \`.binaryTarget\` (\`arm64\` + \`x86_64\`) |
+
+          ### 🍺 Cài đặt qua Homebrew (macOS) / Homebrew Cask
+          \`\`\`bash
+          brew install --cask stevedat/tap/vielotus
+          \`\`\`
+
+          ### 📊 Chỉ số kiểm thử hồi quy chính thức / Benchmark Regression Matrix
           - **Overall Primary Suite:** **100.00% (9,091 / 9,091)**
           - **Symmetric No-Context (\`vn_survives_collision\` / \`ambiguous_both_sides\`):** **97.33% (365 / 375)**
           - **Single-Path Vietnamese Preservation (\`whitelist_safe = never\`):** **100.00% (182 / 182 — 0 critical losses)**
 
-          #### 🔐 Bảng mã băm SHA-256 đối chiếu (Integrity Checksums)
+          <details>
+          <summary><strong>🔐 Mã kiểm chứng toàn vẹn tệp / SHA-256 Checksums (<code>checksums.sha256</code> / <code>SHA256SUMS.txt</code>)</strong></summary>
+
           \`\`\`text
           $(cat .build/dist/checksums.sha256)
           \`\`\`
+          </details>
           EOF
 
       - name: Create GitHub Release
@@ -298,12 +338,15 @@ jobs:
             .build/dist/VieLotus-Setup-x64.exe
             .build/dist/VieLotus-Setup-arm64.exe
             .build/dist/vielotus_*.deb
+            .build/dist/vielotus-linux-*.deb
+            .build/dist/VieLotusCore.xcframework.zip
             .build/dist/checksums.sha256
+            .build/dist/SHA256SUMS.txt
           draft: false
           prerelease: false
           generate_release_notes: true
 
-      - name: Verify GitHub Release 7-Asset Allowlist
+      - name: Verify GitHub Release 11-Asset Allowlist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ steps.version.outputs.tag }}
@@ -311,11 +354,15 @@ jobs:
         run: |
           ACTUAL=$(gh release view "$TAG_NAME" --json assets -q '.assets[].name' | sort)
           EXPECTED=$(printf "%s\n" \
+            "SHA256SUMS.txt" \
             "VieLotus-Setup-arm64.exe" \
             "VieLotus-Setup-x64.exe" \
             "VieLotus-Store-Setup.exe" \
+            "VieLotusCore.xcframework.zip" \
             "VieLotusIM.pkg" \
             "checksums.sha256" \
+            "vielotus-linux-amd64.deb" \
+            "vielotus-linux-arm64.deb" \
             "vielotus_${VERSION}_amd64.deb" \
             "vielotus_${VERSION}_arm64.deb" | sort)
           echo "Published Release Assets:"

@@ -12,24 +12,27 @@ concurrency:
 
 jobs:
   macos-build:
-    name: macOS (Native IMK + Prebuilt Core XCFramework)
+    name: macOS (Native IMK + Remote SwiftPM Core XCFramework)
     runs-on: macos-15
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify prebuilt XCFramework SHA-256 checksum
-        run: shasum -a 256 -c Frameworks/checksums.sha256
+      - name: Extract package version
+        id: version
+        run: |
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist)"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Build Open-Core targets
+      - name: Resolve & build Open-Core targets (SwiftPM SHA-256 verified XCFramework)
         run: swift build --configuration release
 
       - name: Build universal App bundle (VieLotusIM.app)
-        run: ./scripts/build_imk.sh 2.0.2
+        run: ./scripts/build_imk.sh "${{ steps.version.outputs.version }}"
 
       - name: Build installer package (VieLotusIM.pkg)
-        run: ./scripts/build_pkg.sh 2.0.2
+        run: ./scripts/build_pkg.sh "${{ steps.version.outputs.version }}"
 
       - name: Upload macOS build artifacts
         uses: actions/upload-artifact@v4
@@ -45,6 +48,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Extract package version
+        id: version
+        run: |
+          VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
+          echo "version=${VERSION:-2.0.2}" >> "$GITHUB_OUTPUT"
 
       - name: Install build tools, Fcitx5, and IBus dev dependencies
         run: |
@@ -81,6 +90,7 @@ jobs:
 
       - name: Stage Linux distribution artifacts & build APT repository
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           mkdir -p dist/linux
           python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py --check
           cmake -B build-core -S CrossPlatform/capi-native -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -94,11 +104,11 @@ jobs:
           cp build-fcitx5/vielotus.conf dist/linux/
           cp build-ibus/ibus-engine-vielotus dist/linux/
           cp build-ibus/vielotus.xml dist/linux/
-          ./scripts/build_deb.sh 2.0.2 amd64
+          ./scripts/build_deb.sh "${VERSION}" amd64
 
       - name: Verify .deb installation, split packages & E2E IBus/Fcitx5 typing on Ubuntu 24.04
         run: |
-          ./scripts/verify_ubuntu_deb.sh 2.0.2 amd64
+          ./scripts/verify_ubuntu_deb.sh "${{ steps.version.outputs.version }}" amd64
 
       - name: Upload Linux build artifacts
         uses: actions/upload-artifact@v4
@@ -120,7 +130,13 @@ jobs:
       - name: Build Windows TSF COM Shell, Inno Setup Installers & Microsoft Store MSIX (x64 & ARM64)
         shell: pwsh
         run: |
-          ./scripts/build_windows.ps1 -Version 2.0.2 -Arch all -SkipTests
+          $plist = Get-Content Sources/VieLotusIM/Info.plist -Raw
+          if ($plist -match '<key>CFBundleShortVersionString</key>\s*<string>([^<]+)</string>') {
+            $version = $Matches[1]
+          } else {
+            $version = "2.0.2"
+          }
+          ./scripts/build_windows.ps1 -Version $version -Arch all -SkipTests
           foreach ($installer in @("dist\windows\VieLotus-Setup-x64.exe", "dist\windows\VieLotus-Setup-arm64.exe")) {
             if (-not (Test-Path $installer)) {
               Write-Error "Missing built installer: $installer"

@@ -2,24 +2,26 @@
 // =============================================================================
 // Package.swift — VieLotusIM Public Repo (Open-Core)
 // =============================================================================
-// This Package.swift links against a prebuilt VieLotusCore.xcframework binary.
-// The full source for VieLotusCore is maintained in a private repository.
+// This Package.swift resolves VieLotusCore.xcframework via SwiftPM remote
+// binaryTarget from GitHub Releases with built-in SHA-256 verification.
+// Zero binary blobs are stored in the Git source tree.
 //
 // To build the macOS IMK shell:
 //   swift build --product VieLotusIM
 //
-// To verify prebuilt XCFramework integrity:
-//   shasum -a 256 -c Frameworks/checksums.sha256
+// To compute/verify XCFramework zip checksum manually:
+//   swift package compute-checksum VieLotusCore.xcframework.zip
 // =============================================================================
 import PackageDescription
 
 var products: [Product] = []
 
 var targets: [Target] = [
-    // VieLotusCore — prebuilt binary framework (arm64+x86_64 macOS, arm64 iOS)
+    // VieLotusCore — remote prebuilt binary framework (arm64+x86_64 macOS, arm64 iOS)
     .binaryTarget(
         name: "VieLotusCore",
-        path: "Frameworks/VieLotusCore.xcframework"
+        url: "https://github.com/stevedat/VieLotus-IM/releases/download/v2.0.2/VieLotusCore.xcframework.zip",
+        checksum: "27f1f92910fca00e5526b9872d655127d5b7ca69d8d70ead4756c08ea26131e7"
     ),
 
     // VieLotusTrace — diagnostic trace contracts (MIT, full source)

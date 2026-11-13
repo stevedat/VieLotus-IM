@@ -72,7 +72,8 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
   ```
 - **Cài gói `.deb` thủ công qua `apt` (Ubuntu / Debian / Mint / Pop!_OS)**:
   ```bash
-  sudo apt update && sudo apt install ./vielotus_2.0.3_amd64.deb   # hoặc ./vielotus_2.0.3_arm64.deb
+  curl -fLO https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus-linux-amd64.deb   # hoặc vielotus-linux-arm64.deb
+  sudo apt update && sudo apt install ./vielotus-linux-amd64.deb
   ```
 - **Arch Linux / Manjaro (`PKGBUILD`)**: `cd CrossPlatform/packaging/arch && makepkg -si`
 - **Lệnh điều khiển nhanh**: `vielotus-settings` (cửa sổ cài đặt GTK3) · `vielotus-settings --telex` · `vielotus-settings --vni` · `vielotus-settings --doctor`.
@@ -92,20 +93,16 @@ VieLotusIM áp dụng mô hình **Open-Core minh bạch** để bất kỳ kỹ 
 | :--- | :--- | :--- | :--- |
 | **Linux**<br>(`IBus` & `Fcitx5`) | Mã nguồn mở **100% (MIT)**<br>`CrossPlatform/ibus-vielotus/`<br>`CrossPlatform/fcitx5-vielotus/`<br>`CrossPlatform/capi-native/` | Mã nguồn mở **100% C++20 (MIT / Debian DFSG #2)**<br>`Sources/VieLotusCoreWindows/` + từ điển gốc UTF-8 NFC (`lexicon/*.txt`) + script sinh bảng băm tất định (`generate_lexicon_hashes.py`) | **100% Mã nguồn mở hoàn toàn (0 binary blob)**.<br>Tự biên dịch trực tiếp từ mã nguồn chuẩn Debian `dpkg-buildpackage`, Launchpad PPA hoặc `cmake` + `ninja`. |
 | **Windows**<br>(`Win32 TSF`) | Mã nguồn mở **100% (MIT)**<br>`CrossPlatform/windows-tsf/` | Mã nguồn mở **100% C++20 (MIT)**<br>`Sources/VieLotusCoreWindows/` (không làm mờ mã nguồn / unobfuscated) | **100% Mã nguồn mở hoàn toàn (0 binary blob)**.<br>Tự biên dịch DLL & bộ cài trực tiếp bằng CMake / MSVC (`./scripts/build_windows.ps1`). |
-| **macOS**<br>(`InputMethodKit`) | Mã nguồn mở **100% (MIT)**<br>`Sources/VieLotusIM/` (`IMKServer`, `IMKInputController`, Settings UI, `DiagnosticLogger`) & `Sources/VieLotusTrace/` | Binary XCFramework tiền biên dịch (`arm64` + `x86_64`)<br>`Frameworks/VieLotusCore.xcframework` (chia sẻ chung lõi Swift 6 với bản thương mại trên iOS / iPadOS App Store) | **Open-Core có thể kiểm toán bảo mật 100%**.<br>Toàn bộ lớp giao tiếp macOS mở hoàn toàn để xác minh **0 `CGEventTap`**, **0 quyền Accessibility**, **0 ghi phím**, **0 kết nối mạng**, và biên dịch ra `VieLotusIM.app` bằng `swift build`. |
+| **macOS**<br>(`InputMethodKit`) | Mã nguồn mở **100% (MIT)**<br>`Sources/VieLotusIM/` (`IMKServer`, `IMKInputController`, Settings UI, `DiagnosticLogger`) & `Sources/VieLotusTrace/` | SwiftPM Remote BinaryTarget (`arm64` + `x86_64`)<br>[`VieLotusCore.xcframework.zip`](https://github.com/stevedat/VieLotus-IM/releases/download/v2.0.2/VieLotusCore.xcframework.zip) trên GitHub Releases (chia sẻ chung lõi Swift 6 với bản iOS / iPadOS App Store; 0 binary blob trong cây Git) | **Open-Core có thể kiểm toán bảo mật 100%**.<br>Toàn bộ lớp giao tiếp macOS mở hoàn toàn để xác minh **0 `CGEventTap`**, **0 quyền Accessibility**, **0 ghi phím**, **0 kết nối mạng**, và biên dịch ra `VieLotusIM.app` bằng `swift build` kèm đối chiếu SHA-256 tự động của SwiftPM. |
 
 ### Lệnh Tự Biên Dịch (Build from Source)
 
-1. **Xác thực toàn vẹn XCFramework tiền biên dịch (`SHA-256`)**:
-   ```bash
-   shasum -a 256 -c Frameworks/checksums.sha256
-   ```
-2. **macOS (`VieLotusIM.app` Universal `arm64` + `x86_64`)**:
+1. **macOS (`VieLotusIM.app` Universal `arm64` + `x86_64` — SwiftPM tự động tải & xác thực SHA-256 `VieLotusCore.xcframework.zip`)**:
    ```bash
    swift build -c release --product VieLotusIM
    ./scripts/build_imk.sh
    ```
-3. **Linux (Từ mã nguồn C/C++20 thuần — Debian/Ubuntu `.deb` hoặc CMake)**:
+2. **Linux (Từ mã nguồn C/C++20 thuần — Debian/Ubuntu `.deb` hoặc CMake)**:
    ```bash
    # Cách 1: Đóng gói chuẩn Debian / Ubuntu (tự sinh bảng băm từ điển từ lexicon/*.txt)
    dpkg-buildpackage -us -uc -b
@@ -113,7 +110,7 @@ VieLotusIM áp dụng mô hình **Open-Core minh bạch** để bất kỳ kỹ 
    # Cách 2: Biên dịch trực tiếp bằng CMake
    cmake -B build/capi -S CrossPlatform/capi-native -DCMAKE_BUILD_TYPE=Release && cmake --build build/capi
    ```
-4. **Windows (`Win32 TSF` `x64` & `ARM64` từ mã nguồn C++20)**:
+3. **Windows (`Win32 TSF` `x64` & `ARM64` từ mã nguồn C++20)**:
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
    ```

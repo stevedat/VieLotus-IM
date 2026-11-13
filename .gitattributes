@@ -1,0 +1,7 @@
+# Exclude GitHub Pages marketing site & CI metadata from source release tarballs
+# (`archive/refs/heads/main.tar.gz` and `archive/refs/tags/v*.tar.gz`) so Linux /
+# BSD / Raspberry Pi / RISC-V source builds stay compact (~2 MB pure source).
+docs/ export-ignore
+.github/ export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
