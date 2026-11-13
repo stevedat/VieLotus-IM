@@ -93,12 +93,12 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           mkdir -p dist/linux
           python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py --check
-          cmake -B build-core -S CrossPlatform/capi-native -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake -B build-core -S CrossPlatform/capi-native -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
           cmake --build build-core
           cp "$(realpath build-core/libVieLotusCAPI.so)" dist/linux/libVieLotusCAPI.so
-          cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
+          cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
           cmake --build build-fcitx5
-          cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
+          cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBEXECDIR=/usr/lib/ibus -DLIBEXECDIR=/usr/lib/ibus -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
           cmake --build build-ibus
           cp build-fcitx5/vielotus.so dist/linux/
           cp build-fcitx5/vielotus.conf dist/linux/

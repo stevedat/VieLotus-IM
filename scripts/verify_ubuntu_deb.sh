@@ -193,7 +193,15 @@ set -euo pipefail
 echo "  [6.1] Kiểm thử cửa sổ cài đặt GTK3 (vielotus-settings --smoke-test-gui)..."
 /usr/bin/vielotus-settings --smoke-test-gui
 
-echo "  [6.2] Khởi chạy IBus daemon & xác nhận đăng ký engine vielotus / vielotus-vni..."
+echo "  [6.2] Khởi chạy IBus daemon & xác nhận đăng ký + thực thi binary engine vielotus / vielotus-vni..."
+IBUS_EXEC_BIN="$(sed -n "s|.*<exec>\([^ <]*\).*</exec>.*|\1|p" /usr/share/ibus/component/vielotus.xml | head -n 1)"
+echo "  IBus XML <exec> binary: ${IBUS_EXEC_BIN}"
+if [ "${IBUS_EXEC_BIN}" != "/usr/lib/ibus/ibus-engine-vielotus" ] || [ ! -x "${IBUS_EXEC_BIN}" ]; then
+    echo "❌ LỖI NGHIÊM TRỌNG: Đường dẫn <exec> trong /usr/share/ibus/component/vielotus.xml (${IBUS_EXEC_BIN}) lệch khỏi /usr/lib/ibus/ibus-engine-vielotus hoặc không có quyền thực thi!"
+    exit 1
+fi
+"${IBUS_EXEC_BIN}" --xml | grep -Fq "<name>vielotus</name>"
+
 ibus-daemon --daemonize --xim --replace
 sleep 2
 IBUS_ENGINES="$(ibus list-engine)"

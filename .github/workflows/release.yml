@@ -114,12 +114,12 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           mkdir -p dist/linux
           python3 Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py --check
-          cmake -B build-core -S CrossPlatform/capi-native -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake -B build-core -S CrossPlatform/capi-native -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
           cmake --build build-core
           cp "$(realpath build-core/libVieLotusCAPI.so)" dist/linux/libVieLotusCAPI.so
-          cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
+          cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
           cmake --build build-fcitx5
-          cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
+          cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBEXECDIR=/usr/lib/ibus -DLIBEXECDIR=/usr/lib/ibus -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
           cmake --build build-ibus
           cp build-fcitx5/vielotus.so dist/linux/
           cp build-fcitx5/vielotus.conf dist/linux/
@@ -252,7 +252,7 @@ jobs:
           path: .build/dist/
           merge-multiple: true
 
-      - name: Stage Release Installers, Evergreen Aliases, XCFramework Zip & Checksums
+      - name: Stage Release Installers, XCFramework Zip & Checksums
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -260,8 +260,6 @@ jobs:
           if [ ! -f .build/dist/VieLotus-Store-Setup.exe ] && [ -f .build/dist/VieLotus-Setup-x64.exe ]; then
             cp .build/dist/VieLotus-Setup-x64.exe .build/dist/VieLotus-Store-Setup.exe
           fi
-          cp -f ".build/dist/vielotus_${VERSION}_amd64.deb" .build/dist/vielotus-linux-amd64.deb
-          cp -f ".build/dist/vielotus_${VERSION}_arm64.deb" .build/dist/vielotus-linux-arm64.deb
           XCF_URL="$(sed -n 's/.*url: "\([^"]*VieLotusCore\.xcframework\.zip\)".*/\1/p' Package.swift | head -n 1)"
           if [ -n "$XCF_URL" ]; then
             curl -fsSL "$XCF_URL" -o .build/dist/VieLotusCore.xcframework.zip
@@ -277,10 +275,7 @@ jobs:
             VieLotus-Setup-arm64.exe \
             "vielotus_${VERSION}_amd64.deb" \
             "vielotus_${VERSION}_arm64.deb" \
-            vielotus-linux-amd64.deb \
-            vielotus-linux-arm64.deb \
             VieLotusCore.xcframework.zip > checksums.sha256
-          cp -f checksums.sha256 SHA256SUMS.txt
           cat checksums.sha256
 
       - name: Prepare Release Notes Body
@@ -304,8 +299,8 @@ jobs:
           | **Windows 10/11 (\`x64\` — Store Signed)** | [\`VieLotus-Store-Setup.exe\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotus-Store-Setup.exe) | Signed by Microsoft Corporation (Pure Win32 TSF COM) |
           | **Windows 10/11 (\`x64\` Offline)** | [\`VieLotus-Setup-x64.exe\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotus-Setup-x64.exe) | Native Win32 Text Services Framework (\`x64\`) |
           | **Windows 11 ARM (\`ARM64\` Offline)** | [\`VieLotus-Setup-arm64.exe\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotus-Setup-arm64.exe) | Native Win32 Text Services Framework (\`ARM64\`) |
-          | **Linux Debian / Ubuntu (\`amd64\`)** | [\`vielotus-linux-amd64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus-linux-amd64.deb) · [\`vielotus_${VER}_amd64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus_${VER}_amd64.deb) | All-in-One IBus & Fcitx5 + Pure C++20 Engine (\`x86_64\`) |
-          | **Linux Debian / Ubuntu (\`arm64\`)** | [\`vielotus-linux-arm64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus-linux-arm64.deb) · [\`vielotus_${VER}_arm64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus_${VER}_arm64.deb) | All-in-One IBus & Fcitx5 + Pure C++20 Engine (\`aarch64\`) |
+          | **Linux Debian / Ubuntu (\`amd64\`)** | [\`vielotus_${VER}_amd64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus_${VER}_amd64.deb) | All-in-One IBus & Fcitx5 + Pure C++20 Engine (\`x86_64\`) |
+          | **Linux Debian / Ubuntu (\`arm64\`)** | [\`vielotus_${VER}_arm64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus_${VER}_arm64.deb) | All-in-One IBus & Fcitx5 + Pure C++20 Engine (\`aarch64\`) |
           | **macOS Open-Core SwiftPM SDK** | [\`VieLotusCore.xcframework.zip\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotusCore.xcframework.zip) | Remote SwiftPM \`.binaryTarget\` (\`arm64\` + \`x86_64\`) |
 
           ### 🍺 Cài đặt qua Homebrew (macOS) / Homebrew Cask
@@ -319,7 +314,7 @@ jobs:
           - **Single-Path Vietnamese Preservation (\`whitelist_safe = never\`):** **100.00% (182 / 182 — 0 critical losses)**
 
           <details>
-          <summary><strong>🔐 Mã kiểm chứng toàn vẹn tệp / SHA-256 Checksums (<code>checksums.sha256</code> / <code>SHA256SUMS.txt</code>)</strong></summary>
+          <summary><strong>🔐 Mã kiểm chứng toàn vẹn tệp / SHA-256 Checksums (<code>checksums.sha256</code>)</strong></summary>
 
           \`\`\`text
           $(cat .build/dist/checksums.sha256)
@@ -338,31 +333,29 @@ jobs:
             .build/dist/VieLotus-Setup-x64.exe
             .build/dist/VieLotus-Setup-arm64.exe
             .build/dist/vielotus_*.deb
-            .build/dist/vielotus-linux-*.deb
             .build/dist/VieLotusCore.xcframework.zip
             .build/dist/checksums.sha256
-            .build/dist/SHA256SUMS.txt
           draft: false
           prerelease: false
           generate_release_notes: true
 
-      - name: Verify GitHub Release 11-Asset Allowlist
+      - name: Purge Deprecated Duplicate Assets & Verify Canonical Asset Allowlist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          for stale in vielotus-linux-amd64.deb vielotus-linux-arm64.deb SHA256SUMS.txt; do
+            gh release delete-asset "$TAG_NAME" "$stale" -y >/dev/null 2>&1 || true
+          done
           ACTUAL=$(gh release view "$TAG_NAME" --json assets -q '.assets[].name' | sort)
           EXPECTED=$(printf "%s\n" \
-            "SHA256SUMS.txt" \
             "VieLotus-Setup-arm64.exe" \
             "VieLotus-Setup-x64.exe" \
             "VieLotus-Store-Setup.exe" \
             "VieLotusCore.xcframework.zip" \
             "VieLotusIM.pkg" \
             "checksums.sha256" \
-            "vielotus-linux-amd64.deb" \
-            "vielotus-linux-arm64.deb" \
             "vielotus_${VERSION}_amd64.deb" \
             "vielotus_${VERSION}_arm64.deb" | sort)
           echo "Published Release Assets:"
