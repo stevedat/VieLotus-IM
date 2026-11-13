@@ -72,6 +72,7 @@ for icon_file in MenuBarTemplate.tiff MenuBarTemplate.png MenuBarTemplate@2x.png
 done
 
 # Copy SPM module resource bundles (only VieLotusCore typing-modes.yml)
+find .build/artifacts -path "*/macos-*/VieLotusCore.framework/Versions/A/Resources/*VieLotusCore.bundle" -type d -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
 find .build/scratch-arm64 -name "*VieLotusCore.bundle" -type d -maxdepth 5 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
 find .build/out/Products/Release -name "*VieLotusCore.bundle" -type d -maxdepth 2 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
 if [ -d "Frameworks/VieLotusCore.xcframework" ]; then
