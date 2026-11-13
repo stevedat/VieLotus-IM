@@ -200,10 +200,18 @@ if [ "${IBUS_EXEC_BIN}" != "/usr/lib/ibus/ibus-engine-vielotus" ] || [ ! -x "${I
     echo "❌ LỖI NGHIÊM TRỌNG: Đường dẫn <exec> trong /usr/share/ibus/component/vielotus.xml (${IBUS_EXEC_BIN}) lệch khỏi /usr/lib/ibus/ibus-engine-vielotus hoặc không có quyền thực thi!"
     exit 1
 fi
-"${IBUS_EXEC_BIN}" --xml | grep -Fq "<name>vielotus</name>"
+"${IBUS_EXEC_BIN}" --help | grep -Fq -- "--ibus"
 
 ibus-daemon --daemonize --xim --replace
 sleep 2
+"${IBUS_EXEC_BIN}" --ibus >/tmp/ibus-vielotus.log 2>&1 &
+IBUS_VL_PID=$!
+sleep 1
+if ! kill -0 "${IBUS_VL_PID}" 2>/dev/null; then
+    echo "❌ LỖI: ${IBUS_EXEC_BIN} --ibus thoát sớm hoặc không kết nối được với ibus-daemon!"
+    cat /tmp/ibus-vielotus.log || true
+    exit 1
+fi
 IBUS_ENGINES="$(ibus list-engine)"
 grep -E "vielotus" <<<"${IBUS_ENGINES}"
 grep -E "vielotus - .*Sen Vi.*Telex" <<<"${IBUS_ENGINES}" >/dev/null
@@ -218,6 +226,7 @@ echo "  Active IBus engine (VNI): ${ACTIVE_IBUS}"
 sleep 1
 ACTIVE_IBUS="$(ibus engine || true)"
 echo "  Active IBus engine (Telex): ${ACTIVE_IBUS}"
+kill "${IBUS_VL_PID}" >/dev/null 2>&1 || true
 ibus exit >/dev/null 2>&1 || true
 
 echo "  [6.3] Khởi chạy Fcitx5 daemon & xác nhận nạp addon vielotus.so (vielotus-telex / vielotus-vni)..."
