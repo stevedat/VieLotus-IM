@@ -778,7 +778,11 @@ ibus_bin = find_first([
     "/usr/lib64/ibus/ibus-engine-vielotus",
 ])
 
+is_kde = any(k in desktop.upper() for k in ("KDE", "PLASMA"))
+is_gnome = "GNOME" in desktop.upper()
+
 ldd_bin = shutil.which("ldd")
+healthy_plugins = 0
 for label, path, required in (
     ("Thư viện lõi C-ABI", core_so, True),
     ("Plugin Fcitx5", fcitx_so, False),
@@ -788,6 +792,12 @@ for label, path, required in (
         if required:
             errors += 1
             print(f"• {label:<24} : ✗ Không tìm thấy trên hệ thống")
+        elif label == "Plugin Fcitx5" and is_kde:
+            warnings += 1
+            print(f"• {label:<24} : ⚠ Chưa cài đặt (KDE Plasma cần plugin này để gõ)")
+        elif label == "Engine IBus" and is_gnome:
+            warnings += 1
+            print(f"• {label:<24} : ⚠ Chưa cài đặt (GNOME cần engine này để gõ)")
         else:
             print(f"• {label:<24} : - Chưa cài đặt")
         continue
@@ -803,10 +813,23 @@ for label, path, required in (
         except Exception as exc:
             ldd_issue = str(exc)
     if ldd_issue:
-        errors += 1
-        print(f"• {label:<24} : ✗ Lỗi liên kết động tại {path} ({ldd_issue})")
+        if label == "Engine IBus" and is_kde and not ibus_up and "libibus" in ldd_issue:
+            warnings += 1
+            print(f"• {label:<24} : ⚠ Chưa có thư viện IBus ({ldd_issue}) — bình thường trên KDE vì KDE ưu tiên Fcitx5")
+        elif label == "Plugin Fcitx5" and is_gnome and not fcitx_up and "fcitx" in ldd_issue:
+            warnings += 1
+            print(f"• {label:<24} : ⚠ Chưa có thư viện Fcitx5 ({ldd_issue}) — bình thường trên GNOME vì GNOME ưu tiên IBus")
+        else:
+            errors += 1
+            print(f"• {label:<24} : ✗ Lỗi liên kết động tại {path} ({ldd_issue})")
     else:
         print(f"• {label:<24} : ✓ Khỏe mạnh ({path})")
+        if label in ("Plugin Fcitx5", "Engine IBus"):
+            healthy_plugins += 1
+
+if healthy_plugins == 0 and errors == 0:
+    errors += 1
+    print("• Tình trạng bộ gõ         : ✗ Chưa có plugin Fcitx5 hoặc IBus nào hoạt động được trên hệ thống!")
 
 # Configuration files
 if os.path.exists(cfg_path):
@@ -930,11 +953,22 @@ if gsettings_bin and ("gnome" in desktop.lower() or "ubuntu" in desktop.lower())
 print("----------------------------------------------------------------------")
 if errors == 0 and warnings == 0:
     print("✓ Kết luận: Hệ thống Sen Việt hoạt động hoàn hảo (0 lỗi, 0 cảnh báo).")
-    print("  ℹ Lưu ý GNOME Wayland: Nếu vừa mới cài mà thanh trên cùng chưa hiện '🇻🇳 tex' hoặc Settings hiện chữ 'vielotus', hãy Log Out & Log In 1 lần.")
+    if is_gnome:
+        print("  ℹ Lưu ý GNOME Wayland: Nếu vừa mới cài mà thanh trên cùng chưa hiện '🇻🇳 tex' hoặc Settings hiện chữ 'vielotus', hãy Log Out & Log In 1 lần.")
+    elif is_kde:
+        print("  ℹ Lưu ý KDE Plasma: Đảm bảo đã chọn Fcitx 5 trong KDE System Settings → Virtual Keyboard.")
 elif errors == 0:
     print(f"• Kết luận: Hoạt động ổn định ({warnings} lưu ý nhỏ). Gợi ý: bấm 'Tự sửa & Kích hoạt' hoặc Log Out & Log In 1 lần.")
+    if is_kde and not fcitx_so:
+        print("  ℹ Gợi ý KDE Plasma: Cài đặt gói 'fcitx5-im' ('sudo pacman -S fcitx5-im fcitx5-configtool') và cài plugin Fcitx5 của Sen Việt.")
+    elif is_gnome and not ibus_bin:
+        print("  ℹ Gợi ý GNOME: Cài đặt gói 'ibus' và cài engine IBus của Sen Việt.")
 else:
     print(f"✗ Kết luận: Phát hiện {errors} lỗi cần xử lý. Gợi ý: cài đặt lại gói hoặc chạy 'vielotus-settings --activate'.")
+    if is_kde:
+        print("  ℹ Hướng dẫn KDE Plasma (Wayland): Cài 'sudo pacman -S fcitx5-im fcitx5-configtool', sau đó chọn Fcitx 5 trong KDE System Settings → Virtual Keyboard.")
+    elif is_gnome:
+        print("  ℹ Hướng dẫn GNOME Wayland: Cài 'ibus', sau đó chạy 'vielotus-settings --activate' và Log Out / Log In 1 lần.")
 DOC_PYEOF
     else
         echo "✦ === Chẩn đoán Môi trường Sen Việt (VieLotusIM) ==="
@@ -1943,12 +1977,25 @@ def save_app_rules():
     notify_running_engines()
 
 def open_system_keyboard_settings(*_):
-    for cmd in (
+    desk_env = (os.environ.get("XDG_CURRENT_DESKTOP", "") + " " + os.environ.get("DESKTOP_SESSION", "")).lower()
+    is_kde = "kde" in desk_env or "plasma" in desk_env
+    cmds = []
+    if is_kde:
+        cmds.extend([
+            ["kcmshell6", "kcm_virtualkeyboard"],
+            ["kcmshell6", "kcm_keyboard"],
+            ["kcmshell5", "kcm_virtualkeyboard"],
+            ["systemsettings", "kcm_virtualkeyboard"],
+            ["fcitx5-configtool"],
+            ["fcitx5-config-qt"],
+        ])
+    cmds.extend([
         ["gnome-control-center", "keyboard"],
         ["fcitx5-configtool"],
         ["fcitx5-config-qt"],
         ["ibus-setup"],
-    ):
+    ])
+    for cmd in cmds:
         try:
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return
@@ -2826,13 +2873,27 @@ def open_linux_sheet(*_, auto_close=False):
     note_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     note_card.get_style_context().add_class("bento-card-indigo")
     note_card.pack_start(make_icon_badge("ℹ", P["indigo"], "bento-icon-indigo"), False, False, 0)
+    desk_env = (os.environ.get("XDG_CURRENT_DESKTOP", "") + " " + os.environ.get("DESKTOP_SESSION", "")).lower()
+    is_kde = "kde" in desk_env or "plasma" in desk_env
+    is_gnome = "gnome" in desk_env or "ubuntu" in desk_env
+    if is_kde:
+        note_markup = (
+            f"<b>Lưu ý trên KDE Plasma (Wayland):</b> Hệ thống sử dụng <b>Fcitx 5</b> làm bộ gõ chính. "
+            f"Hãy đảm bảo đã cài gói <tt>fcitx5-im</tt>, sau đó vào <b>KDE System Settings → Virtual Keyboard</b> chọn <b>Fcitx 5</b>."
+        )
+    elif is_gnome:
+        note_markup = (
+            f"<b>Lưu ý sau khi mới cài trên Ubuntu / GNOME:</b> Nếu thanh trên cùng chưa hiện <b>tex / vni</b> hoặc Cài đặt Bàn phím "
+            f"chỉ hiện chữ thường <tt>vielotus</tt>, hãy bấm <b>「Tự sửa &amp; Kích hoạt」</b> bên dưới. "
+            f"Trên phiên Wayland, nếu GNOME vẫn giữ bộ nhớ đệm cũ thì chỉ cần <b>Đăng xuất (Log Out) rồi Đăng nhập lại 1 lần</b>."
+        )
+    else:
+        note_markup = (
+            f"<b>Lưu ý trên Linux:</b> Hãy đảm bảo bộ gõ <b>Fcitx 5</b> hoặc <b>IBus</b> đã được cài đặt và kích hoạt trong Cài đặt Bàn phím của hệ thống."
+        )
     note_lbl = Gtk.Label()
     note_lbl.set_markup(
-        f"<span size='8100' foreground='{P['fg_primary']}'>"
-        f"<b>Lưu ý sau khi mới cài trên Ubuntu / GNOME:</b> Nếu thanh trên cùng chưa hiện <b>tex / vni</b> hoặc Cài đặt Bàn phím "
-        f"chỉ hiện chữ thường <tt>vielotus</tt>, hãy bấm <b>「Tự sửa &amp; Kích hoạt」</b> bên dưới. "
-        f"Trên phiên Wayland, nếu GNOME vẫn giữ bộ nhớ đệm cũ thì chỉ cần <b>Đăng xuất (Log Out) rồi Đăng nhập lại 1 lần</b>."
-        f"</span>"
+        f"<span size='8100' foreground='{P['fg_primary']}'>{note_markup}</span>"
     )
     note_lbl.set_xalign(0)
     note_lbl.set_line_wrap(True)
@@ -3858,7 +3919,7 @@ if os.path.exists(config_path):
                 cfg[k.strip()] = v.strip().strip('"').strip("'")
 
 root = tk.Tk()
-root.title("Sen Việt (VieLotusIM v2.0.2) — Cài đặt")
+root.title("Sen Việt (VieLotusIM v2.0.3) — Cài đặt")
 root.geometry("460x320")
 root.resizable(False, False)
 
@@ -3909,7 +3970,7 @@ def apply_changes(*_):
 
 frm = ttk.Frame(root, padding=16)
 frm.pack(fill="both", expand=True)
-ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.2)", font=("Sans", 13, "bold")).pack(anchor="w")
+ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.3)", font=("Sans", 13, "bold")).pack(anchor="w")
 ttk.Label(frm, text="Kiểu gõ Tiếng Việt (tự động lưu & áp dụng):").pack(anchor="w", pady=(10, 4))
 ttk.Radiobutton(frm, text="Telex Tự Do (s f r x j w — vieetj → việt)", variable=im_var, value="telex", command=apply_changes).pack(anchor="w")
 ttk.Radiobutton(frm, text="VNI Chuẩn (phím số 1–9 — vie65t → việt)", variable=im_var, value="vni", command=apply_changes).pack(anchor="w")
