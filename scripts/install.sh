@@ -738,10 +738,8 @@ fetch_and_verify_deb() {
         return 0
     fi
 
-    EVERGREEN_DEB_FILE="vielotus-linux-${DEB_ARCH}.deb"
     PRIMARY_URL="https://github.com/stevedat/VieLotus-IM/releases/download/v${VERSION}/${DEB_FILE}"
     FALLBACK_URL="https://github.com/stevedat/VieLotus-IM/releases/latest/download/${DEB_FILE}"
-    EVERGREEN_URL="https://github.com/stevedat/VieLotus-IM/releases/latest/download/${EVERGREEN_DEB_FILE}"
 
     SUMS_PRIMARY="https://github.com/stevedat/VieLotus-IM/releases/download/v${VERSION}/checksums.sha256"
     SUMS_FALLBACK="https://github.com/stevedat/VieLotus-IM/releases/latest/download/checksums.sha256"
@@ -752,9 +750,6 @@ fetch_and_verify_deb() {
     if download_file "${PRIMARY_URL}" "${TMP_DEB}" 2>/dev/null; then
         download_file "${SUMS_PRIMARY}" "${TMP_SUMS}" 2>/dev/null && SUMS_FETCHED="1" || true
     elif download_file "${FALLBACK_URL}" "${TMP_DEB}" 2>/dev/null; then
-        download_file "${SUMS_FALLBACK}" "${TMP_SUMS}" 2>/dev/null && SUMS_FETCHED="1" || true
-    elif download_file "${EVERGREEN_URL}" "${TMP_DEB}" 2>/dev/null; then
-        VERIFY_NAME="${EVERGREEN_DEB_FILE}"
         download_file "${SUMS_FALLBACK}" "${TMP_SUMS}" 2>/dev/null && SUMS_FETCHED="1" || true
     else
         rm -f "${TMP_SUMS}"

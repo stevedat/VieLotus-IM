@@ -5,6 +5,10 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(IBUS REQUIRED ibus-1.0>=1.5.0)
 pkg_check_modules(GLIB REQUIRED glib-2.0 gobject-2.0 gio-2.0)
 
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Default system install prefix for IBus component" FORCE)
+endif()
+
 include(GNUInstallDirs)
 # Path to VieLotusCAPI header and library
 set(VIELOTUS_CAPI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/VieLotusCAPI")
@@ -57,9 +61,13 @@ target_compile_options(ibus-engine-vielotus PRIVATE
     -Wall
     -Wextra
 )
-# Configure component XML (default to CMAKE_INSTALL_FULL_LIBEXECDIR, e.g. /usr/libexec)
+# Configure component XML (default to /usr/lib/ibus on Debian/Ubuntu or CMAKE_INSTALL_FULL_LIBEXECDIR)
 if(NOT DEFINED LIBEXECDIR)
-    set(LIBEXECDIR "${CMAKE_INSTALL_FULL_LIBEXECDIR}")
+    if(EXISTS "/usr/lib/ibus")
+        set(LIBEXECDIR "/usr/lib/ibus")
+    else()
+        set(LIBEXECDIR "${CMAKE_INSTALL_FULL_LIBEXECDIR}")
+    endif()
 endif()
 configure_file(
     vielotus.xml.in

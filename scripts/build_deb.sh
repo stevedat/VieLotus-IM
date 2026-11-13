@@ -252,9 +252,16 @@ package_single_arch() {
     cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus-vni.conf" "${pkg_dir}/usr/share/fcitx5/inputmethod/vielotus-vni.conf"
     cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/README.md" "${pkg_dir}/usr/share/doc/${pkg_name}/"
 
-    # 3. IBus Engine
+    # 3. IBus Engine (always bind vielotus.xml <exec> strictly to /usr/lib/ibus/ibus-engine-vielotus)
     cp "${arch_bin_dir}/ibus-engine-vielotus" "${pkg_dir}/usr/lib/ibus/"
-    cp "${DIST_LINUX}/vielotus.xml" "${pkg_dir}/usr/share/ibus/component/"
+    chmod 755 "${pkg_dir}/usr/lib/ibus/ibus-engine-vielotus"
+    sed 's|@LIBEXECDIR@|/usr/lib/ibus|g' \
+        "${ROOT_DIR}/CrossPlatform/ibus-vielotus/vielotus.xml.in" \
+        > "${pkg_dir}/usr/share/ibus/component/vielotus.xml"
+    if ! grep -Fq "<exec>/usr/lib/ibus/ibus-engine-vielotus --ibus</exec>" "${pkg_dir}/usr/share/ibus/component/vielotus.xml"; then
+        echo "❌ LỖI: vielotus.xml không trỏ đúng tới /usr/lib/ibus/ibus-engine-vielotus!"
+        exit 1
+    fi
 
     # 4. Freedesktop hicolor icons (16x16 -> 512x512) & status indicators
     for size in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do

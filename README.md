@@ -72,8 +72,8 @@ A lightweight, memory-safe Vietnamese input method anchored in the **Apple ecosy
   ```
 - **Manual `.deb` install via `apt` (Ubuntu / Debian / Mint / Pop!_OS)**:
   ```bash
-  curl -fLO https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus-linux-amd64.deb   # or vielotus-linux-arm64.deb
-  sudo apt update && sudo apt install ./vielotus-linux-amd64.deb
+  curl -fLO https://github.com/stevedat/VieLotus-IM/releases/download/v2.0.2/vielotus_2.0.2_amd64.deb   # or vielotus_2.0.2_arm64.deb
+  sudo apt update && sudo apt install ./vielotus_2.0.2_amd64.deb
   ```
 - **Arch Linux / Manjaro (`PKGBUILD`)**: `cd CrossPlatform/packaging/arch && makepkg -si`
 - **Quick CLI controls**: `vielotus-settings` (GTK3 GUI) · `vielotus-settings --telex` · `vielotus-settings --vni` · `vielotus-settings --doctor`.

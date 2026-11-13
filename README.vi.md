@@ -72,8 +72,8 @@ Bộ gõ tiếng Việt gọn nhẹ, an toàn bộ nhớ lấy **hệ sinh thái
   ```
 - **Cài gói `.deb` thủ công qua `apt` (Ubuntu / Debian / Mint / Pop!_OS)**:
   ```bash
-  curl -fLO https://github.com/stevedat/VieLotus-IM/releases/latest/download/vielotus-linux-amd64.deb   # hoặc vielotus-linux-arm64.deb
-  sudo apt update && sudo apt install ./vielotus-linux-amd64.deb
+  curl -fLO https://github.com/stevedat/VieLotus-IM/releases/download/v2.0.2/vielotus_2.0.2_amd64.deb   # hoặc vielotus_2.0.2_arm64.deb
+  sudo apt update && sudo apt install ./vielotus_2.0.2_amd64.deb
   ```
 - **Arch Linux / Manjaro (`PKGBUILD`)**: `cd CrossPlatform/packaging/arch && makepkg -si`
 - **Lệnh điều khiển nhanh**: `vielotus-settings` (cửa sổ cài đặt GTK3) · `vielotus-settings --telex` · `vielotus-settings --vni` · `vielotus-settings --doctor`.
