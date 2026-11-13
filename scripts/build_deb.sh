@@ -229,7 +229,15 @@ package_single_arch() {
 
     # 1. Core C-ABI Library & Header
     cp "${arch_bin_dir}/libVieLotusCAPI.so" "${pkg_dir}/usr/lib/"
-    cp "${ROOT_DIR}/Sources/VieLotusCAPI/include/vielotus.h" "${pkg_dir}/usr/include/vielotus.h"
+    python3 - "${ROOT_DIR}/Sources/VieLotusCAPI/include/vielotus.h" "${pkg_dir}/usr/include/vielotus.h" << 'PYEOF'
+import re, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    h = f.read()
+h = re.sub(r"// =+\n// Context-Aware Word Suggestion Engine\n// =+\n.*?(?=// =+\n// Version & Metadata)", "", h, flags=re.S)
+h = re.sub(r"\n*// =+\n// EDU-TYPE Local Loopback Bridge.*?(?=\n#ifdef __cplusplus)", "\n", h, flags=re.S)
+with open(sys.argv[2], "w", encoding="utf-8") as f:
+    f.write(h)
+PYEOF
 
     if [ -d "${arch_bin_dir}/swift-runtime" ]; then
         cp -a "${arch_bin_dir}/swift-runtime/"*.so* "${pkg_dir}/usr/lib/vielotus/" 2>/dev/null || true
@@ -255,7 +263,8 @@ package_single_arch() {
     # 3. IBus Engine (always bind vielotus.xml <exec> strictly to /usr/lib/ibus/ibus-engine-vielotus)
     cp "${arch_bin_dir}/ibus-engine-vielotus" "${pkg_dir}/usr/lib/ibus/"
     chmod 755 "${pkg_dir}/usr/lib/ibus/ibus-engine-vielotus"
-    sed 's|@LIBEXECDIR@|/usr/lib/ibus|g' \
+    sed -e 's|@LIBEXECDIR@|/usr/lib/ibus|g' \
+        -e "s|@PROJECT_VERSION@|${VERSION}|g" \
         "${ROOT_DIR}/CrossPlatform/ibus-vielotus/vielotus.xml.in" \
         > "${pkg_dir}/usr/share/ibus/component/vielotus.xml"
     if ! grep -Fq "<exec>/usr/lib/ibus/ibus-engine-vielotus --ibus</exec>" "${pkg_dir}/usr/share/ibus/component/vielotus.xml"; then
