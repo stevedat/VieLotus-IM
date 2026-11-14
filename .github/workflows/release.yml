@@ -36,7 +36,7 @@ jobs:
             VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
             VERSION="${VERSION:-2.0.2}"
           fi
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build Windows TSF COM Shell & Inno Setup Installers (x64 & ARM64)
         shell: pwsh
@@ -86,7 +86,7 @@ jobs:
             VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
             VERSION="${VERSION:-2.0.2}"
           fi
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Install build tools, Fcitx5, and IBus dev dependencies
         run: |
@@ -170,21 +170,25 @@ jobs:
             VERSION="${VERSION:-2.0.2}"
             TAG="v${VERSION}"
           fi
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Apple Developer ID Certificate (if secrets provided)
         if: env.MACOS_CERTIFICATE != ''
         run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
           security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
 
-          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
           echo "$MACOS_CERTIFICATE" | base64 --decode > "$CERT_PATH"
           security import "$CERT_PATH" -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed -e 's/"//g')
+          KEYCHAINS=()
+          while IFS= read -r keychain; do
+            KEYCHAINS+=("$keychain")
+          done < <(security list-keychains -d user | sed -e 's/^ *"//' -e 's/" *$//')
+          security list-keychain -d user -s "$KEYCHAIN_PATH" "${KEYCHAINS[@]}"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
           rm -f "$CERT_PATH"
 
@@ -200,7 +204,7 @@ jobs:
               --key "$KEY_FILE" \
               --key-id "$ASC_KEY_ID" \
               --issuer "$ASC_ISSUER_ID"; then
-              echo "enabled=1" >> $GITHUB_OUTPUT
+              echo "enabled=1" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           fi
@@ -209,13 +213,13 @@ jobs:
               --apple-id "$APPLE_ID" \
               --password "$APPLE_APP_SPECIFIC_PASSWORD" \
               --team-id "$APPLE_TEAM_ID"; then
-              echo "enabled=1" >> $GITHUB_OUTPUT
+              echo "enabled=1" >> "$GITHUB_OUTPUT"
             else
               echo "::warning::Apple Notarization credentials invalid or expired; proceeding with Developer ID signature."
-              echo "enabled=0" >> $GITHUB_OUTPUT
+              echo "enabled=0" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "enabled=0" >> $GITHUB_OUTPUT
+            echo "enabled=0" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and Sign universal App bundle from source
