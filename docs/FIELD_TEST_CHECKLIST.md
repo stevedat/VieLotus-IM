@@ -1,13 +1,13 @@
 # macOS host application field test checklist
 
-Use this checklist to record device-level results. A checked item requires a test on the named host and OS build; CLI fixtures do not count as host verification.
+Maintainer-reported manual test coverage is summarized in [test status](TEST_STATUS.md). This checklist is for capturing reproducible details not yet recorded (app version, OS build, and scenarios); CI fixtures do not count as host verification.
 
 | Host | OS version | Scenario | Result | Notes |
 | --- | --- | --- | --- | --- |
-| TextEdit |  | Vietnamese Telex/VNI, backspace, selection replacement | NOT RUN |  |
-| Safari |  | Address field and web form | NOT RUN |  |
-| Chromium/Electron app |  | Composition, commit, caret movement | NOT RUN |  |
-| Terminal |  | Command line, completion, backspace | NOT RUN |  |
-| Office app |  | Cell/document editing and undo | NOT RUN |  |
+| TextEdit |  | Vietnamese Telex/VNI, backspace, selection replacement | NOT RECORDED |  |
+| Safari | OS build not recorded | Address field and web form | PASS (maintainer-reported) | Details not recorded |
+| Chromium-based apps | OS/app mapping not recorded | Composition, commit, caret movement | PASS (maintainer-reported) | Chrome, Edge; details not recorded |
+| Terminal.app | macOS build not recorded | Command line, completion, backspace | PASS (maintainer-reported) | Details not recorded |
+| Office apps | OS/app mapping not recorded | Cell/document editing and undo | PASS (maintainer-reported) | Microsoft Office, LibreOffice; details not recorded |
 
-Record the app version, OS version, input method settings, and reproducible steps. Do not convert an unrun scenario into a compatibility claim.
+Record app version, OS version, input method settings, and reproducible steps when available. A maintainer-reported result does not establish coverage for other app or OS versions.

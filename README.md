@@ -31,7 +31,7 @@ Linux and Windows build instructions are in [`CrossPlatform`](CrossPlatform/). D
 
 ## Test status
 
-CI verifies Linux IBus/Fcitx5 typing in GTK3 and Qt5 test widgets. macOS and Windows CI build the apps and packages; host-app typing has not been verified there. See the [platform test status](docs/TEST_STATUS.md) and [macOS field-test checklist](docs/FIELD_TEST_CHECKLIST.md).
+CI verifies Linux IBus/Fcitx5 typing in GTK3 and Qt5 test widgets. The maintainer also reports manual tests on macOS, Windows, Ubuntu ARM64, and Linux Mint, and successful typing in several host apps. iOS and Android are available in their official stores. See the [platform test status](docs/TEST_STATUS.md) for scope and evidence type, and the [macOS field-test checklist](docs/FIELD_TEST_CHECKLIST.md).
 
 ## Benchmark snapshot
 

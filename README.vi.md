@@ -31,7 +31,7 @@ Hướng dẫn build Linux và Windows nằm trong [`CrossPlatform`](CrossPlatfo
 
 ## Trạng thái kiểm thử
 
-CI đã kiểm tra gõ qua IBus/Fcitx5 trong widget thử nghiệm GTK3 và Qt5 trên Ubuntu. CI macOS và Windows mới xác nhận build ứng dụng/gói cài đặt; chưa xác nhận gõ trong các ứng dụng chủ trên hai nền tảng này. Xem [bảng kiểm thử theo nền tảng](docs/TEST_STATUS.md) và [danh sách kiểm tra thực tế trên macOS](docs/FIELD_TEST_CHECKLIST.md).
+CI đã kiểm tra gõ qua IBus/Fcitx5 trong widget GTK3 và Qt5 trên Ubuntu. Maintainer cũng báo cáo đã kiểm thử thủ công trên macOS, Windows, Ubuntu ARM64 và Linux Mint, cùng kết quả gõ tốt trong nhiều ứng dụng. Ứng dụng iOS và Android đã có trên store chính thức. Xem [trạng thái kiểm thử và phạm vi bằng chứng](docs/TEST_STATUS.md) và [danh sách kiểm tra ứng dụng macOS](docs/FIELD_TEST_CHECKLIST.md).
 
 ## Kết quả benchmark
 
