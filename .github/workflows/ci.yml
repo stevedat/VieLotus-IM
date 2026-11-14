@@ -28,6 +28,9 @@ jobs:
       - name: Run Swift tests
         run: swift test
 
+      - name: Check optimized adapter latency budgets
+        run: swift test --configuration release --filter UIKitInputSessionAdapterTests
+
       - name: Run regression benchmark
         run: swift run VieLotusCLI --benchmark --json
 
