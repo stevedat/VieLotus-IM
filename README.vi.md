@@ -10,7 +10,7 @@ Kho này có engine Swift và lớp InputMethodKit cho macOS, cùng engine C++20
 | --- | --- | --- |
 | macOS | Engine Swift và lớp InputMethodKit | [Bản phát hành mới nhất](https://github.com/stevedat/VieLotus-IM/releases/latest) |
 | Windows | Engine C++20 và lớp TSF | [Bản phát hành mới nhất](https://github.com/stevedat/VieLotus-IM/releases/latest) · [Microsoft Store](https://apps.microsoft.com/detail/9PF5K64GXXSH) |
-| Linux | Engine C++20, IBus/Fcitx5 và gói Debian | [Launchpad PPA](https://launchpad.net/~stevedat/+archive/ubuntu/vielotus) · [Bản phát hành mới nhất](https://github.com/stevedat/VieLotus-IM/releases/latest) |
+| Linux | Engine C++20, IBus/Fcitx5 và gói Debian | [Cài trên Ubuntu/Debian/Arch](docs/INSTALL_LINUX.vi.md) · [Bản phát hành mới nhất](https://github.com/stevedat/VieLotus-IM/releases/latest) |
 | iOS/iPadOS | Không có mã nguồn ứng dụng trong kho | [App Store](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799) |
 | Android | Không có mã nguồn ứng dụng trong kho | [Google Play](https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard) |
 

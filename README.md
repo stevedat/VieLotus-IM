@@ -10,7 +10,7 @@ This repository contains the Swift engine and macOS InputMethodKit shell, plus t
 | --- | --- | --- |
 | macOS | Swift engine and InputMethodKit shell | [Latest release](https://github.com/stevedat/VieLotus-IM/releases/latest) |
 | Windows | C++20 engine and TSF shell | [Latest release](https://github.com/stevedat/VieLotus-IM/releases/latest) · [Microsoft Store](https://apps.microsoft.com/detail/9PF5K64GXXSH) |
-| Linux | C++20 engine, IBus/Fcitx5 adapters, Debian packaging | [Launchpad PPA](https://launchpad.net/~stevedat/+archive/ubuntu/vielotus) · [Latest release](https://github.com/stevedat/VieLotus-IM/releases/latest) |
+| Linux | C++20 engine, IBus/Fcitx5 adapters, Debian packaging | [Install on Ubuntu/Debian/Arch](docs/INSTALL_LINUX.md) · [Latest release](https://github.com/stevedat/VieLotus-IM/releases/latest) |
 | iOS/iPadOS | App source is not included | [App Store](https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799) |
 | Android | App source is not included | [Google Play](https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard) |
 
