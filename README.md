@@ -45,6 +45,20 @@ Measured on 2026-11-14 from the source snapshot published with this README using
 
 These are regression-suite results, not a claim of error-free typing in every application or device. See [`docs/BENCHMARK_REPORT.md`](docs/BENCHMARK_REPORT.md) for the test conditions.
 
+## Upstream contributions
+
+Patches, unit tests, and packaging contributions submitted to peer open-source projects (full ledger in [`docs/ECOSYSTEM_CONTRIBUTIONS.md`](docs/ECOSYSTEM_CONTRIBUTIONS.md)):
+
+| Project & Maintainer | PRs & Live Status | Contributed Fix / Scope |
+| :--- | :--- | :--- |
+| **[VietTelex](https://github.com/ptrinh/viettelex)** · Phil Trịnh ([@ptrinh](https://github.com/ptrinh)) | [![#133](https://img.shields.io/github/pulls/detail/state/ptrinh/viettelex/133?label=%23133)](https://github.com/ptrinh/viettelex/pull/133) [![#164](https://img.shields.io/github/pulls/detail/state/ptrinh/viettelex/164?label=%23164)](https://github.com/ptrinh/viettelex/pull/164) | Post-toned `V-C-V` syllable splitting (`dduowcj+u`); preserve literal `aa`/`ee` elongation after `ư`/`ơ` (`uwfaaa` → `ừaaa`, `owfaaa` → `ờaaa`). |
+| **[UVie](https://github.com/uvie-project/uvie-rs)** · UVie Project ([@uvie-project](https://github.com/uvie-project)) | [![uvie-rs #20](https://img.shields.io/github/pulls/detail/state/uvie-project/uvie-rs/20?label=uvie-rs%20%2320)](https://github.com/uvie-project/uvie-rs/pull/20) [![uvie-mac #25](https://img.shields.io/github/pulls/detail/state/uvie-project/uvie-mac/25?label=uvie-mac%20%2325)](https://github.com/uvie-project/uvie-mac/pull/25) | Rust FSM post-toned closed-syllable continuation (`dduowcj+u`) and macOS `IMKInputController` multi-syllable buffer sync. |
+| **[Ngó Sen](https://github.com/ngosen/ngosen)** · Nguyễn Phi ([@nguyenphivn](https://github.com/nguyenphivn)) | [![#764](https://img.shields.io/github/pulls/detail/state/ngosen/ngosen/764?label=%23764)](https://github.com/ngosen/ngosen/pull/764) [![#768](https://img.shields.io/github/pulls/detail/state/ngosen/ngosen/768?label=%23768)](https://github.com/ngosen/ngosen/pull/768) | Show non-dictionary prefixes immediately in preedit (`rose`, keeping `khuỷu`); keep stretched words on `Space` (`uwfaaa` → `ừaaa `, `owfaaa` → `ờaaa `). |
+| **[fcitx5-lotus](https://github.com/LotusInputMethod/fcitx5-lotus)** · Nguyễn Hoàng Kỳ ([@nhktmdzhg](https://github.com/nhktmdzhg)) | [![#697](https://img.shields.io/github/pulls/detail/state/LotusInputMethod/fcitx5-lotus/697?label=%23697)](https://github.com/LotusInputMethod/fcitx5-lotus/pull/697) [![#698](https://img.shields.io/github/pulls/detail/state/LotusInputMethod/fcitx5-lotus/698?label=%23698)](https://github.com/LotusInputMethod/fcitx5-lotus/pull/698) | Restore non-Vietnamese words before digits in Macro mode (`test123`, keeping `k8s`); preserve `a`/`e` elongation after `ư`/`ơ` (`uwfaaa` → `ừaaa`, keeping `owe`/`twee`). |
+| **[XKey](https://github.com/xmannv/xkey)** · [@xmannv](https://github.com/xmannv) | [![#338](https://img.shields.io/github/pulls/detail/state/xmannv/xkey/338?label=%23338)](https://github.com/xmannv/xkey/pull/338) | Keep completed horn/breve syllables intact on trailing `w` and Backspace (`dduowcjw` → `đượcw`, `⌫` → `được`). |
+| **[Vikey](https://github.com/tonyminibot/Vikey)** · [@tonyminibot](https://github.com/tonyminibot) | [![#126](https://img.shields.io/github/pulls/detail/state/tonyminibot/Vikey/126?label=%23126)](https://github.com/tonyminibot/Vikey/pull/126) | Preserve completed horn/breve syllables on trailing `w` and retain both `w` keys on English restore (`awkward`). |
+| **OS packaging, reports & open spec** | [Ubuntu LP #2172577](https://bugs.launchpad.net/ubuntu/+source/language-selector/+bug/2172577) · [`typing-modes.yml`](Resources/typing-modes.yml) | `.debdiff` registering `im:vi` in Ubuntu `language-selector`; MIT macOS `Bundle ID` compatibility rules and technical reports ([`phuongtai/ViKey#1`](https://github.com/phuongtai/ViKey/issues/1), [`tr-nam/rustype#1`](https://github.com/tr-nam/rustype/issues/1)). |
+
 ## Privacy
 
 Typing is processed locally by the input engine. The macOS updater contacts GitHub for release checks; the optional website feedback form sends submitted reports to its configured service. See [`PRIVACY.md`](PRIVACY.md).
@@ -56,6 +70,7 @@ Project source in this repository is licensed under [MIT](LICENSE), except third
 ## Links
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Upstream contributions](docs/ECOSYSTEM_CONTRIBUTIONS.md)
 - [Privacy policy](PRIVACY.md)
 - [Release history](https://github.com/stevedat/VieLotus-IM/releases)
 - [Issues](https://github.com/stevedat/VieLotus-IM/issues)
