@@ -955,7 +955,7 @@ internal struct VietnameseSyllableDictionary {
         let baseSyllables = Set(rawString.split(separator: " ").map { String($0) })
             .union(standardYOrthographySyllables)
         let supplementalTonedSyllables: Set<String> = [
-            "dỉ", "hẻ", "pả", "pát", "pẻ", "rím", "roá", "síc", "soà", "sủ", "tơn", "tý",
+            "dỉ", "hẻ", "pả", "pát", "pẻ", "pía", "rím", "roá", "síc", "soà", "sủ", "tơn", "tý",
             "bín", "chảm", "dít", "lía", "loán", "pét", "píc", "quến",
             "bỏn", "mể", "gòi", "quạp"
         ]

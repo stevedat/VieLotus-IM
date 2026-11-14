@@ -570,4 +570,44 @@ final class ModifierPolicy3BPlusGoldenTests: XCTestCase {
             ("t", "t"), ("h", "th"), ("e", "the"), ("e", "thê"), ("m", "thêm"), (" ", "thêm ")
         ], inlineBilingual: false, context: "cần")
     }
+
+    func testCrossRepoAuditRegressions() {
+        // 1. bánh pía (xkey #295): 'pía' in Vietnamese context must not restore to English 'pias'
+        assertDualPlatformScript([
+            ("b", "b"), ("a", "ba"), ("n", "ban"), ("h", "banh"), ("s", "bánh"), (" ", "bánh "),
+            ("p", "bánh p"), ("i", "bánh pi"), ("a", "bánh pia"), ("s", "bánh pía"), (" ", "bánh pía ")
+        ])
+
+        // 2. Stretched expressive vowels on horned nuclei (xkey #294): uwfaaa -> ừaaa, owfaaa -> ờaaa, cuaraaa -> củaaaa
+        for profile in [GrammarProfile.senFlex, .smartHybrid, .classic] {
+            assertDualPlatformScript([
+                ("u", "u"), ("w", "ư"), ("f", "ừ"), ("a", "ừa"), ("a", "ừaa"), ("a", "ừaaa"), (" ", "ừaaa ")
+            ], profile: profile)
+
+            assertDualPlatformScript([
+                ("o", "o"), ("w", "ơ"), ("f", "ờ"), ("a", "ờa"), ("a", "ờaa"), ("a", "ờaaa"), (" ", "ờaaa ")
+            ], profile: profile)
+
+            assertDualPlatformScript([
+                ("c", "c"), ("u", "cu"), ("a", "cua"), ("r", "của"), ("a", "củaa"), ("a", "củaaa"), ("a", "củaaaa"), (" ", "củaaaa ")
+            ], profile: profile)
+        }
+
+        // 3. Ensure single-char horned vowel still extends normally into valid syllables (uwfoi -> ười, owfi -> ời, uwfng -> ừng)
+        assertDualPlatformScript([
+            ("u", "u"), ("w", "ư"), ("f", "ừ"), ("o", "ườ"), ("i", "ười"), (" ", "ười ")
+        ])
+        assertDualPlatformScript([
+            ("o", "o"), ("w", "ơ"), ("f", "ờ"), ("i", "ời"), (" ", "ời ")
+        ])
+        assertDualPlatformScript([
+            ("u", "u"), ("w", "ư"), ("f", "ừ"), ("n", "ừn"), ("g", "ừng"), (" ", "ừng ")
+        ])
+
+        // 4. Policy 3B+ lock & Backspace undo on completed syllables (dduowcju -> đượcu, dduowcjw -> đượcw -> ⌫ -> được)
+        assertDualPlatformScript([
+            ("d", "d"), ("d", "đ"), ("u", "đu"), ("o", "đuo"), ("w", "đươ"), ("c", "đươc"), ("j", "được"),
+            ("u", "đượcu"), ("<", "được"), ("w", "đượcw"), ("<", "được"), (" ", "được ")
+        ])
+    }
 }

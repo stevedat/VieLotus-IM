@@ -627,7 +627,11 @@ internal final class InputGrammarParser: Sendable {
             // Triple vowels: aaa -> aa, eee -> ee, ooo -> oo
             // Vietnamese orthography never contains double ASCII vowels (aa, ee, oo).
             // Once escaped via triple vowel, clear any pending tone and consume remaining characters literally.
-            if !toneEscapeActive && (ch == "a" || ch == "e" || ch == "o") && idx + 2 < n && lowerChars[idx + 1] == ch && lowerChars[idx + 2] == ch {
+            // Guard: if ư/ơ is already present in nucleus, 'a'/'e' is a diphthong offglide (e.g. uwfaaa -> ừaaa), not circumflex â/ê.
+            let hornBlocksTripleCircumflex = (ch == "a" || ch == "e") && nucleusAndCodaChars.contains(where: {
+                $0 == "ư" || $0 == "ơ" || (hasHorn && ($0 == "u" || $0 == "o"))
+            })
+            if !toneEscapeActive && !hornBlocksTripleCircumflex && (ch == "a" || ch == "e" || ch == "o") && idx + 2 < n && lowerChars[idx + 1] == ch && lowerChars[idx + 2] == ch {
                 if preVowelEndIdx > afterOnsetIdx {
                     nucleusAndCodaChars.insert(contentsOf: lowerChars[afterOnsetIdx..<preVowelEndIdx], at: 0)
                 }

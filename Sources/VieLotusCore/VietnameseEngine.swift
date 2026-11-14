@@ -2657,7 +2657,12 @@ internal final class VietnameseEngine: @unchecked Sendable {
             // Check vowel doubling (aa -> â, ee -> ê, oo -> ô) and triple-vowel escape (aaa -> aa, eee -> ee, ooo -> oo)
             // Vietnamese orthography never contains double ASCII vowels (aa, ee, oo).
             // Once escaped via triple vowel, clear any pending tone and consume remaining characters literally.
-            if !toneEscapeActive && (lower == "a" || lower == "e" || lower == "o") && i + 2 < chars.count && Character(chars[i + 1].lowercased()) == lower && Character(chars[i + 2].lowercased()) == lower {
+            // Guard: if ư/ơ is already present in result, 'a'/'e' is an offglide/overflow (e.g. uwfaaa -> ừaaa), not circumflex â/ê.
+            let hornBlocksTripleCircumflex = (lower == "a" || lower == "e") && result.contains(where: {
+                let c = $0.lowercased()
+                return c == "ư" || c == "ơ"
+            })
+            if !toneEscapeActive && !hornBlocksTripleCircumflex && (lower == "a" || lower == "e" || lower == "o") && i + 2 < chars.count && Character(chars[i + 1].lowercased()) == lower && Character(chars[i + 2].lowercased()) == lower {
                 result.append(ch)
                 result.append(chars[i + 1])
                 tone = .none
@@ -3686,7 +3691,10 @@ internal final class VietnameseEngine: @unchecked Sendable {
             }
         }
         let isCodaStem = stemChars.count >= 2 && ["c", "m", "n", "p", "t", "g", "h"].contains(Character(lastChar.lowercased()))
-        let isVowelStem = isVietnameseVowel(lastChar) && (stemChars.count >= 2 || hasCancelledVowelShape)
+        let isSingleTonedHornVowelOverflow = stemChars.count == 1 && tone != .none &&
+            "ơư".contains(lastChar.lowercased()) &&
+            !(lastChar.lowercased() == "ư" && nextChar.lowercased() == "o")
+        let isVowelStem = isVietnameseVowel(lastChar) && (stemChars.count >= 2 || hasCancelledVowelShape || isSingleTonedHornVowelOverflow)
         guard (isCodaStem || isVowelStem),
               stemChars.contains(where: { isVietnameseVowel($0) }) else {
             return nil

@@ -298,6 +298,8 @@ deferred
 deferreds
 dens
 denses
+dessert
+desserts
 diff
 differ
 difference
