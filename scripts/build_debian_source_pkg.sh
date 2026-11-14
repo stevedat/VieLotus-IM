@@ -38,21 +38,14 @@ ORIG_NAME="vielotus_${VERSION}.orig.tar.gz"
 ORIG_PATH="${OUT_DIR}/${ORIG_NAME}"
 GITHUB_TAR_URL="https://github.com/stevedat/VieLotus-IM/archive/refs/tags/v${VERSION}.tar.gz"
 
-if [ "${USE_LOCAL_GIT_ARCHIVE:-0}" != "1" ] && command -v curl >/dev/null 2>&1; then
-    if curl -fsSL --max-time 20 "${GITHUB_TAR_URL}" -o "${ORIG_PATH}" 2>/dev/null && gzip -t "${ORIG_PATH}" >/dev/null 2>&1; then
-        echo "✓ Đã tải upstream tarball chuẩn uscan từ tag v${VERSION}: ${ORIG_NAME}"
-    else
-        rm -f "${ORIG_PATH}"
-    fi
-fi
-
-if [ ! -f "${ORIG_PATH}" ]; then
+if [ "${ALLOW_UNRELEASED_LOCAL_ARCHIVE:-0}" = "1" ]; then
+    SKIP_GPG_SIGN=1
+    export SKIP_GPG_SIGN
     if command -v git >/dev/null 2>&1 && git -C "${PUBLIC_REPO_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         git -C "${PUBLIC_REPO_DIR}" archive --format=tar.gz --prefix="VieLotus-IM-${VERSION}/" HEAD > "${ORIG_PATH}"
-        echo "ℹ Tag v${VERSION} chưa phát hành trên GitHub; đã dựng ${ORIG_NAME} từ HEAD của ${PUBLIC_REPO_DIR} (cùng cấu trúc git archive)."
     else
         python3 - "${PUBLIC_REPO_DIR}" "${ORIG_PATH}" "${VERSION}" <<'TAREOF'
-import io, os, stat, sys, tarfile
+import os, stat, sys, tarfile
 
 src_dir, orig_path, version = sys.argv[1], sys.argv[2], sys.argv[3]
 prefix = f"VieLotus-IM-{version}"
@@ -87,7 +80,65 @@ with tarfile.open(orig_path, "w:gz") as tf:
                 with open(fp, "rb") as f:
                     tf.addfile(ti, fileobj=f)
 TAREOF
-        echo "ℹ Đã dựng ${ORIG_NAME} từ cây nguồn ${PUBLIC_REPO_DIR}."
+    fi
+    echo "⚠ DRY-RUN CHƯA CÓ TAG (ALLOW_UNRELEASED_LOCAL_ARCHIVE=1): Đã dựng ${ORIG_NAME} từ HEAD cục bộ và tắt ký GPG. TUYỆT ĐỐI KHÔNG dùng bản dựng này để nộp Debian/Mentors."
+else
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "❌ LỖI: Thiếu công cụ curl để tải upstream tarball chuẩn từ ${GITHUB_TAR_URL}." >&2
+        exit 1
+    fi
+    if ! curl -fsSL --max-time 30 "${GITHUB_TAR_URL}" -o "${ORIG_PATH}" 2>/dev/null || ! gzip -t "${ORIG_PATH}" >/dev/null 2>&1; then
+        rm -f "${ORIG_PATH}"
+        echo "❌ LỖI: Chưa có tag chính thức v${VERSION} trên GitHub (${GITHUB_TAR_URL}). Không dựng gói nộp Debian từ HEAD. Để chạy thử cục bộ trước khi tạo tag (không ký GPG, không dùng để upload), đặt ALLOW_UNRELEASED_LOCAL_ARCHIVE=1." >&2
+        exit 1
+    fi
+    echo "✓ Đã tải upstream tarball chuẩn uscan từ tag v${VERSION}: ${ORIG_NAME}"
+
+    if command -v git >/dev/null 2>&1 && git -C "${PUBLIC_REPO_DIR}" rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+        python3 - "${ORIG_PATH}" "${PUBLIC_REPO_DIR}" "${VERSION}" <<'PARITY_PYEOF'
+import hashlib, io, subprocess, sys, tarfile
+
+orig_path, repo_dir, version = sys.argv[1], sys.argv[2], sys.argv[3]
+prefix = f"VieLotus-IM-{version}/"
+
+def snapshot_tar(tf):
+    entries = {}
+    for member in tf.getmembers():
+        if member.name == "pax_global_header" or member.isdev() or member.isdir():
+            continue
+        if member.issym():
+            entries[member.name] = ("symlink", member.linkname, "")
+        elif member.isreg():
+            f = tf.extractfile(member)
+            data = f.read() if f is not None else b""
+            entries[member.name] = ("file", "", hashlib.sha256(data).hexdigest())
+    return entries
+
+with tarfile.open(orig_path, "r:gz") as gh_tf:
+    gh_entries = snapshot_tar(gh_tf)
+
+git_tar = subprocess.check_output(
+    ["git", "-C", repo_dir, "archive", "--format=tar", f"--prefix={prefix}", f"refs/tags/v{version}"]
+)
+with tarfile.open(fileobj=io.BytesIO(git_tar), mode="r:") as git_tf:
+    git_entries = snapshot_tar(git_tf)
+
+if gh_entries != git_entries:
+    gh_keys, git_keys = set(gh_entries), set(git_entries)
+    missing = sorted(git_keys - gh_keys)
+    extra = sorted(gh_keys - git_keys)
+    changed = sorted(k for k in (gh_keys & git_keys) if gh_entries[k] != git_entries[k])
+    print("❌ LỖI: Tarball tải từ GitHub KHÔNG khớp từng tệp với git tag cục bộ refs/tags/v" + version, file=sys.stderr)
+    if missing:
+        print(f"  - Thiếu từ GitHub ({len(missing)}): {missing[:5]}", file=sys.stderr)
+    if extra:
+        print(f"  - Dư trên GitHub ({len(extra)}): {extra[:5]}", file=sys.stderr)
+    if changed:
+        print(f"  - Sai nội dung/SHA-256 ({len(changed)}): {changed[:5]}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"✓ Đã đối chiếu SHA-256 khớp 100% ({len(gh_entries)} tệp/liên kết) giữa GitHub v{version}.tar.gz và refs/tags/v{version}.")
+PARITY_PYEOF
     fi
 fi
 
