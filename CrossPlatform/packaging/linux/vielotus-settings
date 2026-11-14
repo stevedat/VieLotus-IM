@@ -1980,7 +1980,7 @@ if not smoke_mode:
 
 sub_lbl = Gtk.Label()
 sub_lbl.set_markup(
-    f"<span size='8600' foreground='{P['fg_secondary']}'>Thuần chuẩn IBus &amp; Fcitx5 • C++20 • 100% Offline</span>"
+    f"<span size='8600' foreground='{P['fg_secondary']}'>IBus &amp; Fcitx5 • Engine C++20</span>"
 )
 sub_lbl.set_xalign(0)
 brand_vbox.pack_start(brand_top, False, False, 0)
@@ -3548,7 +3548,7 @@ m_hdr.set_markup(f"<span size='8000' weight='bold' foreground='{P['indigo']}'>�
 m_hdr.set_xalign(0)
 m_badge = Gtk.Label()
 m_badge.set_markup(
-    f"<span size='7800' weight='600' foreground='{P['fg_secondary']}'>IBus &amp; Fcitx5 Native • C++20 • 100% Offline</span>"
+    f"<span size='7800' weight='600' foreground='{P['fg_secondary']}'>IBus &amp; Fcitx5 • Engine C++20</span>"
 )
 m_badge.set_xalign(1)
 m_hdr_row.pack_start(m_hdr, False, False, 0)
@@ -3565,7 +3565,7 @@ m_pills = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 for pill_icon, pill_col, pill_txt in (
     ("⚡", P["orange"], "Phản hồi tức thì (&lt; 1ms)"),
     ("⇄", P["indigo"], "Song ngữ Anh–Việt tự động"),
-    ("✓", P["green"], "100% Offline • Không quyền ngầm"),
+    ("✓", P["green"], "Xử lý văn bản cục bộ"),
 ):
     p_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
     p_box.get_style_context().add_class("bento-pill")

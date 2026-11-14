@@ -169,6 +169,7 @@
     }
     .muted { color: var(--text-muted); font-weight: 400; }
     .small { font-size: 12.5px; }
+    .privacy-note { padding: 12px; margin: 12px 0; border-left: 3px solid var(--lotus-green); background: var(--bg-subtle); font-size: 13px; }
     input[type="text"],
     input[type="email"],
     textarea {
@@ -385,7 +386,7 @@
 
     <main>
       <h1>Gửi góp ý &amp; Báo lỗi</h1>
-      <p class="sub">Báo từ gõ chưa chuẩn, đề xuất tính năng hoặc chia sẻ trải nghiệm sử dụng Sen Việt. Tác giả đọc từng góp ý để hoàn thiện bộ kiểm thử 9.091 ca.</p>
+      <p class="sub">Gửi báo lỗi hoặc đề xuất. Xem dữ liệu được gửi và nơi lưu trong <a href="privacy.html">chính sách quyền riêng tư</a>.</p>
 
       <div class="meta-badge" id="meta-badge">
         <span class="meta-dot"></span>
@@ -403,7 +404,7 @@
         <div class="word-box" id="word-box">
           <div class="word-box-title">
             <span>Chi tiết từ / câu đang gõ (Tùy chọn)</span>
-            <span class="muted" style="text-transform:none;font-weight:500;">Giúp tái hiện chính xác 100%</span>
+            <span class="muted" style="text-transform:none;font-weight:500;">Không bắt buộc</span>
           </div>
           <div class="word-grid">
             <div class="field">
@@ -448,6 +449,7 @@
         </div>
 
         <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <p class="privacy-note">Khi gửi, biểu mẫu chuyển nội dung, chi tiết môi trường, email tùy chọn và tệp đính kèm (nếu có) tới API feedback. API có thể lưu chúng trong Cloudflare D1/R2 và nhận user-agent; thời hạn lưu chưa được công bố. Báo cáo cũng được chép vào clipboard. Hãy bỏ thông tin nhạy cảm trước khi gửi.</p>
         <p class="err" id="fb-err" role="alert"></p>
         <button class="btn" id="fb-submit" type="submit">Gửi góp ý cho Sen Việt</button>
         <p class="meta-footer" id="meta-footer"></p>
@@ -614,6 +616,8 @@
       form.onsubmit = async e => {
         e.preventDefault();
         errEl.textContent = "";
+
+        if (!window.confirm("Gửi nội dung biểu mẫu và tệp đính kèm (nếu có) tới dịch vụ feedback? Báo cáo cũng sẽ được chép vào clipboard.")) return;
 
         const typedKeys = keysInput.value.trim();
         const actualOut = actualInput.value.trim();

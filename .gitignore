@@ -10,7 +10,7 @@ DerivedData/
 *.xcodeproj/
 *.xcworkspace/
 
-# Local build & installer outputs (desktop installers & XCFramework live on GitHub Releases only)
+# Local build & installer outputs
 Binaries/
 Frameworks/
 dist/

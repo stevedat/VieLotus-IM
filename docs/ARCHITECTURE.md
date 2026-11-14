@@ -1,38 +1,33 @@
-# VieLotusIM (Sen Việt) — Open-Core System Architecture
+# Architecture
 
-## 1. Design Philosophy: Pure Apple Native & Zero Invasive Hooks
+## Swift engine and macOS app
 
-VieLotusIM is engineered to replace legacy low-level keyboard event hooks with a strictly sandboxed, native OS Input Method architecture:
+`Sources/VieLotusCore` contains the Swift input engine, composition state, bilingual handling, spelling abstractions, preferences, and supporting utilities. The source is included in this repository and built by SwiftPM.
 
-- **macOS (`Sources/VieLotusIM/`)**: Built 100% on Apple's `InputMethodKit` (`IMKServer`, `IMKInputController`, `IMKTextInput`). Zero `CGEventTap`, zero `CGEventSource`, zero Carbon synthetic backspaces, and zero Accessibility permission requirements.
-- **Windows (`CrossPlatform/windows-tsf/`)**: Built on Microsoft's Text Services Framework (`ITfTextInputProcessorEx`, `ITfKeyEventSink`, `ITfEditSession`) communicating with the core via the zero-copy C-ABI (`vielotus.h`).
-- **Linux (`CrossPlatform/fcitx5-vielotus/` & `CrossPlatform/ibus-vielotus/`)**: Native Fcitx5 (`fcitx::InputMethodEngineV2`) and IBus (`IBusEngine`) modules backed by `libVieLotusCAPI.so`.
-- **100% Offline & Zero-Logging Privacy**: No external network sockets, no telemetry collection, and zero disk logging of keystrokes.
+`Sources/VieLotusIM` is the macOS app. It integrates with text clients through Apple's InputMethodKit APIs. It does not use a global event tap or request Accessibility access for normal typing.
 
----
+`Sources/VieLotusTrace` contains diagnostic event and trace storage code. Diagnostic recording is separate from normal typing and must be explicitly started by the user.
 
-## 2. Host Integration & Presentation Modes (`ClientAdapter` & `PresentationRules`)
+## Windows and Linux
 
-Different host applications handle IME composition ranges differently. VieLotusIM dynamically selects the optimal presentation mode per bundle identifier:
+`Sources/VieLotusCoreWindows` contains the C++20 engine and its source lexicon/generator. `CrossPlatform/windows-tsf` provides the Windows TSF adapter. `CrossPlatform/ibus-vielotus` and `CrossPlatform/fcitx5-vielotus` provide Linux adapters over the C API.
 
-1. **Marked Text (`markedText`)**: Standard macOS inline underline composition (`setMarkedText:selectionRange:replacementRange:`) for native Cocoa/AppKit/SwiftUI text views and Chromium/Safari address bars.
-2. **Direct Replacement (`directReplacement`)**: Atomic UTF-16 `insertText:replacementRange:` updates for GPU-accelerated terminals (Ghostty, Alacritty, Kitty, iTerm2, Warp, WezTerm) and code editors where marked-text underlines interfere with terminal escape sequences or autocomplete popups.
+Debian packaging definitions are in `CrossPlatform/packaging/debian`. The Debian source package uses the source files named in its `copyright` file and builds the engine and adapters from source.
 
-Resolution order:
-`User Per-App Override` → `User Global Preference` → `Resources/typing-modes.yml` → `ClientAdapter Category Heuristic`.
+## Mobile apps
 
----
+The iOS and Android applications are distributed separately. Their application source and build projects are not in this repository. The Swift core includes platform abstractions, but this repository does not build or ship the iOS app.
 
-## 3. Open-Core Boundary (`VieLotusCore.xcframework` & `vielotus.h`)
+## Build graph
 
-To enable full security auditability of all OS-facing code while protecting proprietary linguistic and bilingual arbitration IP:
+```text
+SwiftPM
+  VieLotusCore ── VieLotusIM (macOS InputMethodKit)
+       ├───────── VieLotusCLI (regression benchmark)
+       └───────── VieLotusCoreTests
 
-- **Open Source (MIT)**:
-  - `Sources/VieLotusIM/`: Complete macOS `IMKInputController` implementation, preferences UI, and `DiagnosticLogger`.
-  - `Sources/VieLotusTrace/`: Sanitized diagnostic event contracts.
-  - `Sources/VieLotusCAPI/include/vielotus.h`: Stable C-ABI contract for Windows and Linux shells.
-  - `Sources/VieLotusCoreWindows/`: Unobfuscated C++20 desktop/Linux engine (`WindowsNativeEngine.{h,cpp}`), canonical UTF-8 (Unicode NFC) wordlists (`lexicon/*.txt`), and deterministic offline FNV-1a generator (`scripts/generate_lexicon_hashes.py`).
-  - `CrossPlatform/`: Complete C/C++ source code for `capi-native` (`libVieLotusCAPI.so`), Windows TSF, Linux Fcitx5, Linux IBus adapters, and Debian/RPM/Arch packaging.
-- **Remote SwiftPM macOS Core (`VieLotusCore.xcframework.zip`) & Release Installers (GitHub Releases)**:
-  - Compiled universal macOS framework (`arm64` + `x86_64`) providing `InputSessionManager`, `EngineBridge`, `SmartBilingualDetector`, `MacroEngine`, `ClientAdapter`, and `PresentationRules` — hosted on GitHub Releases and cryptographically verified by SwiftPM (`Package.swift` `checksum`) so zero binary blobs exist in the Git tree. Final desktop installers (`VieLotusIM.pkg`, `VieLotus-Setup-*.exe`, `vielotus_*.deb`) are published exclusively on GitHub Releases alongside `checksums.sha256`.
-  - Verified against the 9,091-case regression matrix (**100.00% (9,091 / 9,091)** overall alongside symmetric collision survival `vn_survives_collision` / `ambiguous_both_sides` **97.33% (365 / 375)** and `whitelist_safe = never` **100.00% (182 / 182)**).
+C++20
+  VieLotusCoreWindows ── C API ── IBus / Fcitx5 / Windows TSF
+```
+
+All project-owned source in this repository is licensed under MIT. Third-party materials retain the terms in their notices.

@@ -223,7 +223,7 @@ if ($makeappx) {
     <DisplayName>Sen Việt (VieLotusIM)</DisplayName>
     <PublisherDisplayName>Nido Holdings</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <Description>Bộ gõ Tiếng Việt thế hệ mới chuẩn Native TSF cho Windows 10/11 (Telex, VNI, Smart Bilingual 100% Offline).</Description>
+    <Description>Bộ gõ tiếng Việt cho Windows 10/11, dùng Text Services Framework (TSF), hỗ trợ Telex, VNI và nhập liệu Anh–Việt.</Description>
   </Properties>
 
   <Dependencies>

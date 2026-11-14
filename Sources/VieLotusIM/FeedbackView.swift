@@ -325,9 +325,14 @@ struct FeedbackSheetView: View {
 
             // Auto-Diagnostics Toggle & Preview
             VStack(alignment: .leading, spacing: 6) {
+                Text("Không gửi tự động. Khi chọn một nút bên dưới, báo cáo có thể gồm nội dung đã nhập và cấu hình chẩn đoán; GitHub hoặc email có thể nhận nội dung qua URL. Báo cáo cũng được sao chép vào Clipboard. Hãy xem trước và xóa dữ liệu nhạy cảm.")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 HStack {
                     Toggle(
-                        "Đính kèm cấu hình bộ gõ & trạng thái hệ thống (ẩn danh, không chứa văn bản gõ)",
+                        "Đính kèm cấu hình bộ gõ & trạng thái hệ thống",
                         isOn: $includeDiagnostics
                     )
                     .toggleStyle(.checkbox)

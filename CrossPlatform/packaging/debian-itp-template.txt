@@ -19,9 +19,7 @@ Key features:
  - Pure C++20 native engine (~250 KB shared library) with zero external
    runtime dependencies beyond the standard C/C++ runtime
  - Native IBus and Fcitx5 integration as split packages
- - Smart Bilingual detection: 100.00% accuracy on 9,091-case regression
-   suite with symmetric collision metrics (vn_survives_collision: 97.33%,
-   whitelist_safe=never: 100.00%)
+ - Telex and VNI input methods with English/Vietnamese bilingual handling
  - Designed as a modern replacement for legacy Vietnamese input methods
 
 The package is split into:

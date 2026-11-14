@@ -1614,7 +1614,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         }
 
         RectF subBrandRect(64.0f * s, 29.0f * s, 380.0f * s, 17.0f * s);
-        g.DrawString(L"B\u1ED9 g\u00F5 ti\u1EBFng Vi\u1EC7t thu\u1EA7n chu\u1EA9n Native TSF \u2022 100% Offline", -1, &fHeaderSub, subBrandRect, &sfLeft, &secondaryBrush);
+        g.DrawString(L"B\u1ED9 g\u00F5 ti\u1EBFng Vi\u1EC7t thu\u1EA7n chu\u1EA9n Windows TSF", -1, &fHeaderSub, subBrandRect, &sfLeft, &secondaryBrush);
 
         // 2-Tab Segmented Switcher (Cài đặt | Thông tin) (x=456..660)
         RectF segBg(456.0f * s, 11.0f * s, 204.0f * s, 32.0f * s);
@@ -1828,7 +1828,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 -1, &fSecHdr, RectF(34.0f * s, 77.0f * s, 220.0f * s, 18.0f * s), &sfLeft, &indigoBrush
             );
             g.DrawString(
-                L"Windows TSF Native \u2022 100% Offline \u2022 An to\u00E0n tuy\u1EC7t \u0111\u1ED1i",
+                L"Windows TSF Native \u2022 X\u1EED l\u00FD c\u1EE5c b\u1ED9",
                 -1, &fSub, RectF(280.0f * s, 77.0f * s, 366.0f * s, 18.0f * s), &sfRight, &secondaryBrush
             );
             g.DrawString(

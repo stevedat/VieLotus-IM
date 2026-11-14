@@ -1,22 +1,27 @@
-# AGENTS.md — VietLotusIM (Sen Việt) [Open-Core Edition]
+# VietLotusIM repository notes
 
-## Build & Verification Commands
+## Scope
 
-```bash
-swift build --product VieLotusIM               # Compile macOS IMK shell (SwiftPM fetches & SHA-256 verifies VieLotusCore.xcframework.zip)
-./scripts/build_imk.sh                         # Build release universal VieLotusIM.app + codesign
-./scripts/build_pkg.sh                         # Build auto-registering installer package (VieLotusIM.pkg)
+This public repository contains the Swift engine and macOS InputMethodKit app, plus the C++20 Windows and Linux engines/adapters. The iOS and Android application source is maintained outside this repository.
+
+Project-owned source in this repository is MIT licensed. Keep third-party notices with their corresponding files and packages. Do not add mobile application source, signing credentials, build outputs, or private product integrations to the public export.
+
+## Build and verify
+
+Run on macOS 13 or later with the Swift 6 toolchain:
+
+```sh
+swift test
+swift run VieLotusCLI --benchmark
+swift build --product VieLotusIM
 ```
 
-## Open-Core Architecture
+The Swift package compiles `Sources/VieLotusCore` from source. It does not fetch a prebuilt core binary.
 
-VietLotusIM follows an **Open-Core** model designed for full OS-boundary transparency and security auditability while protecting core linguistic engine IP:
+Linux and Windows build steps are maintained under `CrossPlatform/` and `scripts/`.
 
-- **`Sources/VieLotusIM/` (Public — MIT)**: Pure Apple `InputMethodKit` shell (`IMKInputController`, `IMKServer`, `IMKTextInput`). Zero `CGEventTap`, zero `CGEventSource`, zero Accessibility permissions, zero keystroke logging.
-- **`Sources/VieLotusTrace/` (Public — MIT)**: Sanitized diagnostic trace contracts.
-- **`Sources/VieLotusCAPI/include/vielotus.h` (Public — MIT)**: Zero-copy C-ABI header for desktop platform shells.
-- **`Sources/VieLotusCoreWindows/` (Public — MIT, DFSG #2)**: Unobfuscated C++20 desktop/Linux engine (`WindowsNativeEngine.{h,cpp}`), canonical UTF-8 (Unicode NFC) wordlists (`lexicon/*.txt`), and deterministic offline 64-bit FNV-1a table generator (`scripts/generate_lexicon_hashes.py`).
-- **`CrossPlatform/` (Public — MIT)**: Native desktop input method shells and CMake/packaging recipes for Windows (`windows-tsf`) and Linux (`capi-native`, `fcitx5-vielotus`, `ibus-vielotus`, `packaging`).
-- **`Resources/typing-modes.yml` (Public — MIT)**: Data-driven per-app presentation rules.
-- **`docs/ARCHITECTURE.md` & `docs/BENCHMARK_REPORT.md` (Public)**: High-level system architecture and regression matrix disclosure (**100.00% (9,091 / 9,091)** overall alongside symmetric collision survival `vn_survives_collision` / `ambiguous_both_sides` **97.33% (365 / 375)** and `whitelist_safe = never` **100.00% (182 / 182)**).
-- **`VieLotusCore.xcframework.zip` (Remote SwiftPM BinaryTarget on GitHub Releases)**: Universal macOS framework (`arm64` + `x86_64`) verified natively by SwiftPM's SHA-256 `checksum` in `Package.swift` — zero binary blobs are tracked in the Git tree. Desktop installers (`VieLotusIM.pkg`, `VieLotus-Setup-*.exe`, `vielotus_*.deb`) and `checksums.sha256` are published exclusively on GitHub Releases.
+## Release rules
+
+GitHub Releases contain only downloadable installers and `checksums.sha256`. Do not upload core framework archives, source packages, APT metadata, or build products. The release workflow verifies the installer allowlist and checksum manifest.
+
+Benchmark notes must report the primary suite together with `ambiguous_both_sides` and the single-path `whitelist_safe = never` result. Include the suite conditions and measurement date.
