@@ -873,6 +873,26 @@ struct NativeEngineState {
         return false;
     }
 
+    bool hasStrongVietnameseSyllableAnchor() const {
+        if (hasCompoundUoOrStrokeD()) return true;
+        if (!m_nonAdjacentCircumflex && m_tone != 0) {
+            int vStart = -1, vEnd = -1;
+            bool hasCoda = false;
+            findVowelCluster(vStart, vEnd, hasCoda);
+            if (hasCoda) {
+                for (int i = vStart; i < vEnd; ++i) {
+                    const wchar_t c0 = m_tokens[i].baseLower;
+                    const wchar_t c1 = m_tokens[i + 1].baseLower;
+                    if (((c0 == L'i' || c0 == L'y') && c1 == L'e' && m_tokens[i + 1].shape == 1) ||
+                        (c0 == L'u' && c1 == L'o' && m_tokens[i + 1].shape == 1)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     bool isOpenSameVowelExtension() const {
         if (m_tone == 0 || m_literalTailLen <= 0 || m_tokenLen < 1 || !rawWordStartsNonW()) {
             return false;
@@ -910,7 +930,7 @@ struct NativeEngineState {
         if (m_tokenLen != 1 || m_literalTailLen <= 0 || !rawWordStartsNonW()) {
             return false;
         }
-        if (m_tokens[0].shape != 1 && m_tokens[0].shape != 3) {
+        if (m_tokens[0].shape != 1 && m_tokens[0].shape != 2 && m_tokens[0].shape != 3) {
             return false;
         }
         for (int i = 0; i < m_literalTailLen; ++i) {
@@ -1217,9 +1237,15 @@ bool NativeEngineState::isValidVietnameseSyllable() const {
     const bool isRelaxedH =
         m_relaxedCoda && hasShapeOrTone && codaLen == 1 && codaStr[0] == L'h' &&
         !(m_rawLen >= 2 && rawLower[m_rawLen - 2] == L's' && rawLower[m_rawLen - 1] == L'h');
+    const bool isEthnicDakLakK =
+        codaLen == 1 && codaStr[0] == L'k' &&
+        vLen == 1 && m_tokens[vStart].baseLower == L'a' && m_tokens[vStart].shape == 3 &&
+        (hasStrokeD ||
+         (initLen == 1 && initStr[0] == L'l' && (m_tone != 0 || m_tokens[0].isUpper || m_inVietnameseContext)));
     const bool isRelaxedK =
-        m_relaxedCoda && hasShapeOrTone && codaLen == 1 && codaStr[0] == L'k' &&
-        !(m_rawLen >= 2 && rawLower[m_rawLen - 2] == L's' && rawLower[m_rawLen - 1] == L'k');
+        isEthnicDakLakK ||
+        (m_relaxedCoda && hasShapeOrTone && codaLen == 1 && codaStr[0] == L'k' &&
+         !(m_rawLen >= 2 && rawLower[m_rawLen - 2] == L's' && rawLower[m_rawLen - 1] == L'k'));
 
     wchar_t effectiveCoda[16]{};
     int effectiveCodaLen = codaLen;
@@ -1254,7 +1280,7 @@ bool NativeEngineState::isValidVietnameseSyllable() const {
             else if ((v2 == L'u' || v2 == L'y') && (s1 == 0 || s1 == 1) && s2 == 0 && effectiveCodaLen == 0) validPair = true;
         } else if (v1 == L'e') {
             if (v2 == L'o' && s1 == 0 && s2 == 0 && effectiveCodaLen == 0) validPair = true;
-            else if (v2 == L'u' && s1 == 1 && s2 == 0 && effectiveCodaLen == 0) validPair = true;
+            else if (v2 == L'u' && s1 == 1 && s2 == 0 && effectiveCodaLen == 0 && !(initLen == 2 && initStr[0] == L'q' && initStr[1] == L'u')) validPair = true;
         } else if (v1 == L'i') {
             if (v2 == L'a' && s1 == 0 && s2 == 0 && effectiveCodaLen == 0) validPair = true;
             else if (v2 == L'e' && s1 == 0 && s2 == 1) validPair = true;
@@ -1709,7 +1735,8 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
     }
     if (isContextEnglishCollisionWord(rawLower, m_rawLen)) {
         if (m_precededByTechDelimiter) return true;
-        if (m_pendingBoundaryCp == '_' || m_pendingBoundaryCp == '/' || m_pendingBoundaryCp == '.') return true;
+        if (m_pendingBoundaryCp == '_' || m_pendingBoundaryCp == '/' || m_pendingBoundaryCp == '.' ||
+            (m_inputMethod == InputMethod::Telex && isAsciiDigit(m_pendingBoundaryCp))) return true;
         if (m_rawLen == 4 && rawLower[0] == L't' && rawLower[1] == L'u' && rawLower[2] == L'r' && rawLower[3] == L'n') {
             return !m_lastWordWasTunCollocationHead;
         }
@@ -1743,6 +1770,7 @@ bool NativeEngineState::tryComposeMixedCaseCompound(wchar_t *outBuf, int maxLen)
     wchar_t combined[kMaxWordTokens]{};
     int combinedLen = 0;
     bool compoundHasNonAscii = false;
+    bool compoundRestoredEscapeSubword = false;
 
     for (int s = 0; s < segCount; ++s) {
         const wchar_t *segPtr = m_rawWord + segStarts[s];
@@ -1765,6 +1793,9 @@ bool NativeEngineState::tryComposeMixedCaseCompound(wchar_t *outBuf, int maxLen)
         wchar_t segLower[kMaxWordTokens]{};
         for (int j = 0; j < segLen; ++j) {
             segLower[j] = toLowerAscii(segPtr[j]);
+        }
+        if (isExtendedEnglishEscapeWord(segLower, segLen)) {
+            compoundRestoredEscapeSubword = true;
         }
         if (isEnglishContextAnchor(segLower, segLen) || isSpacePrefixStarter(segLower, segLen)) {
             if (combinedLen + segLen >= kMaxWordTokens) return false;
@@ -1807,7 +1838,7 @@ bool NativeEngineState::tryComposeMixedCaseCompound(wchar_t *outBuf, int maxLen)
         }
     }
 
-    if (!compoundHasNonAscii || combinedLen <= 0 || combinedLen >= maxLen) {
+    if ((!compoundHasNonAscii && !compoundRestoredEscapeSubword) || combinedLen <= 0 || combinedLen >= maxLen) {
         return false;
     }
     for (int i = 0; i < combinedLen; ++i) {
@@ -1979,44 +2010,60 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
             return true;
         }
 
-        // Mutual exclusion reshape: 'trương' + 'o' -> 'truông' (ươ -> uô, only when not already finalized with coda + tone)
-        if (lowerCh == L'o' && vStart != -1 && !(hasCoda && m_tone != 0)) {
+        // Mutual exclusion reshape: 'trương'/'trường'/'được' + 'o' -> 'truông'/'truồng'/'đuộc' (ươ -> uô)
+        if (lowerCh == L'o' && vStart != -1) {
             for (int i = vStart; i < vEnd; ++i) {
                 if (m_tokens[i].baseLower == L'u' && m_tokens[i].shape == 2 &&
                     m_tokens[i + 1].baseLower == L'o' && m_tokens[i + 1].shape == 2) {
                     saveUndoSnapshot();
                     m_tokens[i].shape = 0;
                     m_tokens[i + 1].shape = 1;
-                    m_lastShapeKey = L'o';
-                    m_lastToneKey = 0;
-                    m_shapeCancelledOnce = false;
-                    m_uHornFromOwnW = false;
-                    return true;
+                    if (!hasCoda || isValidVietnameseSyllable()) {
+                        m_lastShapeKey = L'o';
+                        m_lastToneKey = 0;
+                        m_shapeCancelledOnce = false;
+                        m_uHornFromOwnW = false;
+                        return true;
+                    }
+                    m_tokens[i].shape = 2;
+                    m_tokens[i + 1].shape = 2;
+                    m_hasUndoSnapshot = false;
+                    break;
                 }
             }
-            // Single 'ơ' + 'o' -> 'ô' (e.g. 'cơ' + 'o' -> 'cô', 'hơn' + 'o' -> 'hôn')
+            // Single 'ơ' + 'o' -> 'ô' (e.g. 'cơ' + 'o' -> 'cô', 'hơn' + 'o' -> 'hôn', 'hớn' + 'o' -> 'hốn')
             for (int i = vStart; i <= vEnd; ++i) {
                 if (m_tokens[i].baseLower == L'o' && m_tokens[i].shape == 2) {
                     saveUndoSnapshot();
                     m_tokens[i].shape = 1;
-                    m_lastShapeKey = L'o';
-                    m_lastToneKey = 0;
-                    m_shapeCancelledOnce = false;
-                    return true;
+                    if (!hasCoda || isValidVietnameseSyllable()) {
+                        m_lastShapeKey = L'o';
+                        m_lastToneKey = 0;
+                        m_shapeCancelledOnce = false;
+                        return true;
+                    }
+                    m_tokens[i].shape = 2;
+                    m_hasUndoSnapshot = false;
+                    break;
                 }
             }
         }
 
-        // Mutual exclusion reshape: 'căn' + 'a' -> 'cân' (ă -> â)
-        if (lowerCh == L'a' && vStart != -1 && !(hasCoda && m_tone != 0)) {
+        // Mutual exclusion reshape: 'căn'/'cắm' + 'a' -> 'cân'/'cấm' (ă -> â)
+        if (lowerCh == L'a' && vStart != -1) {
             for (int i = vStart; i <= vEnd; ++i) {
                 if (m_tokens[i].baseLower == L'a' && m_tokens[i].shape == 3) {
                     saveUndoSnapshot();
                     m_tokens[i].shape = 1;
-                    m_lastShapeKey = L'a';
-                    m_lastToneKey = 0;
-                    m_shapeCancelledOnce = false;
-                    return true;
+                    if (!hasCoda || isValidVietnameseSyllable()) {
+                        m_lastShapeKey = L'a';
+                        m_lastToneKey = 0;
+                        m_shapeCancelledOnce = false;
+                        return true;
+                    }
+                    m_tokens[i].shape = 3;
+                    m_hasUndoSnapshot = false;
+                    break;
                 }
             }
         }
@@ -2059,14 +2106,16 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
         // Adjacent vowel doubling (Including late vowel modification after tone: 'đẻ' + 'e' -> 'để', 'đó' + 'o' -> 'đố', 'cá' + 'a' -> 'cấ')
         if (!hasPriorCircumflexOrBreve && m_tokenLen > 0 && m_tokens[m_tokenLen - 1].baseLower == lowerCh && m_tokens[m_tokenLen - 1].shape == 0) {
             const bool isContiguousDouble = (m_rawLen >= 2 && toLowerAscii(m_rawWord[m_rawLen - 2]) == lowerCh);
-            m_tokens[m_tokenLen - 1].shape = 1;
-            m_lastShapeKey = lowerCh;
-            m_lastToneKey = 0;
-            m_shapeCancelledOnce = false;
-            if (!isContiguousDouble) {
-                m_nonAdjacentCircumflex = true;
+            if (!(vEnd > vStart && m_tone != 0 && !isContiguousDouble)) {
+                m_tokens[m_tokenLen - 1].shape = 1;
+                m_lastShapeKey = lowerCh;
+                m_lastToneKey = 0;
+                m_shapeCancelledOnce = false;
+                if (!isContiguousDouble) {
+                    m_nonAdjacentCircumflex = true;
+                }
+                return true;
             }
-            return true;
         }
 
         // Non-adjacent SEN Flex circumflex (e.g. 'ama' -> 'âm', 'eme' -> 'êm', 'cana' -> 'cân', 'toiso' -> 'tối')
@@ -2077,7 +2126,8 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
                 codaStr[codaLen++] = m_tokens[i].baseLower;
             }
             if (isValidFinalCoda(codaStr, codaLen)) {
-                for (int i = vStart; i <= vEnd; ++i) {
+                const int maxCircIdx = hasCoda ? vEnd : (vEnd - 1);
+                for (int i = vStart; i <= maxCircIdx; ++i) {
                     if (m_tokens[i].baseLower == lowerCh && m_tokens[i].shape == 0) {
                         m_tokens[i].shape = 1;
                         m_lastShapeKey = lowerCh;
@@ -2117,12 +2167,12 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
         }
 
         if (vStart != -1) {
-            // Absorb 2nd 'w' in 'dduwowng' ('ư' got horn from 1st 'w', then 'o' was typed and upgraded to 'ươ', then user immediately typed 'w' for 'ơ' before coda/tone)
-            if (!hasCoda && m_tone == 0) {
+            // Absorb 2nd 'w' in 'dduwowng' / 'buwsowm' / 'muwfowi' ('ư' got horn from 1st 'w', then 'o' was typed and upgraded to 'ươ', then user immediately typed 'w' for 'ơ' before coda/offglide)
+            if (!hasCoda && vEnd == m_tokenLen - 1) {
                 for (int i = vStart; i < vEnd; ++i) {
                     if (m_tokens[i].baseLower == L'u' && m_tokens[i].shape == 2 &&
                         m_tokens[i + 1].baseLower == L'o' && m_tokens[i + 1].shape == 2 &&
-                        m_uHornFromOwnW && m_lastShapeKey != L'w') {
+                        (i + 1 == vEnd) && m_uHornFromOwnW && m_lastShapeKey != L'w') {
                         m_uHornFromOwnW = false;
                         m_lastShapeKey = L'w';
                         return true;
@@ -2152,24 +2202,39 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
                 }
             }
 
-            // Mutual exclusion reshape: 'cân' + 'w' -> 'căn', 'côn' + 'w' -> 'cơn'
-            if (!(hasCoda && m_tone != 0)) {
+            // Mutual exclusion reshape: 'cân'/'cấm' + 'w' -> 'căn'/'cắm', 'côn'/'đuộc' + 'w' -> 'cơn'/'được'
+            if (!(hasCoda && m_tone != 0 && m_nonAdjacentCircumflex)) {
                 for (int i = vStart; i <= vEnd; ++i) {
                     if (m_tokens[i].baseLower == L'a' && m_tokens[i].shape == 1) {
                         saveUndoSnapshot();
                         m_tokens[i].shape = 3;
-                        m_lastShapeKey = L'w';
-                        m_lastToneKey = 0;
-                        m_shapeCancelledOnce = false;
-                        return true;
+                        if (!hasCoda || isValidVietnameseSyllable()) {
+                            m_lastShapeKey = L'w';
+                            m_lastToneKey = 0;
+                            m_shapeCancelledOnce = false;
+                            return true;
+                        }
+                        m_tokens[i].shape = 1;
+                        m_hasUndoSnapshot = false;
+                        break;
                     }
                     if (m_tokens[i].baseLower == L'o' && m_tokens[i].shape == 1) {
                         saveUndoSnapshot();
+                        const bool hasPrevU = (i > vStart && m_tokens[i - 1].baseLower == L'u');
+                        const int prevUShape = hasPrevU ? m_tokens[i - 1].shape : 0;
+                        if (hasPrevU) m_tokens[i - 1].shape = 2;
                         m_tokens[i].shape = 2;
-                        m_lastShapeKey = L'w';
-                        m_lastToneKey = 0;
-                        m_shapeCancelledOnce = false;
-                        return true;
+                        if (!hasCoda || isValidVietnameseSyllable()) {
+                            m_lastShapeKey = L'w';
+                            m_lastToneKey = 0;
+                            m_shapeCancelledOnce = false;
+                            m_uHornFromOwnW = false;
+                            return true;
+                        }
+                        if (hasPrevU) m_tokens[i - 1].shape = prevUShape;
+                        m_tokens[i].shape = 1;
+                        m_hasUndoSnapshot = false;
+                        break;
                     }
                 }
             }
@@ -2183,12 +2248,21 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
                     m_escapeLockTokenLen = 1;
                     return false;
                 }
-                // Classic open untoned single or compound vowel ('oww' -> 'ow', 'tuoww' -> 'tuow', 'muaww' -> 'muaw', 'cuuww' -> 'cuuw', 'hoaww' -> 'hoaw', 'huouww' -> 'huouw')
+                // Classic open untoned single or compound vowel ('oww' -> 'ow', 'tuoww' -> 'tuow', 'muaww' -> 'muaw', 'cuuww' -> 'cuuw', 'hoaww' -> 'hoaw', 'huouww' -> 'huouw', 'tww' -> 'tw', 'nhww' -> 'nhw')
                 const bool isContiguousDoubleW = (m_rawLen >= 2 && toLowerAscii(m_rawWord[m_rawLen - 2]) == L'w');
                 if (!hasCoda && m_tone == 0 && m_lastShapeKey == L'w' && isContiguousDoubleW) {
-                    for (int i = vStart; i <= vEnd; ++i) {
-                        if (m_tokens[i].shape == 2 || m_tokens[i].shape == 3) {
-                            m_tokens[i].shape = 0;
+                    const bool isSyntheticUHorn =
+                        (vStart == vEnd && vStart == m_tokenLen - 1 &&
+                         m_tokens[vStart].baseLower == L'u' && m_uHornFromOwnW && m_rawLen >= 3 &&
+                         (toLowerAscii(m_rawWord[m_rawLen - 3]) != L'u' ||
+                          (vStart == 2 && m_tokens[0].baseLower == L'q' && m_tokens[1].baseLower == L'u')));
+                    if (isSyntheticUHorn) {
+                        --m_tokenLen;
+                    } else {
+                        for (int i = vStart; i <= vEnd; ++i) {
+                            if (m_tokens[i].shape == 2 || m_tokens[i].shape == 3) {
+                                m_tokens[i].shape = 0;
+                            }
                         }
                     }
                     m_literalLock = true;
@@ -2197,8 +2271,20 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
                     m_uHornFromOwnW = false;
                     return false;
                 }
-                // Strip horn/breve while preserving tone and coda, and emit literal 'w' on valid Vietnamese stems
+                // Policy 3B+ Semantic Saturation: on completed closed/offglide Vietnamese syllables
+                // (e.g. 'được' + 'w' -> 'đượcw', 'trưởng' + 'w' -> 'trưởngw', 'người' + 'w' -> 'ngườiw', 'cửa' + 'w' -> 'cửaw'),
+                // lock the syllable stem and emit literal 'w' without stripping horn/breve so Backspace restores 'được'/'trưởng'.
                 const bool stemWasValidVn = rawWordStartsNonW() && isValidVietnameseSyllable();
+                if ((hasCoda || vEnd > vStart) && stemWasValidVn) {
+                    m_telexToneEscape = true;
+                    m_overflowLocked = true;
+                    if (m_literalTailLen < kMaxWordTokens - 1) {
+                        m_literalTail[m_literalTailLen++] = ch;
+                        m_literalTail[m_literalTailLen] = 0;
+                    }
+                    return true;
+                }
+                // Strip horn/breve on open single-vowel stems while preserving tone, and emit literal 'w' on valid Vietnamese stems
                 saveUndoSnapshot();
                 for (int i = vStart; i <= vEnd; ++i) {
                     if (m_tokens[i].shape == 2 || m_tokens[i].shape == 3) {
@@ -2334,13 +2420,19 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
         }
         wchar_t effectiveCoda[16]{};
         int effectiveCodaLen = codaLen;
+        const bool isEthnicDakLakK =
+            codaLen == 1 && codaStr[0] == L'k' && (vEnd == vStart) &&
+            m_tokens[vStart].baseLower == L'a' && m_tokens[vStart].shape == 3 &&
+            ((vStart == 1 && m_tokens[0].baseLower == L'd' && m_tokens[0].shape == 4) ||
+             (vStart == 1 && m_tokens[0].baseLower == L'l'));
         if (m_relaxedCoda && codaLen == 1 && codaStr[0] == L'h' &&
             !(m_rawLen >= 3 && toLowerAscii(m_rawWord[m_rawLen - 3]) == L's' && toLowerAscii(m_rawWord[m_rawLen - 2]) == L'h')) {
             effectiveCoda[0] = L'n';
             effectiveCoda[1] = L'h';
             effectiveCodaLen = 2;
-        } else if (m_relaxedCoda && codaLen == 1 && codaStr[0] == L'k' &&
-                   !(m_rawLen >= 3 && toLowerAscii(m_rawWord[m_rawLen - 3]) == L's' && toLowerAscii(m_rawWord[m_rawLen - 2]) == L'k')) {
+        } else if (isEthnicDakLakK ||
+                   (m_relaxedCoda && codaLen == 1 && codaStr[0] == L'k' &&
+                    !(m_rawLen >= 3 && toLowerAscii(m_rawWord[m_rawLen - 3]) == L's' && toLowerAscii(m_rawWord[m_rawLen - 2]) == L'k'))) {
             effectiveCoda[0] = L'c';
             effectiveCodaLen = 1;
         } else {
@@ -2721,13 +2813,19 @@ bool NativeEngineState::applyVniCharacter(wchar_t ch) {
         }
         wchar_t effectiveCoda[16]{};
         int effectiveCodaLen = codaLen;
+        const bool isEthnicDakLakK =
+            codaLen == 1 && codaStr[0] == L'k' && (vEnd == vStart) &&
+            m_tokens[vStart].baseLower == L'a' && m_tokens[vStart].shape == 3 &&
+            ((vStart == 1 && m_tokens[0].baseLower == L'd' && m_tokens[0].shape == 4) ||
+             (vStart == 1 && m_tokens[0].baseLower == L'l'));
         if (m_relaxedCoda && codaLen == 1 && codaStr[0] == L'h' &&
             !(m_rawLen >= 3 && toLowerAscii(m_rawWord[m_rawLen - 3]) == L's' && toLowerAscii(m_rawWord[m_rawLen - 2]) == L'h')) {
             effectiveCoda[0] = L'n';
             effectiveCoda[1] = L'h';
             effectiveCodaLen = 2;
-        } else if (m_relaxedCoda && codaLen == 1 && codaStr[0] == L'k' &&
-                   !(m_rawLen >= 3 && toLowerAscii(m_rawWord[m_rawLen - 3]) == L's' && toLowerAscii(m_rawWord[m_rawLen - 2]) == L'k')) {
+        } else if (isEthnicDakLakK ||
+                   (m_relaxedCoda && codaLen == 1 && codaStr[0] == L'k' &&
+                    !(m_rawLen >= 3 && toLowerAscii(m_rawWord[m_rawLen - 3]) == L's' && toLowerAscii(m_rawWord[m_rawLen - 2]) == L'k'))) {
             effectiveCoda[0] = L'c';
             effectiveCodaLen = 1;
         } else {
@@ -2954,6 +3052,20 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
             }
         }
     if (!expandedRelaxedG) {
+        // Pre-vowel horn after 'đ' ('ddwuocj' -> 'được', 'ddwoij' -> 'đợi', 'ddwats' -> 'đắt', while standalone 'ddw' remains 'đw')
+        if (m_inputMethod == InputMethod::Telex && !m_literalLock && m_literalTailLen == 0 &&
+            m_tokenLen == 2 &&
+            m_tokens[0].baseLower == L'd' && m_tokens[0].shape == 4 &&
+            m_tokens[1].baseLower == L'w' && m_tokens[1].shape == 0 &&
+            (lowerCh == L'u' || lowerCh == L'o' || lowerCh == L'a')) {
+            const int targetShape = (lowerCh == L'a') ? 3 : 2;
+            m_tokens[1] = SyllableToken{ lowerCh, isUpper, targetShape };
+            m_uHornFromOwnW = (lowerCh == L'u');
+            m_lastToneKey = 0;
+            m_lastShapeKey = 0;
+            m_shapeCancelledOnce = false;
+            m_hasUndoSnapshot = false;
+        } else {
         // Post-Coda / Post-Syllable Overflow Lock (parity with macOS shouldLockPostCodaOverflow):
         // If m_tokens has already formed a valid Vietnamese syllable with Vietnamese-specific shapes (đ, ă, â, ơ, ư),
         // toned ê/ô, or a cancelled vowel shape, and appending lowerCh to m_tokens would violate Vietnamese phonotactics,
@@ -2962,7 +3074,8 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
         bool lockHornedDiphthongRepeat = false;
         const bool isSingleModifiedVowelStem =
             (m_tokenLen == 1 && rawWordStartsNonW() &&
-             (m_tokens[0].shape == 1 || m_tokens[0].shape == 3) &&
+             (m_tokens[0].shape == 1 || m_tokens[0].shape == 3 ||
+              (m_tokens[0].shape == 2 && m_tone != 0 && !(m_tokens[0].baseLower == L'u' && lowerCh == L'o'))) &&
              isAsciiBaseVowel(lowerCh));
         if ((m_tokenLen >= 2 || isSingleModifiedVowelStem) && isValidVietnameseSyllable()) {
             int vStartNow = -1, vEndNow = -1;
@@ -3009,12 +3122,31 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
                 int vS = -1, vE = -1;
                 bool hC = false;
                 findVowelCluster(vS, vE, hC);
+                int savedUoIdx = -1;
+                int savedUShape = 0, savedOShape = 0;
+                if (vS != -1 && !m_shapeCancelledOnce) {
+                    for (int i = vS; i < vE; ++i) {
+                        if (m_tokens[i].baseLower == L'u' && m_tokens[i + 1].baseLower == L'o' &&
+                            (m_tokens[i].shape == 2 || m_tokens[i + 1].shape == 2)) {
+                            savedUoIdx = i;
+                            savedUShape = m_tokens[i].shape;
+                            savedOShape = m_tokens[i + 1].shape;
+                            m_tokens[i].shape = 2;
+                            m_tokens[i + 1].shape = 2;
+                            break;
+                        }
+                    }
+                }
                 const int savedToneForExtend = m_tone;
                 if (!hasCodaNow && !isAsciiBaseVowel(lowerCh)) {
                     m_tone = 0;
                 }
                 bool validExtended = isValidVietnameseSyllable();
                 m_tone = savedToneForExtend;
+                if (savedUoIdx != -1) {
+                    m_tokens[savedUoIdx].shape = savedUShape;
+                    m_tokens[savedUoIdx + 1].shape = savedOShape;
+                }
                 --m_tokenLen;
                 if (!validExtended) {
                     lockOverflowToTail = true;
@@ -3027,7 +3159,7 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
             if (m_inputMethod == InputMethod::VNI) {
                 m_classicOrVniEscape = true;
             }
-            if (hasCompoundUoOrStrokeD() || lockHornedDiphthongRepeat || m_relaxedCodaExpanded) {
+            if (hasStrongVietnameseSyllableAnchor() || lockHornedDiphthongRepeat || m_relaxedCodaExpanded) {
                 m_overflowLocked = true;
             }
             if (m_literalTailLen < kMaxWordTokens - 1) {
@@ -3046,7 +3178,7 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
             int vStart = -1, vEnd = -1;
             bool hasCoda = false;
             findVowelCluster(vStart, vEnd, hasCoda);
-            if (vStart != -1 && hasCoda) {
+            if (vStart != -1 && !m_shapeCancelledOnce) {
                 for (int i = vStart; i < vEnd; ++i) {
                     if (m_tokens[i].baseLower == L'u' && m_tokens[i + 1].baseLower == L'o' &&
                         (m_tokens[i].shape == 2 || m_tokens[i + 1].shape == 2)) {
@@ -3054,6 +3186,8 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
                         m_tokens[i + 1].shape = 2;
                     }
                 }
+            }
+            if (vStart != -1 && hasCoda) {
                 if (vStart == 0 && vEnd == 1 && rawWordStartsNonW() &&
                     m_tokens[0].baseLower == L'u' && m_tokens[0].shape == 2 &&
                     m_tokens[1].baseLower == L'a' && m_tokens[1].shape == 0) {
@@ -3061,6 +3195,7 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
                     m_tokens[1].shape = 3;
                 }
             }
+        }
         }
     }
     }
@@ -4601,9 +4736,9 @@ VIELOTUS_CAPI_EXPORT void vielotus_sync_armed_word(void *session, const char *be
 }
 
 VIELOTUS_CAPI_EXPORT const char *vielotus_get_version(void) {
-    return "2.0.2";
+    return "2.0.3";
 }
 
 VIELOTUS_CAPI_EXPORT const char *vielotus_get_build_stamp(void) {
-    return "2.0.2-r11 (PureTSF+Tray+Feedback)";
+    return "2.0.3-r12 (PureTSF+Tray+Feedback)";
 }
