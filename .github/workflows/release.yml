@@ -364,7 +364,7 @@ jobs:
           TAG_NAME: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          for stale in vielotus-linux-amd64.deb vielotus-linux-arm64.deb SHA256SUMS.txt; do
+          for stale in vielotus-linux-amd64.deb vielotus-linux-arm64.deb SHA256SUMS.txt VieLotusCore.xcframework.zip; do
             gh release delete-asset "$TAG_NAME" "$stale" -y >/dev/null 2>&1 || true
           done
           ACTUAL=$(gh release view "$TAG_NAME" --json assets -q '.assets[].name' | sort)
@@ -382,6 +382,33 @@ jobs:
             echo "::error::Release asset allowlist mismatch!"
             exit 1
           fi
+
+      - name: Sync Homebrew Tap Cask (if HOMEBREW_TAP_TOKEN configured)
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          PKG_SHA256="$(awk '$2 == "VieLotusIM.pkg" { print $1 }' .build/dist/checksums.sha256)"
+          TMP_TAP="$(mktemp -d)"
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/stevedat/homebrew-tap.git" "$TMP_TAP"
+          python3 - "$TMP_TAP/Casks/vielotus.rb" "$VERSION" "$PKG_SHA256" <<'PY'
+          import re, sys
+          from pathlib import Path
+          cask = Path(sys.argv[1])
+          ver, sha = sys.argv[2], sys.argv[3]
+          text = cask.read_text()
+          text = re.sub(r'version\s+"[^"]+"', f'version "{ver}"', text, count=1)
+          text = re.sub(r'sha256\s+"[0-9a-f]{64}"', f'sha256 "{sha}"', text, count=1)
+          cask.write_text(text)
+          PY
+          git -C "$TMP_TAP" config user.name "github-actions[bot]"
+          git -C "$TMP_TAP" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git -C "$TMP_TAP" status --porcelain)" ]; then
+            git -C "$TMP_TAP" commit -am "vielotus ${VERSION}: update cask sha256"
+            git -C "$TMP_TAP" push origin main
+          fi
+          rm -rf "$TMP_TAP"
 
       - name: Clean up temporary keychain
         if: always()

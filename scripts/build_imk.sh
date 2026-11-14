@@ -25,7 +25,8 @@ mkdir -p "$APP_DIR/Contents/Resources"
 
 echo "-> Compiling arm64 target..."
 swift build --configuration release --product VieLotusIM --triple arm64-apple-macosx
-ARM64_SRC="$(swift build --configuration release --product VieLotusIM --triple arm64-apple-macosx --show-bin-path)/VieLotusIM"
+ARM64_BIN_DIR="$(swift build --configuration release --product VieLotusIM --triple arm64-apple-macosx --show-bin-path)"
+ARM64_SRC="$ARM64_BIN_DIR/VieLotusIM"
 cp "$ARM64_SRC" "$DIST_DIR/VieLotusIM.arm64"
 
 echo "-> Compiling x86_64 target..."
@@ -71,10 +72,30 @@ for icon_file in MenuBarTemplate.tiff MenuBarTemplate.png MenuBarTemplate@2x.png
     fi
 done
 
-# Copy SPM module resource bundles (only VieLotusCore typing-modes.yml)
-find .build/artifacts -path "*/macos-*/VieLotusCore.framework/Versions/A/Resources/*VieLotusCore.bundle" -type d -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
-find .build/scratch-arm64 -name "*VieLotusCore.bundle" -type d -maxdepth 5 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
-find .build/out/Products/Release -name "*VieLotusCore.bundle" -type d -maxdepth 2 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+# Copy SPM module resource bundles (works across both Xcode/SwiftBuild and llbuild --show-bin-path layouts)
+find "$ARM64_BIN_DIR" -maxdepth 2 -name "*VieLotusCore.bundle" -type d -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+if [ -z "$(find "$APP_DIR/Contents/Resources" -maxdepth 1 -name "*VieLotusCore.bundle" -type d -print -quit)" ]; then
+    find .build/artifacts -path "*/macos-*/VieLotusCore.framework/Versions/A/Resources/*VieLotusCore.bundle" -type d -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+    find .build/scratch-arm64 -name "*VieLotusCore.bundle" -type d -maxdepth 5 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+    find .build/out/Products/Release -name "*VieLotusCore.bundle" -type d -maxdepth 2 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+fi
+# Exclude mobile touch-keyboard suggestion dictionaries from the macOS InputMethodKit bundle
+rm -f "$APP_DIR/Contents/Resources/"*VieLotusCore.bundle/Contents/Resources/TuDienTuGhep.json \
+      "$APP_DIR/Contents/Resources/"*VieLotusCore.bundle/Contents/Resources/TuDienTuGhep.txt \
+      "$APP_DIR/Contents/Resources/"*VieLotusCore.bundle/TuDienTuGhep.json \
+      "$APP_DIR/Contents/Resources/"*VieLotusCore.bundle/TuDienTuGhep.txt
+
+CORE_BUNDLE="$(find "$APP_DIR/Contents/Resources" -maxdepth 1 -name "*VieLotusCore.bundle" -type d | head -n 1)"
+if [ -z "$CORE_BUNDLE" ]; then
+    echo "❌ Error: *VieLotusCore.bundle was not packaged into $APP_DIR/Contents/Resources" >&2
+    exit 1
+fi
+for required_res in scowl-en.txt SCOWL-Copyright.txt typing-modes.yml; do
+    if [ -z "$(find "$CORE_BUNDLE" -name "$required_res" -print -quit)" ]; then
+        echo "❌ Error: Missing required resource '$required_res' inside $CORE_BUNDLE" >&2
+        exit 1
+    fi
+done
 # Ship the per-app presentation rules at a stable, user-inspectable top-level path.
 # It also exists inside VietLotusIM_VieLotusCore.bundle; PresentationRulesLoader prefers
 # this copy so the documented location is the one that is actually read.
