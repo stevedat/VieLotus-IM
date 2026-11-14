@@ -610,4 +610,12 @@ final class ModifierPolicy3BPlusGoldenTests: XCTestCase {
             ("u", "đượcu"), ("<", "được"), ("w", "đượcw"), ("<", "được"), (" ", "được ")
         ])
     }
+
+    func testSyllableDictionaryParityAndCount() {
+        let dict = VietnameseSyllableDictionary.shared
+        XCTAssertEqual(dict.syllables.count, 7133)
+        for expected in ["pía", "được", "nghiêng", "khuya", "hươu", "ứu", "kỷ"] {
+            XCTAssertTrue(dict.isValidSyllable(expected), "Missing expected syllable '\(expected)'")
+        }
+    }
 }

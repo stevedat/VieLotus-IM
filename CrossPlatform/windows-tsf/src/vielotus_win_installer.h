@@ -194,7 +194,7 @@ inline void RegisterWindowsInstalledAppAndShortcuts(const std::wstring &installD
             nullptr
         ) == ERROR_SUCCESS && hKey) {
         static const WCHAR kDisplayName[] = L"Sen Vi\u1EC7t (VieLotusIM) \u2014 B\u1ED9 g\u00F5 Ti\u1EBFng Vi\u1EC7t";
-        static const WCHAR kDisplayVersion[] = L"2.0.2";
+        static const WCHAR kDisplayVersion[] = L"2.0.3";
         static const WCHAR kPublisher[] = L"Sen Vi\u1EC7t (VieLotusIM)";
         static const WCHAR kUrlInfo[] = L"https://github.com/stevedat/VieLotus-IM";
 

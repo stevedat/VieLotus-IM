@@ -3,7 +3,7 @@
   <assemblyIdentity
     type="win32"
     name="VieLotus.SenViet.Settings"
-    version="2.0.2.0"
+    version="2.0.3.0"
     processorArchitecture="*"
   />
   <description>Sen Viet (VieLotusIM) Settings</description>

@@ -557,7 +557,7 @@ static LRESULT CALLBACK SetupWizardWndProc(HWND hwnd, UINT msg, WPARAM wParam, L
 
         st->hTitle = CreateWindowExW(
             0, L"STATIC",
-            L"Tr\u00ECnh C\u00E0i \u0110\u1EB7t Sen Vi\u1EC7t (VieLotusIM) v2.0.2",
+            L"Tr\u00ECnh C\u00E0i \u0110\u1EB7t Sen Vi\u1EC7t (VieLotusIM) v2.0.3",
             WS_CHILD | WS_VISIBLE,
             pad, pad, w, static_cast<int>(28 * s),
             hwnd, nullptr, cs->hInstance, nullptr
@@ -692,7 +692,7 @@ static bool RunInteractiveSetupWizard(HINSTANCE hInstance, bool &outOpenSettings
     HWND hwnd = CreateWindowExW(
         WS_EX_APPWINDOW,
         L"VieLotusSetupWizardWndClass",
-        L"Tr\u00ECnh C\u00E0i \u0110\u1EB7t Sen Vi\u1EC7t (VieLotusIM) v2.0.2",
+        L"Tr\u00ECnh C\u00E0i \u0110\u1EB7t Sen Vi\u1EC7t (VieLotusIM) v2.0.3",
         dwStyle,
         posX, posY, winW, winH,
         nullptr, nullptr, hInstance, &st

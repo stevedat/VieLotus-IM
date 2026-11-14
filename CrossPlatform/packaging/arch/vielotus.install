@@ -1,0 +1,22 @@
+post_install() {
+    if command -v ibus >/dev/null 2>&1; then
+        ibus write-cache --system >/dev/null 2>&1 || true
+    fi
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -q -t -f usr/share/icons/hicolor >/dev/null 2>&1 || true
+    fi
+    echo "==> Run 'vielotus-settings --activate' as your desktop user to enable Sen Việt (VieLotusIM) in Fcitx5 / IBus."
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    if command -v ibus >/dev/null 2>&1; then
+        ibus write-cache --system >/dev/null 2>&1 || true
+    fi
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -q -t -f usr/share/icons/hicolor >/dev/null 2>&1 || true
+    fi
+}

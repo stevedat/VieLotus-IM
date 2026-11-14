@@ -1550,7 +1550,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
         RectF verPill(142.0f * s, 10.0f * s, 48.0f * s, 17.0f * s);
         FillRoundRect(g, verPill, 8.5f * s, Color(isDark ? 55 : 36, blueCol.GetR(), blueCol.GetG(), blueCol.GetB()));
-        g.DrawString(L"v2.0.2", -1, &fVersion, verPill, &sfCenter, &blueBrush);
+        g.DrawString(L"v2.0.3", -1, &fVersion, verPill, &sfCenter, &blueBrush);
 
         // Active mode status badge in header
         RectF modePill(195.0f * s, 10.0f * s, 132.0f * s, 17.0f * s);
@@ -2004,7 +2004,7 @@ static bool WinInetFetchHttpsBuffer(const WCHAR *url, std::string &outBytes, DWO
     bool ok = false;
     if (pInternetOpenW && pInternetOpenUrlW && pHttpQueryInfoW && pInternetReadFile && pInternetCloseHandle) {
         HINTERNET_HANDLE hInet = pInternetOpenW(
-            L"VieLotusIM/2.0.2 (Windows; SettingsUpdater)",
+            L"VieLotusIM/2.0.3 (Windows; SettingsUpdater)",
             0 /* INTERNET_OPEN_TYPE_PRECONFIG */,
             nullptr,
             nullptr,
@@ -2207,7 +2207,7 @@ static DWORD WINAPI WindowsUpdateWorkerThreadProc(LPVOID lpParam) {
             }
             return 0;
         }
-        if (IsRemoteVersionNewer(remoteVer, "2.0.2")) {
+        if (IsRemoteVersionNewer(remoteVer, "2.0.3")) {
             WCHAR *verHeap = new WCHAR[32]();
             MultiByteToWideChar(CP_UTF8, 0, remoteVer.c_str(), -1, verHeap, 31);
             if (IsWindow(hwnd)) {
@@ -2605,7 +2605,7 @@ static std::wstring GetWindowsDiagnosticsSummary(const VieLotusWindowsPrefs &pre
     StringCchPrintfW(
         summary,
         ARRAYSIZE(summary),
-        L"Sen Vi\u1EC7t v2.0.2 \u2022 Windows %s (Build %lu, %s) \u2022 %s \u2022 D\u1EA5u tr\u01B0\u1EDBc \u00E2m: %s \u2022 G\u00F5 t\u1EAFt: %s",
+        L"Sen Vi\u1EC7t v2.0.3 \u2022 Windows %s (Build %lu, %s) \u2022 %s \u2022 D\u1EA5u tr\u01B0\u1EDBc \u00E2m: %s \u2022 G\u00F5 t\u1EAFt: %s",
         (buildNum >= 22000) ? L"11" : L"10",
         static_cast<unsigned long>(buildNum),
         arch,
@@ -2676,7 +2676,7 @@ static std::wstring BuildFeedbackIssueTitle(FeedbackDialogState *st) {
     } else if (!app.empty()) {
         title += app;
     } else {
-        title += L"B\u00E1o c\u00E1o t\u1EEB ng\u01B0\u1EDDi d\u00F9ng Sen Vi\u1EC7t v2.0.2";
+        title += L"B\u00E1o c\u00E1o t\u1EEB ng\u01B0\u1EDDi d\u00F9ng Sen Vi\u1EC7t v2.0.3";
     }
     return title;
 }

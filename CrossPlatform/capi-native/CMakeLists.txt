@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(VieLotusCAPI VERSION 2.0.2 LANGUAGES CXX)
+project(VieLotusCAPI VERSION 2.0.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -77,7 +77,7 @@ target_compile_options(VieLotusCAPI PRIVATE
 set_target_properties(VieLotusCAPI PROPERTIES
     OUTPUT_NAME "VieLotusCAPI"
     SOVERSION 0
-    VERSION 0.2.2
+    VERSION 0.2.3
 )
 
 install(TARGETS VieLotusCAPI

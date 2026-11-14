@@ -1,0 +1,28 @@
+# Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
+pkgname=vielotus-bin
+_pkgname=vielotus
+pkgver=2.0.2
+pkgrel=1
+pkgdesc="Bộ gõ tiếng Việt Sen Việt (VieLotusIM) thế hệ mới cho Linux (IBus & Fcitx5, prebuilt .deb repack)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/stevedat/VieLotus-IM"
+license=('MIT')
+depends=('glibc' 'gcc-libs' 'glib2' 'python' 'python-gobject' 'gtk3' 'noto-fonts')
+optdepends=(
+    'fcitx5-im: Fcitx5 input method framework & GTK/Qt modules (recommended for KDE/Hyprland/XFCE)'
+    'ibus: IBus input method framework support (recommended for GNOME)'
+)
+provides=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
+conflicts=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
+install=vielotus.install
+source_x86_64=("${_pkgname}_${pkgver}_amd64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_amd64.deb")
+source_aarch64=("${_pkgname}_${pkgver}_arm64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_arm64.deb")
+sha256sums_x86_64=('f24725ff0e3d721be6ef442835289cd9f2b06e1401b863f57638bb8307af0c12')
+sha256sums_aarch64=('f571bf8212095bddcf7c927d6f3827ac506598a292c0743ffa3c434111746f7c')
+
+package() {
+    bsdtar -xf "${srcdir}"/data.tar.* -C "${pkgdir}/"
+    if [ -e "${pkgdir}/usr/lib/libVieLotusCAPI.so" ] && [ ! -e "${pkgdir}/usr/lib/libVieLotusCAPI.so.0" ]; then
+        ln -sf libVieLotusCAPI.so "${pkgdir}/usr/lib/libVieLotusCAPI.so.0"
+    fi
+}
