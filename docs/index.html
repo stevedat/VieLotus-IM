@@ -19,7 +19,7 @@
   <header>
     <h1>VieLotusIM (Sen Việt)</h1>
     <p>Vietnamese input method. This repository contains the macOS Swift engine and InputMethodKit app, and the C++20 Windows and Linux engines and adapters.</p>
-    <p><a href="https://github.com/stevedat/VieLotus-IM">Source repository</a> · <a href="https://github.com/stevedat/VieLotus-IM/releases/latest">Releases</a> · <a href="https://github.com/stevedat/VieLotus-IM/blob/main/README.vi.md">Tiếng Việt</a></p>
+    <p><a href="https://github.com/stevedat/VieLotus-IM">Source repository</a> · <a href="https://github.com/stevedat/VieLotus-IM/releases/latest">Releases</a> · <a href="#sec-upstream">Upstream contributions</a> · <a href="https://github.com/stevedat/VieLotus-IM/blob/main/README.vi.md">Tiếng Việt</a></p>
   </header>
 
   <main>
@@ -48,6 +48,22 @@ swift run VieLotusCLI --benchmark --json</code></pre>
         <tr><td>iOS / Android</td><td><a href="https://apps.apple.com/us/app/sen-vi%E1%BB%87t/id6821782799">App Store</a> · <a href="https://play.google.com/store/apps/details?id=org.vielotus.hardwarekeyboard">Google Play</a>; application source is not included here.</td></tr>
       </tbody>
     </table>
+
+    <h2 id="sec-upstream">Upstream contributions</h2>
+    <p>Patches, regression tests, and packaging changes submitted to peer open-source input methods and operating-system packages:</p>
+    <table>
+      <thead><tr><th>Project &amp; maintainer</th><th>Pull requests</th><th>Contributed fix / scope</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://github.com/ptrinh/viettelex">VietTelex</a> · Phil Trịnh (<a href="https://github.com/ptrinh">@ptrinh</a>)</td><td><a href="https://github.com/ptrinh/viettelex/pull/133">#133</a> (Merged)<br><a href="https://github.com/ptrinh/viettelex/pull/164">#164</a> (Merged)</td><td>Post-toned <code>V-C-V</code> syllable splitting (<code>dduowcj+u</code>); preserve literal <code>aa</code>/<code>ee</code> elongation after <code>ư</code>/<code>ơ</code> (<code>uwfaaa</code> → <code>ừaaa</code>, <code>owfaaa</code> → <code>ờaaa</code>).</td></tr>
+        <tr><td><a href="https://github.com/uvie-project/uvie-rs">UVie</a> · <a href="https://github.com/uvie-project">@uvie-project</a></td><td><a href="https://github.com/uvie-project/uvie-rs/pull/20">uvie-rs #20</a> (Merged)<br><a href="https://github.com/uvie-project/uvie-mac/pull/25">uvie-mac #25</a> (Merged)</td><td>Rust FSM post-toned closed-syllable continuation (<code>dduowcj+u</code>) and macOS <code>IMKInputController</code> multi-syllable buffer sync.</td></tr>
+        <tr><td><a href="https://github.com/ngosen/ngosen">Ngó Sen</a> · Nguyễn Phi (<a href="https://github.com/nguyenphivn">@nguyenphivn</a>)</td><td><a href="https://github.com/ngosen/ngosen/pull/764">#764</a> (Open)<br><a href="https://github.com/ngosen/ngosen/pull/768">#768</a> (Open)</td><td>Show non-dictionary prefixes immediately in preedit (<code>rose</code>, keeping <code>khuỷu</code>); preserve stretched words on <code>Space</code> (<code>uwfaaa</code> → <code>ừaaa </code>).</td></tr>
+        <tr><td><a href="https://github.com/LotusInputMethod/fcitx5-lotus">fcitx5-lotus</a> · Nguyễn Hoàng Kỳ (<a href="https://github.com/nhktmdzhg">@nhktmdzhg</a>)</td><td><a href="https://github.com/LotusInputMethod/fcitx5-lotus/pull/697">#697</a> (Open)<br><a href="https://github.com/LotusInputMethod/fcitx5-lotus/pull/698">#698</a> (Open)</td><td>Restore non-Vietnamese words before digits in Macro mode (<code>test123</code>, keeping <code>k8s</code>); preserve <code>a</code>/<code>e</code> elongation after <code>ư</code>/<code>ơ</code> (<code>uwfaaa</code> → <code>ừaaa</code>).</td></tr>
+        <tr><td><a href="https://github.com/xmannv/xkey">XKey</a> · <a href="https://github.com/xmannv">@xmannv</a></td><td><a href="https://github.com/xmannv/xkey/pull/338">#338</a> (Open)</td><td>Keep completed horn/breve syllables intact on trailing <code>w</code> and Backspace (<code>dduowcjw</code> → <code>đượcw</code>, <code>⌫</code> → <code>được</code>).</td></tr>
+        <tr><td><a href="https://github.com/tonyminibot/Vikey">Vikey</a> · <a href="https://github.com/tonyminibot">@tonyminibot</a></td><td><a href="https://github.com/tonyminibot/Vikey/pull/126">#126</a> (Open)</td><td>Preserve completed horn/breve syllables on trailing <code>w</code> and retain both <code>w</code> keys on English restore (<code>awkward</code>).</td></tr>
+        <tr><td>OS packaging, reports &amp; open spec</td><td><a href="https://bugs.launchpad.net/ubuntu/+source/language-selector/+bug/2172577">Ubuntu LP #2172577</a><br><a href="https://github.com/stevedat/VieLotus-IM/blob/main/Resources/typing-modes.yml">typing-modes.yml</a></td><td><code>.debdiff</code> registering <code>im:vi</code> in Ubuntu <code>language-selector</code>; MIT macOS <code>Bundle ID</code> rules and technical reports (<a href="https://github.com/phuongtai/ViKey/issues/1">phuongtai/ViKey#1</a>, <a href="https://github.com/tr-nam/rustype/issues/1">tr-nam/rustype#1</a>).</td></tr>
+      </tbody>
+    </table>
+    <p>Full ledger with live status badges: <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/ECOSYSTEM_CONTRIBUTIONS.md">English</a> · <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/ECOSYSTEM_CONTRIBUTIONS.vi.md">Tiếng Việt</a>.</p>
 
     <h2>License and privacy</h2>
     <p>Project-owned source in this repository is MIT licensed, except third-party materials with separate notices. See <a href="https://github.com/stevedat/VieLotus-IM/blob/main/docs/THIRD_PARTY_NOTICES.md">third-party notices</a>. Typing is processed locally by the engine. The macOS updater contacts GitHub for release checks and downloads after user action. The optional feedback form sends submitted reports to its configured service.</p>

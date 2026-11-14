@@ -45,6 +45,20 @@ CI đã kiểm tra gõ qua IBus/Fcitx5 trong widget GTK3 và Qt5 trên Ubuntu. M
 
 Đây là kết quả của bộ kiểm thử hồi quy, không có nghĩa bộ gõ không lỗi trong mọi ứng dụng hoặc thiết bị. Xem điều kiện đo tại [`docs/BENCHMARK_REPORT.md`](docs/BENCHMARK_REPORT.md).
 
+## Đóng góp ngược dòng (Upstream)
+
+Các bản vá lỗi biên, kiểm thử đơn vị và đóng gói gửi về các dự án mã nguồn mở cùng hệ sinh thái (sổ cái đầy đủ tại [`docs/ECOSYSTEM_CONTRIBUTIONS.vi.md`](docs/ECOSYSTEM_CONTRIBUTIONS.vi.md)):
+
+| Dự án & Người duy trì | PR & Trạng thái trực tiếp | Lỗi / Ca biên kỹ thuật đóng góp |
+| :--- | :--- | :--- |
+| **[VietTelex](https://github.com/ptrinh/viettelex)** · Phil Trịnh ([@ptrinh](https://github.com/ptrinh)) | [![#133](https://img.shields.io/github/pulls/detail/state/ptrinh/viettelex/133?label=%23133)](https://github.com/ptrinh/viettelex/pull/133) [![#164](https://img.shields.io/github/pulls/detail/state/ptrinh/viettelex/164?label=%23164)](https://github.com/ptrinh/viettelex/pull/164) | Tách âm tiết nối tiếp `V-C-V` sau âm tiết có dấu (`dduowcj+u`); giữ `aa`/`ee` kéo dài sau `ư`/`ơ` (`uwfaaa` → `ừaaa`, `owfaaa` → `ờaaa`). |
+| **[UVie](https://github.com/uvie-project/uvie-rs)** · UVie Project ([@uvie-project](https://github.com/uvie-project)) | [![uvie-rs #20](https://img.shields.io/github/pulls/detail/state/uvie-project/uvie-rs/20?label=uvie-rs%20%2320)](https://github.com/uvie-project/uvie-rs/pull/20) [![uvie-mac #25](https://img.shields.io/github/pulls/detail/state/uvie-project/uvie-mac/25?label=uvie-mac%20%2325)](https://github.com/uvie-project/uvie-mac/pull/25) | Xử lý FSM lõi Rust khi nối nguyên âm sau âm tiết đóng (`dduowcj+u`) và đồng bộ vùng đệm `IMKInputController` trên macOS. |
+| **[Ngó Sen](https://github.com/ngosen/ngosen)** · Nguyễn Phi ([@nguyenphivn](https://github.com/nguyenphivn)) | [![#764](https://img.shields.io/github/pulls/detail/state/ngosen/ngosen/764?label=%23764)](https://github.com/ngosen/ngosen/pull/764) [![#768](https://img.shields.io/github/pulls/detail/state/ngosen/ngosen/768?label=%23768)](https://github.com/ngosen/ngosen/pull/768) | Hiển thị ngay tiền tố ngoài từ điển trên preedit (`rose`, giữ `khuỷu`); giữ nguyên từ kéo dài khi nhấn `Space` (`uwfaaa` → `ừaaa `, `owfaaa` → `ờaaa `). |
+| **[fcitx5-lotus](https://github.com/LotusInputMethod/fcitx5-lotus)** · Nguyễn Hoàng Kỳ ([@nhktmdzhg](https://github.com/nhktmdzhg)) | [![#697](https://img.shields.io/github/pulls/detail/state/LotusInputMethod/fcitx5-lotus/697?label=%23697)](https://github.com/LotusInputMethod/fcitx5-lotus/pull/697) [![#698](https://img.shields.io/github/pulls/detail/state/LotusInputMethod/fcitx5-lotus/698?label=%23698)](https://github.com/LotusInputMethod/fcitx5-lotus/pull/698) | Khôi phục từ phi Việt trước chữ số ở chế độ Macro (`test123`, giữ `k8s`); giữ `a`/`e` kéo dài sau `ư`/`ơ` (`uwfaaa` → `ừaaa`, giữ `owe`/`twee`). |
+| **[XKey](https://github.com/xmannv/xkey)** · [@xmannv](https://github.com/xmannv) | [![#338](https://img.shields.io/github/pulls/detail/state/xmannv/xkey/338?label=%23338)](https://github.com/xmannv/xkey/pull/338) | Giữ nguyên âm tiết hoàn chỉnh có móc/trăng khi dư `w` cuối từ và khi xóa lùi (`dduowcjw` → `đượcw`, `⌫` → `được`). |
+| **[Vikey](https://github.com/tonyminibot/Vikey)** · [@tonyminibot](https://github.com/tonyminibot) | [![#126](https://img.shields.io/github/pulls/detail/state/tonyminibot/Vikey/126?label=%23126)](https://github.com/tonyminibot/Vikey/pull/126) | Bảo toàn âm tiết móc/trăng khi dư `w` cuối từ và giữ đủ hai chữ `w` khi hoàn nguyên từ tiếng Anh (`awkward`). |
+| **Gói HĐH, báo cáo & đặc tả mở** | [Ubuntu LP #2172577](https://bugs.launchpad.net/ubuntu/+source/language-selector/+bug/2172577) · [`typing-modes.yml`](Resources/typing-modes.yml) | Bản vá `.debdiff` đăng ký `im:vi` cho Ubuntu `language-selector`; quy tắc `Bundle ID` macOS (MIT) và báo cáo kỹ thuật ([`phuongtai/ViKey#1`](https://github.com/phuongtai/ViKey/issues/1), [`tr-nam/rustype#1`](https://github.com/tr-nam/rustype/issues/1)). |
+
 ## Quyền riêng tư
 
 Engine xử lý nội dung gõ trên thiết bị. Trình cập nhật macOS kết nối GitHub để kiểm tra bản phát hành; biểu mẫu feedback tùy chọn gửi báo cáo tới dịch vụ được cấu hình. Xem [`PRIVACY.md`](PRIVACY.md).
@@ -56,6 +70,7 @@ Source của dự án trong kho này theo [MIT](LICENSE), trừ thành phần b�
 ## Liên kết
 
 - [Kiến trúc](docs/ARCHITECTURE.md)
+- [Đóng góp ngược dòng](docs/ECOSYSTEM_CONTRIBUTIONS.vi.md)
 - [Chính sách quyền riêng tư](PRIVACY.md)
 - [Lịch sử phát hành](https://github.com/stevedat/VieLotus-IM/releases)
 - [Báo lỗi](https://github.com/stevedat/VieLotus-IM/issues)
