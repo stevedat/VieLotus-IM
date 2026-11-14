@@ -29,6 +29,10 @@ The Swift package uses Swift 5 language mode for source compatibility. The engin
 
 Linux and Windows build instructions are in [`CrossPlatform`](CrossPlatform/). Debian packaging files are in [`CrossPlatform/packaging/debian`](CrossPlatform/packaging/debian/).
 
+## Test status
+
+CI verifies Linux IBus/Fcitx5 typing in GTK3 and Qt5 test widgets. macOS and Windows CI build the apps and packages; host-app typing has not been verified there. See the [platform test status](docs/TEST_STATUS.md) and [macOS field-test checklist](docs/FIELD_TEST_CHECKLIST.md).
+
 ## Benchmark snapshot
 
 Measured on 2026-11-14 from the source snapshot published with this README using `swift run VieLotusCLI --benchmark --json`:

@@ -29,6 +29,10 @@ SwiftPM biên dịch từ source có trong kho, không tải engine nhị phân 
 
 Hướng dẫn build Linux và Windows nằm trong [`CrossPlatform`](CrossPlatform/). Tệp đóng gói Debian ở [`CrossPlatform/packaging/debian`](CrossPlatform/packaging/debian/).
 
+## Trạng thái kiểm thử
+
+CI đã kiểm tra gõ qua IBus/Fcitx5 trong widget thử nghiệm GTK3 và Qt5 trên Ubuntu. CI macOS và Windows mới xác nhận build ứng dụng/gói cài đặt; chưa xác nhận gõ trong các ứng dụng chủ trên hai nền tảng này. Xem [bảng kiểm thử theo nền tảng](docs/TEST_STATUS.md) và [danh sách kiểm tra thực tế trên macOS](docs/FIELD_TEST_CHECKLIST.md).
+
 ## Kết quả benchmark
 
 Đo ngày 14/11/2026 trên source snapshot đi kèm README bằng `swift run VieLotusCLI --benchmark --json`:
