@@ -1,6 +1,6 @@
 #!/bin/sh
 # ==============================================================================
-# Sen Việt (VieLotusIM) v2.0.2 — Universal Linux (Multi-Distro & Multi-Arch)
+# Sen Việt (VieLotusIM) v2.0.3 — Universal Linux (Multi-Distro & Multi-Arch)
 # & macOS One-Line Installer / Uninstaller
 #
 # Supported Linux Distros:
@@ -190,9 +190,11 @@ uninstall_vielotus() {
         /usr/lib/libVieLotusCAPI.so \
         /usr/lib/libVieLotusCAPI.so.0 \
         /usr/lib/libVieLotusCAPI.so.0.2.2 \
+        /usr/lib/libVieLotusCAPI.so.0.2.3 \
         /usr/lib64/libVieLotusCAPI.so \
         /usr/lib64/libVieLotusCAPI.so.0 \
         /usr/lib64/libVieLotusCAPI.so.0.2.2 \
+        /usr/lib64/libVieLotusCAPI.so.0.2.3 \
         /usr/lib/fcitx5/vielotus.so \
         /usr/lib64/fcitx5/vielotus.so \
         /usr/lib/ibus/ibus-engine-vielotus \

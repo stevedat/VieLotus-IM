@@ -1,5 +1,5 @@
 Name:           vielotus
-Version:        2.0.2
+Version:        2.0.3
 Release:        1%{?dist}
 Summary:        VieLotusIM (Sen Viet) — Next-Gen Vietnamese Input Method for IBus & Fcitx5
 License:        MIT AND FSFAP
@@ -62,15 +62,17 @@ cmake -S CrossPlatform/fcitx5-vielotus -B build-fcitx5 \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
     -DCMAKE_INSTALL_LIBDIR=%{_lib} \
     -DCMAKE_SKIP_RPATH=ON \
-    -DVIELOTUS_LIB_DIR="${PWD}/build-core" \
+    -DVIELOTUS_LIB_PATH="${PWD}/build-core/libVieLotusCAPI.so" \
     -DVIELOTUS_INCLUDE_DIR="${PWD}/Sources/VieLotusCAPI/include"
 cmake --build build-fcitx5
 
 cmake -S CrossPlatform/ibus-vielotus -B build-ibus \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+    -DCMAKE_INSTALL_LIBEXECDIR=lib/ibus \
+    -DLIBEXECDIR=%{_prefix}/lib/ibus \
     -DCMAKE_SKIP_RPATH=ON \
-    -DVIELOTUS_LIB_DIR="${PWD}/build-core" \
+    -DVIELOTUS_LIB_PATH="${PWD}/build-core/libVieLotusCAPI.so" \
     -DVIELOTUS_INCLUDE_DIR="${PWD}/Sources/VieLotusCAPI/include"
 cmake --build build-ibus
 
@@ -120,5 +122,8 @@ install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml 
 %{_datadir}/fcitx5/inputmethod/vielotus-vni.conf
 
 %changelog
+* Sat Nov 14 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com> - 2.0.3-1
+- Official Pure C++20 source-built release of Sen Việt (VieLotusIM) 2.0.3
+
 * Wed Nov 11 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com> - 2.0.2-1
 - Official Pure C++20 source-built release of Sen Việt (VieLotusIM) 2.0.2

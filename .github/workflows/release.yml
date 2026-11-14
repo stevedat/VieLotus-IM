@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 2.0.2)'
+        description: 'Release version (e.g. 2.0.3)'
         required: false
         default: ''
 
@@ -34,7 +34,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-            VERSION="${VERSION:-2.0.2}"
+            VERSION="${VERSION:-2.0.3}"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -84,7 +84,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-            VERSION="${VERSION:-2.0.2}"
+            VERSION="${VERSION:-2.0.3}"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -167,7 +167,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist)"
-            VERSION="${VERSION:-2.0.2}"
+            VERSION="${VERSION:-2.0.3}"
             TAG="v${VERSION}"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"

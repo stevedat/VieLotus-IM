@@ -6,8 +6,8 @@
 103 RCDATA "../../scripts/windows/assets/VieLotusIM.ico"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,0,2,0
- PRODUCTVERSION 2,0,2,0
+ FILEVERSION 2,0,3,0
+ PRODUCTVERSION 2,0,3,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -24,12 +24,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", L"Tr\x1EA7n Ph\x00E1t \x0110\x1EA1t (Steve Dat)"
             VALUE "FileDescription", L"Sen Vi\x1EC7t (VieLotusIM) Windows TSF Text Input Processor"
-            VALUE "FileVersion", L"2.0.2.0"
+            VALUE "FileVersion", L"2.0.3.0"
             VALUE "InternalName", L"VieLotusTIP.dll"
             VALUE "LegalCopyright", L"Copyright (C) 2026 Tr\x1EA7n Ph\x00E1t \x0110\x1EA1t (Steve Dat). All rights reserved."
             VALUE "OriginalFilename", L"VieLotusTIP.dll"
             VALUE "ProductName", L"Sen Vi\x1EC7t (VieLotusIM)"
-            VALUE "ProductVersion", L"2.0.2.0"
+            VALUE "ProductVersion", L"2.0.3.0"
         END
     END
     BLOCK "VarFileInfo"

@@ -1,24 +1,112 @@
-# Maintainer: Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM>
-pkgname=vielotus-bin
-_pkgname=vielotus
-pkgver=2.0.2
+# Maintainer: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+pkgname=vielotus
+pkgver=2.0.3
 pkgrel=1
-pkgdesc="Bộ gõ tiếng Việt Sen Việt (VieLotusIM) thế hệ mới cho Linux (IBus & Fcitx5, Pure C++20 Native Engine)"
-arch=('x86_64' 'aarch64')
+pkgdesc="Sen Việt (VieLotusIM) — Next-Gen Vietnamese Input Method for IBus & Fcitx5 (Native C++20 Engine)"
+arch=('x86_64' 'aarch64' 'riscv64' 'armv7h' 'i686' 'powerpc64le')
 url="https://github.com/stevedat/VieLotus-IM"
 license=('MIT')
 depends=('glibc' 'gcc-libs' 'glib2' 'python' 'python-gobject' 'gtk3' 'noto-fonts')
+makedepends=('cmake' 'extra-cmake-modules' 'pkgconf' 'python' 'fcitx5' 'ibus')
 optdepends=(
-    'fcitx5-im: Fcitx5 input method framework & GTK/Qt modules (recommended for KDE/Hyprland/XFCE)'
-    'ibus: IBus input method framework support (recommended for GNOME)'
+    'fcitx5-im: Fcitx5 input method framework & GTK/Qt frontends (KDE/Hyprland/XFCE)'
+    'ibus: IBus input method framework (GNOME)'
 )
 provides=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
-conflicts=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
-source_x86_64=("${_pkgname}_${pkgver}_amd64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_amd64.deb")
-source_aarch64=("${_pkgname}_${pkgver}_arm64.deb::https://github.com/stevedat/VieLotus-IM/releases/download/v${pkgver}/${_pkgname}_${pkgver}_arm64.deb")
-sha256sums_x86_64=('f24725ff0e3d721be6ef442835289cd9f2b06e1401b863f57638bb8307af0c12')
-sha256sums_aarch64=('f571bf8212095bddcf7c927d6f3827ac506598a292c0743ffa3c434111746f7c')
+conflicts=('vielotus-bin' 'fcitx5-vielotus' 'ibus-vielotus')
+install=vielotus.install
+
+if [ -f "${startdir}/../../../CrossPlatform/capi-native/CMakeLists.txt" ]; then
+    source=()
+    sha256sums=()
+else
+    source=("${pkgname}-${pkgver}.tar.gz::https://github.com/stevedat/VieLotus-IM/archive/refs/tags/v${pkgver}.tar.gz")
+    sha256sums=('SKIP')
+fi
+
+_resolve_srcroot() {
+    if [ -f "${startdir}/../../../CrossPlatform/capi-native/CMakeLists.txt" ]; then
+        (cd "${startdir}/../../.." && pwd)
+    else
+        printf '%s/VieLotus-IM-%s\n' "${srcdir}" "${pkgver}"
+    fi
+}
+
+build() {
+    local _srcroot
+    _srcroot="$(_resolve_srcroot)"
+
+    cmake -S "${_srcroot}/CrossPlatform/capi-native" -B "${srcdir}/build-core" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DVIELOTUS_INSTALL_DEV=ON
+    cmake --build "${srcdir}/build-core"
+
+    cmake -S "${_srcroot}/CrossPlatform/fcitx5-vielotus" -B "${srcdir}/build-fcitx5" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DVIELOTUS_LIB_PATH="${srcdir}/build-core/libVieLotusCAPI.so" \
+        -DVIELOTUS_INCLUDE_DIR="${_srcroot}/Sources/VieLotusCAPI/include"
+    cmake --build "${srcdir}/build-fcitx5"
+
+    cmake -S "${_srcroot}/CrossPlatform/ibus-vielotus" -B "${srcdir}/build-ibus" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_INSTALL_LIBEXECDIR=lib/ibus \
+        -DLIBEXECDIR=/usr/lib/ibus \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DVIELOTUS_LIB_PATH="${srcdir}/build-core/libVieLotusCAPI.so" \
+        -DVIELOTUS_INCLUDE_DIR="${_srcroot}/Sources/VieLotusCAPI/include"
+    cmake --build "${srcdir}/build-ibus"
+}
 
 package() {
-    bsdtar -xf "${srcdir}"/data.tar.* -C "${pkgdir}/"
+    local _srcroot
+    _srcroot="$(_resolve_srcroot)"
+
+    DESTDIR="${pkgdir}" cmake --install "${srcdir}/build-core"
+    if [ ! -e "${pkgdir}/usr/lib/libVieLotusCAPI.so" ] && [ -e "${pkgdir}/usr/lib/libVieLotusCAPI.so.0" ]; then
+        ln -sf libVieLotusCAPI.so.0 "${pkgdir}/usr/lib/libVieLotusCAPI.so"
+    fi
+    DESTDIR="${pkgdir}" cmake --install "${srcdir}/build-fcitx5"
+    DESTDIR="${pkgdir}" cmake --install "${srcdir}/build-ibus"
+
+    if [ -f "${_srcroot}/Resources/typing-modes.yml" ]; then
+        install -Dm644 "${_srcroot}/Resources/typing-modes.yml" \
+            "${pkgdir}/usr/share/vielotus/typing-modes.yml"
+        install -Dm644 "${_srcroot}/Resources/typing-modes.yml" \
+            "${pkgdir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml"
+    elif [ -f "${_srcroot}/Sources/VieLotusCore/Resources/typing-modes.yml" ]; then
+        install -Dm644 "${_srcroot}/Sources/VieLotusCore/Resources/typing-modes.yml" \
+            "${pkgdir}/usr/share/vielotus/typing-modes.yml"
+        install -Dm644 "${_srcroot}/Sources/VieLotusCore/Resources/typing-modes.yml" \
+            "${pkgdir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml"
+    fi
+
+    install -Dm755 "${_srcroot}/CrossPlatform/packaging/linux/vielotus-settings" \
+        "${pkgdir}/usr/bin/vielotus-settings"
+    ln -sf vielotus-settings "${pkgdir}/usr/bin/vielotus"
+    install -Dm644 "${_srcroot}/CrossPlatform/packaging/linux/vielotus-settings.1" \
+        "${pkgdir}/usr/share/man/man1/vielotus-settings.1"
+    ln -sf vielotus-settings.1 "${pkgdir}/usr/share/man/man1/vielotus.1"
+    install -Dm644 "${_srcroot}/CrossPlatform/packaging/linux/vielotus.desktop" \
+        "${pkgdir}/usr/share/applications/vielotus.desktop"
+    install -Dm644 "${_srcroot}/CrossPlatform/packaging/linux/vielotus-onboard.desktop" \
+        "${pkgdir}/etc/xdg/autostart/vielotus-onboard.desktop"
+    install -Dm644 "${_srcroot}/CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf" \
+        "${pkgdir}/etc/fonts/conf.d/51-vielotus-vietnamese.conf"
+    install -Dm644 "${_srcroot}/CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml" \
+        "${pkgdir}/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml"
+    for sz in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
+        if [ -f "${_srcroot}/CrossPlatform/linux-icons/hicolor_${sz}_apps/vielotus.png" ]; then
+            install -Dm644 "${_srcroot}/CrossPlatform/linux-icons/hicolor_${sz}_apps/vielotus.png" \
+                "${pkgdir}/usr/share/icons/hicolor/${sz}/apps/vielotus.png"
+        fi
+    done
+    install -Dm644 "${_srcroot}/LICENSE" \
+        "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

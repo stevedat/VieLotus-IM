@@ -229,6 +229,7 @@ package_single_arch() {
 
     # 1. Core C-ABI Library & Header
     cp "${arch_bin_dir}/libVieLotusCAPI.so" "${pkg_dir}/usr/lib/"
+    ln -sf libVieLotusCAPI.so "${pkg_dir}/usr/lib/libVieLotusCAPI.so.0"
     cp "${ROOT_DIR}/Sources/VieLotusCAPI/include/vielotus.h" "${pkg_dir}/usr/include/vielotus.h"
 
     if [ -d "${arch_bin_dir}/swift-runtime" ]; then

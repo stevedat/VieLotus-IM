@@ -25,7 +25,7 @@ sudo apt install vielotus
 Download the matching `vielotus_<version>_<arch>.deb` from the latest release (`amd64` for x86_64, `arm64` for ARM64), then install it with APT. Replace the values below with the downloaded file's version and architecture:
 
 ```sh
-version=2.0.2
+version=2.0.3
 arch=amd64 # use arm64 on ARM64
 sudo apt install "./vielotus_${version}_${arch}.deb"
 ```
@@ -34,21 +34,19 @@ APT resolves package dependencies. The release page also provides `checksums.sha
 
 ## Arch Linux and Arch ARM
 
-The repository includes a binary `PKGBUILD` for `x86_64` and `aarch64`. It installs the matching release package; `makepkg` resolves the declared runtime dependencies.
+`CrossPlatform/packaging/arch/PKGBUILD` compiles the C++20 core, Fcitx5 addon, and IBus engine natively against the host Arch libraries (`PKGBUILD.bin` is also included for prebuilt `.deb` repackaging):
 
 ```sh
-sudo pacman -S --needed base-devel git
+sudo pacman -S --needed base-devel cmake extra-cmake-modules git
+# Plus one input-method framework:
+sudo pacman -S --needed fcitx5-im  # Fcitx5, including GTK/Qt frontends (KDE/Hyprland/XFCE)
+# or
+sudo pacman -S --needed ibus       # IBus (GNOME)
+
 git clone --depth 1 https://github.com/stevedat/VieLotus-IM.git
 cd VieLotus-IM/CrossPlatform/packaging/arch
 makepkg -si
-```
-
-Install one input-method framework if it is not already present:
-
-```sh
-sudo pacman -S --needed fcitx5-im  # Fcitx5, including GTK/Qt frontends
-# or
-sudo pacman -S --needed ibus       # IBus
+vielotus-settings --activate
 ```
 
 ## First launch and input source

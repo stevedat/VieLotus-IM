@@ -1,60 +1,82 @@
 # Maintainer: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
 pkgname=vielotus
-pkgver=2.0.2
+pkgver=2.0.3
 pkgrel=1
-pkgdesc="Sen Việt (VieLotusIM) — Next-Gen Vietnamese Input Method for IBus & Fcitx5 (Pure C++20 Native Engine)"
+pkgdesc="Sen Việt (VieLotusIM) — Next-Gen Vietnamese Input Method for IBus & Fcitx5 (Native C++20 Engine)"
 arch=('x86_64' 'aarch64' 'riscv64' 'armv7h' 'i686' 'powerpc64le')
 url="https://github.com/stevedat/VieLotus-IM"
 license=('MIT')
-depends=('glibc' 'gcc-libs' 'glib2' 'ibus' 'fcitx5' 'python' 'python-gobject' 'gtk3' 'noto-fonts')
+depends=('glibc' 'gcc-libs' 'glib2' 'python' 'python-gobject' 'gtk3' 'noto-fonts')
 makedepends=('cmake' 'extra-cmake-modules' 'pkgconf' 'python' 'fcitx5' 'ibus')
+optdepends=(
+    'fcitx5-im: Fcitx5 input method framework & GTK/Qt frontends (KDE/Hyprland/XFCE)'
+    'ibus: IBus input method framework (GNOME)'
+)
 provides=('vielotus' 'fcitx5-vielotus' 'ibus-vielotus')
-conflicts=('vielotus-bin')
+conflicts=('vielotus-bin' 'fcitx5-vielotus' 'ibus-vielotus')
+install=vielotus.install
 source=("${pkgname}-${pkgver}.tar.gz::https://github.com/stevedat/VieLotus-IM/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=('SKIP')
 
 build() {
     cd "${srcdir}/VieLotus-IM-${pkgver}"
 
-    cmake -S CrossPlatform/capi-native -B build-core \
+    cmake -S CrossPlatform/capi-native -B "${srcdir}/build-core" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_LIBDIR=lib \
         -DVIELOTUS_INSTALL_DEV=ON
-    cmake --build build-core
+    cmake --build "${srcdir}/build-core"
 
-    cmake -S CrossPlatform/fcitx5-vielotus -B build-fcitx5 \
+    cmake -S CrossPlatform/fcitx5-vielotus -B "${srcdir}/build-fcitx5" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_LIBDIR=lib \
         -DCMAKE_SKIP_RPATH=ON \
-        -DVIELOTUS_LIB_DIR="${PWD}/build-core" \
+        -DVIELOTUS_LIB_PATH="${srcdir}/build-core/libVieLotusCAPI.so" \
         -DVIELOTUS_INCLUDE_DIR="${PWD}/Sources/VieLotusCAPI/include"
-    cmake --build build-fcitx5
+    cmake --build "${srcdir}/build-fcitx5"
 
-    cmake -S CrossPlatform/ibus-vielotus -B build-ibus \
+    cmake -S CrossPlatform/ibus-vielotus -B "${srcdir}/build-ibus" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_INSTALL_LIBEXECDIR=lib/ibus \
+        -DLIBEXECDIR=/usr/lib/ibus \
         -DCMAKE_SKIP_RPATH=ON \
-        -DVIELOTUS_LIB_DIR="${PWD}/build-core" \
+        -DVIELOTUS_LIB_PATH="${srcdir}/build-core/libVieLotusCAPI.so" \
         -DVIELOTUS_INCLUDE_DIR="${PWD}/Sources/VieLotusCAPI/include"
-    cmake --build build-ibus
+    cmake --build "${srcdir}/build-ibus"
 }
 
 package() {
     cd "${srcdir}/VieLotus-IM-${pkgver}"
 
-    DESTDIR="${pkgdir}" cmake --install build-core
-    DESTDIR="${pkgdir}" cmake --install build-fcitx5
-    DESTDIR="${pkgdir}" cmake --install build-ibus
+    DESTDIR="${pkgdir}" cmake --install "${srcdir}/build-core"
+    if [ ! -e "${pkgdir}/usr/lib/libVieLotusCAPI.so" ] && [ -e "${pkgdir}/usr/lib/libVieLotusCAPI.so.0" ]; then
+        ln -sf libVieLotusCAPI.so.0 "${pkgdir}/usr/lib/libVieLotusCAPI.so"
+    fi
+    DESTDIR="${pkgdir}" cmake --install "${srcdir}/build-fcitx5"
+    DESTDIR="${pkgdir}" cmake --install "${srcdir}/build-ibus"
 
-    install -Dm644 Resources/typing-modes.yml \
-        "${pkgdir}/usr/share/vielotus/typing-modes.yml"
-    install -Dm644 Resources/typing-modes.yml \
-        "${pkgdir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml"
+    if [ -f Resources/typing-modes.yml ]; then
+        install -Dm644 Resources/typing-modes.yml \
+            "${pkgdir}/usr/share/vielotus/typing-modes.yml"
+        install -Dm644 Resources/typing-modes.yml \
+            "${pkgdir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml"
+    elif [ -f Sources/VieLotusCore/Resources/typing-modes.yml ]; then
+        install -Dm644 Sources/VieLotusCore/Resources/typing-modes.yml \
+            "${pkgdir}/usr/share/vielotus/typing-modes.yml"
+        install -Dm644 Sources/VieLotusCore/Resources/typing-modes.yml \
+            "${pkgdir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml"
+    fi
+
     install -Dm755 CrossPlatform/packaging/linux/vielotus-settings \
         "${pkgdir}/usr/bin/vielotus-settings"
     ln -sf vielotus-settings "${pkgdir}/usr/bin/vielotus"
     install -Dm644 CrossPlatform/packaging/linux/vielotus-settings.1 \
         "${pkgdir}/usr/share/man/man1/vielotus-settings.1"
+    ln -sf vielotus-settings.1 "${pkgdir}/usr/share/man/man1/vielotus.1"
     install -Dm644 CrossPlatform/packaging/linux/vielotus.desktop \
         "${pkgdir}/usr/share/applications/vielotus.desktop"
     install -Dm644 CrossPlatform/packaging/linux/vielotus-onboard.desktop \
@@ -69,4 +91,6 @@ package() {
                 "${pkgdir}/usr/share/icons/hicolor/${sz}/apps/vielotus.png"
         fi
     done
+    install -Dm644 LICENSE \
+        "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

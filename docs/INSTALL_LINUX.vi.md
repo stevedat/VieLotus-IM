@@ -25,7 +25,7 @@ sudo apt install vielotus
 Tải đúng gói `vielotus_<version>_<arch>.deb` từ bản phát hành mới nhất (`amd64` cho x86_64, `arm64` cho ARM64), rồi cài bằng APT. Thay giá trị bên dưới theo phiên bản và kiến trúc của tệp đã tải:
 
 ```sh
-version=2.0.2
+version=2.0.3
 arch=amd64 # dùng arm64 cho máy ARM64
 sudo apt install "./vielotus_${version}_${arch}.deb"
 ```
@@ -34,21 +34,19 @@ APT tự xử lý các gói phụ thuộc. Bản phát hành có `checksums.sha2
 
 ## Arch Linux và Arch ARM
 
-Kho mã nguồn có `PKGBUILD` dạng binary cho `x86_64` và `aarch64`. `makepkg` lấy đúng gói phát hành và cài các phụ thuộc được khai báo.
+`CrossPlatform/packaging/arch/PKGBUILD` biên dịch lõi C++20, plugin Fcitx5 và engine IBus bản địa theo đúng thư viện hệ thống Arch (`PKGBUILD.bin` cũng được cung cấp nếu muốn đóng gói lại từ `.deb`):
 
 ```sh
-sudo pacman -S --needed base-devel git
+sudo pacman -S --needed base-devel cmake extra-cmake-modules git
+# Kèm ít nhất một bộ khung nhập liệu:
+sudo pacman -S --needed fcitx5-im  # Fcitx5, gồm frontend GTK/Qt (KDE/Hyprland/XFCE)
+# hoặc
+sudo pacman -S --needed ibus       # IBus (GNOME)
+
 git clone --depth 1 https://github.com/stevedat/VieLotus-IM.git
 cd VieLotus-IM/CrossPlatform/packaging/arch
 makepkg -si
-```
-
-Cài một bộ khung nhập liệu nếu máy chưa có:
-
-```sh
-sudo pacman -S --needed fcitx5-im  # Fcitx5, gồm frontend GTK/Qt
-# hoặc
-sudo pacman -S --needed ibus       # IBus
+vielotus-settings --activate
 ```
 
 ## Khởi chạy và thêm bộ gõ

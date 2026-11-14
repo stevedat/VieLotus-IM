@@ -1,3 +1,23 @@
+vielotus (2.0.3-1) unstable; urgency=medium
+
+  * New upstream release 2.0.3 (initial upload to Debian; Closes: #1152533):
+    - SEN Flex Policy 3B+ mark-only backspace (duocw + Backspace -> được),
+      Telex horn propagation (dduwocj -> được, huwou -> hươu), tone-mark
+      replacement and expressive vowel repeats (uwfaaa -> ừaaa), double-letter
+      and camelCase English preservation (dessert, queue, saveFile), and "pía"
+      syllable support.
+    - Guard Wayland delete_surrounding_text bounds, harden KDE Plasma 6 Wayland
+      virtual keyboard binding and GNOME input-source repair, and update
+      Arch/rolling-release Linux CMake build support.
+    - Replace legacy hex-encoded array in
+      Sources/VieLotusCore/VietnameseSyllableDictionary.swift with plain UTF-8
+      source (DFSG #2) and add complete DEP-5 SCOWL attribution to
+      debian/copyright.
+    - Swift regression suite: 100.00% (9,091/9,091) primary, 97.86%
+      (365/373) ambiguous_both_sides, 100.00% (180/180) whitelist_safe=never.
+
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Sat, 14 Nov 2026 13:35:00 +0700
+
 vielotus (2.0.2-1) unstable; urgency=medium
 
   * New upstream release 2.0.2:
@@ -16,7 +36,7 @@ vielotus (2.0.2-1) unstable; urgency=medium
 
 vielotus (2.0.1-1) unstable; urgency=medium
 
-  * Initial release. (Closes: #1152533)
+  * Initial Debian packaging preparation for ITP #1152533 (superseded before upload by 2.0.3-1).
   * Official multi-arch (amd64 & arm64) release of Sen Việt (VieLotusIM).
   * Unobfuscated C++20 native engine with canonical UTF-8 (Unicode NFC)
     lexicon wordlists and build-time FNV-1a table generation (DFSG #2).

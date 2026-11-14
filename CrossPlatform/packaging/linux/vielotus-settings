@@ -1824,7 +1824,7 @@ ver_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
 ver_box.get_style_context().add_class("bento-ver-pill")
 ver_box.set_valign(Gtk.Align.CENTER)
 ver_lbl = Gtk.Label()
-ver_lbl.set_markup(f"<span size='8500' weight='bold' foreground='{P['accent']}'>v2.0.2</span>")
+ver_lbl.set_markup(f"<span size='8500' weight='bold' foreground='{P['accent']}'>v2.0.3</span>")
 ver_box.pack_start(ver_lbl, False, False, 0)
 brand_top.pack_start(title_lbl, False, False, 0)
 brand_top.pack_start(ver_box, False, False, 0)
@@ -1882,7 +1882,7 @@ def _start_gtk_update_worker(do_install=False):
                     "https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest",
                     headers={
                         "Accept": "application/vnd.github+json",
-                        "User-Agent": "VieLotusIM/2.0.2 (Linux; SettingsUpdater)",
+                        "User-Agent": "VieLotusIM/2.0.3 (Linux; SettingsUpdater)",
                     },
                 )
                 with urllib.request.urlopen(req, timeout=10) as resp:
@@ -1891,7 +1891,7 @@ def _start_gtk_update_worker(do_install=False):
                 if not tag:
                     raise RuntimeError("empty tag")
                 r_parts = [int(x) for x in tag.split(".") if x.isdigit()]
-                l_parts = [2, 0, 2]
+                l_parts = [2, 0, 3]
                 n = max(len(r_parts), len(l_parts))
                 is_newer = False
                 for i in range(n):
@@ -1907,58 +1907,98 @@ def _start_gtk_update_worker(do_install=False):
                     GLib.idle_add(_set_upd_pill_ui, "up_to_date", tag)
                 return
 
-            ver = _upd_state["version"] or "2.0.2"
+            ver = _upd_state["version"] or "2.0.3"
             mach = platform.machine().lower()
-            deb_arch = "arm64" if mach in ("aarch64", "arm64") else "amd64"
-            deb_name = f"vielotus_{ver}_{deb_arch}.deb"
-            base_dl = f"https://github.com/stevedat/VieLotus-IM/releases/download/v{ver}"
-
-            cs_req = urllib.request.Request(
-                f"{base_dl}/checksums.sha256",
-                headers={"User-Agent": "VieLotusIM/2.0.2 (Linux; SettingsUpdater)"},
-            )
-            with urllib.request.urlopen(cs_req, timeout=15) as cs_resp:
-                cs_text = cs_resp.read().decode("utf-8", errors="replace")
-
-            expected_sha = ""
-            for ln in cs_text.splitlines():
-                parts = ln.strip().split()
-                if len(parts) >= 2 and os.path.basename(parts[-1].lstrip("*./")) == deb_name:
-                    cand = parts[0].lower()
-                    if len(cand) == 64:
-                        expected_sha = cand
-                        break
-            if len(expected_sha) != 64:
-                raise RuntimeError("missing sha256")
-
-            deb_req = urllib.request.Request(
-                f"{base_dl}/{deb_name}",
-                headers={"User-Agent": "VieLotusIM/2.0.2 (Linux; SettingsUpdater)"},
-            )
-            with urllib.request.urlopen(deb_req, timeout=120) as deb_resp:
-                deb_bytes = deb_resp.read()
-
-            actual_sha = hashlib.sha256(deb_bytes).hexdigest().lower()
-            if actual_sha != expected_sha:
-                raise RuntimeError("sha256 mismatch")
-
-            tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
-            os.chmod(tmp_dir, 0o755)
-            deb_path = os.path.join(tmp_dir, deb_name)
-            with open(deb_path, "wb") as df:
-                df.write(deb_bytes)
-            os.chmod(deb_path, 0o644)
-
-            GLib.idle_add(_set_upd_pill_ui, "installing", ver)
             pkexec_bin = shutil.which("pkexec")
             apt_bin = shutil.which("apt-get")
+            is_deb_arch = mach in ("x86_64", "amd64", "aarch64", "arm64")
             rc = 1
-            if pkexec_bin and apt_bin:
-                rc = subprocess.call([pkexec_bin, apt_bin, "install", "-y", "--allow-downgrades", deb_path])
-            try:
-                shutil.rmtree(tmp_dir, ignore_errors=True)
-            except Exception:
-                pass
+
+            if pkexec_bin and apt_bin and is_deb_arch:
+                deb_arch = "arm64" if mach in ("aarch64", "arm64") else "amd64"
+                deb_name = f"vielotus_{ver}_{deb_arch}.deb"
+                base_dl = f"https://github.com/stevedat/VieLotus-IM/releases/download/v{ver}"
+
+                cs_req = urllib.request.Request(
+                    f"{base_dl}/checksums.sha256",
+                    headers={"User-Agent": "VieLotusIM/2.0.3 (Linux; SettingsUpdater)"},
+                )
+                with urllib.request.urlopen(cs_req, timeout=15) as cs_resp:
+                    cs_text = cs_resp.read().decode("utf-8", errors="replace")
+
+                expected_sha = ""
+                for ln in cs_text.splitlines():
+                    parts = ln.strip().split()
+                    if len(parts) >= 2 and os.path.basename(parts[-1].lstrip("*./")) == deb_name:
+                        cand = parts[0].lower()
+                        if len(cand) == 64:
+                            expected_sha = cand
+                            break
+                if len(expected_sha) != 64:
+                    raise RuntimeError("missing sha256")
+
+                deb_req = urllib.request.Request(
+                    f"{base_dl}/{deb_name}",
+                    headers={"User-Agent": "VieLotusIM/2.0.3 (Linux; SettingsUpdater)"},
+                )
+                with urllib.request.urlopen(deb_req, timeout=120) as deb_resp:
+                    deb_bytes = deb_resp.read()
+
+                actual_sha = hashlib.sha256(deb_bytes).hexdigest().lower()
+                if actual_sha != expected_sha:
+                    raise RuntimeError("sha256 mismatch")
+
+                tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
+                try:
+                    os.chmod(tmp_dir, 0o755)
+                    deb_path = os.path.join(tmp_dir, deb_name)
+                    with open(deb_path, "wb") as df:
+                        df.write(deb_bytes)
+                    os.chmod(deb_path, 0o644)
+
+                    GLib.idle_add(_set_upd_pill_ui, "installing", ver)
+                    rc = subprocess.call([pkexec_bin, apt_bin, "install", "-y", "--allow-downgrades", deb_path])
+                finally:
+                    try:
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                    except Exception:
+                        pass
+            elif pkexec_bin:
+                sh_req = urllib.request.Request(
+                    "https://stevedat.github.io/VieLotus-IM/install.sh",
+                    headers={"User-Agent": "VieLotusIM/2.0.3 (Linux; SettingsUpdater)"},
+                )
+                with urllib.request.urlopen(sh_req, timeout=20) as sh_resp:
+                    sh_bytes = sh_resp.read()
+
+                tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
+                try:
+                    os.chmod(tmp_dir, 0o700)
+                    sh_path = os.path.join(tmp_dir, "install.sh")
+                    with open(sh_path, "wb") as sf:
+                        sf.write(sh_bytes)
+                    os.chmod(sh_path, 0o700)
+
+                    GLib.idle_add(_set_upd_pill_ui, "installing", ver)
+                    env_args = [
+                        f"VIELOTUS_VERSION={ver}",
+                        "VIELOTUS_NO_OPEN_SETTINGS=1",
+                        f"SUDO_UID={os.getuid()}",
+                    ]
+                    cur_user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+                    if cur_user:
+                        env_args.append(f"SUDO_USER={cur_user}")
+                    for env_k in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS", "XDG_CURRENT_DESKTOP"):
+                        env_v = os.environ.get(env_k, "")
+                        if env_v:
+                            env_args.append(f"{env_k}={env_v}")
+                    rc = subprocess.call([pkexec_bin, "env", *env_args, "sh", sh_path])
+                finally:
+                    try:
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                    except Exception:
+                        pass
+
             _upd_state["busy"] = False
             if rc == 0:
                 GLib.idle_add(_set_upd_pill_ui, "up_to_date", ver)
@@ -3236,7 +3276,7 @@ def open_feedback_sheet(*_, auto_close=False):
     sess_type = (os.environ.get("XDG_SESSION_TYPE") or ("wayland" if os.environ.get("WAYLAND_DISPLAY") else "x11")).upper()
     os_name = detect_os_pretty_name()
     arch_name = platform.machine() or "linux"
-    sys_badge_str = f"Sen Việt v2.0.2 • {os_name} ({arch_name}) • {sess_type} • {im_title}"
+    sys_badge_str = f"Sen Việt v2.0.3 • {os_name} ({arch_name}) • {sess_type} • {im_title}"
 
     meta_pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
     meta_pill.get_style_context().add_class("bento-pill")
@@ -3418,7 +3458,7 @@ def open_feedback_sheet(*_, auto_close=False):
             hdr_topic = k_title
             issue_sum = k_title
 
-        issue_title = f"{k_prefix} {issue_sum} (Linux v2.0.2)"
+        issue_title = f"{k_prefix} {issue_sum} (Linux v2.0.3)"
         lines = [f"### {k_prefix} {hdr_topic}", ""]
         if t_keys or t_act or t_exp:
             lines.append(f"- **Chuỗi phím đã gõ (Typed Keys):** `{t_keys or '—'}`")
@@ -3885,7 +3925,7 @@ case "${1:-}" in
 import hashlib, json, os, platform, shutil, subprocess, sys, tempfile, urllib.request
 
 do_install = sys.argv[1] == "1"
-local_ver = "2.0.2"
+local_ver = "2.0.3"
 print(f"✦ Đang kiểm tra bản cập nhật Sen Việt (hiện tại: v{local_ver})...")
 try:
     req = urllib.request.Request(
@@ -4038,7 +4078,7 @@ if os.path.exists(config_path):
                 cfg[k.strip()] = v.strip().strip('"').strip("'")
 
 root = tk.Tk()
-root.title("Sen Việt (VieLotusIM v2.0.2) — Cài đặt")
+root.title("Sen Việt (VieLotusIM v2.0.3) — Cài đặt")
 root.geometry("460x320")
 root.resizable(False, False)
 
@@ -4089,7 +4129,7 @@ def apply_changes(*_):
 
 frm = ttk.Frame(root, padding=16)
 frm.pack(fill="both", expand=True)
-ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.2)", font=("Sans", 13, "bold")).pack(anchor="w")
+ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.3)", font=("Sans", 13, "bold")).pack(anchor="w")
 ttk.Label(frm, text="Kiểu gõ Tiếng Việt (tự động lưu & áp dụng):").pack(anchor="w", pady=(10, 4))
 ttk.Radiobutton(frm, text="Telex Tự Do (s f r x j w — vieetj → việt)", variable=im_var, value="telex", command=apply_changes).pack(anchor="w")
 ttk.Radiobutton(frm, text="VNI Chuẩn (phím số 1–9 — vie65t → việt)", variable=im_var, value="vni", command=apply_changes).pack(anchor="w")

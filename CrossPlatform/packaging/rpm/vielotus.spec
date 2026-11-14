@@ -1,5 +1,5 @@
 Name:           vielotus
-Version:        2.0.2
+Version:        2.0.3
 Release:        1%{?dist}
 Summary:        Sen Việt (VieLotusIM) - Bộ gõ tiếng Việt thế hệ mới cho Linux (IBus & Fcitx5)
 
@@ -80,5 +80,8 @@ fi
 /usr/share/vielotus/*
 
 %changelog
+* Sat Nov 14 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.3-1
+- Release of VieLotusIM (Sen Việt) v2.0.3 with SEN Flex Policy 3B+ fixes, Wayland/KDE hardening, and C++20 native engine updates
+
 * Wed Nov 11 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.2-1
 - Release of VieLotusIM (Sen Việt) v2.0.2 with MacroEngine, RelaxedCoda, DeveloperMode, PresentationRules & Doctor
