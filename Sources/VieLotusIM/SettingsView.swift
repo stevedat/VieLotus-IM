@@ -91,7 +91,7 @@ struct SettingsView: View {
 
                         headerUpdatePill
                     }
-                    Text("Thuần chuẩn Apple • 100% Offline • Không quyền Trợ năng")
+                    Text("InputMethodKit • Cập nhật qua GitHub theo yêu cầu")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: true, vertical: false)
@@ -749,7 +749,7 @@ struct SettingsView: View {
                         .font(.system(size: 10.5, weight: .bold))
                         .foregroundColor(.indigo)
                     Spacer()
-                    Text("InputMethodKit Chuẩn Apple • Pure Swift 6 • 100% Offline")
+                    Text("InputMethodKit • Engine Swift • Mã nguồn MIT")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.secondary)
                 }

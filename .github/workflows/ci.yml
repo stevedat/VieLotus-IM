@@ -1,4 +1,4 @@
-name: CI (Open-Core Desktop)
+name: CI (Desktop Source)
 
 on:
   push:
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   macos-build:
-    name: macOS (Native IMK + Remote SwiftPM Core XCFramework)
+    name: macOS (Native IMK + Swift source engine)
     runs-on: macos-15
 
     steps:
@@ -25,7 +25,13 @@ jobs:
           VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist)"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve & build Open-Core targets (SwiftPM SHA-256 verified XCFramework)
+      - name: Run Swift tests
+        run: swift test
+
+      - name: Run regression benchmark
+        run: swift run VieLotusCLI --benchmark --json
+
+      - name: Build Swift source targets
         run: swift build --configuration release
 
       - name: Build universal App bundle (VieLotusIM.app)

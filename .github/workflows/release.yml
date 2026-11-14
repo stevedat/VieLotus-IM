@@ -218,7 +218,7 @@ jobs:
             echo "enabled=0" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build and Sign universal App bundle (SwiftPM SHA-256 verified XCFramework)
+      - name: Build and Sign universal App bundle from source
         run: |
           ./scripts/build_imk.sh "${{ steps.version.outputs.version }}"
 
@@ -252,20 +252,45 @@ jobs:
           path: .build/dist/
           merge-multiple: true
 
-      - name: Stage Release Installers, XCFramework Zip & Checksums
+      - name: Run tests and benchmark
+        id: benchmark
+        run: |
+          mkdir -p .build/dist
+          swift test
+          swift run VieLotusCLI --benchmark --json --threshold 98.0 > .build/dist/benchmark.log
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          text = Path(".build/dist/benchmark.log").read_text()
+          row = next(line.removeprefix("BENCHMARK_JSON ") for line in text.splitlines() if line.startswith("BENCHMARK_JSON "))
+          data = json.loads(row)
+          match = re.search(r"never\s+.*?:\s+(\d+)\s*/\s*(\d+)", text)
+          if not match:
+              raise SystemExit("Missing whitelist_safe=never benchmark result")
+          never, never_total = map(int, match.groups())
+          outputs = {
+              "primary": data["cases"],
+              "cases": data["cases"],
+              "primary_rate": f"{data['overall']:.2f}",
+              "both": round(data["ambiguous_both_sides"] * data["vn_cases"] / 100),
+              "vn_cases": data["vn_cases"],
+              "both_rate": f"{data['ambiguous_both_sides']:.2f}",
+              "never": never,
+              "never_total": never_total,
+              "never_rate": f"{100 * never / never_total:.2f}",
+          }
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              for key, value in outputs.items():
+                  env.write(f"BENCH_{key.upper()}={value}\n")
+          PY
+
+      - name: Stage Release Installers & Checksums
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [ ! -f .build/dist/VieLotus-Store-Setup.exe ] && [ -f .build/dist/VieLotus-Setup-x64.exe ]; then
             cp .build/dist/VieLotus-Setup-x64.exe .build/dist/VieLotus-Store-Setup.exe
-          fi
-          XCF_URL="$(sed -n 's/.*url: "\([^"]*VieLotusCore\.xcframework\.zip\)".*/\1/p' Package.swift | head -n 1)"
-          if [ -n "$XCF_URL" ]; then
-            curl -fsSL "$XCF_URL" -o .build/dist/VieLotusCore.xcframework.zip
-          else
-            XCF_DIR="$(find .build/artifacts -name 'VieLotusCore.xcframework' -type d | head -n 1)"
-            ditto -c -k --sequesterRsrc --keepParent "$XCF_DIR" .build/dist/VieLotusCore.xcframework.zip
           fi
           cd .build/dist
           shasum -a 256 \
@@ -274,53 +299,44 @@ jobs:
             VieLotus-Setup-x64.exe \
             VieLotus-Setup-arm64.exe \
             "vielotus_${VERSION}_amd64.deb" \
-            "vielotus_${VERSION}_arm64.deb" \
-            VieLotusCore.xcframework.zip > checksums.sha256
+            "vielotus_${VERSION}_arm64.deb" > checksums.sha256
           cat checksums.sha256
 
       - name: Prepare Release Notes Body
+        env:
+          VER: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          COMMIT_SHA=$(git rev-parse HEAD)
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          VER="${{ steps.version.outputs.version }}"
-          TAG="${{ steps.version.outputs.tag }}"
-          REPO="${{ github.repository }}"
+          python3 - <<'PY'
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from subprocess import check_output
+          from textwrap import dedent
 
-          cat > release_notes.md <<EOF
-          ## 🌸 Sen Việt (VieLotusIM) ${TAG} — Multi-Platform Desktop Release
+          body = dedent(f'''# VieLotusIM {os.environ["TAG"]}
 
-          - **Git Commit:** [\`${SHORT_SHA}\`](https://github.com/${REPO}/commit/${COMMIT_SHA})
-          - **Build Timestamp:** ${BUILD_DATE}
+          Build commit: {check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()}
+          Build time: {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}
 
-          | Hệ điều hành / Platform | Bộ cài trực tiếp / Direct Download | Ghi chú |
-          | :--- | :--- | :--- |
-          | **macOS 13+ (Universal \`arm64\` & \`x86_64\`)** | [\`VieLotusIM.pkg\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotusIM.pkg) | Apple Developer ID Signed & Notarized (\`InputMethodKit\`) |
-          | **Windows 10/11 (\`x64\` — Store Signed)** | [\`VieLotus-Store-Setup.exe\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotus-Store-Setup.exe) | Signed by Microsoft Corporation (Pure Win32 TSF COM) |
-          | **Windows 10/11 (\`x64\` Offline)** | [\`VieLotus-Setup-x64.exe\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotus-Setup-x64.exe) | Native Win32 Text Services Framework (\`x64\`) |
-          | **Windows 11 ARM (\`ARM64\` Offline)** | [\`VieLotus-Setup-arm64.exe\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotus-Setup-arm64.exe) | Native Win32 Text Services Framework (\`ARM64\`) |
-          | **Linux Debian / Ubuntu (\`amd64\`)** | [\`vielotus_${VER}_amd64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus_${VER}_amd64.deb) | All-in-One IBus & Fcitx5 + Pure C++20 Engine (\`x86_64\`) |
-          | **Linux Debian / Ubuntu (\`arm64\`)** | [\`vielotus_${VER}_arm64.deb\`](https://github.com/${REPO}/releases/download/${TAG}/vielotus_${VER}_arm64.deb) | All-in-One IBus & Fcitx5 + Pure C++20 Engine (\`aarch64\`) |
-          | **macOS Open-Core SwiftPM SDK** | [\`VieLotusCore.xcframework.zip\`](https://github.com/${REPO}/releases/download/${TAG}/VieLotusCore.xcframework.zip) | Remote SwiftPM \`.binaryTarget\` (\`arm64\` + \`x86_64\`) |
+          ## Downloads
 
-          ### 🍺 Cài đặt qua Homebrew (macOS) / Homebrew Cask
-          \`\`\`bash
-          brew install --cask stevedat/tap/vielotus
-          \`\`\`
+          macOS: VieLotusIM.pkg
+          Windows: VieLotus-Setup-x64.exe, VieLotus-Setup-arm64.exe, VieLotus-Store-Setup.exe
+          Linux: vielotus_{os.environ["VER"]}_amd64.deb, vielotus_{os.environ["VER"]}_arm64.deb
 
-          ### 📊 Chỉ số kiểm thử hồi quy chính thức / Benchmark Regression Matrix
-          - **Overall Primary Suite:** **100.00% (9,091 / 9,091)**
-          - **Symmetric No-Context (\`vn_survives_collision\` / \`ambiguous_both_sides\`):** **97.33% (365 / 375)**
-          - **Single-Path Vietnamese Preservation (\`whitelist_safe = never\`):** **100.00% (182 / 182 — 0 critical losses)**
+          ## Swift CLI regression benchmark
 
-          <details>
-          <summary><strong>🔐 Mã kiểm chứng toàn vẹn tệp / SHA-256 Checksums (<code>checksums.sha256</code>)</strong></summary>
+          These results are from the Swift test suite at this source revision. They do not verify the Windows/Linux engines or behavior in every host application.
 
-          \`\`\`text
-          $(cat .build/dist/checksums.sha256)
-          \`\`\`
-          </details>
-          EOF
+          - Primary suite: **{os.environ["BENCH_PRIMARY"]} / {os.environ["BENCH_CASES"]} ({os.environ["BENCH_PRIMARY_RATE"]}%)**
+          - Symmetric no-context collisions (ambiguous_both_sides): **{os.environ["BENCH_BOTH"]} / {os.environ["BENCH_VN_CASES"]} ({os.environ["BENCH_BOTH_RATE"]}%)**
+          - Unique Vietnamese paths (whitelist_safe = never): **{os.environ["BENCH_NEVER"]} / {os.environ["BENCH_NEVER_TOTAL"]} ({os.environ["BENCH_NEVER_RATE"]}%)**
+
+          Checksums for the downloadable installers are in checksums.sha256.
+          ''')
+          Path("release_notes.md").write_text(body)
+          PY
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -333,7 +349,6 @@ jobs:
             .build/dist/VieLotus-Setup-x64.exe
             .build/dist/VieLotus-Setup-arm64.exe
             .build/dist/vielotus_*.deb
-            .build/dist/VieLotusCore.xcframework.zip
             .build/dist/checksums.sha256
           draft: false
           prerelease: false
@@ -353,7 +368,6 @@ jobs:
             "VieLotus-Setup-arm64.exe" \
             "VieLotus-Setup-x64.exe" \
             "VieLotus-Store-Setup.exe" \
-            "VieLotusCore.xcframework.zip" \
             "VieLotusIM.pkg" \
             "checksums.sha256" \
             "vielotus_${VERSION}_amd64.deb" \

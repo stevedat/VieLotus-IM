@@ -75,10 +75,6 @@ done
 find .build/artifacts -path "*/macos-*/VieLotusCore.framework/Versions/A/Resources/*VieLotusCore.bundle" -type d -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
 find .build/scratch-arm64 -name "*VieLotusCore.bundle" -type d -maxdepth 5 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
 find .build/out/Products/Release -name "*VieLotusCore.bundle" -type d -maxdepth 2 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
-if [ -d "Frameworks/VieLotusCore.xcframework" ]; then
-    find Frameworks/VieLotusCore.xcframework -name "*VieLotusCore.bundle" -type d -maxdepth 6 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
-fi
-
 # Ship the per-app presentation rules at a stable, user-inspectable top-level path.
 # It also exists inside VietLotusIM_VieLotusCore.bundle; PresentationRulesLoader prefers
 # this copy so the documented location is the one that is actually read.

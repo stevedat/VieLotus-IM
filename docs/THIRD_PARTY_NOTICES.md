@@ -1,38 +1,19 @@
-# Third-Party Notices & Open Source Acknowledgments
+# Third-party notices
 
-VieLotusIM (Sen Việt) is licensed under the [MIT License](../LICENSE). 
+Project-owned code in this repository is licensed under the MIT License in the repository root. Third-party files keep their own copyright and license terms.
 
-In the spirit of open-source collaboration and engineering excellence, VieLotusIM respects, learns from, and acknowledges foundational research, tools, and prior art in the Vietnamese macOS input method ecosystem:
+## SCOWL word list
 
----
+`Sources/VieLotusCore/Resources/English/scowl-en.txt` is derived from SCOWL. Its copyright and terms are in the adjacent `SCOWL-Copyright.txt` file and are included in the built resource bundle.
 
-## 1. Algorithmic & Linguistic Foundations
+## Debian metadata
 
-- **UniKey**: Open-source core algorithms by **Phạm Kim Long** (GPL).
-  - *Reference*: Foundational state-machine principles for Vietnamese syllable orthography and diacritic placement rules.
-- **OpenKey**: Created by **Mai Vũ Tuyên** ([tuyenvm/OpenKey](https://github.com/tuyenvm/OpenKey), GNU GPLv3).
-  - *Reference*: Structural reference for legacy codepage mappings (TCVN3 / ABC, VNI Windows, Unicode Compound) and phonetic spell-checking matrices.
-- **Bamboo Engine**: Created by **Lương Thanh Lam** ([BambooEngine/bamboo-core](https://github.com/BambooEngine/bamboo-core), GNU GPLv3).
-  - *Reference*: Syllable structure heuristics and forward-deletion disambiguation logic.
+Debian package copyright and license declarations are maintained in [`CrossPlatform/packaging/debian/copyright`](../CrossPlatform/packaging/debian/copyright). That file is authoritative for source packages submitted to Debian.
 
----
+## Apple frameworks
 
-## 2. InputMethodKit & Native macOS Engineering
+The macOS target links system frameworks supplied by Apple, including AppKit, InputMethodKit, and NaturalLanguage. They are not part of this repository's MIT-licensed source.
 
-- **VietTelex**: Engineered by **Phil Trịnh** ([ptrinh/viettelex](https://github.com/ptrinh/viettelex), MIT License).
-  - *Reference & Upstream Contribution*: Extensive technical research and edge-case documentation regarding Apple `InputMethodKit` runtime behaviors (`docs/MACOS_IME_NOTES.md`), secure input detection (`AXSecureTextField`), regression benchmark suite structure (`telex_test_suite.csv`, 9,091 test cases), and upstream collaboration ([ptrinh/viettelex#133](https://github.com/ptrinh/viettelex/pull/133)).
-- **UVie**: Developed by **UVie Project** ([uvie-project/uvie-rs](https://github.com/uvie-project/uvie-rs), [uvie-project/uvie-mac](https://github.com/uvie-project/uvie-mac), MIT License).
-  - *Reference & Upstream Contribution*: Rust-based Vietnamese Telex/VNI engine and native macOS InputMethodKit shell; upstream regression test suites and root-cause analysis for post-toned syllable state synchronization and V-C-V splitting ([uvie-project/uvie-rs#20](https://github.com/uvie-project/uvie-rs/pull/20), [uvie-project/uvie-mac#25](https://github.com/uvie-project/uvie-mac/pull/25)).
-- **XKey**: Developed by **xmannv** ([xmannv/xkey](https://github.com/xmannv/xkey), MIT License).
-  - *Reference*: Real-time keystroke debugging concepts and multi-mode switching paradigms.
-- **PHTV**: Created by **Phạm Hùng Tiến** ([PhamHungTien/PHTV](https://github.com/PhamHungTien/PHTV), GNU AGPLv3).
-  - *Reference (Clean-room conceptual)*: Engineering discipline, compatibility matrix edge-case documentation (TeXstudio single-unit buffering, JetBrains, Claude Code CLI timings), and technical debt governance policies.
+## Related projects
 
----
-
-## 3. Apple System Frameworks
-
-- **Frameworks**: `InputMethodKit.framework`, `Carbon.framework`, `NaturalLanguage.framework`, `AppKit.framework`.
-- **Copyright**: © Apple Inc. All rights reserved.
-- **Purpose**: Native system frameworks utilized for secure, non-invasive input method integration without `CGEventTap` or Accessibility permission requirements.
-
+The project documentation names other Vietnamese input methods as references. Those references do not grant rights to their code. Any third-party code or data added to this repository must retain its upstream notice and compatible license.

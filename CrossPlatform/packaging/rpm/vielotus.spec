@@ -18,11 +18,8 @@ Provides:       fcitx5-vielotus = %{version}-%{release}
 Provides:       ibus-vielotus = %{version}-%{release}
 
 %description
-VieLotusIM (Sen Việt) là bộ gõ tiếng Việt thế hệ mới với lõi C++20 Native C-ABI
-không làm mờ (MIT/Expat), đạt độ chính xác song ngữ 100.00% (9.091/9.091) kèm
-chỉ số đối xứng ambiguous_both_sides 97.33% (365/375) và bảo toàn đường gõ duy nhất
-whitelist_safe = never 100.00% (182/182). Hỗ trợ đồng thời IBus và Fcitx5 trên
-Fedora, RHEL, CentOS Stream và openSUSE.
+VieLotusIM (Sen Việt) là bộ gõ tiếng Việt cho Linux với engine C++20 và C-ABI,
+hỗ trợ IBus và Fcitx5 trên Fedora, RHEL, CentOS Stream và openSUSE.
 
 %install
 %ifarch aarch64

@@ -19,7 +19,7 @@ Plugin tích hợp bộ gõ tiếng Việt thế hệ mới **VieLotus (Sen Vi�
 [ libVieLotusCAPI (Swift 6 Core Engine) ]
 ```
 
-* **Core Engine**: Sử dụng 100% chung thuật toán với bản macOS, bảo toàn **99.97%** độ chính xác trên 9.091 test cases.
+* **Core Engine**: Engine C++20 được duy trì riêng cho Linux và Windows. Kết quả benchmark Swift trong README gốc không đại diện cho engine C++ này.
 * **Non-invasive**: Sử dụng chuẩn `Preedit` và `CommitString` của Fcitx5, không giả lập phím ảo Backspace, không nháy chữ trong trình duyệt hay terminal.
 
 ---

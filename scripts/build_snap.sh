@@ -213,12 +213,10 @@ version: '${VERSION}'
 title: Sen Việt (VieLotusIM)
 summary: Sen Việt (VieLotusIM) - Next-Gen Vietnamese Input Method (IBus & Fcitx5)
 description: |
-  Sen Việt (VieLotusIM) là bộ gõ tiếng Việt thế hệ mới phát triển bởi Nido Holdings,
-  đạt độ chính xác 100.00% (9.091/9.091) trên bộ kiểm thử hồi quy chính thức
-  (cùng 97.33% [365/375] ở vế đối xứng không ngữ cảnh ambiguous_both_sides và
-  100.00% [182/182] ở nhóm đường gõ duy nhất never).
+  Sen Việt (VieLotusIM) là bộ gõ tiếng Việt cho Linux, hỗ trợ Telex, VNI, IBus và Fcitx5.
+  Đây là gói thử nghiệm; bản Snap chưa được công bố.
 
-  Tính năng nổi bật:
+  Tính năng:
   - Gõ dấu tự do SEN Flex & Chuẩn cổ điển (Telex & VNI) tự nhiên, chuẩn xác.
   - Tự động nhận diện và khôi phục từ tiếng Anh / thuật ngữ lập trình khi gõ song ngữ.
   - Hỗ trợ đồng thời cả hai chuẩn bộ gõ phổ biến nhất trên Linux: IBus và Fcitx5.
