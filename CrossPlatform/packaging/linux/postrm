@@ -9,35 +9,6 @@ fi
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor >/dev/null 2>&1 || true
 fi
-rm -f /home/*/.config/fontconfig/conf.d/51-vielotus-vietnamese.conf /root/.config/fontconfig/conf.d/51-vielotus-vietnamese.conf 2>/dev/null || true
-rm -f /home/*/.config/fontconfig/conf.d/64-vielotus-vietnamese.conf /root/.config/fontconfig/conf.d/64-vielotus-vietnamese.conf 2>/dev/null || true
-rm -f /home/*/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf /root/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf 2>/dev/null || true
-rm -f /home/*/.config/vielotus/.onboarded /root/.config/vielotus/.onboarded 2>/dev/null || true
-
-# Clean stale ('ibus', 'vielotus*') entries from active GNOME sessions on remove/purge
-if command -v python3 >/dev/null 2>&1 && command -v gsettings >/dev/null 2>&1; then
-    for bus_sock in /run/user/[1-9][0-9][0-9]*/bus; do
-        [ -S "${bus_sock}" ] || continue
-        u_dir="$(dirname "${bus_sock}")"
-        u_id="$(basename "${u_dir}")"
-        pw_line="$(getent passwd "${u_id}" 2>/dev/null || true)"
-        [ -n "${pw_line}" ] || continue
-        u_name="$(printf '%s' "${pw_line}" | cut -d: -f1)"
-        u_home="$(printf '%s' "${pw_line}" | cut -d: -f6)"
-        [ -n "${u_name}" ] && [ -d "${u_home}" ] || continue
-        su -s /bin/sh "${u_name}" -c "HOME='${u_home}' XDG_RUNTIME_DIR='${u_dir}' DBUS_SESSION_BUS_ADDRESS='unix:path=${bus_sock}' python3 -c \"
-import ast, subprocess
-for k in ('sources', 'mru-sources'):
-    raw = subprocess.check_output(['gsettings', 'get', 'org.gnome.desktop.input-sources', k], stderr=subprocess.DEVNULL).decode().strip()
-    if raw.startswith('@a(ss) '): raw = raw[7:]
-    lst = list(ast.literal_eval(raw)) if raw else []
-    flt = [s for s in lst if not (s[0] == 'ibus' and s[1] in ('vielotus', 'vielotus-vni'))]
-    if flt != lst:
-        val = '[' + ', '.join(f\\\"('{a}', '{b}')\\\" for a, b in flt) + ']'
-        subprocess.call(['gsettings', 'set', 'org.gnome.desktop.input-sources', k, val], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-\"" >/dev/null 2>&1 || true
-    done
-fi
 if command -v fc-cache >/dev/null 2>&1; then
     fc-cache -f >/dev/null 2>&1 || true
 fi

@@ -14,56 +14,20 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor >/dev/null 2>&1 || true
 fi
 if command -v ibus >/dev/null 2>&1; then
-    rm -f /home/*/.cache/ibus/bus/registry* /root/.cache/ibus/bus/registry* 2>/dev/null || true
     ibus write-cache --system >/dev/null 2>&1 || true
-fi
-if [ -d /snap ] && [ -f /etc/fonts/conf.d/51-vielotus-vietnamese.conf ]; then
-    for uhome in /home/*; do
-        if [ -d "${uhome}" ]; then
-            mkdir -p "${uhome}/.config/fontconfig/conf.d" 2>/dev/null || true
-            cp -f /etc/fonts/conf.d/51-vielotus-vietnamese.conf "${uhome}/.config/fontconfig/conf.d/51-vielotus-vietnamese.conf" 2>/dev/null || true
-            cp -f /etc/fonts/conf.d/99-vielotus-vietnamese.conf "${uhome}/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf" 2>/dev/null || true
-            chown --reference="${uhome}" "${uhome}/.config" "${uhome}/.config/fontconfig" "${uhome}/.config/fontconfig/conf.d" "${uhome}/.config/fontconfig/conf.d/51-vielotus-vietnamese.conf" "${uhome}/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf" 2>/dev/null || true
-        fi
-    done
 fi
 if command -v fc-cache >/dev/null 2>&1; then
     fc-cache -f >/dev/null 2>&1 || true
 fi
 
-# Terminate any stale running engine workers before re-onboarding so ibus-daemon / fcitx5
-# immediately loads the newly installed binary and shared library
+# Terminate stale engine workers so ibus-daemon / fcitx5 spawns the newly installed binary
 if command -v pkill >/dev/null 2>&1; then
     pkill -f ibus-engine-vielotus >/dev/null 2>&1 || true
 fi
 
-# Zero-touch live desktop session onboarding: reload live IBus registry & activate Sen Việt (🇻🇳 tex) immediately
-if [ -x /usr/bin/vielotus-settings ]; then
-    for bus_sock in /run/user/[1-9][0-9][0-9]*/bus; do
-        [ -S "${bus_sock}" ] || continue
-        u_dir="$(dirname "${bus_sock}")"
-        u_id="$(basename "${u_dir}")"
-        pw_line="$(getent passwd "${u_id}" 2>/dev/null || true)"
-        [ -n "${pw_line}" ] || continue
-        u_name="$(printf '%s' "${pw_line}" | cut -d: -f1)"
-        u_home="$(printf '%s' "${pw_line}" | cut -d: -f6)"
-        [ -n "${u_name}" ] && [ -d "${u_home}" ] || continue
-        rm -f "${u_home}/.config/vielotus/.onboarded" 2>/dev/null || true
-        wl_env=""
-        x11_env=""
-        [ -S "${u_dir}/wayland-0" ] && wl_env="WAYLAND_DISPLAY='wayland-0'"
-        [ -S "/tmp/.X11-unix/X0" ] && x11_env="DISPLAY=':0'"
-        su -s /bin/sh "${u_name}" -c \
-            "HOME='${u_home}' XDG_RUNTIME_DIR='${u_dir}' DBUS_SESSION_BUS_ADDRESS='unix:path=${bus_sock}' ${wl_env} ${x11_env} XDG_CURRENT_DESKTOP='ubuntu:GNOME' /usr/bin/vielotus-settings --auto-onboard" \
-            >/dev/null 2>&1 || true
-    done
-fi
-
 echo "----------------------------------------------------------------------"
-echo "Sen Việt (VieLotusIM): Đã cài đặt và tự động đăng ký bộ gõ (🇻🇳 tex)."
-echo "  • Chuyển bộ gõ nhanh : Super + Space (chọn 'Sen Việt - Telex / 🇻🇳 tex')"
-echo "  • Lưu ý lần đầu cài  : Trên Ubuntu/GNOME (Wayland), nếu thanh trên cùng"
-echo "    chưa hiện '🇻🇳 tex' hoặc Settings chỉ hiện chữ thường 'vielotus',"
-echo "    hãy Đăng xuất (Log Out) rồi Đăng nhập lại 1 lần duy nhất."
+echo "Sen Việt (VieLotusIM): Đã cài đặt gói hệ thống thành công."
+echo "  • Kích hoạt nhanh    : Chạy 'vielotus-settings --activate' hoặc mở ứng dụng 'Sen Việt'"
+echo "  • Chuyển bộ gõ nhanh : Super + Space / Ctrl + Space"
 echo "----------------------------------------------------------------------"
 exit 0

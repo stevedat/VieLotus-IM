@@ -105,7 +105,7 @@ jobs:
 
       - name: Run Lintian check on generated Debian split packages
         run: |
-          lintian --no-tag-display-limit ../*vielotus*.deb || true
+          lintian --tag-display-limit 0 ../*vielotus*.deb || true
 
       - name: Stage Linux distribution artifacts & build APT repository
         run: |
