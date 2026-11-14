@@ -87,4 +87,51 @@ final class LocalEnglishLexiconTests: XCTestCase {
             XCTAssertTrue(lexicon.candidates(for: word).isEmpty)
         }
     }
+
+    func testResolveVieLotusCoreSupportsPublicPackageBundleName() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("VieLotusBundleResolve-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let appResources = tempRoot
+            .appendingPathComponent("VieLotusIM.app", isDirectory: true)
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Resources", isDirectory: true)
+        let bundleURL = appResources.appendingPathComponent("VieLotusIM_VieLotusCore.bundle", isDirectory: true)
+        let bundleResources = bundleURL
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Resources", isDirectory: true)
+        try FileManager.default.createDirectory(at: bundleResources, withIntermediateDirectories: true)
+
+        let infoPlist = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleIdentifier</key>
+            <string>org.vielotus.VieLotusCore.resources</string>
+            <key>CFBundlePackageType</key>
+            <string>BNDL</string>
+        </dict>
+        </plist>
+        """
+        try infoPlist.write(
+            to: bundleURL.appendingPathComponent("Contents/Info.plist"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "apple\njust\ntrust\n".write(
+            to: bundleResources.appendingPathComponent("scowl-en.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let resolved = Bundle.resolveVieLotusCore(
+            in: [appResources],
+            fallbackBundles: [],
+            sourceResourcesURL: nil
+        )
+        XCTAssertEqual(resolved.bundleURL.standardizedFileURL, bundleURL.standardizedFileURL)
+        XCTAssertNotNil(resolved.url(forResource: "scowl-en", withExtension: "txt"))
+    }
 }

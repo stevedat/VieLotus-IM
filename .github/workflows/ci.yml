@@ -43,6 +43,16 @@ jobs:
       - name: Build installer package (VieLotusIM.pkg)
         run: ./scripts/build_pkg.sh "${{ steps.version.outputs.version }}"
 
+      - name: Verify packaged VieLotusIM.pkg resource payload
+        run: |
+          PAYLOAD="$(pkgutil --payload-files .build/dist/VieLotusIM.pkg)"
+          for req in "VieLotusIM_VieLotusCore.bundle" "scowl-en.txt" "SCOWL-Copyright.txt" "typing-modes.yml"; do
+            if ! printf '%s\n' "$PAYLOAD" | grep -q "$req"; then
+              echo "::error::Missing required resource '$req' inside VieLotusIM.pkg payload"
+              exit 1
+            fi
+          done
+
       - name: Upload macOS build artifacts
         uses: actions/upload-artifact@v4
         with:

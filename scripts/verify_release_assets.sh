@@ -135,6 +135,36 @@ check_pkg() {
         echo "    ❌ Team ID mismatch: expected $EXPECTED_TEAM_ID"
         FAILURES=$((FAILURES + 1))
     fi
+
+    local payload_files
+    payload_files=$(pkgutil --payload-files "$pkg_path" 2>/dev/null || true)
+    for req_payload in "VieLotusCore.bundle" "scowl-en.txt" "SCOWL-Copyright.txt" "typing-modes.yml"; do
+        if echo "$payload_files" | grep -q "$req_payload"; then
+            echo "    ✅ Payload Resource: $req_payload"
+        else
+            echo "    ❌ Missing required payload resource inside PKG: $req_payload"
+            FAILURES=$((FAILURES + 1))
+        fi
+    done
+
+    if [[ -n "$REMOTE_TAG" ]] && command -v curl >/dev/null 2>&1; then
+        local latest_tag
+        latest_tag=$(gh release view --json tagName -q '.tagName' 2>/dev/null || true)
+        if [[ -n "$latest_tag" && "$REMOTE_TAG" == "$latest_tag" ]]; then
+            local cask_content cask_sha pkg_sha
+            cask_content=$(curl -fsSL "https://raw.githubusercontent.com/stevedat/homebrew-tap/main/Casks/vielotus.rb" 2>/dev/null || true)
+            if [[ -n "$cask_content" ]]; then
+                cask_sha=$(echo "$cask_content" | sed -n 's/.*sha256 "\([0-9a-f]\{64\}\)".*/\1/p' | head -n 1)
+                pkg_sha=$(shasum -a 256 "$pkg_path" | awk '{print $1}')
+                if [[ "$cask_sha" == "$pkg_sha" ]]; then
+                    echo "    ✅ Homebrew Tap Cask SHA-256: SYNCED ($cask_sha)"
+                else
+                    echo "    ❌ Homebrew Tap Cask SHA-256 mismatch (cask=$cask_sha vs pkg=$pkg_sha)"
+                    FAILURES=$((FAILURES + 1))
+                fi
+            fi
+        fi
+    fi
 }
 
 check_dmg() {
