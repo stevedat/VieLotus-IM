@@ -221,12 +221,19 @@ uninstall_vielotus() {
         fi
     done
     ${SUDO} rm -rf /usr/lib/vielotus /usr/share/vielotus /usr/share/doc/vielotus 2>/dev/null || true
-    rm -f "${HOME}/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf" \
-          "${HOME}/.config/fontconfig/conf.d/51-vielotus-vietnamese.conf" \
-          "${HOME}/.config/environment.d/fcitx5-vielotus.conf" 2>/dev/null || true
-    ${SUDO} rm -f /home/*/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf \
-                  /home/*/.config/fontconfig/conf.d/51-vielotus-vietnamese.conf \
-                  /home/*/.config/environment.d/fcitx5-vielotus.conf 2>/dev/null || true
+    UNINSTALL_USER="${SUDO_USER:-$(id -un)}"
+    UNINSTALL_HOME="$(getent passwd "${UNINSTALL_USER}" 2>/dev/null | cut -d: -f6 || echo "${HOME}")"
+    if [ -n "${UNINSTALL_HOME}" ] && [ -d "${UNINSTALL_HOME}" ]; then
+        for _uf in \
+            "${UNINSTALL_HOME}/.config/fontconfig/conf.d/99-vielotus-vietnamese.conf" \
+            "${UNINSTALL_HOME}/.config/fontconfig/conf.d/51-vielotus-vietnamese.conf" \
+            "${UNINSTALL_HOME}/.config/environment.d/fcitx5-vielotus.conf"
+        do
+            if [ -f "${_uf}" ] && [ ! -L "${_uf}" ]; then
+                rm -f "${_uf}" 2>/dev/null || true
+            fi
+        done
+    fi
     for sz in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
         ${SUDO} rm -f "/usr/share/icons/hicolor/${sz}/apps/vielotus.png" 2>/dev/null || true
     done
@@ -394,29 +401,33 @@ refresh_settings_script_from_main() {
     if [ "${VIELOTUS_VERSION_PINNED:-0}" = "1" ] || [ -n "${VIELOTUS_DEB_PATH:-}" ] || [ "${VIELOTUS_REQUIRE_SHA256:-0}" = "1" ]; then
         return 0
     fi
-    tmp_vs="/tmp/vielotus-settings-refresh-$$"
-    rm -f "${tmp_vs}"
+    tmp_vs_dir="$(mktemp -d "${TMPDIR:-/tmp}/vielotus-vs.XXXXXXXX")"
+    chmod 0700 "${tmp_vs_dir}"
+    tmp_vs="${tmp_vs_dir}/vielotus-settings"
     if [ -n "${VIELOTUS_SOURCE_DIR:-}" ] && [ -f "${VIELOTUS_SOURCE_DIR}/CrossPlatform/packaging/linux/vielotus-settings" ]; then
-        cp "${VIELOTUS_SOURCE_DIR}/CrossPlatform/packaging/linux/vielotus-settings" "${tmp_vs}" 2>/dev/null || return 0
+        cp "${VIELOTUS_SOURCE_DIR}/CrossPlatform/packaging/linux/vielotus-settings" "${tmp_vs}" 2>/dev/null || {
+            rm -rf "${tmp_vs_dir}"
+            return 0
+        }
     else
         download_file "https://raw.githubusercontent.com/stevedat/VieLotus-IM/main/CrossPlatform/packaging/linux/vielotus-settings" "${tmp_vs}" 2>/dev/null || {
-            rm -f "${tmp_vs}"
+            rm -rf "${tmp_vs_dir}"
             return 0
         }
     fi
-    if ! head -n 1 "${tmp_vs}" 2>/dev/null | grep -q '^#!/usr/bin/env bash'; then
-        rm -f "${tmp_vs}"
+    if ! head -n 1 "${tmp_vs}" 2>/dev/null | grep -q '^#!/usr/bin/env bash' && ! head -n 1 "${tmp_vs}" 2>/dev/null | grep -q '^#!/bin/bash'; then
+        rm -rf "${tmp_vs_dir}"
         return 0
     fi
     if command -v bash >/dev/null 2>&1 && ! bash -n "${tmp_vs}" >/dev/null 2>&1; then
-        rm -f "${tmp_vs}"
+        rm -rf "${tmp_vs_dir}"
         return 0
     fi
     ${SUDO} mkdir -p /usr/bin
     ${SUDO} cp "${tmp_vs}" /usr/bin/vielotus-settings
     ${SUDO} chmod 0755 /usr/bin/vielotus-settings
     ${SUDO} ln -sf vielotus-settings /usr/bin/vielotus
-    rm -f "${tmp_vs}"
+    rm -rf "${tmp_vs_dir}"
 }
 
 try_native_cmake_build() {
@@ -448,9 +459,8 @@ try_native_cmake_build() {
         return 1
     fi
 
-    build_ws="/tmp/vielotus-srcbuild-$$"
-    rm -rf "${build_ws}"
-    mkdir -p "${build_ws}"
+    build_ws="$(mktemp -d "${TMPDIR:-/tmp}/vielotus-srcbuild.XXXXXXXX")"
+    chmod 0700 "${build_ws}"
 
     SRC_ROOT=""
     if [ -n "${VIELOTUS_SOURCE_DIR:-}" ] && [ -d "${VIELOTUS_SOURCE_DIR}/CrossPlatform/capi-native" ]; then
@@ -593,9 +603,8 @@ try_native_cmake_build() {
 
 extract_deb_to_root() {
     deb_path="$1"
-    work_dir="/tmp/vielotus-extract-$$"
-    rm -rf "${work_dir}"
-    mkdir -p "${work_dir}"
+    work_dir="$(mktemp -d "${TMPDIR:-/tmp}/vielotus-extract.XXXXXXXX")"
+    chmod 0700 "${work_dir}"
 
     if command -v python3 >/dev/null 2>&1; then
         python3 - "${deb_path}" "${work_dir}" <<'PYEOF'
@@ -622,7 +631,10 @@ with open(deb_path, "rb") as f:
             with open(data_tar, "wb") as out:
                 out.write(data)
             with tarfile.open(data_tar, "r:*") as tf:
-                tf.extractall(os.path.join(work_dir, "rootfs"))
+                if sys.version_info >= (3, 12):
+                    tf.extractall(os.path.join(work_dir, "rootfs"), filter="data")
+                else:
+                    tf.extractall(os.path.join(work_dir, "rootfs"))
             break
 PYEOF
     elif command -v ar >/dev/null 2>&1; then
@@ -697,17 +709,20 @@ ARCH_RAW="$(uname -m)"
 # ------------------------------------------------------------------------------
 if [ "${OS_NAME}" = "Darwin" ]; then
     echo "🌸 === Cài đặt Sen Việt (VieLotusIM v${VERSION}) cho macOS ==="
-    TMP_PKG="/tmp/VieLotusIM.pkg"
-    TMP_SUMS="/tmp/vielotus-checksums-$$.sha256"
+    MAC_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vielotus-pkg.XXXXXXXX")"
+    chmod 0700 "${MAC_TMP_DIR}"
+    trap 'rm -rf "${MAC_TMP_DIR}"' EXIT HUP INT TERM
+    TMP_PKG="${MAC_TMP_DIR}/VieLotusIM.pkg"
+    TMP_SUMS="${MAC_TMP_DIR}/checksums.sha256"
     echo "⬇️  Đang tải gói cài đặt VieLotusIM.pkg..."
     curl -fL --progress-bar "https://github.com/stevedat/VieLotus-IM/releases/latest/download/VieLotusIM.pkg" -o "${TMP_PKG}"
     if download_file "https://github.com/stevedat/VieLotus-IM/releases/latest/download/checksums.sha256" "${TMP_SUMS}" 2>/dev/null; then
         verify_artifact_sha256 "${TMP_PKG}" "VieLotusIM.pkg" "${TMP_SUMS}" "1"
     fi
-    rm -f "${TMP_SUMS}"
     echo "📦 Đang cài đặt vào /Library/Input Methods..."
     ${SUDO} installer -pkg "${TMP_PKG}" -target /
-    rm -f "${TMP_PKG}"
+    rm -rf "${MAC_TMP_DIR}"
+    trap - EXIT HUP INT TERM
     echo "✅ Cài đặt Sen Việt trên macOS hoàn tất!"
     exit 0
 fi
@@ -809,11 +824,12 @@ run_as_real_user() {
 }
 
 if [ -n "${REAL_HOME}" ] && [ -d "${REAL_HOME}" ]; then
-    rm -rf "${REAL_HOME}/.local/lib/vielotus" 2>/dev/null || ${SUDO} rm -rf "${REAL_HOME}/.local/lib/vielotus" 2>/dev/null || true
-    rm -f "${REAL_HOME}/.config/environment.d/90-vielotus.conf" 2>/dev/null || ${SUDO} rm -f "${REAL_HOME}/.config/environment.d/90-vielotus.conf" 2>/dev/null || true
-    ${SUDO} rm -f /tmp/vielotus-settings.log 2>/dev/null || true
-    if [ -d "${REAL_HOME}/.config/vielotus" ]; then
-        ${SUDO} chown -R "${REAL_USER}:${REAL_USER}" "${REAL_HOME}/.config/vielotus" 2>/dev/null || true
+    run_as_real_user rm -rf "${REAL_HOME}/.local/lib/vielotus" 2>/dev/null || true
+    if [ -f "${REAL_HOME}/.config/environment.d/90-vielotus.conf" ] && [ ! -L "${REAL_HOME}/.config/environment.d/90-vielotus.conf" ]; then
+        run_as_real_user rm -f "${REAL_HOME}/.config/environment.d/90-vielotus.conf" 2>/dev/null || true
+    fi
+    if [ -d "${REAL_HOME}/.config/vielotus" ] && [ ! -L "${REAL_HOME}/.config/vielotus" ]; then
+        ${SUDO} chown -RP "${REAL_USER}:${REAL_USER}" "${REAL_HOME}/.config/vielotus" 2>/dev/null || true
     fi
 fi
 
@@ -823,8 +839,11 @@ if command -v pkill >/dev/null 2>&1; then
 fi
 
 DEB_FILE="vielotus_${VERSION}_${DEB_ARCH}.deb"
-TMP_DEB="/tmp/${DEB_FILE}"
-TMP_SUMS="/tmp/vielotus-checksums-$$.sha256"
+LINUX_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vielotus-deb.XXXXXXXX")"
+chmod 0700 "${LINUX_TMP_DIR}"
+trap 'rm -rf "${LINUX_TMP_DIR}"' EXIT HUP INT TERM
+TMP_DEB="${LINUX_TMP_DIR}/${DEB_FILE}"
+TMP_SUMS="${LINUX_TMP_DIR}/checksums.sha256"
 
 fetch_and_verify_deb() {
     if [ -n "${VIELOTUS_DEB_PATH:-}" ]; then
@@ -1157,7 +1176,8 @@ else
     finalize_linux_integration
 fi
 
-rm -f "${TMP_DEB}" "${TMP_SUMS}"
+rm -rf "${LINUX_TMP_DIR}"
+trap - EXIT HUP INT TERM
 
 if [ -x /usr/bin/vielotus-settings ]; then
     BOOTSTRAP_FCITX5="0"

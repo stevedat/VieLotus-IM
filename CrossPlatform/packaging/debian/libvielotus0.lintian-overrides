@@ -1,2 +1,4 @@
 # The shared C-ABI runtime library is named libVieLotusCAPI.so.0 while the Debian binary package follows the lowercase source package prefix libvielotus0.
 libvielotus0: package-name-doesnt-match-sonames libVieLotusCAPI0
+# libvielotus0 is an internal shared library used exclusively by ibus-vielotus and fcitx5-vielotus (both built from this source package with strict = ${binary:Version} dependencies) and does not ship a public -dev package.
+libvielotus0: no-symbols-control-file usr/lib/*/libVieLotusCAPI.so.0*

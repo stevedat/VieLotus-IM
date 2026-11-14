@@ -1,10 +1,16 @@
 vielotus (2.0.2-1) unstable; urgency=medium
 
   * New upstream release 2.0.2:
-    - Post-coda circumflex bilingual preservation (theme -> theme vs theem -> thêm).
-    - Cross-platform code-switching alignment for ee/oo Vietnamese syllables
-      in English context (check status treen website -> check status trên website).
-    - Full 9,091-case + 44 bilingual phrase regression verification (100.00%).
+    - Preserve post-coda circumflex English words (theme vs theem -> them).
+    - Align cross-platform code-switching for ee/oo Vietnamese syllables
+      in English context (check status treen website -> tren website).
+    - Regression suite: 100.00% (9,091/9,091) primary, 97.33% (365/375)
+      ambiguous_both_sides, 100.00% (182/182) whitelist_safe=never.
+  * Address DFSG NEW review findings from 2.0.1-1:
+    - Use mktemp -d (0700) with exit trap in vielotus-settings.
+    - Drop redundant Recommends on the vielotus metapackage.
+    - Ship /usr/bin/vielotus symlink and manpage alias; update debian/watch
+      to Version 5 and keep libvielotus0 strictly Multi-Arch library-only.
 
  -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Wed, 04 Nov 2026 18:45:00 +0700
 
