@@ -1,42 +1,36 @@
 vielotus (2.0.3-1) unstable; urgency=medium
 
-  * New upstream release 2.0.3 (initial upload to Debian; Closes: #1152533):
+  * New upstream release 2.0.3 (incorporating 2.0.2 and 2.0.3 changes):
     - SEN Flex Policy 3B+ mark-only backspace (duocw + Backspace -> được),
       Telex horn propagation (dduwocj -> được, huwou -> hươu), tone-mark
-      replacement and expressive vowel repeats (uwfaaa -> ừaaa), double-letter
-      and camelCase English preservation (dessert, queue, saveFile), and "pía"
-      syllable support.
+      replacement and expressive vowel repeats (uwfaaa -> ừaaa), post-coda
+      circumflex English preservation (theme vs theem -> thêm), ee/oo
+      code-switching in English context, double-letter and camelCase English
+      preservation (dessert, queue, saveFile), and "pía" syllable support.
     - Guard Wayland delete_surrounding_text bounds, harden KDE Plasma 6 Wayland
       virtual keyboard binding and GNOME input-source repair, and update
       Arch/rolling-release Linux CMake build support.
-    - Replace legacy hex-encoded array in
-      Sources/VieLotusCore/VietnameseSyllableDictionary.swift with plain UTF-8
-      source (DFSG #2) and add complete DEP-5 SCOWL attribution to
-      debian/copyright.
-    - Swift regression suite: 100.00% (9,091/9,091) primary, 97.86%
-      (365/373) ambiguous_both_sides, 100.00% (180/180) whitelist_safe=never.
+    - Native C++20 regression suite: 100.00% (9,091/9,091) primary,
+      100.00% (373/373) ambiguous_both_sides, 100.00% (180/180)
+      whitelist_safe=never. Swift regression suite: 100.00% (9,091/9,091)
+      primary, 97.86% (365/373) ambiguous_both_sides, 100.00% (180/180)
+      whitelist_safe=never.
+  * Address packaging review items from 2.0.1-1 and tracker diagnostics:
+    - Use mktemp -d (0700) with exit trap in vielotus-settings instead of a
+      predictable /tmp path.
+    - Drop redundant Recommends on the vielotus metapackage and ship
+      /usr/bin/vielotus plus vielotus.1 manpage symlinks.
+    - Update debian/watch to Version 5 and set Vcs-Git subpath
+      [CrossPlatform/packaging] for vcswatch.
+    - Replace legacy encoded arrays in VietnameseSyllableDictionary.swift and
+      EmbeddedTestSuite.swift with plain UTF-8 source (DFSG #2), and add
+      complete DEP-5 SCOWL attribution to debian/copyright.
 
- -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Sat, 14 Nov 2026 13:35:00 +0700
-
-vielotus (2.0.2-1) unstable; urgency=medium
-
-  * New upstream release 2.0.2:
-    - Preserve post-coda circumflex English words (theme vs theem -> them).
-    - Align cross-platform code-switching for ee/oo Vietnamese syllables
-      in English context (check status treen website -> tren website).
-    - Regression suite: 100.00% (9,091/9,091) primary, 97.33% (365/375)
-      ambiguous_both_sides, 100.00% (182/182) whitelist_safe=never.
-  * Address DFSG NEW review findings from 2.0.1-1:
-    - Use mktemp -d (0700) with exit trap in vielotus-settings.
-    - Drop redundant Recommends on the vielotus metapackage.
-    - Ship /usr/bin/vielotus symlink and manpage alias; update debian/watch
-      to Version 5 and keep libvielotus0 strictly Multi-Arch library-only.
-
- -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Wed, 04 Nov 2026 18:45:00 +0700
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Sat, 14 Nov 2026 14:10:00 +0700
 
 vielotus (2.0.1-1) unstable; urgency=medium
 
-  * Initial Debian packaging preparation for ITP #1152533 (superseded before upload by 2.0.3-1).
+  * Initial release. (Closes: #1152533)
   * Official multi-arch (amd64 & arm64) release of Sen Việt (VieLotusIM).
   * Unobfuscated C++20 native engine with canonical UTF-8 (Unicode NFC)
     lexicon wordlists and build-time FNV-1a table generation (DFSG #2).

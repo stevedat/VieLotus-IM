@@ -467,6 +467,100 @@ ENVD_EOF
                         kwriteconfig5 --file kwinrc --group Wayland --key InputMethod "${FCITX_KWIN_DESKTOP}" >/dev/null 2>&1 || true
                         command -v qdbus >/dev/null 2>&1 && qdbus org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
                     fi
+                elif command -v python3 >/dev/null 2>&1; then
+                    KWINRC_PATH="${CONFIG_ROOT}/kwinrc"
+                    KWIN_CHANGED=0
+                    if python3 - "${KWINRC_PATH}" "${FCITX_KWIN_DESKTOP}" <<'KWIN_PYEOF' 2>/dev/null; then
+import os, sys, tempfile
+
+kwinrc_path, desktop_path = sys.argv[1], sys.argv[2]
+lines = []
+if os.path.isfile(kwinrc_path):
+    with open(kwinrc_path, "r", encoding="utf-8", errors="ignore") as f:
+        lines = f.read().splitlines()
+
+wayland_start = None
+wayland_end = len(lines)
+for idx, raw in enumerate(lines):
+    s = raw.strip()
+    if s.startswith("[") and s.endswith("]"):
+        if s == "[Wayland]":
+            wayland_start = idx
+        elif wayland_start is not None:
+            wayland_end = idx
+            break
+
+changed = False
+if wayland_start is None:
+    if lines and lines[-1].strip() != "":
+        lines.append("")
+    lines.extend(["[Wayland]", f"InputMethod={desktop_path}", "VirtualKeyboardEnabled=true"])
+    changed = True
+else:
+    im_idx = None
+    vk_idx = None
+    im_val = ""
+    vk_val = ""
+    for i in range(wayland_start + 1, wayland_end):
+        s = lines[i].strip()
+        if "=" not in s or s.startswith("#"):
+            continue
+        k, v = s.split("=", 1)
+        k_s, v_s = k.strip(), v.strip()
+        if k_s == "InputMethod":
+            im_idx = i
+            im_val = v_s
+        elif k_s == "VirtualKeyboardEnabled":
+            vk_idx = i
+            vk_val = v_s
+
+    need_im = (not im_val) or (not os.path.isfile(im_val))
+    need_vk = (not vk_val) or (vk_val.lower() == "false")
+    if need_im:
+        new_line = f"InputMethod={desktop_path}"
+        if im_idx is not None:
+            lines[im_idx] = new_line
+        else:
+            lines.insert(wayland_end, new_line)
+            wayland_end += 1
+        changed = True
+    if need_vk:
+        new_line = "VirtualKeyboardEnabled=true"
+        if vk_idx is not None:
+            lines[vk_idx] = new_line
+        else:
+            lines.insert(wayland_end, new_line)
+        changed = True
+
+if changed:
+    parent = os.path.dirname(os.path.abspath(kwinrc_path))
+    os.makedirs(parent, mode=0o700, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(prefix=".kwinrc.", dir=parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as tf:
+            tf.write("\n".join(lines) + "\n")
+            tf.flush()
+            os.fsync(tf.fileno())
+        os.replace(tmp_path, kwinrc_path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+    sys.exit(0)
+sys.exit(10)
+KWIN_PYEOF
+                        KWIN_CHANGED=1
+                    fi
+                    if [ "${KWIN_CHANGED}" = "1" ] || ! pgrep -x fcitx5 >/dev/null 2>&1; then
+                        if command -v qdbus6 >/dev/null 2>&1; then
+                            qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+                        elif command -v dbus-send >/dev/null 2>&1; then
+                            dbus-send --session --type=method_call --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true
+                        fi
+                    fi
                 fi
             fi
         fi

@@ -32,7 +32,9 @@ jobs:
         run: swift test --configuration release --filter UIKitInputSessionAdapterTests
 
       - name: Run regression benchmark
-        run: swift run VieLotusCLI --benchmark --json
+        run: |
+          swift run VieLotusCLI --benchmark --json
+          swift run VieLotusCLI --benchmark "<embedded>"
 
       - name: Build Swift source targets
         run: swift build --configuration release
@@ -96,6 +98,11 @@ jobs:
             pkg-config \
             python3
 
+      - name: Run C++20 Engine, C-ABI & TSF Lifecycle Regression Suite (9,091 cases)
+        run: |
+          ./scripts/test_windows_engine.sh
+          rm -rf .build/windows-lab
+
       - name: Build Debian Split Packages via dpkg-buildpackage (Zero Swift Dependency)
         run: |
           ln -sfn CrossPlatform/packaging/debian debian
@@ -105,7 +112,7 @@ jobs:
 
       - name: Run Lintian check on generated Debian split packages
         run: |
-          lintian --tag-display-limit 0 ../*vielotus*.deb || true
+          lintian --fail-on error,warning --tag-display-limit 0 ../*vielotus*.deb
 
       - name: Stage Linux distribution artifacts & build APT repository
         run: |
@@ -117,7 +124,7 @@ jobs:
           cp "$(realpath build-core/libVieLotusCAPI.so)" dist/linux/libVieLotusCAPI.so
           cmake -B build-fcitx5 -S CrossPlatform/fcitx5-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
           cmake --build build-fcitx5
-          cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBEXECDIR=/usr/lib/ibus -DLIBEXECDIR=/usr/lib/ibus -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
+          cmake -B build-ibus -S CrossPlatform/ibus-vielotus -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBEXECDIR=/usr/lib/ibus -DLIBEXECDIR=/usr/lib/ibus -DCMAKE_INSTALL_PREFIX=/usr -DVIELOTUS_LIB_PATH="$PWD/dist/linux/libVieLotusCAPI.so"
           cmake --build build-ibus
           cp build-fcitx5/vielotus.so dist/linux/
           cp build-fcitx5/vielotus.conf dist/linux/
@@ -138,13 +145,273 @@ jobs:
             dist/linux/Packages*
             dist/linux/Release
 
+  debian-unstable-qa:
+    name: Debian Unstable (3.0 quilt Source + Binary Build & Lintian Gate)
+    runs-on: ubuntu-24.04
+    container:
+      image: debian:unstable
+
+    steps:
+      - name: Install Debian unstable packaging toolchain before checkout
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            cmake \
+            debhelper \
+            dpkg-dev \
+            extra-cmake-modules \
+            fcitx5 \
+            fcitx5-modules-dev \
+            g++ \
+            git \
+            libfcitx5config-dev \
+            libfcitx5core-dev \
+            libfcitx5utils-dev \
+            libglib2.0-dev \
+            libibus-1.0-dev \
+            lintian \
+            ninja-build \
+            pkgconf \
+            python3
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build 3.0 (quilt) source + binary packages from clean archive
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
+          VERSION="${VERSION:-2.0.3}"
+          rm -rf /tmp/deb-src
+          mkdir -p /tmp/deb-src
+          git archive --format=tar.gz --prefix="VieLotus-IM-${VERSION}/" HEAD > "/tmp/deb-src/vielotus_${VERSION}.orig.tar.gz"
+          tar -xzf "/tmp/deb-src/vielotus_${VERSION}.orig.tar.gz" -C /tmp/deb-src
+          cp -R CrossPlatform/packaging/debian "/tmp/deb-src/VieLotus-IM-${VERSION}/debian"
+          (cd "/tmp/deb-src/VieLotus-IM-${VERSION}" && dpkg-buildpackage -us -uc)
+          ls -lh /tmp/deb-src
+
+      - name: Verify Debian 2.0.3-1 update metadata (.dsc and .changes)
+        run: |
+          VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
+          VERSION="${VERSION:-2.0.3}"
+          DSC="/tmp/deb-src/vielotus_${VERSION}-1.dsc"
+          CHANGES="$(ls /tmp/deb-src/vielotus_${VERSION}-1_*.changes | head -n 1)"
+          grep -q '^Vcs-Git: https://github.com/stevedat/VieLotus-IM.git \[CrossPlatform/packaging\]$' "$DSC"
+          if grep -qi '^Closes:' "$CHANGES"; then
+            echo "::error::Unexpected Closes field in $CHANGES (ITP #1152533 was already closed in 2.0.1-1)"
+            cat "$CHANGES"
+            exit 1
+          fi
+          cat "$CHANGES"
+
+      - name: Gate Lintian on Debian unstable (.dsc + all 4 .deb packages)
+        run: |
+          CHANGES="$(ls /tmp/deb-src/vielotus_*-1_*.changes | head -n 1)"
+          lintian -I --fail-on error,warning --tag-display-limit 0 "$CHANGES"
+
+      - name: Verify clean install, symbol resolution & purge on Debian unstable
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
+          VERSION="${VERSION:-2.0.3}"
+          apt-get install -y --no-install-recommends /tmp/deb-src/*_${VERSION}-1_*.deb
+          test -L /usr/bin/vielotus
+          test -x /usr/bin/vielotus-settings
+          for bin in /usr/lib/*/libVieLotusCAPI.so.0 /usr/lib/*/fcitx5/vielotus.so /usr/libexec/ibus-engine-vielotus; do
+            OUT="$(LC_ALL=C ldd -r "$bin" 2>&1)"
+            echo "=== ldd -r $bin ==="
+            echo "$OUT"
+            if printf '%s\n' "$OUT" | grep -Eq 'not found|undefined symbol'; then
+              echo "::error::Dynamic linker issue in $bin"
+              exit 1
+            fi
+          done
+          apt-get purge -y vielotus fcitx5-vielotus ibus-vielotus libvielotus0
+          apt-get autoremove -y
+
+  arch-build:
+    name: Arch Linux (makepkg + pacman Install + KDE/GNOME Wayland Activation)
+    runs-on: ubuntu-24.04
+    container:
+      image: archlinux:latest
+
+    steps:
+      - name: Install Arch packaging and desktop test dependencies before checkout
+        run: |
+          pacman -Syu --noconfirm --needed \
+            base-devel ca-certificates cmake dbus dconf extra-cmake-modules \
+            fcitx5 fcitx5-im git glib2 gsettings-desktop-schemas gtk3 ibus \
+            kconfig noto-fonts pkgconf python python-gobject sudo
+          id builder >/dev/null 2>&1 || useradd -m -G wheel builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          chmod 0440 /etc/sudoers.d/builder
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build package via makepkg
+        run: |
+          rm -rf /tmp/work
+          cp -R "$GITHUB_WORKSPACE" /tmp/work
+          chown -R builder:builder /tmp/work
+          su - builder -c "cd /tmp/work/CrossPlatform/packaging/arch && makepkg -s --noconfirm"
+          ls -lh /tmp/work/CrossPlatform/packaging/arch/vielotus-*.pkg.tar.zst
+
+      - name: Install package via pacman -U and verify binaries & symbols
+        run: |
+          pacman -U --noconfirm /tmp/work/CrossPlatform/packaging/arch/vielotus-*.pkg.tar.zst
+          test -L /usr/bin/vielotus
+          test -x /usr/bin/vielotus-settings
+          test -f /usr/lib/libVieLotusCAPI.so.0
+          test -L /usr/lib/libVieLotusCAPI.so
+          test -f /usr/lib/fcitx5/vielotus.so
+          test -x /usr/lib/ibus/ibus-engine-vielotus
+          for bin in /usr/lib/libVieLotusCAPI.so.0 /usr/lib/fcitx5/vielotus.so /usr/lib/ibus/ibus-engine-vielotus; do
+            OUT="$(LC_ALL=C ldd -r "$bin" 2>&1)"
+            echo "=== ldd -r $bin ==="
+            echo "$OUT"
+            if printf '%s\n' "$OUT" | grep -Eq 'not found|undefined symbol'; then
+              echo "::error::Linker error in $bin"
+              exit 1
+            fi
+          done
+
+      - name: Verify C-ABI typing on Arch Linux (/usr/lib/libVieLotusCAPI.so.0)
+        run: |
+          python3 - <<'PYEOF'
+          import ctypes
+
+          lib = ctypes.CDLL("/usr/lib/libVieLotusCAPI.so.0")
+          lib.vielotus_create_session.restype = ctypes.c_void_p
+          lib.vielotus_destroy_session.argtypes = [ctypes.c_void_p]
+          lib.vielotus_reset_session.argtypes = [ctypes.c_void_p]
+          lib.vielotus_set_input_method.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+          lib.vielotus_set_grammar_profile.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+          lib.vielotus_set_smart_bilingual.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+          lib.vielotus_feed_char.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+          lib.vielotus_feed_char.restype = ctypes.c_int32
+          lib.vielotus_commit_word.argtypes = [ctypes.c_void_p]
+          lib.vielotus_commit_word.restype = ctypes.c_int32
+          lib.vielotus_is_composing.argtypes = [ctypes.c_void_p]
+          lib.vielotus_is_composing.restype = ctypes.c_bool
+          lib.vielotus_get_last_text.argtypes = [ctypes.c_void_p]
+          lib.vielotus_get_last_text.restype = ctypes.c_char_p
+
+          s = lib.vielotus_create_session()
+          lib.vielotus_set_input_method(s, 0)      # Telex
+          lib.vielotus_set_grammar_profile(s, 1)   # SEN Flex
+          lib.vielotus_set_smart_bilingual(s, True)
+
+          def type_word(seq):
+              lib.vielotus_reset_session(s)
+              for ch in seq:
+                  lib.vielotus_feed_char(s, ord(ch))
+              if lib.vielotus_is_composing(s):
+                  lib.vielotus_commit_word(s)
+              txt = lib.vielotus_get_last_text(s)
+              return txt.decode("utf-8") if txt else ""
+
+          cases = [
+              ("dduwocj", "được"),
+              ("uwfaaa", "ừaaa"),
+              ("saveFile", "saveFile"),
+              ("dessert", "dessert"),
+          ]
+          for raw, expected in cases:
+              got = type_word(raw)
+              print(f"  Arch C-ABI: {raw!r} -> {got!r}")
+              assert got == expected, f"Expected {expected!r} for {raw!r}, got {got!r}"
+          lib.vielotus_destroy_session(s)
+          PYEOF
+
+      - name: Verify KDE Plasma Wayland and GNOME Wayland activation & doctor checks
+        run: |
+          # 1. KDE Plasma Wayland simulation
+          cat > /tmp/check_kde.sh <<'KDE_EOF'
+          #!/bin/bash
+          set -euo pipefail
+          mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+          vielotus-settings --activate
+          vielotus-settings --doctor | tee /tmp/doc-kde.txt
+          grep -q '^DefaultIM=vielotus-telex$' "$XDG_CONFIG_HOME/fcitx5/profile"
+          grep -q '^XMODIFIERS=@im=fcitx$' "$XDG_CONFIG_HOME/environment.d/fcitx5-vielotus.conf"
+          if grep -q '^QT_IM_MODULE=fcitx$' "$XDG_CONFIG_HOME/environment.d/fcitx5-vielotus.conf"; then
+            echo "::error::KDE Wayland environment.d must not set QT_IM_MODULE=fcitx"
+            exit 1
+          fi
+          grep -q 'fcitx5' "$XDG_CONFIG_HOME/kwinrc"
+          grep -q '✓ Đã liên kết Fcitx5' /tmp/doc-kde.txt
+          if grep -q '✗ Kết luận' /tmp/doc-kde.txt; then
+            echo "::error::KDE --doctor reported failure"
+            exit 1
+          fi
+          KDE_EOF
+          chmod 755 /tmp/check_kde.sh
+          su - builder -c 'HOME=/tmp/home-kde XDG_CONFIG_HOME=/tmp/home-kde/.config XDG_DATA_HOME=/tmp/home-kde/.local/share XDG_CACHE_HOME=/tmp/home-kde/.cache XDG_CURRENT_DESKTOP=KDE XDG_SESSION_TYPE=wayland WAYLAND_DISPLAY=wayland-0 dbus-run-session -- /tmp/check_kde.sh'
+
+          # 2. GNOME Wayland simulation
+          cat > /tmp/check_gnome.sh <<'GNOME_EOF'
+          #!/bin/bash
+          set -euo pipefail
+          mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+          vielotus-settings --activate
+          SOURCES="$(gsettings get org.gnome.desktop.input-sources sources)"
+          MRU="$(gsettings get org.gnome.desktop.input-sources mru-sources)"
+          echo "GNOME sources: $SOURCES"
+          echo "GNOME mru-sources: $MRU"
+          python3 - "$SOURCES" "$MRU" <<'PYEOF'
+          import ast, sys
+          def parse(raw):
+              s = raw.strip()
+              if s.startswith("@a(ss) "):
+                  s = s[len("@a(ss) "):]
+              return list(ast.literal_eval(s)) if s else []
+          sources = parse(sys.argv[1])
+          mru = parse(sys.argv[2])
+          assert ("ibus", "vielotus") in sources, f"Missing ('ibus', 'vielotus') in sources: {sources}"
+          assert mru and mru[0] == ("ibus", "vielotus"), f"Expected ('ibus', 'vielotus') first in mru: {mru}"
+          PYEOF
+          vielotus-settings --doctor | tee /tmp/doc-gnome.txt
+          grep -q '✓ Đã đăng ký Sen Việt (vielotus)' /tmp/doc-gnome.txt
+          if grep -q '✗ Kết luận' /tmp/doc-gnome.txt; then
+            echo "::error::GNOME --doctor reported failure"
+            exit 1
+          fi
+          GNOME_EOF
+          chmod 755 /tmp/check_gnome.sh
+          su - builder -c 'HOME=/tmp/home-gnome XDG_CONFIG_HOME=/tmp/home-gnome/.config XDG_DATA_HOME=/tmp/home-gnome/.local/share XDG_CACHE_HOME=/tmp/home-gnome/.cache XDG_CURRENT_DESKTOP=GNOME XDG_SESSION_TYPE=wayland WAYLAND_DISPLAY=wayland-0 dbus-run-session -- /tmp/check_gnome.sh'
+
   windows-build:
-    name: Windows (x64 & ARM64 — TSF C++ Shell + Installer Verification)
+    name: Windows (x64 & ARM64 — MSVC Typing Suite + TSF COM Shell + Installers)
     runs-on: windows-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Run Native MSVC Windows Engine & TSF Lifecycle Regression Suite (9,091 cases)
+        shell: pwsh
+        run: |
+          python Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $h1 = Get-Content -Raw -Encoding UTF8 Sources/VieLotusCoreWindows/WindowsNativeEngine.h
+          $h2 = Get-Content -Raw -Encoding UTF8 CrossPlatform/windows-tsf/src/WindowsNativeEngine.h
+          if ($h1 -cne $h2) {
+            Write-Error "ODR mismatch between Sources/VieLotusCoreWindows/WindowsNativeEngine.h and CrossPlatform/windows-tsf/src/WindowsNativeEngine.h"
+            exit 1
+          }
+
+          cmake -S Tests/WindowsEngineLab -B build-win-lab -A x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build-win-lab --config Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\build-win-lab\Release\VieLotusWinEngineLab.exe Sources\VieLotusCLI\Resources\test_suite.csv
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item -Recurse -Force build-win-lab
 
       - name: Build Windows TSF COM Shell, Inno Setup Installers & Microsoft Store MSIX (x64 & ARM64)
         shell: pwsh

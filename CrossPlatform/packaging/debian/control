@@ -18,7 +18,7 @@ Build-Depends:
  libglib2.0-dev
 Standards-Version: 4.7.4
 Homepage: https://github.com/stevedat/VieLotus-IM
-Vcs-Git: https://github.com/stevedat/VieLotus-IM.git
+Vcs-Git: https://github.com/stevedat/VieLotus-IM.git [CrossPlatform/packaging]
 Vcs-Browser: https://github.com/stevedat/VieLotus-IM
 Rules-Requires-Root: no
 
