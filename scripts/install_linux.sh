@@ -222,7 +222,7 @@ uninstall_vielotus() {
             ${SUDO} rm -f "${multi_p}" 2>/dev/null || true
         fi
     done
-    ${SUDO} rm -rf /usr/lib/vielotus /usr/share/vielotus /usr/share/doc/vielotus 2>/dev/null || true
+    ${SUDO} rm -rf /usr/lib/vielotus /usr/share/vielotus /usr/share/ibus-vielotus /usr/share/fcitx5/vielotus /usr/share/doc/vielotus 2>/dev/null || true
     UNINSTALL_USER="${SUDO_USER:-$(id -un)}"
     UNINSTALL_HOME="$(getent passwd "${UNINSTALL_USER}" 2>/dev/null | cut -d: -f6 || echo "${HOME}")"
     if [ -n "${UNINSTALL_HOME}" ] && [ -d "${UNINSTALL_HOME}" ]; then
@@ -237,7 +237,7 @@ uninstall_vielotus() {
         done
     fi
     for sz in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
-        ${SUDO} rm -f "/usr/share/icons/hicolor/${sz}/apps/vielotus.png" 2>/dev/null || true
+        ${SUDO} rm -f "/usr/share/icons/hicolor/${sz}/apps/vielotus.png" "/usr/share/icons/hicolor/${sz}/apps/fcitx-vielotus.png" 2>/dev/null || true
     done
 
     if command -v gsettings >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then

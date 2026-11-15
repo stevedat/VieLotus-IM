@@ -19,7 +19,7 @@ namespace fcitx {
 namespace {
 
 constexpr const char* kSystemTypingModesPath =
-    "/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml";
+    "/usr/share/fcitx5/vielotus/typing-modes.yml";
 
 void replayRawKeys(vielotus_session_t session, const char* rawKeys) {
     vielotus_reset_session(session);
@@ -874,7 +874,7 @@ void VieLotusEngine::reloadAuxiliaryDataIfChanged() {
     vl_presentation_rules_reload_if_changed(
         &presentationRules_,
         cachedRulesPath_.empty() ? nullptr : cachedRulesPath_.c_str(),
-        kSystemTypingModesPath);
+        vl_resolve_system_typing_modes_path(kSystemTypingModesPath));
 }
 
 void VieLotusEngine::saveUserEnvConfig() const {

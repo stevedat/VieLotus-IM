@@ -34,9 +34,9 @@ DATA_ROOT="${XDG_DATA_HOME:-${HOME_DIR}/.local/share}"
 CONFIG_DIR="${CONFIG_ROOT}/vielotus"
 TMP_CONFIG_DIR=""
 mkdir -p -m 0700 "${CONFIG_DIR}" 2>/dev/null || true
-if [ ! -d "${CONFIG_DIR}" ] || [ ! -w "${CONFIG_DIR}" ]; then
-    TMP_CONFIG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vielotus-cfg.XXXXXXXX")"
-    chmod 0700 "${TMP_CONFIG_DIR}"
+if [ -L "${CONFIG_DIR}" ] || [ ! -d "${CONFIG_DIR}" ] || [ ! -O "${CONFIG_DIR}" ] || [ ! -w "${CONFIG_DIR}" ]; then
+    TMP_CONFIG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vielotus-cfg.XXXXXXXX")" || exit 1
+    chmod 0700 "${TMP_CONFIG_DIR}" || exit 1
     CONFIG_DIR="${TMP_CONFIG_DIR}"
     trap 'rm -rf "${TMP_CONFIG_DIR}"' EXIT HUP INT TERM
 fi
@@ -1098,7 +1098,7 @@ if ibus_up and ibus_cli:
         else:
             warnings += 1
             print("• Đăng ký Engine IBus      : ⚠ ibus-daemon phiên hiện tại chưa nạp danh mục Sen Việt mới")
-            print("  ↳ Giải pháp: Bấm 'Tự sửa & Kích hoạt' (vielotus --doctor --fix) hoặc Đăng xuất (Log Out) & Đăng nhập lại 1 lần.")
+            print("  ↳ Giải pháp: Bấm 'Tự sửa & Kích hoạt' (vielotus-settings --doctor --fix) hoặc Đăng xuất (Log Out) & Đăng nhập lại 1 lần.")
     except Exception:
         pass
 
@@ -1922,195 +1922,6 @@ ver_lbl.set_markup(f"<span size='8500' weight='bold' foreground='{P['accent']}'>
 ver_box.pack_start(ver_lbl, False, False, 0)
 brand_top.pack_start(title_lbl, False, False, 0)
 brand_top.pack_start(ver_box, False, False, 0)
-
-btn_upd_pill = Gtk.Button(label="↻ Kiểm tra cập nhật")
-btn_upd_pill.set_can_focus(False)
-btn_upd_pill.set_valign(Gtk.Align.CENTER)
-btn_upd_pill.get_style_context().add_class("bento-upd-pill")
-brand_top.pack_start(btn_upd_pill, False, False, 0)
-
-_upd_state = {"status": "idle", "version": "", "busy": False}
-
-def _set_upd_pill_ui(status, ver=""):
-    _upd_state["status"] = status
-    if ver:
-        _upd_state["version"] = ver
-    ctx = btn_upd_pill.get_style_context()
-    for cls in ("bento-upd-pill", "bento-upd-pill-ok", "bento-upd-pill-avail"):
-        ctx.remove_class(cls)
-    if status == "checking":
-        btn_upd_pill.set_label("⏳ Đang kiểm tra...")
-        ctx.add_class("bento-upd-pill")
-    elif status == "up_to_date":
-        btn_upd_pill.set_label("✓ Bản mới nhất")
-        ctx.add_class("bento-upd-pill-ok")
-    elif status == "available":
-        btn_upd_pill.set_label(f"⬇ Cập nhật v{ver}")
-        ctx.add_class("bento-upd-pill-avail")
-    elif status == "downloading":
-        btn_upd_pill.set_label("⏳ Đang tải gói...")
-        ctx.add_class("bento-upd-pill")
-    elif status == "installing":
-        btn_upd_pill.set_label("⚙ Đang cài đặt...")
-        ctx.add_class("bento-upd-pill")
-    elif status == "error":
-        btn_upd_pill.set_label("⚠ Thử lại cập nhật")
-        ctx.add_class("bento-upd-pill")
-    else:
-        btn_upd_pill.set_label("↻ Kiểm tra cập nhật")
-        ctx.add_class("bento-upd-pill")
-    btn_upd_pill.queue_draw()
-    return False
-
-def _start_gtk_update_worker(do_install=False):
-    if _upd_state["busy"]:
-        return
-    _upd_state["busy"] = True
-    _set_upd_pill_ui("downloading" if do_install else "checking", _upd_state["version"])
-    import hashlib, threading, urllib.request
-
-    def _worker():
-        try:
-            if not do_install:
-                req = urllib.request.Request(
-                    "https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest",
-                    headers={
-                        "Accept": "application/vnd.github+json",
-                        "User-Agent": "VieLotusIM/2.0.3 (Linux; SettingsUpdater)",
-                    },
-                )
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    data = json.loads(resp.read().decode("utf-8", errors="replace"))
-                tag = str(data.get("tag_name", "")).strip().lstrip("vV").split("-")[0]
-                if not tag:
-                    raise RuntimeError("empty tag")
-                r_parts = [int(x) for x in tag.split(".") if x.isdigit()]
-                l_parts = [2, 0, 3]
-                n = max(len(r_parts), len(l_parts))
-                is_newer = False
-                for i in range(n):
-                    rv = r_parts[i] if i < len(r_parts) else 0
-                    lv = l_parts[i] if i < len(l_parts) else 0
-                    if rv != lv:
-                        is_newer = rv > lv
-                        break
-                _upd_state["busy"] = False
-                if is_newer:
-                    GLib.idle_add(_set_upd_pill_ui, "available", tag)
-                else:
-                    GLib.idle_add(_set_upd_pill_ui, "up_to_date", tag)
-                return
-
-            ver = _upd_state["version"] or "2.0.3"
-            mach = platform.machine().lower()
-            pkexec_bin = shutil.which("pkexec")
-            apt_bin = shutil.which("apt-get")
-            is_deb_arch = mach in ("x86_64", "amd64", "aarch64", "arm64")
-            rc = 1
-
-            if pkexec_bin and apt_bin and is_deb_arch:
-                deb_arch = "arm64" if mach in ("aarch64", "arm64") else "amd64"
-                deb_name = f"vielotus_{ver}_{deb_arch}.deb"
-                base_dl = f"https://github.com/stevedat/VieLotus-IM/releases/download/v{ver}"
-
-                cs_req = urllib.request.Request(
-                    f"{base_dl}/checksums.sha256",
-                    headers={"User-Agent": "VieLotusIM/2.0.3 (Linux; SettingsUpdater)"},
-                )
-                with urllib.request.urlopen(cs_req, timeout=15) as cs_resp:
-                    cs_text = cs_resp.read().decode("utf-8", errors="replace")
-
-                expected_sha = ""
-                for ln in cs_text.splitlines():
-                    parts = ln.strip().split()
-                    if len(parts) >= 2 and os.path.basename(parts[-1].lstrip("*./")) == deb_name:
-                        cand = parts[0].lower()
-                        if len(cand) == 64:
-                            expected_sha = cand
-                            break
-                if len(expected_sha) != 64:
-                    raise RuntimeError("missing sha256")
-
-                deb_req = urllib.request.Request(
-                    f"{base_dl}/{deb_name}",
-                    headers={"User-Agent": "VieLotusIM/2.0.3 (Linux; SettingsUpdater)"},
-                )
-                with urllib.request.urlopen(deb_req, timeout=120) as deb_resp:
-                    deb_bytes = deb_resp.read()
-
-                actual_sha = hashlib.sha256(deb_bytes).hexdigest().lower()
-                if actual_sha != expected_sha:
-                    raise RuntimeError("sha256 mismatch")
-
-                tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
-                try:
-                    os.chmod(tmp_dir, 0o755)
-                    deb_path = os.path.join(tmp_dir, deb_name)
-                    with open(deb_path, "wb") as df:
-                        df.write(deb_bytes)
-                    os.chmod(deb_path, 0o644)
-
-                    GLib.idle_add(_set_upd_pill_ui, "installing", ver)
-                    rc = subprocess.call([pkexec_bin, apt_bin, "install", "-y", "--allow-downgrades", deb_path])
-                finally:
-                    try:
-                        shutil.rmtree(tmp_dir, ignore_errors=True)
-                    except Exception:
-                        pass
-            elif pkexec_bin:
-                sh_req = urllib.request.Request(
-                    "https://stevedat.github.io/VieLotus-IM/install.sh",
-                    headers={"User-Agent": "VieLotusIM/2.0.3 (Linux; SettingsUpdater)"},
-                )
-                with urllib.request.urlopen(sh_req, timeout=20) as sh_resp:
-                    sh_bytes = sh_resp.read()
-
-                tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
-                try:
-                    os.chmod(tmp_dir, 0o700)
-                    sh_path = os.path.join(tmp_dir, "install.sh")
-                    with open(sh_path, "wb") as sf:
-                        sf.write(sh_bytes)
-                    os.chmod(sh_path, 0o700)
-
-                    GLib.idle_add(_set_upd_pill_ui, "installing", ver)
-                    env_args = [
-                        f"VIELOTUS_VERSION={ver}",
-                        "VIELOTUS_NO_OPEN_SETTINGS=1",
-                        f"SUDO_UID={os.getuid()}",
-                    ]
-                    cur_user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
-                    if cur_user:
-                        env_args.append(f"SUDO_USER={cur_user}")
-                    for env_k in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS", "XDG_CURRENT_DESKTOP"):
-                        env_v = os.environ.get(env_k, "")
-                        if env_v:
-                            env_args.append(f"{env_k}={env_v}")
-                    rc = subprocess.call([pkexec_bin, "env", *env_args, "sh", sh_path])
-                finally:
-                    try:
-                        shutil.rmtree(tmp_dir, ignore_errors=True)
-                    except Exception:
-                        pass
-
-            _upd_state["busy"] = False
-            if rc == 0:
-                GLib.idle_add(_set_upd_pill_ui, "up_to_date", ver)
-            else:
-                GLib.idle_add(_set_upd_pill_ui, "available", ver)
-        except Exception:
-            _upd_state["busy"] = False
-            GLib.idle_add(_set_upd_pill_ui, "error", "")
-
-    t = threading.Thread(target=_worker, daemon=True)
-    t.start()
-
-btn_upd_pill.connect(
-    "clicked",
-    lambda *_: _start_gtk_update_worker(do_install=(_upd_state["status"] == "available")),
-)
-if not smoke_mode:
-    GLib.timeout_add(350, lambda: (_start_gtk_update_worker(False), False)[1])
 
 sub_lbl = Gtk.Label()
 sub_lbl.set_markup(
@@ -4013,109 +3824,15 @@ case "${1:-}" in
         exit 0
         ;;
     --check-update|--update)
-        DO_INSTALL="0"
-        [ "${1:-}" = "--update" ] && DO_INSTALL="1"
-        python3 - "${DO_INSTALL}" <<'UPD_PYEOF'
-import hashlib, json, os, platform, shutil, subprocess, sys, tempfile, urllib.request
-
-do_install = sys.argv[1] == "1"
-local_ver = "2.0.3"
-print(f"✦ Đang kiểm tra bản cập nhật Sen Việt (hiện tại: v{local_ver})...")
-try:
-    req = urllib.request.Request(
-        "https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest",
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": f"VieLotusIM/{local_ver} (Linux; CLIUpdater)",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=12) as resp:
-        rel = json.loads(resp.read().decode("utf-8", errors="replace"))
-except Exception as exc:
-    print(f"✗ Không thể kết nối GitHub Releases: {exc}")
-    sys.exit(1)
-
-remote_ver = str(rel.get("tag_name", "")).strip().lstrip("vV").split("-")[0]
-r_parts = [int(x) for x in remote_ver.split(".") if x.isdigit()]
-l_parts = [int(x) for x in local_ver.split(".") if x.isdigit()]
-is_newer = False
-for i in range(max(len(r_parts), len(l_parts))):
-    rv = r_parts[i] if i < len(r_parts) else 0
-    lv = l_parts[i] if i < len(l_parts) else 0
-    if rv != lv:
-        is_newer = rv > lv
-        break
-
-if not is_newer:
-    print(f"✓ Bạn đang sử dụng phiên bản mới nhất (v{local_ver}).")
-    sys.exit(0)
-
-print(f"⬇ Phát hiện phiên bản mới: v{remote_ver}!")
-if not do_install:
-    print("  Chạy 'vielotus-settings --update' để tự động tải về, xác thực SHA-256 và cài đặt.")
-    sys.exit(0)
-
-mach = platform.machine().lower()
-has_deb_arch = mach in ("x86_64", "amd64", "aarch64", "arm64")
-if shutil.which("apt-get") and shutil.which("dpkg") and has_deb_arch:
-    deb_arch = "arm64" if mach in ("aarch64", "arm64") else "amd64"
-    deb_name = f"vielotus_{remote_ver}_{deb_arch}.deb"
-    base_dl = f"https://github.com/stevedat/VieLotus-IM/releases/download/v{remote_ver}"
-
-    print(f"• Đang tải bảng mã kiểm tra SHA-256 và gói {deb_name}...")
-    with urllib.request.urlopen(f"{base_dl}/checksums.sha256", timeout=15) as r_cs:
-        cs_text = r_cs.read().decode("utf-8", errors="replace")
-
-    expected_sha = ""
-    for ln in cs_text.splitlines():
-        parts = ln.strip().split()
-        if len(parts) >= 2 and os.path.basename(parts[-1].lstrip("*./")) == deb_name:
-            expected_sha = parts[0].lower()
-            break
-
-    if len(expected_sha) != 64:
-        print(f"✗ Không tìm thấy mã SHA-256 cho {deb_name} trong checksums.sha256.")
-        sys.exit(1)
-
-    with urllib.request.urlopen(f"{base_dl}/{deb_name}", timeout=120) as r_deb:
-        deb_bytes = r_deb.read()
-
-    actual_sha = hashlib.sha256(deb_bytes).hexdigest().lower()
-    if actual_sha != expected_sha:
-        print(f"✗ Mã băm SHA-256 không khớp ({actual_sha} != {expected_sha}). Đã huỷ cài đặt!")
-        sys.exit(1)
-
-    print(f"✓ Đã xác thực SHA-256 khớp 100% ({actual_sha[:16]}...). Đang cài đặt...")
-    tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
-    os.chmod(tmp_dir, 0o755)
-    deb_path = os.path.join(tmp_dir, deb_name)
-    with open(deb_path, "wb") as df:
-        df.write(deb_bytes)
-    os.chmod(deb_path, 0o644)
-    cmd = ["sudo", "apt-get", "install", "-y", "--allow-downgrades", deb_path]
-    if os.geteuid() == 0:
-        cmd = ["apt-get", "install", "-y", "--allow-downgrades", deb_path]
-    rc = subprocess.call(cmd)
-    shutil.rmtree(tmp_dir, ignore_errors=True)
-    sys.exit(rc)
-
-print(f"• Đang cập nhật bản địa cho kiến trúc {mach} qua trình cài đặt chuẩn...")
-with urllib.request.urlopen("https://stevedat.github.io/VieLotus-IM/install.sh", timeout=20) as r_sh:
-    sh_bytes = r_sh.read()
-tmp_dir = tempfile.mkdtemp(prefix="vielotus-upd-")
-os.chmod(tmp_dir, 0o755)
-sh_path = os.path.join(tmp_dir, "install.sh")
-with open(sh_path, "wb") as sf:
-    sf.write(sh_bytes)
-os.chmod(sh_path, 0o755)
-env_upd = dict(os.environ)
-env_upd["VIELOTUS_VERSION"] = remote_ver
-env_upd["VIELOTUS_NO_OPEN_SETTINGS"] = "1"
-rc = subprocess.call(["sh", sh_path], env=env_upd)
-shutil.rmtree(tmp_dir, ignore_errors=True)
-sys.exit(rc)
-UPD_PYEOF
-        exit $?
+        echo "ℹ Sen Việt (VieLotusIM v2.0.3): Bản cập nhật được quản lý qua trình quản lý gói hệ thống."
+        if command -v apt-get >/dev/null 2>&1; then
+            echo "  • Debian / Ubuntu : sudo apt update && sudo apt upgrade"
+        elif command -v pacman >/dev/null 2>&1; then
+            echo "  • Arch Linux      : sudo pacman -Syu"
+        elif command -v dnf >/dev/null 2>&1; then
+            echo "  • Fedora / RHEL   : sudo dnf upgrade"
+        fi
+        exit 0
         ;;
 esac
 

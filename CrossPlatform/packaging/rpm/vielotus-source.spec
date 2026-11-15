@@ -112,6 +112,7 @@ install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml 
 %{_mandir}/man1/vielotus-settings.1*
 %{_prefix}/lib/ibus/ibus-engine-vielotus
 %{_datadir}/ibus/component/vielotus.xml
+%{_datadir}/ibus-vielotus/typing-modes.yml
 %{_datadir}/applications/vielotus.desktop
 %{_datadir}/metainfo/org.vielotus.VieLotus.metainfo.xml
 
@@ -120,6 +121,8 @@ install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml 
 %{_datadir}/fcitx5/addon/vielotus.conf
 %{_datadir}/fcitx5/inputmethod/vielotus-telex.conf
 %{_datadir}/fcitx5/inputmethod/vielotus-vni.conf
+%{_datadir}/fcitx5/vielotus/typing-modes.yml
+%{_datadir}/icons/hicolor/*/apps/fcitx-vielotus.png
 
 %changelog
 * Sat Nov 14 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com> - 2.0.3-1

@@ -212,14 +212,48 @@ jobs:
           CHANGES="$(ls /tmp/deb-src/vielotus_*-1_*.changes | head -n 1)"
           lintian -I --fail-on error,warning --tag-display-limit 0 "$CHANGES"
 
-      - name: Verify clean install, symbol resolution & purge on Debian unstable
+      - name: Verify standalone engine installs, co-install, symbol resolution & purge
         run: |
           export DEBIAN_FRONTEND=noninteractive
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
           VERSION="${VERSION:-2.0.3}"
-          apt-get install -y --no-install-recommends /tmp/deb-src/*_${VERSION}-1_*.deb
+          LIB_DEB="$(ls /tmp/deb-src/libvielotus0_${VERSION}-1_*.deb | head -n 1)"
+          FCITX_DEB="$(ls /tmp/deb-src/fcitx5-vielotus_${VERSION}-1_*.deb | head -n 1)"
+          IBUS_DEB="$(ls /tmp/deb-src/ibus-vielotus_${VERSION}-1_*.deb | head -n 1)"
+          META_DEB="$(ls /tmp/deb-src/vielotus_${VERSION}-1_all.deb | head -n 1)"
+
+          echo "=== 1. Standalone fcitx5-vielotus + vielotus metapackage (no ibus-vielotus) ==="
+          apt-get install -y --no-install-recommends "$LIB_DEB" "$FCITX_DEB" "$META_DEB"
+          if dpkg -s ibus-vielotus >/dev/null 2>&1; then
+            echo "::error::Installing fcitx5-vielotus + vielotus unexpectedly pulled in ibus-vielotus"
+            exit 1
+          fi
+          grep -q '^Icon=fcitx-vielotus$' /usr/share/fcitx5/inputmethod/vielotus-telex.conf
+          grep -q '^Icon=fcitx-vielotus$' /usr/share/fcitx5/inputmethod/vielotus-vni.conf
+          test -s /usr/share/icons/hicolor/48x48/apps/fcitx-vielotus.png
+          test -s /usr/share/fcitx5/vielotus/typing-modes.yml
+          apt-get purge -y vielotus fcitx5-vielotus libvielotus0
+          apt-get autoremove -y
+
+          echo "=== 2. Standalone ibus-vielotus + vielotus metapackage (no fcitx5-vielotus) ==="
+          apt-get install -y --no-install-recommends "$LIB_DEB" "$IBUS_DEB" "$META_DEB"
+          if dpkg -s fcitx5-vielotus >/dev/null 2>&1; then
+            echo "::error::Installing ibus-vielotus + vielotus unexpectedly pulled in fcitx5-vielotus"
+            exit 1
+          fi
           test -L /usr/bin/vielotus
           test -x /usr/bin/vielotus-settings
+          test -s /usr/share/icons/hicolor/48x48/apps/vielotus.png
+          test -s /usr/share/ibus-vielotus/typing-modes.yml
+          if grep -Eq 'urllib\.request|pkexec' /usr/bin/vielotus-settings; then
+            echo "::error::/usr/bin/vielotus-settings still contains network updater or pkexec calls"
+            exit 1
+          fi
+          apt-get purge -y vielotus ibus-vielotus libvielotus0
+          apt-get autoremove -y
+
+          echo "=== 3. Co-installation of all 4 packages, ldd -r & clean purge ==="
+          apt-get install -y --no-install-recommends /tmp/deb-src/*_${VERSION}-1_*.deb
           for bin in /usr/lib/*/libVieLotusCAPI.so.0 /usr/lib/*/fcitx5/vielotus.so /usr/libexec/ibus-engine-vielotus; do
             OUT="$(LC_ALL=C ldd -r "$bin" 2>&1)"
             echo "=== ldd -r $bin ==="

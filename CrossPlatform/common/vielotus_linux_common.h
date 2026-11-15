@@ -533,12 +533,18 @@ static inline VL_COMMON_UNUSED bool vl_env_config_save_merged(
     bool seen[9] = { false, false, false, false, false, false, false, false, false };
 
     char tmp_path[1100];
-    int tn = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp.%ld", path, (long)getpid());
+    int tn = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp.XXXXXX", path);
     if (tn <= 0 || (size_t)tn >= sizeof(tmp_path)) return false;
 
-    FILE *out_fp = fopen(tmp_path, "w");
-    if (!out_fp) return false;
-    (void)chmod(tmp_path, 0600);
+    int out_fd = mkstemp(tmp_path);
+    if (out_fd < 0) return false;
+    (void)fchmod(out_fd, 0600);
+    FILE *out_fp = fdopen(out_fd, "w");
+    if (!out_fp) {
+        close(out_fd);
+        (void)remove(tmp_path);
+        return false;
+    }
 
     FILE *in_fp = fopen(path, "r");
     if (in_fp) {
@@ -802,6 +808,26 @@ static inline VL_COMMON_UNUSED bool vl_presentation_rules_load_file(
     rules->loaded_mtime = st.st_mtime;
     snprintf(rules->loaded_path, sizeof(rules->loaded_path), "%s", path);
     return true;
+}
+
+static inline VL_COMMON_UNUSED const char *vl_resolve_system_typing_modes_path(
+    const char *engine_specific_path
+) {
+    struct stat st;
+    if (engine_specific_path && engine_specific_path[0] != '\0' &&
+        stat(engine_specific_path, &st) == 0 && st.st_size > 0) {
+        return engine_specific_path;
+    }
+    static const char *const kSharedSystemPaths[] = {
+        "/usr/share/vielotus/typing-modes.yml",
+        "/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml"
+    };
+    for (size_t i = 0; i < sizeof(kSharedSystemPaths) / sizeof(kSharedSystemPaths[0]); i++) {
+        if (stat(kSharedSystemPaths[i], &st) == 0 && st.st_size > 0) {
+            return kSharedSystemPaths[i];
+        }
+    }
+    return engine_specific_path;
 }
 
 static inline VL_COMMON_UNUSED void vl_presentation_rules_reload_if_changed(

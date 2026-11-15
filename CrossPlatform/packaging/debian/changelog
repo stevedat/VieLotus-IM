@@ -15,18 +15,23 @@ vielotus (2.0.3-1) unstable; urgency=medium
       whitelist_safe=never. Swift regression suite: 100.00% (9,091/9,091)
       primary, 97.86% (365/373) ambiguous_both_sides, 100.00% (180/180)
       whitelist_safe=never.
-  * Address packaging review items from 2.0.1-1 and tracker diagnostics:
-    - Use mktemp -d (0700) with exit trap in vielotus-settings instead of a
-      predictable /tmp path.
-    - Drop redundant Recommends on the vielotus metapackage and ship
-      /usr/bin/vielotus plus vielotus.1 manpage symlinks.
+  * Address DFSG NEW review items from 2.0.1-1 (#1152533 message #10) and
+    tracker diagnostics:
+    - Use mktemp -d (0700) with ownership/symlink guards and exit trap in
+      vielotus-settings, use mkstemp (0600) for atomic config.env merges, and
+      remove network update checks / external self-updater calls in favor of
+      system package management (APT).
+    - Drop redundant Recommends on the vielotus metapackage, ship dedicated
+      fcitx-vielotus icons and per-engine typing-modes.yml paths so
+      fcitx5-vielotus and ibus-vielotus work both standalone and co-installed,
+      and ship /usr/bin/vielotus plus vielotus.1 manpage symlinks.
     - Update debian/watch to Version 5 and set Vcs-Git subpath
       [CrossPlatform/packaging] for vcswatch.
     - Replace legacy encoded arrays in VietnameseSyllableDictionary.swift and
       EmbeddedTestSuite.swift with plain UTF-8 source (DFSG #2), and add
       complete DEP-5 SCOWL attribution to debian/copyright.
 
- -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Sat, 14 Nov 2026 14:10:00 +0700
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Mon, 16 Nov 2026 04:00:00 +0700
 
 vielotus (2.0.1-1) unstable; urgency=medium
 

@@ -2129,7 +2129,13 @@ int main(int argc, char **argv) {
             // 9. Shared Linux Common Header (non-destructive config.env, typing-modes.yml, developer backtick FSM, UTF-8 raw keys)
             {
                 // 9a. Non-destructive config.env merge-writer preserves comments and unknown keys
-                std::string tmpPath = "/tmp/vielotus_test_cfg_" + std::to_string(static_cast<long>(getpid())) + ".env";
+                const char *tmpBase = std::getenv("TMPDIR");
+                std::string tmpDirTpl = std::string((tmpBase && tmpBase[0] != '\0') ? tmpBase : "/tmp") + "/vielotus_test_XXXXXX";
+                std::vector<char> tmpDirBuf(tmpDirTpl.begin(), tmpDirTpl.end());
+                tmpDirBuf.push_back('\0');
+                char *createdDir = mkdtemp(tmpDirBuf.data());
+                std::string tmpDir = createdDir ? std::string(createdDir) : ".";
+                std::string tmpPath = tmpDir + "/config.env";
                 {
                     std::ofstream out(tmpPath, std::ios::trunc);
                     out << "# User custom header\n"
@@ -2157,10 +2163,21 @@ int main(int argc, char **argv) {
                 vl_env_config_t cfgReload{};
                 vl_env_config_init_defaults(&cfgReload);
                 bool reloadedOk = vl_env_config_load(tmpPath.c_str(), &cfgReload, nullptr);
+                std::string tmpRulesPath = tmpDir + "/typing-modes.yml";
+                {
+                    std::ofstream outRules(tmpRulesPath, std::ios::trunc);
+                    outRules << "org.kde.kate: automatic\n";
+                }
+                const char *resolvedRules = vl_resolve_system_typing_modes_path(tmpRulesPath.c_str());
+                bool resolvedRulesOk = (resolvedRules != nullptr && tmpRulesPath == resolvedRules);
+                std::remove(tmpRulesPath.c_str());
                 std::remove(tmpPath.c_str());
+                if (createdDir) {
+                    rmdir(createdDir);
+                }
 
                 bool cfgMergeOk =
-                    loadedOk && savedOk && reloadedOk &&
+                    loadedOk && savedOk && reloadedOk && resolvedRulesOk &&
                     cfgReload.has_input_method && cfgReload.is_vni &&
                     !cfgReload.smart_bilingual &&
                     cfgReload.preedit_underline &&
