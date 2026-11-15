@@ -78,3 +78,23 @@ install(FILES
     DESTINATION "${FCITX_INSTALL_PKGDATADIR}/inputmethod"
 )
 install(TARGETS vielotus-addon DESTINATION "${FCITX_INSTALL_LIBDIR}/fcitx5")
+
+foreach(_icon_sz IN ITEMS 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512)
+    set(_icon_src "${CMAKE_CURRENT_SOURCE_DIR}/../linux-icons/hicolor_${_icon_sz}_apps/vielotus.png")
+    if(EXISTS "${_icon_src}")
+        install(FILES "${_icon_src}"
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/${_icon_sz}/apps"
+            RENAME "fcitx-vielotus.png"
+        )
+    endif()
+endforeach()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../Resources/typing-modes.yml")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../../Resources/typing-modes.yml"
+        DESTINATION "${FCITX_INSTALL_PKGDATADIR}/vielotus"
+    )
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/VieLotusCore/Resources/typing-modes.yml")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/VieLotusCore/Resources/typing-modes.yml"
+        DESTINATION "${FCITX_INSTALL_PKGDATADIR}/vielotus"
+    )
+endif()

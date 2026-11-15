@@ -19,7 +19,7 @@
 #endif
 
 static const char *const kSystemTypingModesPath =
-    "/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml";
+    "/usr/share/ibus-vielotus/typing-modes.yml";
 
 typedef struct _IBusVieLotusEngine IBusVieLotusEngine;
 typedef struct _IBusVieLotusEngineClass IBusVieLotusEngineClass;
@@ -99,7 +99,7 @@ static void ibus_vielotus_reload_auxiliary_data(IBusVieLotusEngine *vl_engine) {
     vl_presentation_rules_reload_if_changed(
         &vl_engine->presentation_rules,
         vl_engine->rules_path,
-        kSystemTypingModesPath
+        vl_resolve_system_typing_modes_path(kSystemTypingModesPath)
     );
 }
 

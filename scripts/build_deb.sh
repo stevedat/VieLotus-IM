@@ -271,6 +271,7 @@ package_single_arch() {
         if [ -f "${ICON_SRC}" ]; then
             mkdir -p "${pkg_dir}/usr/share/icons/hicolor/${size}/apps"
             cp "${ICON_SRC}" "${pkg_dir}/usr/share/icons/hicolor/${size}/apps/vielotus.png"
+            cp "${ICON_SRC}" "${pkg_dir}/usr/share/icons/hicolor/${size}/apps/fcitx-vielotus.png"
         fi
     done
 
@@ -290,7 +291,11 @@ package_single_arch() {
     fi
     if [ -n "${yml_src}" ]; then
         mkdir -p "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
+        mkdir -p "${pkg_dir}/usr/share/ibus-vielotus" "${pkg_dir}/usr/share/fcitx5/vielotus"
+        cp "${yml_src}" "${pkg_dir}/usr/share/vielotus/typing-modes.yml"
         cp "${yml_src}" "${pkg_dir}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/"
+        cp "${yml_src}" "${pkg_dir}/usr/share/ibus-vielotus/typing-modes.yml"
+        cp "${yml_src}" "${pkg_dir}/usr/share/fcitx5/vielotus/typing-modes.yml"
     fi
 
     # 6. Desktop Application Launcher, GUI/CLI Settings Utility & AppStream Metadata
@@ -404,13 +409,11 @@ EOF
     # 1) libvielotus0
     local lib_dir="${DEB_BASE}/libvielotus0_${VERSION}_${target_arch}"
     rm -rf "${lib_dir}"
-    mkdir -p "${lib_dir}/DEBIAN" "${lib_dir}/usr/lib/${multiarch_dir}" "${lib_dir}/usr/include" "${lib_dir}/usr/share"
+    mkdir -p "${lib_dir}/DEBIAN" "${lib_dir}/usr/lib/${multiarch_dir}" "${lib_dir}/usr/include"
     cp "${arch_bin_dir}/libVieLotusCAPI.so" "${lib_dir}/usr/lib/${multiarch_dir}/libVieLotusCAPI.so.0"
     ln -sf "libVieLotusCAPI.so.0" "${lib_dir}/usr/lib/${multiarch_dir}/libVieLotusCAPI.so"
     ln -sf "${multiarch_dir}/libVieLotusCAPI.so.0" "${lib_dir}/usr/lib/libVieLotusCAPI.so"
     cp "${pkg_dir}/usr/include/vielotus.h" "${lib_dir}/usr/include/vielotus.h"
-    cp -a "${pkg_dir}/usr/share/icons" "${lib_dir}/usr/share/" 2>/dev/null || true
-    cp -a "${pkg_dir}/usr/share/vielotus" "${lib_dir}/usr/share/" 2>/dev/null || true
     local lib_size
     lib_size=$(du -sk "${lib_dir}" | awk '{print $1}')
     cat <<EOF > "${lib_dir}/DEBIAN/control"
@@ -435,9 +438,19 @@ EOF
     # 2) ibus-vielotus
     local ibus_dir="${DEB_BASE}/ibus-vielotus_${VERSION}_${target_arch}"
     rm -rf "${ibus_dir}"
-    mkdir -p "${ibus_dir}/DEBIAN" "${ibus_dir}/usr/lib/ibus" "${ibus_dir}/usr/share/ibus/component"
+    mkdir -p "${ibus_dir}/DEBIAN" "${ibus_dir}/usr/lib/ibus" "${ibus_dir}/usr/share/ibus/component" "${ibus_dir}/usr/share/ibus-vielotus"
     cp "${arch_bin_dir}/ibus-engine-vielotus" "${ibus_dir}/usr/lib/ibus/"
     cp "${DIST_LINUX}/vielotus.xml" "${ibus_dir}/usr/share/ibus/component/"
+    if [ -n "${yml_src}" ]; then
+        cp "${yml_src}" "${ibus_dir}/usr/share/ibus-vielotus/typing-modes.yml"
+    fi
+    for size in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
+        ICON_SRC="${ROOT_DIR}/CrossPlatform/linux-icons/hicolor_${size}_apps/vielotus.png"
+        if [ -f "${ICON_SRC}" ]; then
+            mkdir -p "${ibus_dir}/usr/share/icons/hicolor/${size}/apps"
+            cp "${ICON_SRC}" "${ibus_dir}/usr/share/icons/hicolor/${size}/apps/vielotus.png"
+        fi
+    done
     install_desktop_integration "${ibus_dir}"
     local ibus_size
     ibus_size=$(du -sk "${ibus_dir}" | awk '{print $1}')
@@ -464,12 +477,22 @@ EOF
     # 3) fcitx5-vielotus
     local fcitx_dir="${DEB_BASE}/fcitx5-vielotus_${VERSION}_${target_arch}"
     rm -rf "${fcitx_dir}"
-    mkdir -p "${fcitx_dir}/DEBIAN" "${fcitx_dir}/usr/lib/fcitx5" "${fcitx_dir}/usr/lib/${multiarch_dir}/fcitx5" "${fcitx_dir}/usr/share/fcitx5/addon" "${fcitx_dir}/usr/share/fcitx5/inputmethod"
+    mkdir -p "${fcitx_dir}/DEBIAN" "${fcitx_dir}/usr/lib/fcitx5" "${fcitx_dir}/usr/lib/${multiarch_dir}/fcitx5" "${fcitx_dir}/usr/share/fcitx5/addon" "${fcitx_dir}/usr/share/fcitx5/inputmethod" "${fcitx_dir}/usr/share/fcitx5/vielotus"
     cp "${arch_bin_dir}/vielotus.so" "${fcitx_dir}/usr/lib/fcitx5/"
     ln -sf ../../fcitx5/vielotus.so "${fcitx_dir}/usr/lib/${multiarch_dir}/fcitx5/vielotus.so"
     cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus.conf.in" "${fcitx_dir}/usr/share/fcitx5/addon/vielotus.conf"
     cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus-telex.conf" "${fcitx_dir}/usr/share/fcitx5/inputmethod/vielotus-telex.conf"
     cp "${ROOT_DIR}/CrossPlatform/fcitx5-vielotus/vielotus-vni.conf" "${fcitx_dir}/usr/share/fcitx5/inputmethod/vielotus-vni.conf"
+    if [ -n "${yml_src}" ]; then
+        cp "${yml_src}" "${fcitx_dir}/usr/share/fcitx5/vielotus/typing-modes.yml"
+    fi
+    for size in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
+        ICON_SRC="${ROOT_DIR}/CrossPlatform/linux-icons/hicolor_${size}_apps/vielotus.png"
+        if [ -f "${ICON_SRC}" ]; then
+            mkdir -p "${fcitx_dir}/usr/share/icons/hicolor/${size}/apps"
+            cp "${ICON_SRC}" "${fcitx_dir}/usr/share/icons/hicolor/${size}/apps/fcitx-vielotus.png"
+        fi
+    done
     local fcitx_size
     fcitx_size=$(du -sk "${fcitx_dir}" | awk '{print $1}')
     cat <<EOF > "${fcitx_dir}/DEBIAN/control"

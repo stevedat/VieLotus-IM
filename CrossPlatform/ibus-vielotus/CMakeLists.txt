@@ -78,3 +78,13 @@ configure_file(
 # Installation paths
 install(TARGETS ibus-engine-vielotus DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/vielotus.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/ibus/component)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../Resources/typing-modes.yml")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../../Resources/typing-modes.yml"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/ibus-vielotus"
+    )
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/VieLotusCore/Resources/typing-modes.yml")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/VieLotusCore/Resources/typing-modes.yml"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/ibus-vielotus"
+    )
+endif()

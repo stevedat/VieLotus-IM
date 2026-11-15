@@ -1,6 +1,6 @@
 # Test status
 
-Updated 2026-11-14. CI evidence: [workflow run](https://github.com/stevedat/VieLotus-IM/actions/runs/43533424195). Manual results below are reported by the maintainer; this repository does not contain device logs for those sessions.
+Updated 2026-11-16. CI evidence: [workflow run](https://github.com/stevedat/VieLotus-IM/actions/runs/43570345394). Manual results below are reported by the maintainer; this repository does not contain device logs for those sessions.
 
 ## Manual platform tests
 
@@ -35,17 +35,17 @@ The app-to-platform mapping, app versions, OS builds, and test cases were not re
 | Platform | CI check | Result |
 | --- | --- | --- |
 | macOS 15 | Swift tests, regression suite, universal app and installer builds | PASS; not a substitute for host-app tests |
-| Windows | TSF x64/ARM64 builds and installer/MSIX packaging | BUILD PASS; CI skips runtime tests |
+| Windows | MSVC C++20 `VieLotusWinEngineLab.exe` runtime suite, TSF x64/ARM64 builds, and installer packaging | PASS in engine lab; CI does not drive live Windows host-app UI |
+| Debian `unstable` | `3.0 (quilt)` source/binary build, Lintian gate, standalone `fcitx5-vielotus` / `ibus-vielotus` installs, co-install, `ldd -r`, and purge | PASS |
+| Arch Linux | `makepkg`, `pacman -U`, headless KDE Plasma 6 and GNOME Wayland `--activate` / `--doctor` checks | PASS in headless container; not a live compositor typing test |
 | Ubuntu 24.04 | Debian package install; IBus/Fcitx5 activation; Telex/VNI and bilingual typing in GTK3 `Gtk.Entry` and Qt5 `QLineEdit` | E2E PASS in test widgets |
 
 ## Engine regression results
 
-The CI regression suite reports 9,091/9,091 primary cases (100%), 365/373 symmetric no-context collision cases (97.86%), and 180/180 unique Vietnamese paths (100%). These are fixture results, not host-app acceptance results. See [benchmark report](BENCHMARK_REPORT.md).
+The CI regression suite reports 9,091/9,091 primary cases (100%), 365/373 symmetric no-context collision cases (97.86%) on Swift and 373/373 (100%) on the C++20 desktop engine, and 180/180 unique Vietnamese paths (100%). These are fixture results, not host-app acceptance results. See [benchmark report](BENCHMARK_REPORT.md).
 
 ## Debian status
 
-- Upstream tag `v2.0.2` exists, and [`debian/watch`](../CrossPlatform/packaging/debian/watch) tracks GitHub tags.
-- The live Debian NEW list shows `vielotus 2.0.1-1`, sponsored by `byang @debian.org`; its DFSG review is accepted. That upload is one upstream version behind this repository's `v2.0.2` tag.
-- [DFSG review for `vielotus 2.0.1-1`](https://dfsg-new-queue.debian.org/reviews/vielotus/2.0.1-1) · [Debian NEW queue](https://ftp-master.debian.org/new.html)
-
-The upload is in the review queue, but is not yet listed in the Debian package archive. The upstream tag and watch file are present; a Debian source upload for `2.0.2-1` has not been demonstrated. Check the live queue before describing archive acceptance.
+- `vielotus 2.0.1-1` (sponsored by `byang@debian.org`) was accepted into Debian `unstable` on 2026-11-14: [Debian Package Tracker](https://tracker.debian.org/pkg/vielotus) · [Bug #1152533](https://bugs.debian.org/1152533) · [DFSG review for `vielotus 2.0.1-1`](https://dfsg-new-queue.debian.org/reviews/vielotus/2.0.1-1).
+- [`debian/watch`](../CrossPlatform/packaging/debian/watch) (Version 5) tracks upstream GitHub release tags (`v2.0.2` is currently the latest published tag).
+- Upstream and packaging updates for `2.0.3-1` (including the review follow-ups from [Bug #1152533 message #10](https://bugs.debian.org/1152533#10)) are staged in [`CrossPlatform/packaging/debian/`](../CrossPlatform/packaging/debian); publishing tag `v2.0.3` and uploading the signed `2.0.3-1` source package are pending final release sign-off.
