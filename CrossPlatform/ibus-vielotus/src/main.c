@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if !defined(_POSIX_C_SOURCE) && !defined(_GNU_SOURCE) && !defined(_DEFAULT_SOURCE)
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <ibus.h>
 #include <stdio.h>
 #include <string.h>

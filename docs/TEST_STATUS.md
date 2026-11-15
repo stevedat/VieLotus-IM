@@ -1,6 +1,6 @@
 # Test status
 
-Updated 2026-11-16. CI evidence: [workflow run](https://github.com/stevedat/VieLotus-IM/actions/runs/43570345394). Manual results below are reported by the maintainer; this repository does not contain device logs for those sessions.
+Updated 2026-11-16. CI evidence: [CI workflow runs (`main`)](https://github.com/stevedat/VieLotus-IM/actions/workflows/ci.yml?query=branch%3Amain). Manual results below are reported by the maintainer; this repository does not contain device logs for those sessions.
 
 ## Manual platform tests
 
