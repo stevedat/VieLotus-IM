@@ -16,6 +16,10 @@
 #ifndef VIELOTUS_LINUX_COMMON_H
 #define VIELOTUS_LINUX_COMMON_H
 
+#if !defined(_POSIX_C_SOURCE) && !defined(_GNU_SOURCE) && !defined(_DEFAULT_SOURCE)
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
