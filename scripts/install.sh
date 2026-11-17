@@ -1,6 +1,6 @@
 #!/bin/sh
 # ==============================================================================
-# Sen Việt (VieLotusIM) v2.0.3 — Universal Linux (Multi-Distro & Multi-Arch)
+# Sen Việt (VieLotusIM) v2.0.4 — Universal Linux (Multi-Distro & Multi-Arch)
 # & macOS One-Line Installer / Uninstaller
 #
 # Supported Linux Distros:
