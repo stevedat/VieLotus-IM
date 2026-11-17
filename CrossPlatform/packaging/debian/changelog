@@ -1,3 +1,23 @@
+vielotus (2.0.4-1) unstable; urgency=medium
+
+  * New upstream release 2.0.4:
+    - Sync compound-head bilingual detection (miếng lót, hoa dơn, áo lót,
+      etc.) between Swift and C++20 engines for consistent behavior across
+      macOS, Windows, and Linux.
+    - C++ engine: add toLowerVietnamese() for Unicode-capitalized compound
+      heads, fix "downw" semantic saturation overflow, support "hoa lay dơn"
+      two-word compound head.
+    - Cross-engine parity gate: 59/59 ratified cases (100%).
+    - Add benchmark_ratchet.sh, test_cross_engine_parity.py, and
+      benchmark_mobile_path.sh to the public source tree.
+  * Native C++20 regression suite: 100.00% (9,091/9,091) primary,
+    100.00% (371/371) ambiguous_both_sides, 100.00% (179/179)
+    whitelist_safe=never. Swift regression suite: 100.00% (9,091/9,091)
+    primary, 97.84% (363/371) ambiguous_both_sides, 100.00% (179/179)
+    whitelist_safe=never.
+
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Mon, 16 Nov 2026 08:32:59 +0000
+
 vielotus (2.0.3-1) unstable; urgency=medium
 
   * New upstream release 2.0.3 (incorporating 2.0.2 and 2.0.3 changes):
