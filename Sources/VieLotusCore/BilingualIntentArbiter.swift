@@ -493,6 +493,8 @@ public struct BilingualIntentArbiter: Sendable {
         "sơn": 7.7,
         "đơn": 8.1,
         "cơn": 7.5,
+        "dơn": 3.4,
+        "lót": 5.8,
         "mới": 8.9,
         "tới": 8.5,
         "nơi": 8.3,
@@ -772,11 +774,13 @@ public struct BilingualIntentArbiter: Sendable {
         "best": 8.6,
         "list": 8.3,
         "cost": 8.1,
+        "lost": 8.4,
         "host": 7.5,
         "post": 8.2,
         "last": 8.7,
         "fast": 8.0,
         "turn": 8.2,
+        "down": 9.1,
         "toast": 6.4,
         "seen": 8.3,
         "teen": 7.1,
@@ -855,6 +859,8 @@ public struct BilingualIntentArbiter: Sendable {
         "boots": ["đôi", "giày", "mang"],
         "last": ["cắt", "mỗi", "từng"],
         "best": ["hạng", "đứng", "chót"],
+        "lost": ["miếng", "tấm", "đệm", "thảm", "lớp", "áo", "quần", "đồ", "giấy", "khăn"],
+        "down": ["hoa", "hoa lay", "cây", "củ", "bông", "bó", "cành", "vườn", "luống"],
         "car": ["tất", "với", "cho"],
         "bar": ["bánh", "thuốc", "mồi"],
         "now": ["cái", "thắt", "dây"],
@@ -1016,8 +1022,32 @@ public struct BilingualIntentArbiter: Sendable {
     }
 
     private static let explicitCollocationRequiredShortTokens: Set<String> = [
-        "is", "or", "of", "if"
+        "is", "or", "of", "if", "down", "lost"
     ]
+
+    /// Returns `true` strictly when `context` ends with an explicit Vietnamese compound head registered
+    /// in `vietnameseCompoundPrecedingHeads` for `lowerRaw` (e.g. `"miếng lót"`, `"tấm lót"`, `"hoa dơn"`, `"hoa lay dơn"`),
+    /// without treating arbitrary preceding Vietnamese words (`"bị lost"`, `"kéo down"`) as compound heads.
+    public static func hasExplicitVietnameseCompoundHead(_ context: String, lowerRaw: String) -> Bool {
+        guard let heads = vietnameseCompoundPrecedingHeads[lowerRaw] else { return false }
+        let trimmed = context.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let tokens = trimmed.lowercased()
+            .split(whereSeparator: \.isWhitespace)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .filter { !$0.isEmpty }
+        guard let last = tokens.last else { return false }
+        if heads.contains(last) {
+            return true
+        }
+        if tokens.count >= 2 {
+            let lastTwo = "\(tokens[tokens.count - 2]) \(last)"
+            if heads.contains(lastTwo) {
+                return true
+            }
+        }
+        return false
+    }
 
     /// Evaluates whether `context` is a Vietnamese context that licenses a short collision syllable
     /// such as `"cái í"`, `"nước mĩ"`, `"châu mĩ"`, `"kêu ò"`, `"ầm ì"`, `"ỏ thẻ"` (P0.4.1 & P0.7 Section 1/4).
@@ -1955,6 +1985,8 @@ public struct BilingualIntentArbiter: Sendable {
         "rét": "rest",
         "bét": "best",
         "lát": "last",
+        "lót": "lost",
+        "dơn": "down",
         "cát": "cats",
         "hát": "hats",
         "sĩ": "six",
@@ -2072,8 +2104,8 @@ extension BilingualIntentArbiter {
             "sex", "is", "six", "cats", "hats", "bats", "rats", "mats", "last", "fast",
             "past", "cast", "vast", "best", "rest", "test", "west", "nest", "vest", "chest",
             "guest", "quest", "car", "cars", "bar", "bars", "far", "jar", "star", "stars",
-            "war", "wars", "now", "cow", "cows", "how", "bow", "row", "low", "slow", "snow",
-            "show", "flow", "grow", "know", "blow", "throw", "window", "yellow", "follow",
+            "war", "wars", "now", "cow", "cows", "how", "bow", "row", "low", "slow", "snow", "down",
+            "show", "flow", "grow", "know", "blow", "throw", "window", "yellow", "follow", "lost",
             "law", "laws", "raw", "saw", "draw", "straw", "flaw", "claw", "jaw", "paw",
             "code", "mode", "node", "file", "files", "line", "lines", "time", "times", "fine",
             "home", "some", "come", "done", "none", "tone", "zone", "bone", "stone", "phone",

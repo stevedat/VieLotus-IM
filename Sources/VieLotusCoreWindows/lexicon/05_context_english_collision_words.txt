@@ -108,7 +108,6 @@ doms
 dons
 dos
 dow
-down
 dust
 ems
 ens
@@ -184,7 +183,6 @@ longs
 loops
 los
 lose
-lost
 lots
 low
 luis

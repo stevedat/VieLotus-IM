@@ -264,7 +264,15 @@ internal final class SyllableCandidateResolver: Sendable {
                                     raw: String(lowerRaw.dropLast()),
                                     genZMode: true
                                 )
-                            if isValidOrUntonedVnStem && !SmartBilingualDetector.isKnownEnglishWord(lowerRaw) {
+                            let isEnglishStemWithTrailingW =
+                                lastRendered == "w" &&
+                                !VietnameseSyllableDictionary.hasToneMark(stem) &&
+                                !stem.contains("đ") &&
+                                VietnameseSyllableDictionary.stripToneMarks(stem).contains(where: { "ăơư".contains($0) }) &&
+                                (Self.isEnglishCollision(rawStem) || SmartBilingualDetector.isKnownEnglishWord(rawStem))
+                            if isValidOrUntonedVnStem &&
+                               !isEnglishStemWithTrailingW &&
+                               !SmartBilingualDetector.isKnownEnglishWord(lowerRaw) {
                                 return true
                             }
                             let isVowelShapeUndoOrReshape =
@@ -273,6 +281,7 @@ internal final class SyllableCandidateResolver: Sendable {
                                 (lastRendered == "a" && (aCount >= 3 || wCount >= 1)) ||
                                 (lastRendered == "e" && eCount >= 3)
                             if isVowelShapeUndoOrReshape,
+                               !isEnglishStemWithTrailingW,
                                (VietnameseSyllableDictionary.shared.isValidSyllableIgnoringVowelShape(stem) ||
                                 (stem.contains("đ") &&
                                  !VietnameseSyllableDictionary.hasToneMark(stem) &&
@@ -472,6 +481,15 @@ internal final class SyllableCandidateResolver: Sendable {
             }()
 
             guard validCodaEndings.contains(lastStemChar) || isVowelOverflowStem else {
+                continue
+            }
+            let rawStemCheck = String(lowerRaw.dropLast(rawTail.count))
+            if validCodaEndings.contains(lastStemChar),
+               rawTail.first == "w",
+               !hasTone,
+               !stem.contains("đ"),
+               untonedStem.contains(where: { "ăơư".contains($0) }),
+               (Self.isEnglishCollision(rawStemCheck) || SmartBilingualDetector.isKnownEnglishWord(rawStemCheck)) {
                 continue
             }
 

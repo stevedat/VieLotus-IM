@@ -2089,4 +2089,79 @@ final class UIKitInputSessionAdapterTests: XCTestCase {
         adapter.commitSuggestion(insideBracketSuggestions.last!, proxy: proxy, trailingSpace: false)
         XCTAssertEqual(proxy.buffer, "(việt)")
     }
+
+    func testLostAndDownAndDownwEnglishPriorityWithVietnameseCompoundPreservation() {
+        let savedProvider = SmartBilingualDetector.spellCheckerProvider
+        defer { SmartBilingualDetector.spellCheckerProvider = savedProvider }
+        SmartBilingualDetector.spellCheckerProvider = IOSSpellChecker()
+
+        func driveIOS(_ typed: String) -> String {
+            let proxy = MockTextDocumentProxy()
+            let adapter = UIKitInputSessionAdapter()
+            adapter.smartBilingual = true
+            for ch in typed {
+                if ch == "<" {
+                    adapter.handleBackspace(proxy: proxy)
+                } else {
+                    adapter.handleCharacter(ch, proxy: proxy)
+                }
+            }
+            return proxy.buffer
+        }
+
+        // 1. "lost" prioritized over "lót" by default and in English/bilingual contexts; "lots" and Vietnamese compound heads preserve "lót"
+        XCTAssertEqual(driveIOS("lost"), "lost")
+        XCTAssertEqual(driveIOS("lost "), "lost ")
+        XCTAssertEqual(driveIOS("Lost "), "Lost ")
+        XCTAssertEqual(driveIOS("LOST "), "LOST ")
+        XCTAssertEqual(driveIOS("get lost "), "get lost ")
+        XCTAssertEqual(driveIOS("lost my "), "lost my ")
+        XCTAssertEqual(driveIOS("bij lost "), "bị lost ")
+        XCTAssertEqual(driveIOS("lots "), "lót ")
+        XCTAssertEqual(driveIOS("mieengs lost "), "miếng lót ")
+        XCTAssertEqual(driveIOS("taams lost "), "tấm lót ")
+        XCTAssertEqual(driveIOS("Aos lost "), "Áo lót ")
+        XCTAssertEqual(driveIOS("Ddeemj lost "), "Đệm lót ")
+        XCTAssertEqual(driveIOS("Ddoof lost "), "Đồ lót ")
+        XCTAssertEqual(driveIOS("MIEENGS LOST "), "MIẾNG LÓT ")
+        XCTAssertEqual(driveIOS("AOS LOST "), "ÁO LÓT ")
+        XCTAssertEqual(driveIOS("mieengs lost tay "), "miếng lót tay ")
+
+        // 2. "down" prioritized over "dơn" across standalone & phrasal contexts; "donw" and botanical heads preserve "dơn"
+        XCTAssertEqual(driveIOS("down"), "down")
+        XCTAssertEqual(driveIOS("down "), "down ")
+        XCTAssertEqual(driveIOS("Down "), "Down ")
+        XCTAssertEqual(driveIOS("DOWN "), "DOWN ")
+        XCTAssertEqual(driveIOS("turn down "), "turn down ")
+        XCTAssertEqual(driveIOS("Turn down "), "Turn down ")
+        XCTAssertEqual(driveIOS("go down "), "go down ")
+        XCTAssertEqual(driveIOS("Go down "), "Go down ")
+        XCTAssertEqual(driveIOS("up down "), "up down ")
+        XCTAssertEqual(driveIOS("Up down "), "Up down ")
+        XCTAssertEqual(driveIOS("sit down "), "sit down ")
+        XCTAssertEqual(driveIOS("put down "), "put down ")
+        XCTAssertEqual(driveIOS("lay down "), "lay down ")
+        XCTAssertEqual(driveIOS("he lay down "), "he lay down ")
+        XCTAssertEqual(driveIOS("nhows turn down "), "nhớ turn down ")
+        XCTAssertEqual(driveIOS("keos down "), "kéo down ")
+        XCTAssertEqual(driveIOS("donw "), "dơn ")
+        XCTAssertEqual(driveIOS("hoa down "), "hoa dơn ")
+        XCTAssertEqual(driveIOS("HOA DOWN "), "HOA DƠN ")
+        XCTAssertEqual(driveIOS("hoa lay down "), "hoa lay dơn ")
+        XCTAssertEqual(driveIOS("Hoa lay down "), "Hoa lay dơn ")
+        XCTAssertEqual(driveIOS("caay down "), "cây dơn ")
+        XCTAssertEqual(driveIOS("hoa down do "), "hoa dơn do ")
+
+        // 3. "downw" and "downward" never render "dơnw" / "dơnwa" / "dơnwar" inline or on commit
+        XCTAssertEqual(driveIOS("downw"), "downw")
+        XCTAssertEqual(driveIOS("downw "), "downw ")
+        XCTAssertEqual(driveIOS("downwa"), "downwa")
+        XCTAssertEqual(driveIOS("downwar"), "downwar")
+        XCTAssertEqual(driveIOS("downward "), "downward ")
+        XCTAssertEqual(driveIOS("downwards "), "downwards ")
+        XCTAssertEqual(driveIOS("turn downw "), "turn downw ")
+        XCTAssertEqual(driveIOS("hoa downw "), "hoa downw ")
+        XCTAssertEqual(driveIOS("hoa downw< "), "hoa dơn ")
+        XCTAssertEqual(driveIOS("donww "), "dơnw ")
+    }
 }
