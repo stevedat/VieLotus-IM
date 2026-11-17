@@ -95,6 +95,19 @@ wchar_t toLowerAscii(wchar_t ch) {
     return ch;
 }
 
+wchar_t toLowerVietnamese(wchar_t ch) {
+    const uint32_t cp = static_cast<uint32_t>(ch);
+    if (cp >= 0x41 && cp <= 0x5A) return static_cast<wchar_t>(cp + 0x20);
+    if (cp >= 0x00C0 && cp <= 0x00DE && cp != 0x00D7) return static_cast<wchar_t>(cp + 0x20);
+    if (cp == 0x0102 || cp == 0x0110 || cp == 0x0128 || cp == 0x0168 || cp == 0x01A0 || cp == 0x01AF) {
+        return static_cast<wchar_t>(cp + 1);
+    }
+    if (cp >= 0x1EA0 && cp <= 0x1EF8 && ((cp & 1u) == 0u)) {
+        return static_cast<wchar_t>(cp + 1);
+    }
+    return ch;
+}
+
 bool hasDoubleO(const wchar_t *s, int len) {
     for (int i = 0; i + 1 < len; ++i) {
         if (s[i] == L'o' && s[i + 1] == L'o') return true;
@@ -751,6 +764,9 @@ struct NativeEngineState {
     int m_mathContextWordsRemaining{0};
     bool m_lastWordWasSexLoanwordHead{false};
     bool m_lastWordWasTunCollocationHead{false};
+    bool m_lastWordWasLotCompoundHead{false};
+    bool m_lastWordWasDonCompoundHead{false};
+    bool m_lastWordWasHoa{false};
     bool m_prevTurnCanBecomeTun{false};
     bool m_precededByTechDelimiter{false};
     bool m_precededByMacroDelimiter{false};
@@ -1431,6 +1447,58 @@ bool isTunCollocationPrecedingHead(const wchar_t *w, int len) {
     return false;
 }
 
+/// Returns true when the committed composed word `w` (lowercased Unicode) is a known Vietnamese
+/// compound head that precedes "lót" (e.g. "miếng", "tấm", "đệm", "thảm", "lớp", "áo", "quần",
+/// "đồ", "giấy", "khăn").  Mirrors Swift `vietnameseCompoundPrecedingHeads["lost"]`.
+bool isLotCompoundPrecedingHead(const wchar_t *w, int len) {
+    if (len <= 0 || len > 6) return false;
+    // miếng (U+006D U+0069 U+1EBF U+006E U+0067)
+    if (len == 5 && w[0] == L'm' && w[1] == L'i' && w[2] == static_cast<wchar_t>(0x1EBF) && w[3] == L'n' && w[4] == L'g') return true;
+    // tấm (U+0074 U+1EA5 U+006D)
+    if (len == 3 && w[0] == L't' && w[1] == static_cast<wchar_t>(0x1EA5) && w[2] == L'm') return true;
+    // đệm (U+0111 U+1EC7 U+006D)
+    if (len == 3 && w[0] == static_cast<wchar_t>(0x0111) && w[1] == static_cast<wchar_t>(0x1EC7) && w[2] == L'm') return true;
+    // thảm (U+0074 U+0068 U+1EA3 U+006D)
+    if (len == 4 && w[0] == L't' && w[1] == L'h' && w[2] == static_cast<wchar_t>(0x1EA3) && w[3] == L'm') return true;
+    // lớp (U+006C U+1EDB U+0070)
+    if (len == 3 && w[0] == L'l' && w[1] == static_cast<wchar_t>(0x1EDB) && w[2] == L'p') return true;
+    // áo (U+00E1 U+006F)
+    if (len == 2 && w[0] == static_cast<wchar_t>(0x00E1) && w[1] == L'o') return true;
+    // quần (U+0071 U+0075 U+1EA7 U+006E)
+    if (len == 4 && w[0] == L'q' && w[1] == L'u' && w[2] == static_cast<wchar_t>(0x1EA7) && w[3] == L'n') return true;
+    // đồ (U+0111 U+1ED3)
+    if (len == 2 && w[0] == static_cast<wchar_t>(0x0111) && w[1] == static_cast<wchar_t>(0x1ED3)) return true;
+    // giấy (U+0067 U+0069 U+1EA5 U+0079)
+    if (len == 4 && w[0] == L'g' && w[1] == L'i' && w[2] == static_cast<wchar_t>(0x1EA5) && w[3] == L'y') return true;
+    // khăn (U+006B U+0068 U+0103 U+006E)
+    if (len == 4 && w[0] == L'k' && w[1] == L'h' && w[2] == static_cast<wchar_t>(0x0103) && w[3] == L'n') return true;
+    return false;
+}
+
+/// Returns true when the committed composed word `w` (lowercased Unicode) is a known Vietnamese
+/// compound head that precedes "đơn" (e.g. "hoa", "cây", "củ", "bông", "bó", "cành", "vườn",
+/// "luống", and the two-word "hoa lay").  Mirrors Swift `vietnameseCompoundPrecedingHeads["down"]`.
+bool isDonCompoundPrecedingHead(const wchar_t *w, int len) {
+    if (len <= 0 || len > 6) return false;
+    // hoa (plain ASCII)
+    if (len == 3 && w[0] == L'h' && w[1] == L'o' && w[2] == L'a') return true;
+    // cây (U+0063 U+00E2 U+0079)
+    if (len == 3 && w[0] == L'c' && w[1] == static_cast<wchar_t>(0x00E2) && w[2] == L'y') return true;
+    // củ (U+0063 U+1EE7)
+    if (len == 2 && w[0] == L'c' && w[1] == static_cast<wchar_t>(0x1EE7)) return true;
+    // bông (U+0062 U+00F4 U+006E U+0067)
+    if (len == 4 && w[0] == L'b' && w[1] == static_cast<wchar_t>(0x00F4) && w[2] == L'n' && w[3] == L'g') return true;
+    // bó (U+0062 U+00F3)
+    if (len == 2 && w[0] == L'b' && w[1] == static_cast<wchar_t>(0x00F3)) return true;
+    // cành (U+0063 U+00E0 U+006E U+0068)
+    if (len == 4 && w[0] == L'c' && w[1] == static_cast<wchar_t>(0x00E0) && w[2] == L'n' && w[3] == L'h') return true;
+    // vườn (U+0076 U+01B0 U+1EDD U+006E)
+    if (len == 4 && w[0] == L'v' && w[1] == static_cast<wchar_t>(0x01B0) && w[2] == static_cast<wchar_t>(0x1EDD) && w[3] == L'n') return true;
+    // luống (U+006C U+0075 U+1ED1 U+006E U+0067)
+    if (len == 5 && w[0] == L'l' && w[1] == L'u' && w[2] == static_cast<wchar_t>(0x1ED1) && w[3] == L'n' && w[4] == L'g') return true;
+    return false;
+}
+
 bool isSpacePrefixStarter(const wchar_t *lower, int len) {
     if (len == 2) {
         return std::wmemcmp(lower, L"is", 2) == 0;
@@ -1543,6 +1611,10 @@ bool isVietnameseCompoundContinuationAfterStarter(
                  eq(secondRawLower, secondRawLen, L"rental", 6) ||
                  eq(secondRawLower, secondRawLen, L"owner", 5));
     }
+    // NOTE: "lost"/"down" compound heads are handled via m_lastWordWasLotCompoundHead /
+    // m_lastWordWasDonCompoundHead flags, NOT here, because the preceding Vietnamese words
+    // (e.g. "miếng", "hoa") are pure Vietnamese — never collision words — so
+    // m_prevCollisionRawLen == 0 and this function is never reached for those pairs.
     return false;
 }
 
@@ -1710,7 +1782,14 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
         m_inVietnameseContext && m_rawLen == 3 &&
         rawLower[0] == L'i' && rawLower[1] == L's' && rawLower[2] == L'a';
     if (!isIsaInVnContext && isUnconditionalEnglishWord(rawLower, m_rawLen)) {
-        return true;
+        // "lost" and "down" are unconditional EXCEPT when preceded by a Vietnamese compound head
+        if (m_rawLen == 4 && rawLower[0] == L'l' && rawLower[1] == L'o' && rawLower[2] == L's' && rawLower[3] == L't' && m_lastWordWasLotCompoundHead) {
+            // fall through — don't restore, keep Vietnamese "lót"
+        } else if (m_rawLen == 4 && rawLower[0] == L'd' && rawLower[1] == L'o' && rawLower[2] == L'w' && rawLower[3] == L'n' && m_lastWordWasDonCompoundHead) {
+            // fall through — don't restore, keep Vietnamese "dơn"
+        } else {
+            return true;
+        }
     }
     if (m_precededByLeadingSlash && isLeadingSlashCommandOrPathToken(rawLower, m_rawLen)) {
         return true;
@@ -1739,6 +1818,14 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
             (m_inputMethod == InputMethod::Telex && isAsciiDigit(m_pendingBoundaryCp))) return true;
         if (m_rawLen == 4 && rawLower[0] == L't' && rawLower[1] == L'u' && rawLower[2] == L'r' && rawLower[3] == L'n') {
             return !m_lastWordWasTunCollocationHead;
+        }
+        // "lost" → "lót" when preceded by a Vietnamese compound head (miếng, tấm, đệm, ...)
+        if (m_rawLen == 4 && rawLower[0] == L'l' && rawLower[1] == L'o' && rawLower[2] == L's' && rawLower[3] == L't') {
+            if (m_lastWordWasLotCompoundHead) return false;
+        }
+        // "down" → "dơn" when preceded by a Vietnamese compound head (hoa, cây, củ, ...)
+        if (m_rawLen == 4 && rawLower[0] == L'd' && rawLower[1] == L'o' && rawLower[2] == L'w' && rawLower[3] == L'n') {
+            if (m_lastWordWasDonCompoundHead) return false;
         }
         if (m_rawLen == 3 && rawLower[0] == L's' && rawLower[1] == L'e' && rawLower[2] == L'x') {
             if (m_lastWordWasSexLoanwordHead) return true;
@@ -2274,10 +2361,25 @@ bool NativeEngineState::applyTelexCharacter(wchar_t ch, wchar_t lowerCh, bool is
                 // Policy 3B+ Semantic Saturation: on completed closed/offglide Vietnamese syllables
                 // (e.g. 'được' + 'w' -> 'đượcw', 'trưởng' + 'w' -> 'trưởngw', 'người' + 'w' -> 'ngườiw', 'cửa' + 'w' -> 'cửaw'),
                 // lock the syllable stem and emit literal 'w' without stripping horn/breve so Backspace restores 'được'/'trưởng'.
+                // Mirror Swift SyllableCandidateResolver: do NOT lock overflow when the untoned non-đ closed stem before 'w'
+                // is itself an English collision/lexicon word (e.g. 'down' + 'w' -> 'downw', 'downward', never 'dơnw'/'dơnward').
                 const bool stemWasValidVn = rawWordStartsNonW() && isValidVietnameseSyllable();
                 if ((hasCoda || vEnd > vStart) && stemWasValidVn) {
-                    m_telexToneEscape = true;
-                    m_overflowLocked = true;
+                    bool isEnglishUntonedHornBreveCodaStem = false;
+                    if (hasCoda && m_tone == 0 && !hasCompoundUoOrStrokeD() && m_rawLen >= 2) {
+                        wchar_t stemLower[kMaxWordTokens]{};
+                        const int stemRawLen = m_rawLen - 1;
+                        for (int i = 0; i < stemRawLen; ++i) {
+                            stemLower[i] = toLowerAscii(m_rawWord[i]);
+                        }
+                        isEnglishUntonedHornBreveCodaStem =
+                            isUnconditionalEnglishWord(stemLower, stemRawLen) ||
+                            isContextEnglishCollisionWord(stemLower, stemRawLen);
+                    }
+                    if (!isEnglishUntonedHornBreveCodaStem) {
+                        m_telexToneEscape = true;
+                        m_overflowLocked = true;
+                    }
                     if (m_literalTailLen < kMaxWordTokens - 1) {
                         m_literalTail[m_literalTailLen++] = ch;
                         m_literalTail[m_literalTailLen] = 0;
@@ -3574,6 +3676,9 @@ int32_t NativeEngineState::commitWord() {
             m_hadVietnameseInSentence = true;
             m_lastWordWasSexLoanwordHead = false;
             m_lastWordWasTunCollocationHead = false;
+            m_lastWordWasLotCompoundHead = false;
+            m_lastWordWasDonCompoundHead = false;
+            m_lastWordWasHoa = false;
             clearWordState();
             m_lastBackspaces = retroBs;
             m_lastCommitDiffBackspaces = retroBs;
@@ -3602,6 +3707,9 @@ int32_t NativeEngineState::commitWord() {
             m_inVietnameseContext = false;
             m_lastWordWasSexLoanwordHead = false;
             m_lastWordWasTunCollocationHead = false;
+            m_lastWordWasLotCompoundHead = false;
+            m_lastWordWasDonCompoundHead = false;
+            m_lastWordWasHoa = false;
             clearWordState();
             m_lastBackspaces = retroBs;
             m_lastCommitDiffBackspaces = retroBs;
@@ -3649,6 +3757,9 @@ int32_t NativeEngineState::commitWord() {
                 m_lastWordWasEnglishAnchor = isEnglishContextAnchor(rawLower, m_rawLen);
                 m_lastWordWasSexLoanwordHead = false;
                 m_lastWordWasTunCollocationHead = false;
+                m_lastWordWasLotCompoundHead = false;
+                m_lastWordWasDonCompoundHead = false;
+                m_lastWordWasHoa = false;
                 clearWordState();
                 m_lastBackspaces = retroBs;
                 m_lastCommitDiffBackspaces = retroBs;
@@ -3728,6 +3839,9 @@ int32_t NativeEngineState::commitWord() {
             m_lastWordWasEnglishAnchor = false;
             m_lastWordWasSexLoanwordHead = false;
             m_lastWordWasTunCollocationHead = false;
+            m_lastWordWasLotCompoundHead = false;
+            m_lastWordWasDonCompoundHead = false;
+            m_lastWordWasHoa = false;
             m_prevTurnCanBecomeTun = false;
             m_prevCollisionDisplayedLen = 0;
             m_prevCollisionRawLen = 0;
@@ -3772,7 +3886,7 @@ int32_t NativeEngineState::commitWord() {
     bool hasNonAscii = false;
     for (int i = 0; i < finalLen; ++i) {
         if (finalWord[i] > 0x7F) hasNonAscii = true;
-        finalLower[i] = toLowerAscii(finalWord[i]);
+        finalLower[i] = toLowerVietnamese(finalWord[i]);
     }
     const bool isTurnWord = (m_rawLen == 4 && rawLower[0] == L't' && rawLower[1] == L'u' && rawLower[2] == L'r' && rawLower[3] == L'n');
     const bool isSexWord = (m_rawLen == 3 && rawLower[0] == L's' && rawLower[1] == L'e' && rawLower[2] == L'x');
@@ -3788,9 +3902,15 @@ int32_t NativeEngineState::commitWord() {
         if (joiner) --m_mathContextWordsRemaining;
         else m_mathContextWordsRemaining = 0;
     }
+    const bool prevWasHoa = m_lastWordWasHoa;
+    const bool curIsHoa = (finalLen == 3 && finalLower[0] == L'h' && finalLower[1] == L'o' && finalLower[2] == L'a');
+    const bool curIsLay = (finalLen == 3 && finalLower[0] == L'l' && finalLower[1] == L'a' && finalLower[2] == L'y');
     m_lastWordWasEnglishAnchor = isAnchor;
     m_lastWordWasSexLoanwordHead = isSexLoanwordPrecedingHead(finalLower, finalLen) || isSexLoanwordPrecedingHead(rawLower, m_rawLen);
     m_lastWordWasTunCollocationHead = isTunCollocationPrecedingHead(finalLower, finalLen) || isTunCollocationPrecedingHead(rawLower, m_rawLen);
+    m_lastWordWasLotCompoundHead = isLotCompoundPrecedingHead(finalLower, finalLen);
+    m_lastWordWasDonCompoundHead = isDonCompoundPrecedingHead(finalLower, finalLen) || (prevWasHoa && curIsLay);
+    m_lastWordWasHoa = curIsHoa;
     if (hasNonAscii || isVietnameseContextReset(finalLower, finalLen)) {
         m_inEnglishContext = false;
         if (!isTurnOrSex) {
@@ -3901,6 +4021,9 @@ void WindowsNativeEngine::reset() {
     impl->m_mathContextWordsRemaining = 0;
     impl->m_lastWordWasSexLoanwordHead = false;
     impl->m_lastWordWasTunCollocationHead = false;
+    impl->m_lastWordWasLotCompoundHead = false;
+    impl->m_lastWordWasDonCompoundHead = false;
+    impl->m_lastWordWasHoa = false;
     impl->m_prevTurnCanBecomeTun = false;
     impl->m_precededByTechDelimiter = false;
     impl->m_precededByMacroDelimiter = false;
@@ -4001,6 +4124,9 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
         m_mathContextWordsRemaining = 0;
         m_lastWordWasSexLoanwordHead = false;
         m_lastWordWasTunCollocationHead = false;
+        m_lastWordWasLotCompoundHead = false;
+        m_lastWordWasDonCompoundHead = false;
+        m_lastWordWasHoa = false;
         m_prevTurnCanBecomeTun = false;
         m_precededByTechDelimiter = false;
         m_precededByMacroDelimiter = false;
@@ -4019,22 +4145,23 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
         }
     }
     if (hasNonAscii) {
-        auto utf8Eq = [](const char *a, const char *b) -> bool {
-            while (*a && *b && *a == *b) { ++a; ++b; }
-            return *a == '\0' && *b == '\0';
-        };
+        auto cps = decodeUtf8Codepoints(contextWord);
+        wchar_t wLower[32]{};
+        int wLen = 0;
+        for (uint32_t cp : cps) {
+            if (wLen >= 31) break;
+            wLower[wLen++] = toLowerVietnamese(static_cast<wchar_t>(cp));
+        }
         m_inVietnameseContext = true;
         m_hadVietnameseInSentence = true;
         m_inEnglishContext = false;
         m_lastWordWasEnglishAnchor = false;
         m_mathContextWordsRemaining = 0;
-        m_lastWordWasSexLoanwordHead =
-            utf8Eq(contextWord, "ảnh") || utf8Eq(contextWord, "cảnh") ||
-            utf8Eq(contextWord, "hình") || utf8Eq(contextWord, "truyện");
-        m_lastWordWasTunCollocationHead =
-            utf8Eq(contextWord, "lùn") || utf8Eq(contextWord, "lủn") ||
-            utf8Eq(contextWord, "nhỏ") || utf8Eq(contextWord, "ngắn") ||
-            utf8Eq(contextWord, "cụt");
+        m_lastWordWasSexLoanwordHead = isSexLoanwordPrecedingHead(wLower, wLen);
+        m_lastWordWasTunCollocationHead = isTunCollocationPrecedingHead(wLower, wLen);
+        m_lastWordWasLotCompoundHead = isLotCompoundPrecedingHead(wLower, wLen);
+        m_lastWordWasDonCompoundHead = isDonCompoundPrecedingHead(wLower, wLen);
+        m_lastWordWasHoa = false;
         m_prevTurnCanBecomeTun = false;
         m_precededByTechDelimiter = false;
         m_afterDigit = false;
@@ -4055,6 +4182,9 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
     m_mathContextWordsRemaining = temp.m_mathContextWordsRemaining;
     m_lastWordWasSexLoanwordHead = temp.m_lastWordWasSexLoanwordHead;
     m_lastWordWasTunCollocationHead = temp.m_lastWordWasTunCollocationHead;
+    m_lastWordWasLotCompoundHead = temp.m_lastWordWasLotCompoundHead;
+    m_lastWordWasDonCompoundHead = temp.m_lastWordWasDonCompoundHead;
+    m_lastWordWasHoa = temp.m_lastWordWasHoa;
     m_prevTurnCanBecomeTun = false;
     m_precededByTechDelimiter = temp.m_precededByTechDelimiter;
     m_afterDigit = false;

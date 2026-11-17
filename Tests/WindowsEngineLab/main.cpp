@@ -266,6 +266,44 @@ const PhraseTest kBilingualPhrases[] = {
     { "caafn cos kijch banr plan thees nafo a good plan thees ", "cần có kịch bản plan thế nào a good plan thế ", "Mid-sentence EN noun phrase resumes VN 'thế'" },
     { "caafn cos kijch banr plan thees nafo a good plan theer ", "cần có kịch bản plan thế nào a good plan thể ", "Mid-sentence EN noun phrase resumes VN 'thể'" },
     { "thuwr caif ddawtj treen windows nos gox thaays ghee chawngr ra dducowj gioongs khir hoj gif luoon.", "thử cài đặt trên windows nó gõ thấy ghê chẳng ra được giống khỉ họ gì luôn.", "Windows 11 ARM64 user diagnostic log sentence (including SenFlex dducowj -> được)" },
+
+    // Cross-engine parity: lost / down / downw & Vietnamese compound heads (Swift <-> C++)
+    { "mieengs lost ",              "miếng lót ",           "VN compound 'miếng lót' — compound head test" },
+    { "lost ",                      "lost ",                "Standalone 'lost' — English priority" },
+    { "LOST ",                      "LOST ",                "ALL-CAPS standalone 'LOST' — English priority" },
+    { "the lost city ",             "the lost city ",       "EN context 'the lost' — English phrase" },
+    { "bij lost ",                  "bị lost ",             "Non-head VN verb 'bị' keeps English 'lost'" },
+    { "taams lost ",                "tấm lót ",             "VN compound 'tấm lót' — compound head test" },
+    { "Aos lost ",                  "Áo lót ",              "Capitalized Unicode head 'Áo lót'" },
+    { "Ddeemj lost ",               "Đệm lót ",             "Capitalized Đ head 'Đệm lót'" },
+    { "Ddoof lost ",                "Đồ lót ",              "Capitalized Đ head 'Đồ lót'" },
+    { "MIEENGS LOST ",              "MIẾNG LÓT ",           "ALL-CAPS VN compound 'MIẾNG LÓT'" },
+    { "AOS LOST ",                  "ÁO LÓT ",              "ALL-CAPS VN compound 'ÁO LÓT'" },
+    { "mieengs lost tay ",          "miếng lót tay ",       "3-word VN compound 'miếng lót tay'" },
+    { "hoa down ",                  "hoa dơn ",             "VN compound 'hoa dơn' — compound head test" },
+    { "HOA DOWN ",                  "HOA DƠN ",             "ALL-CAPS VN compound 'HOA DƠN'" },
+    { "hoa lay down ",              "hoa lay dơn ",         "Two-word VN compound head 'hoa lay dơn'" },
+    { "Hoa lay down ",              "Hoa lay dơn ",         "Capitalized two-word VN compound head 'Hoa lay dơn'" },
+    { "lay down ",                  "lay down ",            "Standalone 'lay down' stays English without 'hoa'" },
+    { "he lay down ",               "he lay down ",         "EN clause 'he lay down' stays English" },
+    { "hoa down do ",               "hoa dơn do ",          "Committed 'hoa dơn' never reverts on following word" },
+    { "down ",                      "down ",                "Standalone 'down' — English priority" },
+    { "DOWN ",                      "DOWN ",                "ALL-CAPS standalone 'DOWN' — English priority" },
+    { "go down ",                   "go down ",             "EN phrasal verb 'go down'" },
+    { "turn down the music ",       "turn down the music ", "EN phrasal 'turn down the music'" },
+    { "nhows turn down ",           "nhớ turn down ",       "Mixed VN+EN 'nhớ turn down'" },
+    { "keos down ",                 "kéo down ",            "Non-head VN verb 'kéo' keeps English 'down'" },
+    { "cayj down ",                 "cạy down ",            "cayj=cạy (Telex: cay+j=nặng), not a compound head for dơn" },
+    { "caay down ",                 "cây dơn ",             "VN compound 'cây dơn' — caay=cây is a compound head" },
+    { "downw ",                     "downw ",               "English 'downw' never renders 'dơnw'" },
+    { "downwa ",                    "downwa ",              "English prefix 'downwa' never renders 'dơnwa'" },
+    { "downwar ",                   "downwar ",             "English prefix 'downwar' never renders 'dơnwar'" },
+    { "downward ",                  "downward ",            "English 'downward' never renders 'dơnward'" },
+    { "downwards ",                 "downwards ",           "English 'downwards' never renders 'dơnwards'" },
+    { "turn downw ",                "turn downw ",          "EN phrasal 'turn downw' stays raw English" },
+    { "hoa downw ",                 "hoa downw ",           "'hoa downw' restores 'downw' on extra 'w'" },
+    { "hoa downw< ",                "hoa dơn ",             "Backspace on 'hoa downw' restores 'hoa dơn'" },
+    { "donww ",                     "dơnw ",                "Explicit Telex 'donww' preserves 'dơnw' saturation" },
 };
 
 void runTraceList(WindowsNativeEngine &eng, const std::string &spec) {
@@ -719,6 +757,7 @@ int main(int argc, char **argv) {
     std::string digitPreeditOut = drivePreeditPhrase("100W 4K60W Sose2026 Test123 dduoxwcj quapj UWCLN Chafo lowx ref ref ", true);
     std::string slashPreeditOut = drivePreeditPhrase("/aws /os ", true);
     std::string mathPreeditOut = drivePreeditPhrase("sin and cos ", true);
+    std::string lostDownPreeditOut = drivePreeditPhrase("mieengs lost Aos lost hoa lay down turn downw ", true);
     if (turnOnPreeditOut == "turn on " &&
         tunMunPreeditOut == "tủn mủn " &&
         tunMunNoSurrOut == "turn mủn " &&
@@ -729,7 +768,8 @@ int main(int argc, char **argv) {
         sexEduPreeditOut == "sex education " &&
         digitPreeditOut == "100W 4K60W Sose2026 Test123 được quạp ƯCLN Chào lỡ rè rè " &&
         slashPreeditOut == "/aws /os " &&
-        mathPreeditOut == "sin and cos ") {
+        mathPreeditOut == "sin and cos " &&
+        lostDownPreeditOut == "miếng lót Áo lót hoa lay dơn turn downw ") {
         eng.reset();
         eng.setInputMethod(InputMethod::Telex);
         const wchar_t kDuc[] = { 0x0111, L'u', L'c', 0 };

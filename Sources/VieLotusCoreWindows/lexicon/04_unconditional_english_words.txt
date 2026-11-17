@@ -141,6 +141,7 @@ doom
 door
 doors
 dose
+down
 draft
 drift
 dwarf
@@ -288,6 +289,7 @@ loft
 look
 loop
 lord
+lost
 lure
 lust
 lux

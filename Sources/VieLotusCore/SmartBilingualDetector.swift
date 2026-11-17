@@ -30,6 +30,15 @@ public struct SmartBilingualDetector {
         BilingualIntentArbiter.resetArbitrationCache()
     }
 
+    public static func purgeMemoryForLowMemoryWarning() {
+        lock.lock()
+        defer { lock.unlock() }
+        spellCheckCache.removeAll(keepingCapacity: false)
+        cacheKeys.removeAll(keepingCapacity: false)
+        contextConfidenceCache.removeAll(keepingCapacity: false)
+        BilingualIntentArbiter.resetArbitrationCache()
+    }
+
     internal static func lockForTesting(_ block: () -> Void) {
         lock.lock()
         defer { lock.unlock() }
@@ -81,7 +90,8 @@ public struct SmartBilingualDetector {
         0xcf75efe80464e696, 0x9c6d5760fccff201, 0x2d9f4b4c0ae65551, 0x1dec1b490fa3fd69,
         0xdcd64f738a03675c, 0x8dcab99811f6711e, 0x2def742a19277de2, 0x32ea7d8dd3d6a213,
         0xc992366b6b09be45, 0x8329fcfc87114b05, 0x5834bc88fbe752ea, 0x80f445c3e54a3aae,
-        0x00347fdb84d40bea, 0x695f4971be0a7c9d, 0x287c998fc6876825
+        0x00347fdb84d40bea, 0x695f4971be0a7c9d, 0x287c998fc6876825,
+        0xf02973945d0b6ab1, 0xd27df6b0d6af3f98
     ]
 
     private static let vietnameseProtectedCollisionDigests: Set<UInt64> = [
@@ -240,11 +250,11 @@ public struct SmartBilingualDetector {
         "add", "agents", "api", "app", "apps", "ar", "as", "aw", "awk", "aws",
         "bash", "bin", "boost", "boot", "browser", "bug", "build",
         "cast", "cash", "clear", "compact", "config", "core", "cost",
-        "dash", "dev", "diff", "dist", "doc", "docs", "doctor",
+        "dash", "dev", "diff", "dist", "doc", "docs", "doctor", "down",
         "env", "es", "etc", "ex", "exit",
         "fast", "git", "goal", "hash", "help", "home", "host",
         "if", "image", "info", "init", "ir", "is", "ix",
-        "last", "learn", "lib", "list", "log", "login", "logout", "logs", "loop",
+        "last", "learn", "lib", "list", "log", "login", "logout", "logs", "loop", "lost",
         "mask", "mcp", "memory", "mnt", "model", "models", "more",
         "new", "of", "opt", "or", "os", "out",
         "permissions", "pkg", "plan", "port", "post", "pr", "proc",
@@ -382,6 +392,7 @@ public struct SmartBilingualDetector {
 
         if LexiconDigest.contains(commonEnglishWordDigests, lower),
            !(cleanRaw == lower && LexiconDigest.contains(vietnameseProtectedCollisionDigests, lower)),
+           !BilingualIntentArbiter.hasExplicitVietnameseCompoundHead(context, lowerRaw: lower),
            lower != lowerRendered {
             return true
         }
@@ -741,6 +752,7 @@ public struct SmartBilingualDetector {
 
         if LexiconDigest.contains(commonEnglishWordDigests, lowerRaw),
            !(raw == lowerRaw && LexiconDigest.contains(vietnameseProtectedCollisionDigests, lowerRaw)),
+           !BilingualIntentArbiter.hasExplicitVietnameseCompoundHead(context, lowerRaw: lowerRaw),
            let rendered,
            lowerRaw != rendered.lowercased() {
             return true
