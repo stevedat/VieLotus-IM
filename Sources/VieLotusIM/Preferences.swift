@@ -22,7 +22,7 @@ final class Preferences: ObservableObject {
         static let presentationModePreference = "VieLotusIM.presentationModePreference"
         static let appModeOverrides = "VieLotusIM.appModeOverrides"
         static let developerMode = "VieLotusIM.developerMode"
-        static let genZMode = "VieLotusIM.genZMode"
+        static let genZMode = "VieLotusIM.genZModeV2"
         static let engineBackend = "VieLotusIM.engineBackend"
         static let passthroughRemoteApps = "VieLotusIM.passthroughRemoteApps"
         static let enforceABCBaseLayout = "VieLotusIM.enforceABCBaseLayout"
@@ -132,8 +132,20 @@ final class Preferences: ObservableObject {
     
     @Published var genZMode: Bool {
         didSet {
+            guard !isReloading else { return }
             defaults.set(genZMode, forKey: Key.genZMode)
+            CFPreferencesSetAppValue(
+                Key.genZMode as CFString,
+                (genZMode as CFBoolean),
+                kCFPreferencesCurrentApplication
+            )
             flushDefaults()
+            DistributedNotificationCenter.default().postNotificationName(
+                Self.preferencesChangedNotification,
+                object: nil,
+                userInfo: nil,
+                deliverImmediately: true
+            )
         }
     }
     
@@ -202,7 +214,9 @@ final class Preferences: ObservableObject {
                 result[bundleID] = preference
             }
         }
-        self.genZMode = true
+        self.genZMode = (CFPreferencesCopyAppValue(Key.genZMode as CFString, kCFPreferencesCurrentApplication) as? Bool)
+            ?? (defaults.object(forKey: Key.genZMode) as? Bool)
+            ?? false
         self.developerMode = defaults.object(forKey: Key.developerMode) as? Bool ?? false
         
         let rawGrammarProfile: String
@@ -216,7 +230,7 @@ final class Preferences: ObservableObject {
         defaults.set(initialProfile.rawValue, forKey: Key.grammarProfile)
         defaults.set(true, forKey: Key.smartBilingual)
         defaults.set(true, forKey: Key.modernOrthography)
-        defaults.set(true, forKey: Key.genZMode)
+        // genZMode defaults to false (opt-in via VieLotusIM.genZModeV2).
         
         let rawBackend = defaults.string(forKey: Key.engineBackend) ?? EngineBackend.pureSwift.rawValue
         self.engineBackend = EngineBackend(rawValue: rawBackend) ?? .pureSwift
@@ -287,7 +301,9 @@ final class Preferences: ObservableObject {
                 result[bundleID] = preference
             }
         }
-        self.genZMode = true
+        self.genZMode = (CFPreferencesCopyAppValue(Key.genZMode as CFString, kCFPreferencesCurrentApplication) as? Bool)
+            ?? (defaults.object(forKey: Key.genZMode) as? Bool)
+            ?? false
         self.developerMode = defaults.object(forKey: Key.developerMode) as? Bool ?? false
 
         let rawBackend = defaults.string(forKey: Key.engineBackend) ?? EngineBackend.pureSwift.rawValue

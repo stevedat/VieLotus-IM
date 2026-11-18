@@ -30,12 +30,14 @@ be
 bee
 been
 beer
+bees
 beest
 bens
 bes
 best
 bins
 bis
+bist
 bits
 bons
 boom
@@ -125,6 +127,7 @@ hams
 hangs
 hans
 harm
+has
 hats
 hays
 he
@@ -156,6 +159,7 @@ its
 keen
 keeps
 kens
+kist
 kits
 kys
 langs
@@ -203,11 +207,11 @@ mere
 mes
 mias
 mis
+mist
 mix
 moms
 moon
 mos
-most
 mus
 must
 my
@@ -218,6 +222,7 @@ neos
 nes
 nest
 nextjs
+nist
 no
 nons
 noon
@@ -265,6 +270,7 @@ reset
 rest
 rims
 ris
+rist
 roms
 rons
 roof
@@ -324,6 +330,7 @@ tims
 tins
 tips
 tis
+tist
 tits
 to
 toer
@@ -341,6 +348,7 @@ treos
 trust
 turn
 tus
+tust
 tys
 ums
 up
@@ -365,6 +373,7 @@ vias
 virus
 vis
 visa
+vist
 vons
 wa
 wars

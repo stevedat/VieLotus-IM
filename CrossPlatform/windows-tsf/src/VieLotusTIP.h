@@ -65,6 +65,7 @@ private:
     bool m_isVietnameseMode{true};
     bool m_isVniMode{false};
     bool m_inProfileSync{false};
+    bool m_inActivateEx{false};
     bool m_isRemoteProcess{false};
     bool m_hasManualProcessOverride{false};
     bool m_manualProcessVietnameseMode{true};

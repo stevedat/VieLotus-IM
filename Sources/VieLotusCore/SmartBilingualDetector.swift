@@ -13,6 +13,10 @@ public struct SmartBilingualDetector {
     internal static var spellCheckCache: [String: Bool] = [:]
     internal static var cacheKeys: [String] = []
     internal static var contextConfidenceCache: [String: Bool] = [:]
+    private static var contextConfidenceKeys: [String] = []
+    private static var rawContextConfidenceCache: [String: Bool] = [:]
+    private static var rawContextConfidenceKeys: [String] = []
+    private static var didWarmUpModels = false
     internal static var maxCacheEntries = 65536
 
     internal static var cacheCount: Int {
@@ -27,6 +31,9 @@ public struct SmartBilingualDetector {
         spellCheckCache.removeAll(keepingCapacity: true)
         cacheKeys.removeAll(keepingCapacity: true)
         contextConfidenceCache.removeAll(keepingCapacity: true)
+        contextConfidenceKeys.removeAll(keepingCapacity: true)
+        rawContextConfidenceCache.removeAll(keepingCapacity: true)
+        rawContextConfidenceKeys.removeAll(keepingCapacity: true)
         BilingualIntentArbiter.resetArbitrationCache()
     }
 
@@ -36,7 +43,72 @@ public struct SmartBilingualDetector {
         spellCheckCache.removeAll(keepingCapacity: false)
         cacheKeys.removeAll(keepingCapacity: false)
         contextConfidenceCache.removeAll(keepingCapacity: false)
+        contextConfidenceKeys.removeAll(keepingCapacity: false)
+        rawContextConfidenceCache.removeAll(keepingCapacity: false)
+        rawContextConfidenceKeys.removeAll(keepingCapacity: false)
         BilingualIntentArbiter.resetArbitrationCache()
+    }
+
+    /// Pre-warms `NLLanguageRecognizer` and static bilingual lookup tables off the main thread
+    /// so the first keystroke never incurs cold-start model initialization latency.
+    public static func warmUpModelsAsync() {
+        lock.lock()
+        if didWarmUpModels {
+            lock.unlock()
+            return
+        }
+        didWarmUpModels = true
+        let provider = languageRecognizerProvider
+        lock.unlock()
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            _ = EmbeddedEnglishSpellChecker.shared
+            _ = VietnameseSyllableDictionary.shared
+            _ = BilingualIntentArbiter.englishCollisionLogFrequencies
+            _ = provider.isDominantLanguageEnglish("hello")
+            _ = provider.isConfidentEnglishContext("the")
+        }
+    }
+
+    private static let supplementaryTechAndBrandWords: Set<String> = [
+        "siri", "iphone", "ipad", "ipod", "imac", "macbook", "airpods", "airtag",
+        "airdrop", "airplay", "carplay", "homepod", "icloud", "imessage", "facetime",
+        "ios", "ipados", "macos", "watchos", "tvos", "visionos", "xcode", "swiftui",
+        "appstore", "chatgpt", "openai", "gemini", "claude", "copilot", "zalo",
+        "tiktok", "shopee", "lazada", "vnpay", "spotify", "netflix", "youtube",
+        "github", "ubuntu", "android", "chrome"
+    ]
+
+    private static var supplementaryLexiconTokens: Set<String> = []
+
+    /// Updates dynamic non-Vietnamese tokens sourced from iOS `UILexicon` (Contacts / system words)
+    /// without blocking keystrokes.
+    public static func updateSupplementaryKnownTokens(_ tokens: Set<String>) {
+        lock.lock()
+        supplementaryLexiconTokens = tokens
+        spellCheckCache.removeAll(keepingCapacity: true)
+        cacheKeys.removeAll(keepingCapacity: true)
+        lock.unlock()
+    }
+
+    @inline(__always)
+    private static func isCommonTechWord(_ lower: String, precomputedHash: UInt64? = nil) -> Bool {
+        if let h = precomputedHash {
+            if commonEnglishTechWordDigests.contains(h) {
+                return true
+            }
+        } else if LexiconDigest.contains(commonEnglishTechWordDigests, lower) {
+            return true
+        }
+        return supplementaryTechAndBrandWords.contains(lower)
+    }
+
+    @inline(__always)
+    private static func isSupplementaryLexiconToken(_ lower: String) -> Bool {
+        lock.lock()
+        let contains = supplementaryLexiconTokens.contains(lower)
+        lock.unlock()
+        return contains
     }
 
     internal static func lockForTesting(_ block: () -> Void) {
@@ -91,7 +163,9 @@ public struct SmartBilingualDetector {
         0xdcd64f738a03675c, 0x8dcab99811f6711e, 0x2def742a19277de2, 0x32ea7d8dd3d6a213,
         0xc992366b6b09be45, 0x8329fcfc87114b05, 0x5834bc88fbe752ea, 0x80f445c3e54a3aae,
         0x00347fdb84d40bea, 0x695f4971be0a7c9d, 0x287c998fc6876825,
-        0xf02973945d0b6ab1, 0xd27df6b0d6af3f98
+        0xf02973945d0b6ab1, 0xd27df6b0d6af3f98,
+        // "most", "pist"
+        0xed82fc02c445c144, 0xc37e72c700e32d9c
     ]
 
     private static let vietnameseProtectedCollisionDigests: Set<UInt64> = [
@@ -255,9 +329,9 @@ public struct SmartBilingualDetector {
         "fast", "git", "goal", "hash", "help", "home", "host",
         "if", "image", "info", "init", "ir", "is", "ix",
         "last", "learn", "lib", "list", "log", "login", "logout", "logs", "loop", "lost",
-        "mask", "mcp", "memory", "mnt", "model", "models", "more",
+        "mask", "mcp", "memory", "mnt", "model", "models", "more", "most",
         "new", "of", "opt", "or", "os", "out",
-        "permissions", "pkg", "plan", "port", "post", "pr", "proc",
+        "permissions", "pist", "pkg", "plan", "port", "post", "pr", "proc",
         "quit", "raw", "reset", "review", "room", "root", "run",
         "sbin", "schedule", "search", "share", "sort", "src", "srv", "ssh", "start", "status", "stop", "store", "sys",
         "task", "tasks", "teamwork", "terminal", "test", "tests", "tmp", "tool", "tools",
@@ -267,6 +341,16 @@ public struct SmartBilingualDetector {
 
     public static func isLeadingSlashCommandOrPathToken(_ lowerRaw: String) -> Bool {
         leadingSlashCommandAndPathTokens.contains(lowerRaw)
+    }
+
+    @inline(__always)
+    internal static func asciiLowercasedFast(_ s: String) -> String {
+        for b in s.utf8 {
+            if (b >= 65 && b <= 90) || b >= 128 {
+                return s.lowercased()
+            }
+        }
+        return s
     }
 
     @inline(__always)
@@ -293,8 +377,8 @@ public struct SmartBilingualDetector {
         let cleanRaw = trimPunctuationFast(raw)
         let cleanRendered = trimPunctuationFast(rendered)
         let effectiveRendered = cleanRendered.isEmpty ? rendered : cleanRendered
-        let lower = cleanRaw.lowercased()
-        let lowerRendered = effectiveRendered.lowercased()
+        let lower = asciiLowercasedFast(cleanRaw)
+        let lowerRendered = asciiLowercasedFast(effectiveRendered)
         if raw.hasPrefix("/") && !raw.hasPrefix("//") && isLeadingSlashCommandOrPathToken(lower) {
             return true
         }
@@ -329,7 +413,9 @@ public struct SmartBilingualDetector {
         if lower.contains(where: { $0 != "-" && codeCharacters.contains($0) }) {
             return true
         }
-        if genZMode && lowerRendered != lower && VietnameseEngine.isValidGenZInitialTransformation(rendered: effectiveRendered, raw: lower) {
+        if genZMode && lowerRendered != lower &&
+           !isConfidentEnglishContext(context) &&
+           VietnameseEngine.isValidGenZInitialTransformation(rendered: effectiveRendered, raw: lower) {
             return false
         }
         if LexiconDigest.contains(telexPrimitiveDigests, lower) { return false }
@@ -371,7 +457,7 @@ public struct SmartBilingualDetector {
                 !isAllUppercaseRaw &&
                 !lower.hasPrefix("w") &&
                 !LexiconDigest.contains(commonEnglishWordDigests, lower) &&
-                !LexiconDigest.contains(commonEnglishTechWordDigests, lower) &&
+                !isCommonTechWord(lower) &&
                 !SyllableCandidateResolver.isEnglishCollision(lower) &&
                 !getIsKnownWord()
         }
@@ -484,7 +570,7 @@ public struct SmartBilingualDetector {
         let hasEnglishDouble = hasNonVietnameseDoubleConsonant(lower)
         let hasEnglishCluster = inlineEnglishClusters.contains(where: { lower.hasPrefix($0) })
         let hasEnglishPastEnding = lower.count >= 4 && lower.hasSuffix("ed") && rendered.lowercased().hasSuffix("d")
-        let isTechWord = LexiconDigest.contains(commonEnglishTechWordDigests, lower)
+        let isTechWord = isCommonTechWord(lower)
         let isKnownCommon =
             LexiconDigest.contains(commonEnglishWordDigests, lower) ||
             LexiconDigest.contains(commonEnglishWordDigests, stemForEnding) ||
@@ -509,7 +595,7 @@ public struct SmartBilingualDetector {
         return LexiconDigest.contains(commonEnglishWordDigests, lower) ||
                LexiconDigest.contains(commonEnglishWordDigests, stemForEnding) ||
                LexiconDigest.contains(commonEnglishWordDigests, silentEStem) ||
-               LexiconDigest.contains(commonEnglishTechWordDigests, lower) ||
+               isCommonTechWord(lower) ||
                getIsKnownWord() ||
                isKnownEnglishWord(stemForEnding) ||
                isKnownEnglishWord(silentEStem)
@@ -657,7 +743,7 @@ public struct SmartBilingualDetector {
 
     public static func isEnglishWord(raw: String, context: String = "", rendered: String? = nil, genZMode: Bool = false) -> Bool {
         let cleanRaw = trimPunctuationFast(raw)
-        let lowerRaw = cleanRaw.lowercased()
+        let lowerRaw = asciiLowercasedFast(cleanRaw)
         let rendered = rendered.map { r -> String in
             let trimmed = trimPunctuationFast(r)
             return trimmed.isEmpty ? r : trimmed
@@ -801,7 +887,7 @@ public struct SmartBilingualDetector {
         }
         if let rendered,
            lowerRaw != rendered.lowercased(),
-           !LexiconDigest.contains(commonEnglishTechWordDigests, lowerRaw),
+           !isCommonTechWord(lowerRaw),
            !isSupplementalForCasedInput,
            (isStandardPlausibleVN || (allowPhonotacticGap && isPlausibleVietnameseText(rendered, allowPhonotacticGap: true))) {
             if isConfidentEnglishContext(context) &&
@@ -816,7 +902,7 @@ public struct SmartBilingualDetector {
         if let rendered,
            lowerRaw != rendered.lowercased(),
            !isUppercaseWord,
-           !LexiconDigest.contains(commonEnglishTechWordDigests, lowerRaw),
+           !isCommonTechWord(lowerRaw),
            !isSupplementalForCasedInput,
            (isStandardPlausibleVN || isPlausibleVietnameseSyllable(rendered, allowPhonotacticGap: allowPhonotacticGap)),
            (lowerRaw.contains(where: telexEndingKeys.contains) || hasWModifierAfterVowel(lowerRaw)) {
@@ -878,7 +964,9 @@ public struct SmartBilingualDetector {
         } else {
             lock.unlock()
 
-            let result = LexiconDigest.contains(commonEnglishTechWordDigests, lowerRaw) || (spellCheckerProvider?.isWordInEnglishDictionary(raw) ?? false)
+            let result = isCommonTechWord(lowerRaw) ||
+                isSupplementaryLexiconToken(lowerRaw) ||
+                (spellCheckerProvider?.isWordInEnglishDictionary(raw) ?? false)
 
             lock.lock()
             if spellCheckCache[lowerRaw] == nil {
@@ -999,12 +1087,16 @@ public struct SmartBilingualDetector {
     ]
 
     private static let explicitEnglishContextAnchors: Set<String> = [
-        "there", "here", "where", "this", "that", "these", "those",
+        "i", "he", "she", "we", "you", "they", "it", "its",
+        "who", "whom", "whose", "what", "when", "where", "which", "while", "whether",
+        "there", "here", "this", "that", "these", "those",
         "his", "her",
-        "it", "its", "is", "are", "was", "were", "be", "been",
-        "the", "have", "has", "had", "do", "does", "did",
-        "will", "would", "can", "could", "should", "must",
-        "with", "from", "about", "into", "they", "what", "when", "which", "while"
+        "am", "is", "are", "was", "were", "be", "been", "being",
+        "the", "have", "has", "had", "having", "do", "does", "did",
+        "will", "would", "can", "could", "shall", "should", "might", "must",
+        "never", "always", "also", "still", "even", "already",
+        "with", "from", "about", "into", "after", "before", "under", "between", "without", "through", "during",
+        "but", "because", "although", "though", "unless", "until"
     ]
 
     private static func isEnglishAnchorToken(_ word: String) -> Bool {
@@ -1101,12 +1193,13 @@ public struct SmartBilingualDetector {
         // non-ASCII scalar (excluding curly apostrophes), `rawAsciiTokens` is empty -> false.
         var sawNonWhitespace = false
         for scalar in context.unicodeScalars.reversed() {
-            if CharacterSet.whitespacesAndNewlines.contains(scalar) {
+            let v = scalar.value
+            if v == 0x20 || v == 0x0A || v == 0x09 || v == 0x0D || (v >= 0x80 && CharacterSet.whitespacesAndNewlines.contains(scalar)) {
                 if sawNonWhitespace { break }
                 continue
             }
             sawNonWhitespace = true
-            if !scalar.isASCII && scalar.value != 0x2018 && scalar.value != 0x2019 {
+            if !scalar.isASCII && v != 0x2018 && v != 0x2019 {
                 return false
             }
         }
@@ -1117,6 +1210,16 @@ public struct SmartBilingualDetector {
         #else
         let useCache = true
         #endif
+
+        let canCacheRawContext = useCache && context.utf8.count <= 512
+        if canCacheRawContext {
+            lock.lock()
+            if let cachedRaw = rawContextConfidenceCache[context] {
+                lock.unlock()
+                return cachedRaw
+            }
+            lock.unlock()
+        }
 
         let hasCurlyQuotes = context.utf8.contains(0xE2) && (context.contains("\u{2019}") || context.contains("\u{2018}"))
         let normalizedContext = (hasCurlyQuotes
@@ -1143,7 +1246,7 @@ public struct SmartBilingualDetector {
             ? rawAsciiTokens
             : rawAsciiTokens.filter { !isAllCapsAcronymToken($0) }
 
-        let words = asciiTokens.map { $0.lowercased() }
+        let words = asciiTokens.map { asciiLowercasedFast($0) }
         guard let lastWord = words.last else {
             return false
         }
@@ -1152,6 +1255,17 @@ public struct SmartBilingualDetector {
         if useCache {
             lock.lock()
             if let cached = contextConfidenceCache[cacheKey] {
+                if canCacheRawContext && rawContextConfidenceCache[context] == nil {
+                    if rawContextConfidenceKeys.count >= 1024 {
+                        let evictCount = 256
+                        for oldKey in rawContextConfidenceKeys.prefix(evictCount) {
+                            rawContextConfidenceCache.removeValue(forKey: oldKey)
+                        }
+                        rawContextConfidenceKeys.removeFirst(evictCount)
+                    }
+                    rawContextConfidenceCache[context] = cached
+                    rawContextConfidenceKeys.append(context)
+                }
                 lock.unlock()
                 return cached
             }
@@ -1184,7 +1298,7 @@ public struct SmartBilingualDetector {
                 let isCommittedEnglishContextToken: (String) -> Bool = { token in
                     isEnglishAnchorToken(token) || isKnownEnglishWord(token) || token == "off"
                 }
-                let recentWindow = words.suffix(8).map { $0.trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
+                let recentWindow = words.suffix(8).map { trimPunctuationFast($0) }.filter { !$0.isEmpty }
                 let recentPair = recentWindow.suffix(2)
                 if recentWindow.contains(where: { isEnglishAnchorToken($0) }) &&
                    recentWindow.allSatisfy({ !LexiconDigest.contains(vietnameseAnchorWordDigests, $0) && isCommittedEnglishContextToken($0) }) {
@@ -1201,7 +1315,7 @@ public struct SmartBilingualDetector {
                 } else {
                     let tailContext = asciiTokens.suffix(8).joined(separator: " ")
                     if hadNonASCIIPrefix {
-                        let cleanWords = words.suffix(8).map { $0.trimmingCharacters(in: .punctuationCharacters) }
+                        let cleanWords = words.suffix(8).map { trimPunctuationFast($0) }
                         if !cleanWords.allSatisfy({ !$0.isEmpty && isCommittedEnglishContextToken($0) }) {
                             computed = false
                         } else {
@@ -1216,15 +1330,36 @@ public struct SmartBilingualDetector {
 
         if useCache {
             lock.lock()
-            if contextConfidenceCache.count >= 4096 { contextConfidenceCache.removeAll(keepingCapacity: true) }
+            if contextConfidenceCache[cacheKey] == nil {
+                if contextConfidenceKeys.count >= 4096 {
+                    let evictCount = 1024
+                    for oldKey in contextConfidenceKeys.prefix(evictCount) {
+                        contextConfidenceCache.removeValue(forKey: oldKey)
+                    }
+                    contextConfidenceKeys.removeFirst(evictCount)
+                }
+                contextConfidenceKeys.append(cacheKey)
+            }
             contextConfidenceCache[cacheKey] = computed
+            if canCacheRawContext && rawContextConfidenceCache[context] == nil {
+                if rawContextConfidenceKeys.count >= 1024 {
+                    let evictCount = 256
+                    for oldKey in rawContextConfidenceKeys.prefix(evictCount) {
+                        rawContextConfidenceCache.removeValue(forKey: oldKey)
+                    }
+                    rawContextConfidenceKeys.removeFirst(evictCount)
+                }
+                rawContextConfidenceCache[context] = computed
+                rawContextConfidenceKeys.append(context)
+            }
             lock.unlock()
         }
         return computed
     }
 
     private static let contextSensitiveEnglishCollisionTokens: Set<String> = [
-        "ser", "deest", "sics", "urw", "dist", "gis", "inf", "toots", "meme", "cana", "treos", "usa", "uri"
+        "ser", "deest", "sics", "urw", "dist", "gis", "inf", "toots", "meme", "cana", "treos", "usa", "uri",
+        "nist", "bist", "vist", "tist", "rist", "tust", "kist", "hist", "mist", "rust", "must", "dust", "bust", "gust", "lust"
     ]
 
     internal static func isContextSensitiveEnglishCollision(_ lowerRaw: String) -> Bool {
@@ -1257,7 +1392,7 @@ public struct SmartBilingualDetector {
     /// Attested Vietnamese Telex inputs (`whitelist_safe = never` and non-benchmark attested Vietnamese syllables)
     /// whose raw keystrokes happen to collide with archaic/Scrabble entries in `EmbeddedEnglishSpellChecker`,
     /// but must NEVER be restored to raw ASCII even after an English phrase (e.g. `"a good plan thees"` -> `"a good plan thế"`).
-    internal static let vietnameseProtectedTelexInputs: Set<String> = [
+    public static let vietnameseProtectedTelexInputs: Set<String> = [
         // telex_core & vn_positive `whitelist_safe = never` syllables (not in ambiguous_needs_context)
         "thees", "deef", "dees", "tees", "chees", "khees", "mees",
         "boos", "coos", "loos", "moos", "moof", "oof",
@@ -1297,7 +1432,7 @@ public struct SmartBilingualDetector {
         let h = LexiconDigest.hash(lowerRaw)
         if commonEnglishDoubleConsonantWordDigests.contains(h) ||
            commonEnglishWordDigests.contains(h) ||
-           commonEnglishTechWordDigests.contains(h) {
+           isCommonTechWord(lowerRaw, precomputedHash: h) {
             return true
         }
         if BilingualIntentArbiter.englishCollisionLogFrequencies[lowerRaw] != nil ||
@@ -1499,7 +1634,8 @@ public struct SmartBilingualDetector {
         let h = LexiconDigest.hash(lower)
         if commonEnglishDoubleConsonantWordDigests.contains(h) ||
            commonEnglishWordDigests.contains(h) ||
-           commonEnglishTechWordDigests.contains(h) {
+           isCommonTechWord(lower, precomputedHash: h) ||
+           isSupplementaryLexiconToken(lower) {
             return true
         }
         lock.lock()
@@ -1572,7 +1708,7 @@ public struct SmartBilingualDetector {
     }
 
     public static func isKnownEnglishWord(_ word: String) -> Bool {
-        let lower = word.lowercased()
+        let lower = asciiLowercasedFast(word)
         guard !lower.isEmpty,
               lower.unicodeScalars.allSatisfy({ ($0.value >= 0x61 && $0.value <= 0x7A) || $0.value == 0x27 || $0.value == 0x2D }) else {
             return false
@@ -1590,7 +1726,7 @@ public struct SmartBilingualDetector {
         if commonEnglishDoubleConsonantWordDigests.contains(h) {
             return true
         }
-        if commonEnglishWordDigests.contains(h) || commonEnglishTechWordDigests.contains(h) {
+        if commonEnglishWordDigests.contains(h) || isCommonTechWord(lower, precomputedHash: h) || isSupplementaryLexiconToken(lower) {
             return true
         }
         lock.lock()

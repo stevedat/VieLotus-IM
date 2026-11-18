@@ -6,10 +6,27 @@ export COPYFILE_DISABLE=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
-VERSION="${1:-$(git describe --tags --always 2>/dev/null || echo '2.0.0')}"
-VERSION="${VERSION#v}" # Strip leading 'v' if present
-if [ -z "$1" ] && [ -n "$(git status --porcelain 2>/dev/null)" ] && [[ "$VERSION" != *"-dev"* ]]; then
-    VERSION="${VERSION}-dev"
+if [ -n "${1:-}" ]; then
+    VERSION="${1#v}"
+else
+    PLIST_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist 2>/dev/null || echo '2.0.4')"
+    GIT_DESC="$(git describe --tags --always 2>/dev/null || echo '')"
+    GIT_DESC="${GIT_DESC#v}"
+    GIT_BASE="${GIT_DESC%%-*}"
+    HIGHEST_BASE="$(printf '%s\n%s\n' "$PLIST_VERSION" "$GIT_BASE" | sed '/^$/d' | sort -V | tail -n 1)"
+    SHORT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo 'local')"
+    if [ "$HIGHEST_BASE" = "$PLIST_VERSION" ] && [ "$PLIST_VERSION" != "$GIT_BASE" ]; then
+        if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+            VERSION="${PLIST_VERSION}-${SHORT_SHA}-dev"
+        else
+            VERSION="${PLIST_VERSION}-${SHORT_SHA}"
+        fi
+    else
+        VERSION="${GIT_DESC:-$PLIST_VERSION}"
+        if [ -n "$(git status --porcelain 2>/dev/null)" ] && [[ "$VERSION" != *"-dev"* ]]; then
+            VERSION="${VERSION}-dev"
+        fi
+    fi
 fi
 BUILD_NUMBER="${2:-1}"
 
@@ -23,15 +40,20 @@ rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
+SCRATCH_ARGS=()
+if [ -n "${SWIFT_BUILD_SCRATCH:-}" ]; then
+    SCRATCH_ARGS=(--scratch-path "$SWIFT_BUILD_SCRATCH")
+fi
+
 echo "-> Compiling arm64 target..."
-swift build --configuration release --product VieLotusIM --triple arm64-apple-macosx
-ARM64_BIN_DIR="$(swift build --configuration release --product VieLotusIM --triple arm64-apple-macosx --show-bin-path)"
+swift build --configuration release --product VieLotusIM --triple arm64-apple-macosx "${SCRATCH_ARGS[@]}"
+ARM64_BIN_DIR="$(swift build --configuration release --product VieLotusIM --triple arm64-apple-macosx "${SCRATCH_ARGS[@]}" --show-bin-path)"
 ARM64_SRC="$ARM64_BIN_DIR/VieLotusIM"
 cp "$ARM64_SRC" "$DIST_DIR/VieLotusIM.arm64"
 
 echo "-> Compiling x86_64 target..."
-swift build --configuration release --product VieLotusIM --triple x86_64-apple-macosx
-X86_SRC="$(swift build --configuration release --product VieLotusIM --triple x86_64-apple-macosx --show-bin-path)/VieLotusIM"
+swift build --configuration release --product VieLotusIM --triple x86_64-apple-macosx "${SCRATCH_ARGS[@]}"
+X86_SRC="$(swift build --configuration release --product VieLotusIM --triple x86_64-apple-macosx "${SCRATCH_ARGS[@]}" --show-bin-path)/VieLotusIM"
 cp "$X86_SRC" "$DIST_DIR/VieLotusIM.x86_64"
 
 echo "-> Combining architectures into Universal Binary..."
@@ -96,6 +118,7 @@ for required_res in scowl-en.txt SCOWL-Copyright.txt typing-modes.yml; do
         exit 1
     fi
 done
+
 # Ship the per-app presentation rules at a stable, user-inspectable top-level path.
 # It also exists inside VietLotusIM_VieLotusCore.bundle; PresentationRulesLoader prefers
 # this copy so the documented location is the one that is actually read.

@@ -3,9 +3,9 @@ import Foundation
 /// Multi-order Vietnamese syllable intent parser.
 internal final class InputGrammarParser: Sendable {
     internal static let shared = InputGrammarParser()
-
+    
     internal init() {}
-
+    
     /// Parses raw keystrokes according to the specified GrammarProfile.
     internal func parse(
         _ chars: [Character],
@@ -18,19 +18,19 @@ internal final class InputGrammarParser: Sendable {
         guard !chars.isEmpty else {
             return (SyllableIntent(), "")
         }
-
+        
         let lowerRaw = String(chars).lowercased()
-
+        
         // Non-Vietnamese initials: 'f', 'j', 'z' cannot start a Vietnamese syllable unless genZMode
         if let first = lowerRaw.first, (first == "f" || first == "j" || first == "z") && !genZMode {
             return (SyllableIntent(rawChars: chars), String(chars))
         }
-
+        
         // Simple Telex default: standalone 'w' or repeated 'w' ("w", "ww", "www", ...) remains literal 'w...' (not 'ư' or swallowed)
         if simpleTelex && chars.allSatisfy({ $0.lowercased() == "w" }) {
             return (SyllableIntent(rawChars: chars), String(chars))
         }
-
+        
         // Gen-Z 'w'-initial syllables where 'w' stands for 'qu' (e.g. was/wsa -> wá, war/wra -> wả, waf/wfa -> wà, waayj/wayaj -> wậy)
         if genZMode, let wResolved = VietnameseEngine.transformGenZInitialWIfApplicable(
             chars,
@@ -41,13 +41,13 @@ internal final class InputGrammarParser: Sendable {
         ) {
             return wResolved
         }
-
+        
         // Phonotactically impossible Vietnamese 'w'-initial words (e.g. "we", "wi", "wh", "wo", "wy", "wri", "wat", "wan")
         // resolve immediately to raw ASCII on the 2nd/3rd keystroke while preserving "ww" -> "w", "wa" -> "ưa", "wu" -> "ưu", "ws"/"wr" -> "ứ"/"ử".
         if VietnameseEngine.isEnglishWInitial(chars) || SmartBilingualDetector.isPostCodaCircumflexEnglishWord(lowerRaw) {
             return (SyllableIntent(rawChars: chars), String(chars))
         }
-
+        
         // For Pre-vowel, Smart Hybrid, and SEN VIỆT Flex:
         let parsed = parsePreVowelOrHybrid(
             chars,
@@ -57,13 +57,13 @@ internal final class InputGrammarParser: Sendable {
             genZMode: genZMode,
             simpleTelex: simpleTelex
         )
-
+        
         if genZMode, let first = lowerRaw.first, (first == "f" || first == "j" || first == "z" || lowerRaw.hasPrefix("dz")),
            parsed.rendered.lowercased() != lowerRaw,
            !VietnameseEngine.isValidGenZInitialTransformation(rendered: parsed.rendered, raw: lowerRaw) {
             return (SyllableIntent(rawChars: chars), String(chars))
         }
-
+        
         if profile != .classic {
             let candidate = SyllableCandidateResolver.shared.arbitrate(
                 rawChars: chars,
@@ -72,10 +72,10 @@ internal final class InputGrammarParser: Sendable {
             )
             return (candidate.intent, candidate.rendered)
         }
-
+        
         return parsed
     }
-
+    
     internal func parsePreVowelOrHybrid(
         _ chars: [Character],
         profile: GrammarProfile,
@@ -134,25 +134,25 @@ internal final class InputGrammarParser: Sendable {
         let lowerRaw = rawStr.lowercased()
         let lowerChars = Array(lowerRaw)
         let n = lowerChars.count
-
+        
         var intent = SyllableIntent(rawChars: chars)
         var tone: VietnameseTone = .none
         var hasHorn = false
         var onset = ""
         var idx = 0
-
+        
         // Special check: "www" at word start is web prefix, not horn/vowel
         if idx == 0 && n >= 3 && lowerChars[0] == "w" && lowerChars[1] == "w" && lowerChars[2] == "w" {
             let remainder = String(lowerChars[3...])
             return (SyllableIntent(rawChars: chars), applyCasing(original: chars, transformed: Array("www" + remainder)))
         }
-
+        
         // Special check: "ww" at word start cancels "ư" -> literal "w"; any subsequent characters are literal ASCII
         if idx == 0 && n >= 2 && lowerChars[0] == "w" && lowerChars[1] == "w" {
             let transformedChars: [Character] = [chars[0]] + Array(chars.dropFirst(2))
             return (SyllableIntent(rawChars: chars), String(transformedChars))
         }
-
+        
         // 1. Parse Onset with Maximal Munch and special Pre-vowel Onset rules
         // Check "ddd" -> "dd" (triple-d escape) and "dd" -> "đ"
         if idx + 2 < n && lowerChars[idx] == "d" && lowerChars[idx + 1] == "d" && lowerChars[idx + 2] == "d" {
@@ -197,7 +197,7 @@ internal final class InputGrammarParser: Sendable {
                 ? ["ch", "dz", "gh", "gi", "kh", "nh", "ng", "ph", "th", "tr"]
                 : ["ch", "gh", "gi", "kh", "nh", "ng", "ph", "th", "tr"]
             let prefixes1 = ["b", "c", "d", "f", "g", "h", "j", "k", "l", "m", "n", "p", "r", "s", "t", "v", "x", "z"]
-
+            
             var matchedOnset = ""
             if idx + 3 <= n && prefixes3.contains(String(lowerChars[idx..<idx+3])) {
                 matchedOnset = String(lowerChars[idx..<idx+3])
@@ -224,7 +224,7 @@ internal final class InputGrammarParser: Sendable {
             onset = matchedOnset
         }
         intent.onset = onset
-
+        
         // 2. Parse Pre-Vowel Modifiers between Onset and Nucleus (e.g. "w", "s", "f", "r", "x", "j")
         // Pre-vowel modifiers can only appear AFTER a valid Vietnamese onset (or f/j/z/w in genZMode).
         let afterOnsetIdx = idx
@@ -270,7 +270,7 @@ internal final class InputGrammarParser: Sendable {
             }
         }
         let preVowelEndIdx = idx
-
+        
         // 3. Parse Nucleus and Coda with Infix & Postfix modifier support
         var nucleusAndCodaChars: [Character] = []
         var trailingToneFound: VietnameseTone = .none
@@ -282,7 +282,7 @@ internal final class InputGrammarParser: Sendable {
         var circumflexCancelled = false
         var strokeDCancelled = (onset == "dd")
         var postStrokeTail: [Character] = []
-
+        
         while idx < n {
             let ch = lowerChars[idx]
             let isAdjacentDoubleVowelAfterToneEscape = toneEscapeActive &&
@@ -309,7 +309,7 @@ internal final class InputGrammarParser: Sendable {
             if circumflexCancelledKey != nil && ch != circumflexCancelledKey {
                 circumflexCancelledKey = nil
             }
-
+            
             // Post-coda / non-adjacent circumflex modifier (e.g. nhana -> nhân, nhanas -> nhấn, nhansa -> nhấn, theme -> thêm, trongo -> trông)
             if (ch == "a" || ch == "e" || ch == "o") && !nucleusAndCodaChars.isEmpty {
                 if circumflexCancelledKey == ch {
@@ -623,7 +623,7 @@ internal final class InputGrammarParser: Sendable {
                     break
                 }
             }
-
+            
             // Triple vowels: aaa -> aa, eee -> ee, ooo -> oo
             // Vietnamese orthography never contains double ASCII vowels (aa, ee, oo).
             // Once escaped via triple vowel, clear any pending tone and consume remaining characters literally.
@@ -657,7 +657,7 @@ internal final class InputGrammarParser: Sendable {
                 }
                 break
             }
-
+            
             // Double vowels: aa -> â, ee -> ê, oo -> ô (never form an illegal second circumflex after â/ê/ô/ă, or â/ê after ư/ơ)
             if !toneEscapeActive && (ch == "a" || ch == "e" || ch == "o") && idx + 1 < n && lowerChars[idx + 1] == ch {
                 let hasPriorCircumflexOrBreve = nucleusAndCodaChars.contains(where: {
@@ -674,7 +674,7 @@ internal final class InputGrammarParser: Sendable {
                     continue
                 }
             }
-
+            
             // Modifiers: aw -> ă, ow -> ơ, uw -> ư, uaw -> ưa, uow -> ươ
             if ch == "w" {
                 if hornCancelled {
@@ -721,7 +721,7 @@ internal final class InputGrammarParser: Sendable {
                     idx += 2
                     continue
                 }
-
+                
                 let canModifyExistingVowel: Bool = {
                     guard !hasHorn && !toneEscapeActive && postStrokeTail.isEmpty, let lastResChar = nucleusAndCodaChars.last else {
                         return false
@@ -850,7 +850,7 @@ internal final class InputGrammarParser: Sendable {
                     }
                     }
                 }
-
+                
                 if !modified {
                     if nucleusAndCodaChars.isEmpty && onset.isEmpty {
                         if simpleTelex && n == 1 {
@@ -901,7 +901,7 @@ internal final class InputGrammarParser: Sendable {
                 idx += 1
                 continue
             }
-
+            
             // Check if tone key appears after vowels (infix or postfix)
             if isToneKey(ch) {
                 let hasVowels = !nucleusAndCodaChars.contains("w") && nucleusAndCodaChars.contains { VietnameseEngine.isVietnameseVowel($0) }
@@ -922,7 +922,7 @@ internal final class InputGrammarParser: Sendable {
                             currentTone != newTone &&
                             (currentTone != .none || hasModifiedChar) &&
                             VietnameseEngine.endsWithStopCodaAfterVowel(nucleusAndCodaChars)
-
+                        
                         if !isIllegalStopCodaTone {
                             if toneEscapeActive {
                                 let hasVnStem = hasModifiedChar || hornCancelled || circumflexCancelled || circumflexCancelledKey != nil || strokeDCancelled
@@ -954,13 +954,13 @@ internal final class InputGrammarParser: Sendable {
                                         continue
                                     }
                                 }
-
+                                
                                 if currentTone == .none {
                                     let prevIsVowel = nucleusAndCodaChars.last.map { VietnameseEngine.isVietnameseVowel($0) } ?? false
                                     let isOffglide = (idx + 1 < n) && (lowerChars[idx + 1] == "i" || lowerChars[idx + 1] == "y" || lowerChars[idx + 1] == "u" || lowerChars[idx + 1] == "o")
                                     let nextIsToneKey = (idx + 1 < n) && isToneKey(lowerChars[idx + 1])
                                     let nextIsCoda = (idx + 1 < n) && !nextIsToneKey && (!isVowelChar(lowerChars[idx + 1]) || (isOffglide && idx + 2 >= n))
-
+                                    
                                     let isGeminate = (idx + 1 < n) && (lowerChars[idx + 1] == ch)
                                     if prevIsVowel && nextIsCoda && !isGeminate {
                                         // Infix tone (e.g. truowfng, teest, nguowfi)
@@ -1031,7 +1031,7 @@ internal final class InputGrammarParser: Sendable {
                     }
                 }
             }
-
+            
             // Relaxed coda shortcut: 'g' at end of word (or before trailing modifiers) transforms to 'ng'
             if relaxedCoda && ch == "g",
                !nucleusAndCodaChars.contains("w"),
@@ -1042,7 +1042,7 @@ internal final class InputGrammarParser: Sendable {
                 idx += 1
                 continue
             }
-
+            
             if ch == "d" && onset == "đ" && !toneEscapeActive && postStrokeTail.isEmpty &&
                nucleusAndCodaChars.contains(where: { VietnameseEngine.isVietnameseVowel($0) }),
                let lastChar = nucleusAndCodaChars.last,
@@ -1127,7 +1127,7 @@ internal final class InputGrammarParser: Sendable {
                     continue
                 }
             }
-
+            
             let activeTone = trailingToneFound != .none ? trailingToneFound : tone
             if let lockedStem = VietnameseEngine.shouldLockPostCodaOverflow(
                 stemChars: Array(onset) + nucleusAndCodaChars,
@@ -1151,7 +1151,7 @@ internal final class InputGrammarParser: Sendable {
                 hornCancelled = true
                 break
             }
-
+            
             if ch == "d" && !nucleusAndCodaChars.contains(where: { VietnameseEngine.isVietnameseVowel($0) }) {
                 if nucleusAndCodaChars.last == "d" {
                     nucleusAndCodaChars[nucleusAndCodaChars.count - 1] = "đ"
@@ -1168,17 +1168,17 @@ internal final class InputGrammarParser: Sendable {
             nucleusAndCodaChars.append(ch)
             idx += 1
         }
-
+        
         // If trailing tone was found and allowed
         if tone == .none && trailingToneFound != .none {
             tone = trailingToneFound
         }
-
+        
         // 4. If hasHorn is true, apply horn to "uo" -> "ươ", "u" -> "ư", "o" -> "ơ", "a" -> "ă"
         if hasHorn {
             applyHornModifier(&nucleusAndCodaChars)
         }
-
+        
         // Harmonize 'ưo' -> 'ươ' when horn was applied to 'u' before 'o' (e.g. truwongr -> trưởng, dduwocj -> được, nguwoif -> người)
         if !hornCancelled && circumflexCancelledKey != "o" && nucleusAndCodaChars.count >= 2 {
             for vIdx in 0..<(nucleusAndCodaChars.count - 1) {
@@ -1187,7 +1187,7 @@ internal final class InputGrammarParser: Sendable {
                 }
             }
         }
-
+        
         // 5. Relaxed coda shortcut: 'g' at end transforms to 'ng' if relaxedCoda is enabled
         if relaxedCoda && !hornCancelled && !toneEscapeActive && nucleusAndCodaChars.last == "g" {
             if nucleusAndCodaChars.count >= 2 && VietnameseEngine.isVietnameseVowel(nucleusAndCodaChars[nucleusAndCodaChars.count - 2]) {
@@ -1196,40 +1196,40 @@ internal final class InputGrammarParser: Sendable {
                 nucleusAndCodaChars.append("g")
             }
         }
-
+        
         // Separate nucleus from coda
         separateNucleusAndCoda(nucleusAndCodaChars, intent: &intent)
-
+        
         // Build base rendered string
         var renderedChars: [Character] = Array(onset) + nucleusAndCodaChars
-
+        
         // 7. Apply tone to vowel cluster
         if tone != .none {
             VietnameseEngine.applyTone(&renderedChars, tone: tone, modern: modernOrthography)
             intent.tone = tone
         }
-
+        
         if !postStrokeTail.isEmpty {
             renderedChars.append(contentsOf: postStrokeTail)
         }
 
         // 8. Preserve casing
         let finalRendered = applyCasing(original: chars, transformed: renderedChars)
-
+        
         // Check validity against dictionary
         intent.isValidVietnamese = VietnameseSyllableDictionary.shared.isPhonotacticallyValidSyllable(finalRendered) ||
             (!lowerRaw.hasPrefix("w") &&
              VietnameseSyllableDictionary.shared.isValidVietnameseRhyme(finalRendered) &&
              !SmartBilingualDetector.isKnownEnglishWord(rawStr))
-
+        
         return (intent, finalRendered)
     }
-
+    
     private func separateNucleusAndCoda(_ chars: [Character], intent: inout SyllableIntent) {
         var nucleusChars: [Character] = []
         var codaChars: [Character] = []
         var inCoda = false
-
+        
         for ch in chars {
             if !inCoda {
                 if VietnameseEngine.isVietnameseVowel(ch) {
@@ -1242,11 +1242,11 @@ internal final class InputGrammarParser: Sendable {
                 codaChars.append(ch)
             }
         }
-
+        
         intent.nucleus = String(nucleusChars)
         intent.coda = String(codaChars)
     }
-
+    
     private func applyHornModifier(_ chars: inout [Character]) {
         // Look for "uo" -> "ươ"
         for i in 0..<chars.count {
@@ -1270,7 +1270,7 @@ internal final class InputGrammarParser: Sendable {
             }
         }
     }
-
+    
     private static let vowelCharacters: Set<Character> = [
         "a", "e", "i", "o", "u", "y", "ă", "â", "ê", "ô", "ơ", "ư"
     ]
@@ -1278,11 +1278,11 @@ internal final class InputGrammarParser: Sendable {
     private func isVowelChar(_ ch: Character) -> Bool {
         return Self.vowelCharacters.contains(ch)
     }
-
+    
     private func isToneKey(_ ch: Character) -> Bool {
         return ch == "s" || ch == "f" || ch == "r" || ch == "x" || ch == "j" || ch == "z"
     }
-
+    
     private func mapToneKey(_ ch: Character) -> VietnameseTone {
         switch ch {
         case "s": return .acute
@@ -1293,7 +1293,7 @@ internal final class InputGrammarParser: Sendable {
         default: return .none
         }
     }
-
+    
     private static func baseAsciiKey(for ch: Character) -> Character {
         let stripped = VietnameseSyllableDictionary.stripToneMarks(String(ch).lowercased())
         guard let c = stripped.first else { return ch }
@@ -1309,12 +1309,12 @@ internal final class InputGrammarParser: Sendable {
 
     private func applyCasing(original: [Character], transformed: [Character]) -> String {
         guard !original.isEmpty, !transformed.isEmpty else { return String(transformed) }
-
+        
         let allLetters = original.filter { $0.isLetter }
         let isAllUpper = !allLetters.isEmpty && allLetters.allSatisfy { $0.isUppercase }
         let hasInteriorUpper = original.dropFirst().contains { $0.isUppercase }
         let isFirstUpper = original[0].isUppercase
-
+        
         if isAllUpper {
             return String(transformed).uppercased()
         } else if hasInteriorUpper {

@@ -91,7 +91,7 @@ struct SettingsView: View {
 
                         headerUpdatePill
                     }
-                    Text("InputMethodKit • Cập nhật qua GitHub theo yêu cầu")
+                    Text("Thuần chuẩn Apple • 100% Offline • Không quyền Trợ năng")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: true, vertical: false)
@@ -216,7 +216,6 @@ struct SettingsView: View {
         .onAppear {
             if !prefs.smartBilingual { prefs.smartBilingual = true }
             if !prefs.modernOrthography { prefs.modernOrthography = true }
-            if !prefs.genZMode { prefs.genZMode = true }
             if !prefs.terminalDirectMode { prefs.terminalDirectMode = true }
             if !prefs.passthroughRemoteApps { prefs.passthroughRemoteApps = true }
             if !prefs.enforceABCBaseLayout { prefs.enforceABCBaseLayout = true }
@@ -505,7 +504,7 @@ struct SettingsView: View {
     }
 
     private var bentoConsonantCard: some View {
-        let anyActive = prefs.quickTelex || prefs.relaxedCoda
+        let anyActive = prefs.quickTelex || prefs.relaxedCoda || prefs.genZMode
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 ZStack {
@@ -534,6 +533,12 @@ struct SettingsView: View {
                     isOn: prefs.relaxedCoda
                 ) {
                     prefs.relaxedCoda.toggle()
+                }
+                chipToggleButton(
+                    label: "f/j/w/z",
+                    isOn: prefs.genZMode
+                ) {
+                    prefs.genZMode.toggle()
                 }
             }
         }
@@ -749,7 +754,7 @@ struct SettingsView: View {
                         .font(.system(size: 10.5, weight: .bold))
                         .foregroundColor(.indigo)
                     Spacer()
-                    Text("InputMethodKit • Engine Swift • Mã nguồn MIT")
+                    Text("InputMethodKit Chuẩn Apple • Pure Swift 6 • 100% Offline")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.secondary)
                 }

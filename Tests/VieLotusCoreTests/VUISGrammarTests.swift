@@ -2,58 +2,58 @@ import XCTest
 @testable import VieLotusCore
 
 final class VUISGrammarTests: XCTestCase {
-
+    
     // MARK: - Pre-vowel Profile Tests
-
+    
     func testPreVowelCoreTransformations() {
         let engine = VietnameseEngine()
         engine.grammarProfile = .preVowel
-
+        
         // 1. rrung -> rủng
         XCTAssertEqual(engine.transform(Array("rrung")), "rủng")
-
+        
         // 2. rrinh -> rỉnh
         XCTAssertEqual(engine.transform(Array("rrinh")), "rỉnh")
-
+        
         // 3. rinh -> rinh (untouched)
         XCTAssertEqual(engine.transform(Array("rinh")), "rinh")
-
+        
         // 4. cra -> cả
         XCTAssertEqual(engine.transform(Array("cra")), "cả")
-
+        
         // 5. csa -> cá
         XCTAssertEqual(engine.transform(Array("csa")), "cá")
-
+        
         // 6. tse -> té
         XCTAssertEqual(engine.transform(Array("tse")), "té")
-
+        
         // 7. qfua -> quà
         XCTAssertEqual(engine.transform(Array("qfua")), "quà")
-
+        
         // 8. qufa -> quà
         XCTAssertEqual(engine.transform(Array("qufa")), "quà")
-
+        
         // 9. ddson -> đón
         XCTAssertEqual(engine.transform(Array("ddson")), "đón")
-
+        
         // 10. tseet -> tết / Tseet -> Tết
         XCTAssertEqual(engine.transform(Array("tseet")), "tết")
         XCTAssertEqual(engine.transform(Array("Tseet")), "Tết")
-
+        
         // 11. ngjo -> ngọ
         XCTAssertEqual(engine.transform(Array("ngjo")), "ngọ")
-
+        
         // 12. thfuyeen -> thuyền
         XCTAssertEqual(engine.transform(Array("thfuyeen")), "thuyền")
-
+        
         // 13. qusyeet -> quyết
         XCTAssertEqual(engine.transform(Array("qusyeet")), "quyết")
     }
-
+    
     func testFlexibleModifierPlacement() {
         let engine = VietnameseEngine()
         engine.grammarProfile = .preVowel
-
+        
         // "trường" variants:
         // trfuowng (pre-vowel tone + uow)
         XCTAssertEqual(engine.transform(Array("trfuowng")), "trường")
@@ -61,7 +61,7 @@ final class VUISGrammarTests: XCTestCase {
         XCTAssertEqual(engine.transform(Array("trwfuong")), "trường")
         // truowfng (infix tone f)
         XCTAssertEqual(engine.transform(Array("truowfng")), "trường")
-
+        
         // "nướng" variants:
         // nsuowng (pre-vowel acute s + uow)
         XCTAssertEqual(engine.transform(Array("nsuowng")), "nướng")
@@ -69,7 +69,7 @@ final class VUISGrammarTests: XCTestCase {
         XCTAssertEqual(engine.transform(Array("nwsuong")), "nướng")
         // nsuongw (pre-vowel acute s + uong + trailing w)
         XCTAssertEqual(engine.transform(Array("nsuongw")), "nướng")
-
+        
         // "gương" variants:
         // guowng (standard uow)
         XCTAssertEqual(engine.transform(Array("guowng")), "gương")
@@ -78,19 +78,19 @@ final class VUISGrammarTests: XCTestCase {
         // guongw (uong + trailing horn w)
         XCTAssertEqual(engine.transform(Array("guongw")), "gương")
     }
-
+    
     // MARK: - Smart Hybrid Profile Tests
-
+    
     func testSmartHybridProfile() {
         let engine = VietnameseEngine()
         engine.grammarProfile = .smartHybrid
-
+        
         // Pre-vowel works
         XCTAssertEqual(engine.transform(Array("rrung")), "rủng")
         XCTAssertEqual(engine.transform(Array("cra")), "cả")
         XCTAssertEqual(engine.transform(Array("qfua")), "quà")
         XCTAssertEqual(engine.transform(Array("tseet")), "tết")
-
+        
         // Trailing tone works when Vietnamese markers or valid Vietnamese syllables exist
         XCTAssertEqual(engine.transform(Array("truowngf")), "trường")
         XCTAssertEqual(engine.transform(Array("quyeets")), "quyết")
@@ -100,16 +100,16 @@ final class VUISGrammarTests: XCTestCase {
         XCTAssertEqual(engine.transform(Array("thuyeenf")), "thuyền")
         XCTAssertEqual(engine.transform(Array("quaf")), "quà")
     }
-
+    
     // MARK: - English Collision Preservation Tests
-
+    
     func testEnglishCollisionProtectionInPreVowelAndHybrid() {
         let preVowelEngine = VietnameseEngine()
         preVowelEngine.grammarProfile = .preVowel
-
+        
         let hybridEngine = VietnameseEngine()
         hybridEngine.grammarProfile = .smartHybrid
-
+        
         // In pure Pre-Vowel mode, trailing tones (s, f, r, etc.) are never interpreted as tones.
         // Therefore words like "car", "has", "is", "as", "us", "if", "of", "cas", "tes" naturally remain raw!
         let preVowelEnglishWords = ["car", "cas", "tes", "has", "is", "as", "us", "if", "of", "boss", "error", "pass", "crash", "class", "test"]
@@ -117,14 +117,14 @@ final class VUISGrammarTests: XCTestCase {
             let chars = Array(word)
             XCTAssertEqual(preVowelEngine.transform(chars), word, "Pre-vowel must preserve '\(word)' as raw")
         }
-
+        
         // In Smart Hybrid, impossible codas or double-modifier cancellations remain raw:
         let hybridRawWords = ["boss", "error", "pass", "crash", "class", "test"]
         for word in hybridRawWords {
             let chars = Array(word)
             XCTAssertEqual(hybridEngine.transform(chars), word, "Smart Hybrid must preserve '\(word)' as raw")
         }
-
+        
         // In Smart Hybrid, standard trailing tones MUST produce Vietnamese syllables:
         XCTAssertEqual(hybridEngine.transform(Array("as")), "á")
         XCTAssertEqual(hybridEngine.transform(Array("is")), "í")
@@ -136,35 +136,35 @@ final class VUISGrammarTests: XCTestCase {
         XCTAssertEqual(hybridEngine.transform(Array("tes")), "té")
         XCTAssertEqual(hybridEngine.transform(Array("has")), "há")
     }
-
+    
     // MARK: - Deterministic Negative Boundary Tests
-
+    
     func testDeterministicBoundaries() {
         let engine = VietnameseEngine()
         engine.grammarProfile = .smartHybrid
-
+        
         // 1. qsueet does NOT have 'y', so it must NOT become "quyết"
         let qsueet = engine.transform(Array("qsueet"))
         XCTAssertNotEqual(qsueet, "quyết", "qsueet must not hallucinate missing 'y'")
-
+        
         // 2. chuonwg and chuongw do NOT have 'x', so they must NOT become "chưỡng" (they should be "chương")
         XCTAssertEqual(engine.transform(Array("chuonwg")), "chương")
         XCTAssertEqual(engine.transform(Array("chuongw")), "chương")
         XCTAssertNotEqual(engine.transform(Array("chuonwg")), "chưỡng")
         XCTAssertNotEqual(engine.transform(Array("chuongw")), "chưỡng")
-
+        
         // 3. tra must remain "tra" (onset digraph 'tr' maximal munch), not "tả"
         XCTAssertEqual(engine.transform(Array("tra")), "tra")
         XCTAssertNotEqual(engine.transform(Array("tra")), "tả")
     }
-
+    
     // MARK: - Full Sentence Integration Test
-
+    
     func testFullCorpusSentenceIntegration() {
         // Sentence: "Rủng rỉnh rinh quà đón Tết Đoan Ngọ bên trường thuyền quyết nướng gương."
         let engine = VietnameseEngine()
         engine.grammarProfile = .smartHybrid
-
+        
         let rawTokens = [
             "rrung",      // Rủng
             "rrinh",      // rỉnh
@@ -181,7 +181,7 @@ final class VUISGrammarTests: XCTestCase {
             "nwsuong",    // nướng
             "guowng"      // gương
         ]
-
+        
         let expectedTokens = [
             "rủng",
             "rỉnh",
@@ -198,132 +198,132 @@ final class VUISGrammarTests: XCTestCase {
             "nướng",
             "gương"
         ]
-
+        
         for (raw, expected) in zip(rawTokens, expectedTokens) {
             let actual = engine.transform(Array(raw))
             XCTAssertEqual(actual, expected, "Token '\(raw)' expected '\(expected)', got '\(actual)'")
         }
     }
-
+    
     // MARK: - SEN VIỆT Flex v1 (OPRSC-v2.1) Tests
-
+    
     func testSenVietFlexMultiOrderConvergence() {
         let engine = VietnameseEngine()
         engine.grammarProfile = .senFlex
-
+        
         // 1. rủng: rrung, rungr
         XCTAssertEqual(engine.transform(Array("rrung")), "rủng")
         XCTAssertEqual(engine.transform(Array("rungr")), "rủng")
-
+        
         // 2. rỉnh: rrinh, rinhr
         XCTAssertEqual(engine.transform(Array("rrinh")), "rỉnh")
         XCTAssertEqual(engine.transform(Array("rinhr")), "rỉnh")
-
+        
         // 3. cùng: cfung, cungf
         XCTAssertEqual(engine.transform(Array("cfung")), "cùng")
         XCTAssertEqual(engine.transform(Array("cungf")), "cùng")
-
+        
         // 4. cái: csai, cais
         XCTAssertEqual(engine.transform(Array("csai")), "cái")
         XCTAssertEqual(engine.transform(Array("cais")), "cái")
-
+        
         // 5. một: mjoot, mootj
         XCTAssertEqual(engine.transform(Array("mjoot")), "một")
         XCTAssertEqual(engine.transform(Array("mootj")), "một")
-
+        
         // 6. đón: ddson, ddons
         XCTAssertEqual(engine.transform(Array("ddson")), "đón")
         XCTAssertEqual(engine.transform(Array("ddons")), "đón")
-
+        
         // 7. quà: qfua, quaf
         XCTAssertEqual(engine.transform(Array("qfua")), "quà")
         XCTAssertEqual(engine.transform(Array("quaf")), "quà")
-
+        
         // 8. trường: trwfuong, trfuowng, truowfng, truowngf
         XCTAssertEqual(engine.transform(Array("trwfuong")), "trường")
         XCTAssertEqual(engine.transform(Array("trfuowng")), "trường")
         XCTAssertEqual(engine.transform(Array("truowfng")), "trường")
         XCTAssertEqual(engine.transform(Array("truowngf")), "trường")
-
+        
         // 9. trưởng: trwruong, truowngr
         XCTAssertEqual(engine.transform(Array("trwruong")), "trưởng")
         XCTAssertEqual(engine.transform(Array("truowngr")), "trưởng")
-
+        
         // 10. trượng: trwjuong, truowngj
         XCTAssertEqual(engine.transform(Array("trwjuong")), "trượng")
         XCTAssertEqual(engine.transform(Array("truowngj")), "trượng")
-
+        
         // 11. trưỡng: trwxuong, truowngx
         XCTAssertEqual(engine.transform(Array("trwxuong")), "trưỡng")
         XCTAssertEqual(engine.transform(Array("truowngx")), "trưỡng")
-
+        
         // 12. nướng: nwsuong, nsuongw, nuowngs
         XCTAssertEqual(engine.transform(Array("nwsuong")), "nướng")
         XCTAssertEqual(engine.transform(Array("nsuongw")), "nướng")
         XCTAssertEqual(engine.transform(Array("nuowngs")), "nướng")
-
+        
         // 13. gương: gwuong, guongw, guowng
         XCTAssertEqual(engine.transform(Array("gwuong")), "gương")
         XCTAssertEqual(engine.transform(Array("guongw")), "gương")
         XCTAssertEqual(engine.transform(Array("guowng")), "gương")
     }
-
+    
     func testSenVietFlexDualRoleAndEnglishPreservation() {
         let engine = VietnameseEngine()
         engine.grammarProfile = .senFlex
-
+        
         // tra -> tra (Raw priority: onset digraph "tr", not "tả")
         XCTAssertEqual(engine.transform(Array("tra")), "tra")
-
+        
         // cra -> cả (VN priority: "cr" is not a Vietnamese onset, "r" is hook tone)
         XCTAssertEqual(engine.transform(Array("cra")), "cả")
-
+        
         // car -> cả (Classic trailing path: c + a + r -> cả. English "car" is restored via SmartBilingual context)
         XCTAssertEqual(engine.transform(Array("car")), "cả")
-
+        
         // teen -> tên (Classic path: t + ee + n -> tên. English "teen" is restored via SmartBilingual context)
         XCTAssertEqual(engine.transform(Array("teen")), "tên")
-
+        
         // crash -> crash (Raw priority: English word with -sh coda)
         XCTAssertEqual(engine.transform(Array("crash")), "crash")
-
+        
         // class -> class (Raw priority: English word with -ss double consonant)
         XCTAssertEqual(engine.transform(Array("class")), "class")
-
+        
         // test -> test (Raw priority: English word with -st coda)
         XCTAssertEqual(engine.transform(Array("test")), "test")
     }
-
+    
     func testTypingFlowReversibilityAndBackspace() {
         let engine = VietnameseEngine()
         engine.grammarProfile = .senFlex
-
+        
         // Forward typing simulation: c -> cr -> cra -> cras -> crash
         _ = engine.feed("c")
         XCTAssertEqual(engine.currentOutput(), "c")
-
+        
         _ = engine.feed("r")
         XCTAssertEqual(engine.currentOutput(), "cr")
-
+        
         _ = engine.feed("a")
         XCTAssertEqual(engine.currentOutput(), "cả", "cra should render as 'cả' via pre-vowel hook tone")
-
+        
         _ = engine.feed("s")
         // cras intermediate state
         XCTAssertFalse(engine.currentOutput().isEmpty)
-
+        
         _ = engine.feed("h")
         XCTAssertEqual(engine.currentOutput(), "crash", "crash should flip to raw English word")
-
+        
         // Backward unwinding simulation via Backspace:
         // 1. "crash" (raw English) -> removes 'h' -> re-evaluates "cras" as "cá"
         _ = engine.backspace()
         XCTAssertEqual(engine.currentOutput(), "cá", "Backspace on raw 'crash' removes 'h' and re-evaluates 'cras' -> 'cá'")
-
+        
         // 2. "cá" -> semantic backspace strips acute tone -> "ca"
         _ = engine.backspace()
         XCTAssertEqual(engine.currentOutput(), "ca", "Backspace on 'cá' strips acute tone, leaving 'ca'")
-
+        
         // 3. "ca" -> deletes 'a' -> "c"
         _ = engine.backspace()
         XCTAssertEqual(engine.currentOutput(), "c", "Backspace on 'ca' deletes 'a', leaving 'c'")
@@ -332,11 +332,11 @@ final class VUISGrammarTests: XCTestCase {
         _ = engine.backspace()
         XCTAssertEqual(engine.currentOutput(), "")
     }
-
+    
     func testSenVietFlexFullSentenceIntegration() {
         let engine = VietnameseEngine()
         engine.grammarProfile = .senFlex
-
+        
         let sentenceTokens = [
             ("rrung", "rủng"),
             ("rrinh", "rỉnh"),
@@ -353,22 +353,22 @@ final class VUISGrammarTests: XCTestCase {
             ("nwsuong", "nướng"),
             ("guowng", "gương")
         ]
-
+        
         for (raw, expected) in sentenceTokens {
             let actual = engine.transform(Array(raw))
             XCTAssertEqual(actual, expected, "senFlex: token '\(raw)' expected '\(expected)', got '\(actual)'")
         }
     }
-
+    
     func testDoubleKeyTelexEscapesInSmartHybridAndSenFlex() {
         #if os(macOS)
         SmartBilingualDetector.spellCheckerProvider = MacSpellChecker()
         #endif
-
+        
         for profile in [GrammarProfile.smartHybrid, GrammarProfile.senFlex] {
             let engine = VietnameseEngine()
             engine.grammarProfile = profile
-
+            
             // Simple Telex standalone 'w' and double-w horn escapes
             XCTAssertEqual(engine.transform(Array("w")), "w", "\(profile): w -> w")
             XCTAssertEqual(engine.transform(Array("W")), "W", "\(profile): W -> W")
@@ -376,14 +376,14 @@ final class VUISGrammarTests: XCTestCase {
             XCTAssertEqual(engine.transform(Array("aww")), "aw", "\(profile): aww -> aw")
             XCTAssertEqual(engine.transform(Array("uww")), "uw", "\(profile): uww -> uw")
             XCTAssertEqual(engine.transform(Array("oww")), "ow", "\(profile): oww -> ow")
-
+            
             // Double tone key escapes (e.g. hits -> hít, hitss -> hits)
             XCTAssertEqual(engine.transform(Array("hits")), "hít", "\(profile): hits -> hít")
             XCTAssertEqual(engine.transform(Array("hitss")), "hits", "\(profile): hitss -> hits")
             XCTAssertEqual(engine.transform(Array("carr")), "car", "\(profile): carr -> car")
             XCTAssertEqual(engine.transform(Array("giff")), "gif", "\(profile): giff -> gif")
             XCTAssertEqual(engine.transform(Array("sexx")), "sex", "\(profile): sexx -> sex")
-
+            
             // Double and triple tone key escapes (as -> á, ass -> as, asss -> ass, off -> of, offf -> off)
             XCTAssertEqual(engine.transform(Array("as")), "á", "\(profile): as -> á")
             XCTAssertEqual(engine.transform(Array("ass")), "as", "\(profile): ass -> as")
@@ -424,7 +424,7 @@ final class VUISGrammarTests: XCTestCase {
             // P0.7 Section 1: standalone `or` defaults to English, while Vietnamese collocation (`thẻ ỏ`) preserves `ỏ`.
             XCTAssertTrue(SmartBilingualDetector.isEnglishWord(raw: "or", context: "", rendered: "ỏ"))
             XCTAssertFalse(SmartBilingualDetector.isEnglishWord(raw: "or", context: "thẻ", rendered: "ỏ"))
-
+            
             // Post-commit editing: "hits" ("hít") + commit + Backspace + 's' -> "hits"
             engine.reset()
             for ch in "hits" { _ = engine.feed(ch) }
@@ -433,7 +433,7 @@ final class VUISGrammarTests: XCTestCase {
             let diff = engine.editAt(caretBack: 0, char: "s")
             XCTAssertNotNil(diff)
             XCTAssertEqual(engine.currentOutput(), "hits")
-
+            
             // Post-commit editing & trailing 'd' stroke toggle: "ddooir" ("đổi") + 'd' -> "dổi"
             XCTAssertEqual(engine.transform(Array("ddooird")), "dổi")
             engine.reset()
@@ -449,7 +449,7 @@ final class VUISGrammarTests: XCTestCase {
             XCTAssertEqual(engine.currentOutput(), "đổi")
             engine.commitWord(raw: "ddooir", rendered: "đổi")
             XCTAssertNil(engine.editAt(caretBack: 0, char: "b"), "Non-modifier consonant must not corrupt 'đổi' into 'đôỉb'")
-
+            
             // Sentence punctuation ('.', ':') must NOT revert Vietnamese words to raw Telex
             let session = InputSessionManager()
             session.setGrammarProfile(profile)
@@ -512,7 +512,7 @@ final class VUISGrammarTests: XCTestCase {
                     XCTAssertEqual(engine.transform(Array("ws")), "ứ", "profile=\(profile): ws -> ứ")
                     XCTAssertEqual(engine.transform(Array("wr")), "ử", "profile=\(profile): wr -> ử")
                     XCTAssertEqual(engine.transform(Array("was")), genZ ? "wá" : "ứa", "profile=\(profile): was -> wá in GenZ, ứa otherwise")
-                    XCTAssertEqual(engine.transform(Array("wus")), "ứu", "profile=\(profile): wus -> ứu")
+                    XCTAssertEqual(engine.transform(Array("wus")), "wus", "profile=\(profile): wus -> wus")
                 }
 
                 // 4. 'w'-initial English words resolve immediately to literal 'w...' inline on 2nd/3rd keystroke
@@ -1274,3 +1274,7 @@ final class VUISGrammarTests: XCTestCase {
         }
     }
 }
+
+
+
+

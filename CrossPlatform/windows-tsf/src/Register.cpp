@@ -1,4 +1,5 @@
 #include "Register.h"
+#include "vielotus_win_installer.h"
 #include <strsafe.h>
 #include <objidl.h>
 #include <gdiplus.h>
@@ -614,7 +615,20 @@ HRESULT RegisterProfiles() {
     return hr;
 }
 
-static void SyncWinUserLanguageListViaPowerShell(bool preferVni) {
+static bool AreBothTipsRegisteredInViProfile() {
+    HKEY hViKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Control Panel\\International\\User Profile\\vi-VN", 0, KEY_READ, &hViKey) != ERROR_SUCCESS || !hViKey) {
+        return false;
+    }
+    DWORD dummy = 0;
+    bool hasTelex = ReadRegDword(hViKey, c_szTipTelexLayoutString, dummy);
+    bool hasVni = ReadRegDword(hViKey, c_szTipVniLayoutString, dummy);
+    RegCloseKey(hViKey);
+    return hasTelex && hasVni;
+}
+
+static void SyncWinUserLanguageListViaPowerShell(bool preferVni, bool forceSync) {
+    static constexpr DWORD kTargetCleanVer = 10u;
     HKEY hPrefs = nullptr;
     DWORD cleanVer = 0;
     if (RegCreateKeyExW(
@@ -631,16 +645,16 @@ static void SyncWinUserLanguageListViaPowerShell(bool preferVni) {
         ReadRegDword(hPrefs, L"WinLangListCleanVer", cleanVer);
         RegCloseKey(hPrefs);
     }
-    if (cleanVer >= 9u) {
+    if (!forceSync && cleanVer >= kTargetCleanVer && AreBothTipsRegisteredInViProfile()) {
         return;
     }
 
-    WCHAR cmdLine[2048] = {0};
+    WCHAR cmdLine[3072] = {0};
     StringCchPrintfW(
         cmdLine,
-        2048,
+        3072,
         L"powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command \""
-        L"$ErrorActionPreference='SilentlyContinue';"
+        L"$ErrorActionPreference='Stop';"
         L"$telex='042A:{C7B08E9D-4762-4C97-8B1F-522197A598DE}{8E2A7B44-5A1F-4B82-9B7C-123456789ABC}';"
         L"$vni='042A:{C7B08E9D-4762-4C97-8B1F-522197A598DE}{8E2A7B45-5A1F-4B82-9B7C-123456789ABC}';"
         L"$pref=%s;$other=%s;"
@@ -651,13 +665,17 @@ static void SyncWinUserLanguageListViaPowerShell(bool preferVni) {
         L"foreach($r in $rem){[void]$item.InputMethodTips.Remove($r)}"
         L"}};"
         L"$v=$list|Where-Object{$_.LanguageTag -like 'vi*'}|Select-Object -First 1;"
-        L"$tag=if($v){$v.LanguageTag}else{'vi-VN'};"
-        L"$newList=New-WinUserLanguageList $tag;"
-        L"$newList[0].InputMethodTips.Clear();"
-        L"[void]$newList[0].InputMethodTips.Add($pref);"
-        L"[void]$newList[0].InputMethodTips.Add($other);"
-        L"foreach($item in $list){if($item.LanguageTag -notlike 'vi*'){$newList.Add($item)}};"
-        L"Set-WinUserLanguageList $newList -Force -Confirm:$false;"
+        L"if(-not $v){$v=(New-WinUserLanguageList 'vi-VN')[0];$kept=@()}else{"
+        L"$kept=@($v.InputMethodTips|Where-Object{$_ -and ($_ -notlike '*C7B08E9D*') -and ($_ -ne '042A:00000409') -and ($_ -ne '042A:0000042A')})"
+        L"};"
+        L"$v.InputMethodTips.Clear();"
+        L"[void]$v.InputMethodTips.Add($pref);"
+        L"[void]$v.InputMethodTips.Add($other);"
+        L"foreach($k in $kept){[void]$v.InputMethodTips.Add($k)};"
+        L"$out=New-Object 'System.Collections.Generic.List[Microsoft.InternationalSettings.Commands.WinUserLanguage]';"
+        L"[void]$out.Add($v);"
+        L"foreach($item in $list){if($item.LanguageTag -notlike 'vi*'){$out.Add($item)}};"
+        L"Set-WinUserLanguageList $out -Force;"
         L"Set-WinDefaultInputMethodOverride -InputTip $pref\"",
         preferVni ? L"$vni" : L"$telex",
         preferVni ? L"$telex" : L"$vni"
@@ -686,7 +704,7 @@ static void SyncWinUserLanguageListViaPowerShell(bool preferVni) {
                     &hPrefs,
                     nullptr
                 ) == ERROR_SUCCESS && hPrefs) {
-                WriteRegDword(hPrefs, L"WinLangListCleanVer", 9u);
+                WriteRegDword(hPrefs, L"WinLangListCleanVer", kTargetCleanVer);
                 RegCloseKey(hPrefs);
             }
         }
@@ -865,7 +883,7 @@ static void EnsureVietnameseUserProfileLanguage(bool preferVni) {
     }
 }
 
-HRESULT ActivateUserProfiles() {
+HRESULT ActivateUserProfiles(bool forceLangListSync) {
     EnsureDefaultPrefsInitializedOnce();
     CleanupLegacyClsid98DC();
 
@@ -880,7 +898,7 @@ HRESULT ActivateUserProfiles() {
     LPCWSTR otherTipString = preferVni ? c_szTipTelexLayoutString : c_szTipVniLayoutString;
 
     EnsureVietnameseUserProfileLanguage(preferVni);
-    SyncWinUserLanguageListViaPowerShell(preferVni);
+    SyncWinUserLanguageListViaPowerShell(preferVni, forceLangListSync);
 
     HMODULE hInputDll = LoadLibraryExW(L"input.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (hInputDll) {
@@ -1006,6 +1024,11 @@ HRESULT DeactivateUserProfiles() {
         RegDeleteValueW(hViKey, c_szTipVniLayoutString);
         RegCloseKey(hViKey);
     }
+    HKEY hPrefsKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, c_szPrefsSubKey, 0, KEY_SET_VALUE, &hPrefsKey) == ERROR_SUCCESS && hPrefsKey) {
+        WriteRegDword(hPrefsKey, L"WinLangListCleanVer", 0u);
+        RegCloseKey(hPrefsKey);
+    }
     return S_OK;
 }
 
@@ -1066,6 +1089,7 @@ enum class HitRegion : int {
     TabSettings,
     TabAbout,
     BtnCheckUpdate,
+    BadgeImeConflict,
     CardTelex,
     CardVni,
     BarSenFlex,
@@ -1119,6 +1143,7 @@ struct BentoSettingsState {
     HWND hTestEdit{nullptr};
     HFONT hEditFont{nullptr};
     HBRUSH hEditBgBrush{nullptr};
+    std::wstring conflictImeSummary{};
 };
 
 static HICON LoadEmbeddedAppIcon(int cx, int cy) {
@@ -1243,6 +1268,9 @@ static HitRegion HitTestBentoUI(const BentoSettingsState *st, float xDip, float 
     if (PtInDipRect(xDip, yDip, 632.0f, 388.0f, 36.0f, 32.0f)) return HitRegion::FooterGitHub;
 
     if (st->selectedTab == 0) {
+        if (!st->conflictImeSummary.empty() && PtInDipRect(xDip, yDip, 340.0f, 59.0f, 320.0f, 20.0f)) {
+            return HitRegion::BadgeImeConflict;
+        }
         // Row 1: 3 Hero Cards (x=20..224, 238..442, 456..660, y=82..154)
         if (PtInDipRect(xDip, yDip, 20.0f, 82.0f, 204.0f, 72.0f)) return HitRegion::CardTelex;
         if (PtInDipRect(xDip, yDip, 238.0f, 82.0f, 204.0f, 72.0f)) return HitRegion::CardVni;
@@ -1614,7 +1642,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         }
 
         RectF subBrandRect(64.0f * s, 29.0f * s, 380.0f * s, 17.0f * s);
-        g.DrawString(L"B\u1ED9 g\u00F5 ti\u1EBFng Vi\u1EC7t thu\u1EA7n chu\u1EA9n Windows TSF", -1, &fHeaderSub, subBrandRect, &sfLeft, &secondaryBrush);
+        g.DrawString(L"B\u1ED9 g\u00F5 ti\u1EBFng Vi\u1EC7t thu\u1EA7n chu\u1EA9n Native TSF \u2022 100% Offline", -1, &fHeaderSub, subBrandRect, &sfLeft, &secondaryBrush);
 
         // 2-Tab Segmented Switcher (Cài đặt | Thông tin) (x=456..660)
         RectF segBg(456.0f * s, 11.0f * s, 204.0f * s, 32.0f * s);
@@ -1644,10 +1672,33 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 L"KI\u1EC2U G\u00D5 TI\u1EBENG VI\u1EC6T",
                 -1, &fSecHdr, RectF(20.0f * s, 61.0f * s, 240.0f * s, 17.0f * s), &sfLeft, &secondaryBrush
             );
-            g.DrawString(
-                L"B\u1ECF d\u1EA5u t\u1EF1 do \u2022 Ph\u00EDm Z xo\u00E1 d\u1EA5u",
-                -1, &fSecRight, RectF(380.0f * s, 61.0f * s, 280.0f * s, 17.0f * s), &sfRight, &blueBrush
-            );
+            if (!st->conflictImeSummary.empty() && st->prefs.vietnameseEnabled) {
+                bool hov = (st->hoveredRegion == HitRegion::BadgeImeConflict);
+                Color warnBg = st->isDark
+                    ? (hov ? Color(90, 255, 180, 0) : Color(60, 255, 165, 0))
+                    : (hov ? Color(255, 238, 198) : Color(255, 246, 224));
+                Color warnBorder = st->isDark ? Color(200, 255, 185, 45) : Color(217, 119, 6);
+                Color warnText = st->isDark ? Color(255, 214, 92) : Color(161, 78, 0);
+                RectF badgeRect(340.0f * s, 59.0f * s, 320.0f * s, 20.0f * s);
+                FillRoundRect(g, badgeRect, 6.0f * s, warnBg);
+                DrawRoundRect(g, badgeRect, 6.0f * s, warnBorder, 1.0f);
+                SolidBrush warnBrush(warnText);
+                StringFormat sfWarn;
+                sfWarn.SetAlignment(StringAlignmentCenter);
+                sfWarn.SetLineAlignment(StringAlignmentCenter);
+                sfWarn.SetTrimming(StringTrimmingEllipsisCharacter);
+                sfWarn.SetFormatFlags(StringFormatFlagsNoWrap);
+                std::wstring warnMsg = L"\u26A0 \u0110ang ch\u1EA1y " + st->conflictImeSummary + L" \u2014 B\u1EA5m \u0111\u1EC3 t\u1EAFt";
+                g.DrawString(
+                    warnMsg.c_str(), -1, &fSecRight,
+                    RectF(346.0f * s, 59.0f * s, 308.0f * s, 20.0f * s), &sfWarn, &warnBrush
+                );
+            } else {
+                g.DrawString(
+                    L"B\u1ECF d\u1EA5u t\u1EF1 do \u2022 Ph\u00EDm Z xo\u00E1 d\u1EA5u",
+                    -1, &fSecRight, RectF(380.0f * s, 61.0f * s, 280.0f * s, 17.0f * s), &sfRight, &blueBrush
+                );
+            }
 
             DrawHeroInputCard(
                 g, s, isDark, 20.0f, 82.0f, 204.0f, 72.0f,
@@ -1828,7 +1879,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 -1, &fSecHdr, RectF(34.0f * s, 77.0f * s, 220.0f * s, 18.0f * s), &sfLeft, &indigoBrush
             );
             g.DrawString(
-                L"Windows TSF Native \u2022 X\u1EED l\u00FD c\u1EE5c b\u1ED9",
+                L"Windows TSF Native \u2022 100% Offline \u2022 An to\u00E0n tuy\u1EC7t \u0111\u1ED1i",
                 -1, &fSub, RectF(280.0f * s, 77.0f * s, 366.0f * s, 18.0f * s), &sfRight, &secondaryBrush
             );
             g.DrawString(
@@ -2458,14 +2509,14 @@ static void ShowTrayContextMenu(HWND hwnd, BentoSettingsState *st) {
     case IDM_TRAY_TELEX:
         st->prefs.isVni = false;
         SaveVieLotusPrefs(st->prefs);
-        ActivateUserProfiles();
+        ActivateUserProfiles(true);
         UpdateTrayIconState(hwnd, st);
         InvalidateRect(hwnd, nullptr, FALSE);
         break;
     case IDM_TRAY_VNI:
         st->prefs.isVni = true;
         SaveVieLotusPrefs(st->prefs);
-        ActivateUserProfiles();
+        ActivateUserProfiles(true);
         UpdateTrayIconState(hwnd, st);
         InvalidateRect(hwnd, nullptr, FALSE);
         break;
@@ -2489,7 +2540,10 @@ static void ShowTrayContextMenu(HWND hwnd, BentoSettingsState *st) {
         ShowWindow(hwnd, SW_SHOW);
         ShowWindow(hwnd, SW_RESTORE);
         SetForegroundWindow(hwnd);
-        ActivateUserProfiles();
+        st->conflictImeSummary = vielotus_win_installer::FormatConflictingImeNames(
+            vielotus_win_installer::DetectConflictingHookImes()
+        );
+        ActivateUserProfiles(false);
         if (st->updateStatus == WinUpdateStatus::Idle && !st->updateWorkerBusy) {
             StartWindowsUpdateWorker(hwnd, st, false);
         }
@@ -2499,7 +2553,10 @@ static void ShowTrayContextMenu(HWND hwnd, BentoSettingsState *st) {
         ShowWindow(hwnd, SW_SHOW);
         ShowWindow(hwnd, SW_RESTORE);
         SetForegroundWindow(hwnd);
-        ActivateUserProfiles();
+        st->conflictImeSummary = vielotus_win_installer::FormatConflictingImeNames(
+            vielotus_win_installer::DetectConflictingHookImes()
+        );
+        ActivateUserProfiles(false);
         StartWindowsUpdateWorker(hwnd, st, st->updateStatus == WinUpdateStatus::UpdateAvailable);
         if (st->hTestEdit && st->selectedTab == 0) SetFocus(st->hTestEdit);
         break;
@@ -2613,7 +2670,13 @@ static std::wstring GetWindowsDiagnosticsSummary(const VieLotusWindowsPrefs &pre
         prefs.senFlex ? L"B\u1EACT" : L"T\u1EAET",
         prefs.macroEnabled ? L"B\u1EACT" : L"T\u1EAET"
     );
-    return std::wstring(summary);
+    std::wstring out(summary);
+    auto conflicts = vielotus_win_installer::DetectConflictingHookImes();
+    if (!conflicts.empty()) {
+        out += L" \u2022 C\u1EA3nh b\u00E1o xung \u0111\u1ED9t: ";
+        out += vielotus_win_installer::FormatConflictingImeNames(conflicts);
+    }
+    return out;
 }
 
 static std::wstring BuildFeedbackReportMarkdown(FeedbackDialogState *st) {
@@ -3226,7 +3289,10 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                 reinterpret_cast<LPARAM>(L"G\u00F5 th\u1EED: truowngr \u2192 tr\u01B0\u1EDFng \u2022 12haf \u2192 12h\u00E0 \u2022 window user...")
             );
         }
-        ActivateUserProfiles();
+        st->conflictImeSummary = vielotus_win_installer::FormatConflictingImeNames(
+            vielotus_win_installer::DetectConflictingHookImes()
+        );
+        ActivateUserProfiles(false);
         if (st->hTestEdit) {
             SetFocus(st->hTestEdit);
         }
@@ -3263,10 +3329,13 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
     case WM_VIELOTUS_ACTIVATE_PROFILES: {
         if (st) {
             LoadVieLotusPrefs(st->prefs);
+            st->conflictImeSummary = vielotus_win_installer::FormatConflictingImeNames(
+                vielotus_win_installer::DetectConflictingHookImes()
+            );
             UpdateTrayIconState(hwnd, st);
             InvalidateRect(hwnd, nullptr, FALSE);
         }
-        ActivateUserProfiles();
+        ActivateUserProfiles(false);
         if (st && st->hTestEdit && st->selectedTab == 0 && IsWindowVisible(hwnd)) {
             SetFocus(st->hTestEdit);
         }
@@ -3279,13 +3348,16 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         SetForegroundWindow(hwnd);
         if (st) {
             LoadVieLotusPrefs(st->prefs);
+            st->conflictImeSummary = vielotus_win_installer::FormatConflictingImeNames(
+                vielotus_win_installer::DetectConflictingHookImes()
+            );
             UpdateTrayIconState(hwnd, st);
             if (st->updateStatus == WinUpdateStatus::Idle && !st->updateWorkerBusy) {
                 StartWindowsUpdateWorker(hwnd, st, false);
             }
             InvalidateRect(hwnd, nullptr, FALSE);
         }
-        ActivateUserProfiles();
+        ActivateUserProfiles(false);
         if (st && st->hTestEdit && st->selectedTab == 0) {
             SetFocus(st->hTestEdit);
         }
@@ -3325,7 +3397,11 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         if (st) {
             bool oldVni = st->prefs.isVni;
             bool oldDark = st->isDark;
+            std::wstring oldConflicts = st->conflictImeSummary;
             LoadVieLotusPrefs(st->prefs);
+            st->conflictImeSummary = vielotus_win_installer::FormatConflictingImeNames(
+                vielotus_win_installer::DetectConflictingHookImes()
+            );
             st->isDark = IsWindowsDarkMode();
             if (st->isDark != oldDark) {
                 if (st->hEditBgBrush) DeleteObject(st->hEditBgBrush);
@@ -3334,7 +3410,7 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                 DwmSetWindowAttribute(hwnd, 20, &darkTitle, sizeof(darkTitle));
             }
             UpdateTrayIconState(hwnd, st);
-            if (st->prefs.isVni != oldVni || st->isDark != oldDark) {
+            if (st->prefs.isVni != oldVni || st->isDark != oldDark || st->conflictImeSummary != oldConflicts) {
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
         }
@@ -3399,10 +3475,30 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                 StartWindowsUpdateWorker(hwnd, st, shouldInstall);
             }
             break;
+        case HitRegion::BadgeImeConflict: {
+            auto conflicts = vielotus_win_installer::DetectConflictingHookImes();
+            if (!conflicts.empty()) {
+                std::wstring names = vielotus_win_installer::FormatConflictingImeNames(conflicts);
+                std::wstring prompt =
+                    L"Ph\u00E1t hi\u1EC7n b\u1ED9 g\u00F5 kh\u00E1c (" + names +
+                    L") \u0111ang ch\u1EA1y n\u1EC1n c\u00F3 th\u1EC3 ch\u1EB7n ph\u00EDm v\u00E0 g\u00E2y l\u1ED7i l\u1EB7p ch\u1EEF khi d\u00F9ng Sen Vi\u1EC7t.\n\n"
+                    L"B\u1EA1n c\u00F3 mu\u1ED1n \u0111\u00F3ng " + names + L" \u0111\u1EC3 tr\u00E1nh xung \u0111\u1ED9t kh\u00F4ng?";
+                if (MessageBoxW(hwnd, prompt.c_str(), L"Sen Vi\u1EC7t \u2014 Tr\u00E1nh xung \u0111\u1ED9t b\u1ED9 g\u00F5", MB_YESNO | MB_ICONWARNING) == IDYES) {
+                    vielotus_win_installer::CloseConflictingHookImes(conflicts);
+                    ActivateUserProfiles(true);
+                }
+            }
+            st->conflictImeSummary = vielotus_win_installer::FormatConflictingImeNames(
+                vielotus_win_installer::DetectConflictingHookImes()
+            );
+            InvalidateRect(hwnd, nullptr, FALSE);
+            if (st->hTestEdit) SetFocus(st->hTestEdit);
+            break;
+        }
         case HitRegion::CardTelex:
             st->prefs.isVni = false;
             SaveVieLotusPrefs(st->prefs);
-            ActivateUserProfiles();
+            ActivateUserProfiles(true);
             UpdateTrayIconState(hwnd, st);
             InvalidateRect(hwnd, nullptr, FALSE);
             if (st->hTestEdit) SetFocus(st->hTestEdit);
@@ -3410,7 +3506,7 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         case HitRegion::CardVni:
             st->prefs.isVni = true;
             SaveVieLotusPrefs(st->prefs);
-            ActivateUserProfiles();
+            ActivateUserProfiles(true);
             UpdateTrayIconState(hwnd, st);
             InvalidateRect(hwnd, nullptr, FALSE);
             if (st->hTestEdit) SetFocus(st->hTestEdit);

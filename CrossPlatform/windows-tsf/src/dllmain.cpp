@@ -70,7 +70,7 @@ extern "C" void CALLBACK ActivateUserProfilesW(HWND hwnd, HINSTANCE hinst, LPWST
     (void)lpszCmdLine;
     (void)nCmdShow;
     HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    ActivateUserProfiles();
+    ActivateUserProfiles(true);
     if (SUCCEEDED(hrCo)) {
         CoUninitialize();
     }
@@ -96,7 +96,7 @@ extern "C" void CALLBACK ShowSettingsDialogW(HWND hwnd, HINSTANCE hinst, LPWSTR 
                                         wcsstr(lpszCmdLine, L"--tray") != nullptr));
     HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (startHidden) {
-        ActivateUserProfiles();
+        ActivateUserProfiles(false);
     }
     ShowVieLotusSettingsDialog(hwnd, startHidden);
     if (SUCCEEDED(hrCo)) {

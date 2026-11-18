@@ -510,6 +510,24 @@ static void ExecuteWizardInstallSteps(SetupWizardState *st) {
 
     AppendWizardLog(st->hLogEdit, L"[2/4] \u2713 \u0110\u00E3 tri\u1EC3n khai VieLotusTIP.dll (Pure TSF 64-bit) & VieLotusSettings.exe.\r\n");
     AppendWizardLog(st->hLogEdit, L"[3/4] \u2713 \u0110\u00E3 \u0111\u0103ng k\u00FD Windows Installed Apps (Add/Remove Programs) & Start Menu.\r\n");
+
+    auto conflicts = vielotus_win_installer::DetectConflictingHookImes();
+    if (!conflicts.empty()) {
+        std::wstring names = vielotus_win_installer::FormatConflictingImeNames(conflicts);
+        std::wstring warnLine = L"[!] Ph\u00E1t hi\u1EC7n b\u1ED9 g\u00F5 kh\u00E1c (" + names + L") \u0111ang ch\u1EA1y n\u1EC1n c\u00F3 th\u1EC3 g\u00E2y xung \u0111\u1ED9t ph\u00EDm v\u1EDBi Sen Vi\u1EC7t.\r\n";
+        AppendWizardLog(st->hLogEdit, warnLine.c_str());
+        std::wstring prompt =
+            L"M\u00E1y t\u00EDnh \u0111ang ch\u1EA1y " + names +
+            L". Hai b\u1ED9 g\u00F5 b\u1EADt c\u00F9ng l\u00FAc s\u1EBD b\u1ECB l\u1EB7p ch\u1EEF ho\u1EB7c m\u1EA5t d\u1EA5u.\n\n"
+            L"B\u1EA1n c\u00F3 mu\u1ED1n \u0111\u00F3ng " + names + L" \u0111\u1EC3 d\u00F9ng Sen Vi\u1EC7t \u1ED5n \u0111\u1ECBnh kh\u00F4ng?";
+        if (MessageBoxW(st->hWnd, prompt.c_str(), L"Sen Vi\u1EC7t \u2014 Tr\u00E1nh xung \u0111\u1ED9t b\u1ED9 g\u00F5", MB_YESNO | MB_ICONWARNING) == IDYES) {
+            if (vielotus_win_installer::CloseConflictingHookImes(conflicts)) {
+                std::wstring closedLine = L"    \u2713 \u0110\u00E3 \u0111\u00F3ng " + names + L" an to\u00E0n.\r\n";
+                AppendWizardLog(st->hLogEdit, closedLine.c_str());
+            }
+        }
+    }
+
     AppendWizardLog(st->hLogEdit, L"[4/4] \u0110ang d\u1ECDn d\u1EB9p b\u00E0n ph\u00EDm VIE-US th\u1EEBa v\u00E0 k\u00EDch ho\u1EA1t TSF \"Ti\u1EBFng Vi\u1EC7t (Sen Vi\u1EC7t - Telex)\" cho phi\u00EAn ng\u01B0\u1EDDi d\u00F9ng...\r\n");
 
     ResetWinLangListCleanStamp();
@@ -739,10 +757,27 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         cmdLine.find(L"--quiet") != std::wstring::npos ||
         cmdLine.find(L"/quiet") != std::wstring::npos ||
         cmdLine.find(L"/S") != std::wstring::npos) {
+        int rc = 0;
         if (vielotus_win_installer::IsProcessElevated()) {
-            return PerformElevatedMsixTipProvisioning();
+            rc = PerformElevatedMsixTipProvisioning();
+        } else {
+            rc = RunElevatedSelfCommand(L"--install-msix-ime", 60000);
         }
-        return RunElevatedSelfCommand(L"--install-msix-ime", 60000);
+        if (rc == 0) {
+            ResetWinLangListCleanStamp();
+            std::wstring pfDll = GetProgramFilesInstallDir() + L"\\VieLotusTIP.dll";
+            HMODULE hDll = LoadLibraryW(pfDll.c_str());
+            if (hDll) {
+                auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(GetProcAddress(hDll, "ActivateUserProfilesW"));
+                if (pfnAct) {
+                    pfnAct(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
+                }
+                FreeLibrary(hDll);
+            } else if (GetFileAttributesW(pfDll.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                RunSystemToolWait(L"rundll32.exe", L"\"" + pfDll + L"\",ActivateUserProfilesW", 15000);
+            }
+        }
+        return rc;
     }
 
     const bool isStartupMode = (cmdLine.find(L"--startup") != std::wstring::npos ||
@@ -803,7 +838,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
             return 0;
         }
         RunSystemToolWait(L"rundll32.exe", L"\"" + pfDll + L"\",ActivateUserProfilesW", 15000);
-        if (!isStartupMode) {
+        if (isStartupMode) {
+            std::wstring trayArgs = L"\"" + pfDll + L"\",ShowSettingsDialogW --startup";
+            ShellExecuteW(nullptr, L"open", L"rundll32.exe", trayArgs.c_str(), nullptr, SW_HIDE);
+        } else {
             RunSystemToolWait(L"rundll32.exe", L"\"" + pfDll + L"\",ShowSettingsDialogW", INFINITE);
         }
         return 0;

@@ -17,13 +17,19 @@ adorn
 adventure
 afford
 agree
+airdrop
+airplay
+airpods
 airport
+airtag
 alarm
 alert
 almost
+android
 anywhere
 apart
 apex
+appstore
 architecture
 arrest
 art
@@ -66,17 +72,21 @@ card
 care
 career
 carp
+carplay
 cart
 casa
 case
 charms
 chart
+chatgpt
 checklist
 cheer
 cheese
 chore
 chosen
+chrome
 cir
+claude
 clerk
 closure
 coast
@@ -96,6 +106,7 @@ contrast
 convert
 cook
 cool
+copilot
 cord
 core
 cork
@@ -163,6 +174,7 @@ explore
 export
 exposure
 face
+facetime
 failure
 false
 fare
@@ -209,6 +221,7 @@ furniture
 furthermore
 future
 geek
+gemini
 genes
 genre
 genres
@@ -219,6 +232,7 @@ gift
 gifts
 girl
 girls
+github
 goes
 good
 gore
@@ -240,6 +254,7 @@ heart
 heel
 herb
 hire
+homepod
 honest
 honor
 honors
@@ -250,7 +265,10 @@ hosts
 howto
 hurt
 hurts
+icloud
 ignore
+imac
+imessage
 import
 index
 inform
@@ -263,6 +281,11 @@ interest
 interfere
 intern
 invest
+ios
+ipad
+ipados
+iphone
+ipod
 ips
 irl
 isa
@@ -276,6 +299,7 @@ latest
 laura
 law
 laws
+lazada
 learn
 learns
 lecture
@@ -293,6 +317,8 @@ lost
 lure
 lust
 lux
+macbook
+macos
 major
 malware
 maps
@@ -306,7 +332,6 @@ meet
 microsoft
 mins
 misc
-mist
 mixture
 mode
 modern
@@ -316,9 +341,11 @@ mono
 mood
 more
 morn
+most
 nasa
 nature
 need
+netflix
 next
 nginx
 nightmare
@@ -329,6 +356,7 @@ nose
 nowhere
 obscure
 ons
+openai
 pace
 pair
 pairs
@@ -356,6 +384,7 @@ phys
 picture
 pieces
 pins
+pist
 pix
 place
 platform
@@ -440,6 +469,7 @@ sheet
 shift
 shirt
 shoot
+shopee
 shore
 short
 signature
@@ -447,6 +477,7 @@ sims
 sin
 sincere
 sire
+siri
 skirt
 sleep
 smart
@@ -468,6 +499,7 @@ sphere
 spoon
 sport
 sports
+spotify
 square
 standard
 stare
@@ -489,6 +521,7 @@ susan
 sweep
 sweet
 swift
+swiftui
 sword
 swore
 sworn
@@ -508,6 +541,7 @@ thongs
 thorn
 those
 three
+tiktok
 time
 tire
 toast
@@ -529,10 +563,12 @@ true
 turf
 turned
 turns
+tvos
 tweet
 twist
 type
 types
+ubuntu
 umpire
 unicorn
 uniform
@@ -552,8 +588,10 @@ vida
 video
 view
 virtual
+visionos
 visit
 visual
+vnpay
 voice
 volume
 vortex
@@ -571,6 +609,7 @@ warns
 warp
 wash
 watch
+watchos
 water
 wave
 wax
@@ -629,7 +668,10 @@ write
 wt
 wx
 xanax
+xcode
 yard
 yarn
 yearn
+youtube
+zalo
 zoom

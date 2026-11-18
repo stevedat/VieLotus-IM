@@ -22,7 +22,6 @@ final class VieLotusIMAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSLog("VieLotusIM (Sen Việt): Application finished launching and ready for input")
 
-
         // Pre-warm NaturalLanguage recognizer & system spell daemon when main runloop is idle
         DispatchQueue.main.async {
             _ = SmartBilingualDetector.isEnglishWord(raw: "test", context: "vietlotus cold start prewarm")

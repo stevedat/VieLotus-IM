@@ -7,10 +7,130 @@
 #include <shobjidl.h>
 #include <shlguid.h>
 #include <strsafe.h>
+#include <tlhelp32.h>
 #include <string>
 #include <vector>
 
 namespace vielotus_win_installer {
+
+struct ConflictingImeInfo {
+    DWORD pid{0};
+    std::wstring exeName{};
+    std::wstring displayName{};
+};
+
+inline const wchar_t *ResolveConflictingImeDisplayName(const std::wstring &lowerExe) {
+    struct Entry {
+        const wchar_t *exeLower;
+        const wchar_t *label;
+    };
+    static constexpr Entry kKnownHookImes[] = {
+        { L"unikeynt.exe",   L"UniKey" },
+        { L"unikey.exe",     L"UniKey" },
+        { L"unikeyvista.exe",L"UniKey" },
+        { L"evkey64.exe",    L"EVKey" },
+        { L"evkey32.exe",    L"EVKey" },
+        { L"evkey.exe",      L"EVKey" },
+        { L"openkey64.exe",  L"OpenKey" },
+        { L"openkey32.exe",  L"OpenKey" },
+        { L"openkey.exe",    L"OpenKey" },
+        { L"gotiengviet.exe",L"GoTiengViet" },
+        { L"vietkey.exe",    L"VietKey" },
+        { L"vntyper.exe",    L"VNTyper" },
+    };
+    for (const auto &entry : kKnownHookImes) {
+        if (lowerExe == entry.exeLower) {
+            return entry.label;
+        }
+    }
+    return nullptr;
+}
+
+inline std::vector<ConflictingImeInfo> DetectConflictingHookImes() {
+    std::vector<ConflictingImeInfo> found;
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnap == INVALID_HANDLE_VALUE) {
+        return found;
+    }
+    PROCESSENTRY32W pe{};
+    pe.dwSize = sizeof(pe);
+    if (Process32FirstW(hSnap, &pe)) {
+        do {
+            std::wstring lowerExe(pe.szExeFile);
+            for (WCHAR &ch : lowerExe) {
+                if (ch >= L'A' && ch <= L'Z') {
+                    ch = static_cast<WCHAR>(ch + (L'a' - L'A'));
+                }
+            }
+            const wchar_t *label = ResolveConflictingImeDisplayName(lowerExe);
+            if (label) {
+                found.push_back(ConflictingImeInfo{pe.th32ProcessID, pe.szExeFile, label});
+            }
+        } while (Process32NextW(hSnap, &pe));
+    }
+    CloseHandle(hSnap);
+    return found;
+}
+
+inline std::wstring FormatConflictingImeNames(const std::vector<ConflictingImeInfo> &items) {
+    std::vector<std::wstring> uniqueNames;
+    for (const auto &item : items) {
+        bool dup = false;
+        for (const auto &u : uniqueNames) {
+            if (u == item.displayName) {
+                dup = true;
+                break;
+            }
+        }
+        if (!dup) {
+            uniqueNames.push_back(item.displayName);
+        }
+    }
+    std::wstring joined;
+    for (size_t i = 0; i < uniqueNames.size(); ++i) {
+        if (i > 0) joined += L", ";
+        joined += uniqueNames[i];
+    }
+    return joined;
+}
+
+inline bool CloseConflictingHookImes(const std::vector<ConflictingImeInfo> &items) {
+    if (items.empty()) return true;
+    struct EnumCtx {
+        const std::vector<ConflictingImeInfo> *list;
+    } ctx{&items};
+
+    EnumWindows(
+        [](HWND hwnd, LPARAM lp) -> BOOL {
+            auto *c = reinterpret_cast<EnumCtx *>(lp);
+            DWORD pid = 0;
+            GetWindowThreadProcessId(hwnd, &pid);
+            for (const auto &item : *(c->list)) {
+                if (item.pid == pid) {
+                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    break;
+                }
+            }
+            return TRUE;
+        },
+        reinterpret_cast<LPARAM>(&ctx)
+    );
+
+    bool allClosed = true;
+    for (const auto &item : items) {
+        HANDLE hProc = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, FALSE, item.pid);
+        if (!hProc) continue;
+        if (WaitForSingleObject(hProc, 600) != WAIT_OBJECT_0) {
+            if (!TerminateProcess(hProc, 0)) {
+                allClosed = false;
+            } else {
+                WaitForSingleObject(hProc, 1000);
+            }
+        }
+        CloseHandle(hProc);
+    }
+    return allClosed;
+}
 
 static constexpr const wchar_t *kUninstallRegSubKey =
     L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\VieLotusIM";
@@ -324,6 +444,8 @@ inline int RunFullUninstallFlow(bool quiet) {
     if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Keyboard Layout\\Substitutes", 0, KEY_SET_VALUE, &hSubKey) == ERROR_SUCCESS && hSubKey) {
         RegDeleteValueW(hSubKey, L"0000042a");
         RegDeleteValueW(hSubKey, L"0000042A");
+        RegDeleteValueW(hSubKey, L"d001042a");
+        RegDeleteValueW(hSubKey, L"d001042A");
         RegCloseKey(hSubKey);
     }
     HKEY hRunKey = nullptr;

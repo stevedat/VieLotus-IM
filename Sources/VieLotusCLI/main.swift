@@ -31,7 +31,7 @@ func driveInput(session: InputSessionManager, input: String, primeEnglish: Bool,
     // primed one silently inherits "he is" and the whole suite measures a contaminated
     // context instead of the per-row condition it claims to test.
     session.context = primeEnglish ? "he is" : ""
-
+    
     var result = ""
     for char in input {
         if char == "<" {
@@ -61,7 +61,7 @@ func driveInput(session: InputSessionManager, input: String, primeEnglish: Bool,
             }
         }
     }
-
+    
     if session.isComposing {
         let action = session.commitWord(smartBilingualEnabled: bilingualEnabled)
         if case let .commit(backspaces, text, isOverride) = action {
@@ -94,7 +94,7 @@ func runBenchmark(
     print("Reading CSV from: \(csvPath)")
     print("Grammar Profile: \(profile.rawValue)")
     print("Target Threshold: \(String(format: "%.2f%%", targetThreshold))")
-
+    
     let content: String
     if csvPath == "<embedded>" {
         guard let embedded = EmbeddedTestSuite.loadCSV() else {
@@ -110,22 +110,22 @@ func runBenchmark(
         print("❌ Error: Could not read CSV benchmark file at '\(csvPath)'")
         exit(1)
     }
-
+    
     let lines = content.components(separatedBy: .newlines)
     var testCases = [TestCase]()
-
+    
     let knownBehaviors: Set<String> = [
         "transform", "restore_raw", "keep_as_typed",
         "ambiguous_needs_context", "cancel_keep_composed"
     ]
-
+    
     for (index, line) in lines.enumerated() {
         if index == 0 || line.trimmingCharacters(in: .whitespaces).isEmpty { continue }
         let columns = line.components(separatedBy: ",")
         if columns.count >= 6 {
             let behavior = columns[5]
             guard knownBehaviors.contains(behavior) else { continue }
-
+            
             let expectedRaw = columns[4]
             // Only split on " / " with spaces, so URLs and file paths like "/usr/bin" or "https://..." stay intact!
             let expectedParts: [String]
@@ -134,7 +134,7 @@ func runBenchmark(
             } else {
                 expectedParts = [expectedRaw.trimmingCharacters(in: .whitespaces)]
             }
-
+            
             let tc = TestCase(
                 input: columns[1],
                 expectedOutput: expectedParts,
@@ -146,7 +146,7 @@ func runBenchmark(
             testCases.append(tc)
         }
     }
-
+    
     // Suite self-consistency scan.
     //
     // (1) UNSATISFIABLE: two rows that the harness drives under IDENTICAL conditions
@@ -197,7 +197,7 @@ func runBenchmark(
         print("❌ Error: No valid test cases found in benchmark file.")
         exit(1)
     }
-
+    
     #if os(macOS)
     SmartBilingualDetector.spellCheckerProvider = MacSpellChecker()
     #endif
@@ -214,7 +214,7 @@ func runBenchmark(
 
     for (caseIndex, tc) in testCases.enumerated() {
         totalCounts[tc.expectedBehavior, default: 0] += 1
-
+        
         let result: String
         switch tc.expectedBehavior {
         case "transform":
@@ -232,7 +232,7 @@ func runBenchmark(
         default: // keep_as_typed
             result = driveInput(session: session, input: tc.input, primeEnglish: false, bilingualEnabled: true)
         }
-
+        
         let isPass = tc.expectedOutput.contains(result)
         if isPass {
             passCounts[tc.expectedBehavior, default: 0] += 1
@@ -245,7 +245,7 @@ func runBenchmark(
             }
         }
     }
-
+    
     print("--- 📊 Chi tiết từng nhóm kiểm thử (Regression Test Matrix) ---")
     for (behavior, total) in totalCounts.sorted(by: { $0.key < $1.key }) {
         let passed = passCounts[behavior, default: 0]
@@ -253,7 +253,7 @@ func runBenchmark(
         let padded = behavior.padding(toLength: 25, withPad: " ", startingAt: 0)
         print("  • \(padded): \(passed) / \(total) (\(String(format: "%6.2f%%", rate)))")
     }
-
+    
     // -------------------------------------------------------------------------
     // PHASE 2 — the other side of the ambiguous trade
     //
@@ -354,7 +354,7 @@ func runBenchmark(
     print("\n=======================================================")
     print(String(format: "🏆 Tổng kết Pass Rate Toàn Diện: %.2f%% (%d / %d)", overallRate, overallPass, testCases.count))
     print("=======================================================\n")
-
+    
     if !failureExamples.isEmpty {
         print("Một số ca thất bại mẫu:")
         for example in failureExamples {
@@ -537,7 +537,7 @@ func driveContinuousStream(
     var wordsCommitted = 0
     var backspacesExecuted = 0
     var replacesExecuted = 0
-
+    
     let tStart = DispatchTime.now().uptimeNanoseconds
     for char in stream {
         switch classifyStressOperation(char, session: session) {
@@ -566,13 +566,13 @@ func driveContinuousStream(
             latencies.append(Double(t1 - t0) / 1000.0)
             applyStressAction(action, fallbackChar: char, to: &outputUTF16, replacesExecuted: &replacesExecuted)
         }
-
+        
         count += 1
         if progressStep > 0 && count % progressStep == 0 {
             onProgress?(count, getMemoryRSS())
         }
     }
-
+    
     if session.isComposing {
         let action = session.commitWord(smartBilingualEnabled: bilingualEnabled)
         if case .commit = action { wordsCommitted += 1 }
@@ -581,7 +581,7 @@ func driveContinuousStream(
     let tEnd = DispatchTime.now().uptimeNanoseconds
     let elapsedSec = Double(tEnd - tStart) / 1_000_000_000.0
     let text = String(decoding: outputUTF16, as: UTF16.self)
-
+    
     return ContinuousStreamResult(
         latenciesUs: latencies,
         totalKeystrokes: count,
@@ -617,48 +617,44 @@ func runStressAndEnduranceBenchmark(
     print("   Bộ gõ Sen Việt (VieLotusIM) — Telex & VNI High-Throughput Stream Harness")
     print("   Grammar Profile: \(profile.rawValue)")
     print("================================================================================\n")
-
-    if mobilePath {
-        SmartBilingualDetector.spellCheckerProvider = IOSSpellChecker()
-    } else {
-        #if os(macOS)
-        SmartBilingualDetector.spellCheckerProvider = MacSpellChecker()
-        #endif
-    }
+    
+    #if os(macOS)
+    SmartBilingualDetector.spellCheckerProvider = MacSpellChecker()
+    #endif
     print("   Inline bilingual: \(mobilePath); provider: \(mobilePath ? "local-mobile" : "platform-desktop"); host/UI: NOT MEASURED")
     func configuredSession() -> InputSessionManager {
         let session = InputSessionManager()
         session.setGrammarProfile(profile)
         session.inlineBilingualEnabled = mobilePath
-        session.setGenZMode(mobilePath)
+        session.setGenZMode(false)
         session.setModernOrthography(true)
         session.macroEnabled = false
         return session
     }
     let initialRSS = getMemoryRSS()
     print(String(format: "📌 Bộ nhớ ban đầu (Baseline Memory RSS): %.2f MB\n", initialRSS))
-
+    
     let telexRawCorpus = """
-Trawm nawm trong coxi nguowfi ta, chuwx taif chuwx meejnh kheos laf ghest nhau. Trair qua moojt cuoojc ber dau, nhuwngx ddieeuf troong thaays maf ddau ddoosns lonfg. Lar gif bir sawsc tuw phong, troowfi xanh quen thoos maas hoonfg ddasnh ghen.
-VieLotusIM laf booj gox tieengs Vieejt thees heej mowis treen macOS, dduowjc vieest hoanf toanf bawfng ngoon nguwr laapj trinhf Swift 6 hieejn ddaaij. Kieesn trusc cura booj gox tuaan thur nghieem ngawtj moo hinhf baor maawtj cura Apple, khoong caafn quyeefn Accessibility hay EventTap.
-Alo banj oowi, trwua nay awn gif nhir? DDi awn phor bov soost vang owr phoos cor khoong? Hay ra quasn cowm nieeu gaafn coong ty nhes, taafm 12 gioowf kesm mifnh qua ddosn banj!
-Heej thoosng microservices ddang xuwr lys khoarng muwowif nghifn requests mooxi giaay vowis latency cuwcj thaasp. Hays kieerm tra cacs file configuration, caapj nhaajt package dependencies vaf deploy leen production server ngay trong hoom nay nhes.
-Khai maacj hooji nghij thuowjng ddirnh quoocs tees veef chuyeern ddooir soos vaf phast trieern kinh tees xanh beefn vuwngx nawm 2026. Cacs chuyeen gia nhaasn manjh taafm quan troongj cura vieecj baor veej duwr lieeju cas nhaan vaf an ninh manjg trong kyr nguyeon soos.
-Chusc muwngf nawm mowis an khang thijnh vuwowjng vanj suwj nhuw ys phast taif phast loocj suwcj khoer doofii dafo gia ddirnh hanjh phusc.
-toans<f nguyeenx<j tieengf<s chaof<s dduowngj<f cuoojcs<j vieejtt<
-https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, retryCount: 3)
+Trawm nawm trong coxi nguowfi ta, chuwx taif chuwx meejnh kheos laf ghest nhau. Trair qua moojt cuoojc ber dau, nhuwngx ddieeuf troong thaays maf ddau ddoosns lonfg. Lar gif bir sawsc tuw phong, troowfi xanh quen thoos maas hoonfg ddasnh ghen. 
+VieLotusIM laf booj gox tieengs Vieejt thees heej mowis treen macOS, dduowjc vieest hoanf toanf bawfng ngoon nguwr laapj trinhf Swift 6 hieejn ddaaij. Kieesn trusc cura booj gox tuaan thur nghieem ngawtj moo hinhf baor maawtj cura Apple, khoong caafn quyeefn Accessibility hay EventTap. 
+Alo banj oowi, trwua nay awn gif nhir? DDi awn phor bov soost vang owr phoos cor khoong? Hay ra quasn cowm nieeu gaafn coong ty nhes, taafm 12 gioowf kesm mifnh qua ddosn banj! 
+Heej thoosng microservices ddang xuwr lys khoarng muwowif nghifn requests mooxi giaay vowis latency cuwcj thaasp. Hays kieerm tra cacs file configuration, caapj nhaajt package dependencies vaf deploy leen production server ngay trong hoom nay nhes. 
+Khai maacj hooji nghij thuowjng ddirnh quoocs tees veef chuyeern ddooir soos vaf phast trieern kinh tees xanh beefn vuwngx nawm 2026. Cacs chuyeen gia nhaasn manjh taafm quan troongj cura vieecj baor veej duwr lieeju cas nhaan vaf an ninh manjg trong kyr nguyeon soos. 
+Chusc muwngf nawm mowis an khang thijnh vuwowjng vanj suwj nhuw ys phast taif phast loocj suwcj khoer doofii dafo gia ddirnh hanjh phusc. 
+toans<f nguyeenx<j tieengf<s chaof<s dduowngj<f cuoojcs<j vieejtt< 
+https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, retryCount: 3) 
 """
 
     let vniRawCorpus = """
-Tram8 nam8 trong coi4 nguoi72 ta, chu74 tai2 chu74 menh65 kheo1 la2 ghet1 nhau. Trai3 qua mot65 cuoc65 be3 dau, nhung74 d9ieu2 trong thay1 ma2 d9au d9on1 long2. La5 gi2 bi3 sac1 tu7 phong, troi72 xanh quen thoi1 ma1 hong2 d9anh1 ghen.
-VieLotusIM la2 bo65 go4 tie6ng1 Viet65 the61 he65 mo7i1 tre6n macOS, d9uoc75 viet1 hoan2 toan2 bang2 ngon6 ngu74 lap5 trinh2 Swift 6 hien65 d9ai5. Kien1 truc1 cua3 bo65 go4 tuan6 thu3 nghiem6 ngat5 mo6 hinh2 bao3 mat65 cua3 Apple, khong can2 quyen2 Accessibility hay EventTap.
-Alo ban5 oi7, trua nay an8 gi2 nhi3? D9i an8 pho3 bo2 sot1 vang o73 pho1 co3 khong? Hay ra quan1 com7 nieu gan2 cong ty nhe1, tam62 12 gio72 kem1 minh2 qua d9on1 ban5!
-He5 thong1 microservices d9ang xu73 ly1 khoang3 muoi72 nghin2 requests moi4 giay voi1 latency cuc5 thap1. Hay4 kiem3 tra cac1 file configuration, cap5 nhat5 package dependencies va2 deploy len6 production server ngay trong hom6 nay nhe1.
-Khai mac5 hoi5 nghi5 thuong75 d9inh3 quoc1 te1 ve2 chuyen3 d9oi3 so1 va2 phat1 trien3 kinh te1 xanh ben2 vung4 nam8 2026. Cac1 chuyen gia nhan1 manh5 tam62 quan trong cua3 viec65 bao3 ve5 du74 lieu5 ca1 nhan va2 an ninh mang5 trong ky3 nguyen so1.
-Chuc1 mung72 nam8 moi1 an khang thinh5 vuong75 van5 su75 nhu7 y1 phat1 tai2 phat1 loc65 suc1 khoe3 doi2 dao2 gia d9inh2 hanh5 phuc1.
-toan1<2 nguyen64<5 tie6ng2<1 chao2<1 d9uong75<2 cuoc61<5
-Hom6 nay ngay2 15 thang1 10 nam8 2026, tong63 doanh thu d9at5 150000000 d9ong62, ma4 san3 pham63 la2 SP102938.
-https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, retryCount: 3)
+Tram8 nam8 trong coi4 nguoi72 ta, chu74 tai2 chu74 menh65 kheo1 la2 ghet1 nhau. Trai3 qua mot65 cuoc65 be3 dau, nhung74 d9ieu2 trong thay1 ma2 d9au d9on1 long2. La5 gi2 bi3 sac1 tu7 phong, troi72 xanh quen thoi1 ma1 hong2 d9anh1 ghen. 
+VieLotusIM la2 bo65 go4 tie6ng1 Viet65 the61 he65 mo7i1 tre6n macOS, d9uoc75 viet1 hoan2 toan2 bang2 ngon6 ngu74 lap5 trinh2 Swift 6 hien65 d9ai5. Kien1 truc1 cua3 bo65 go4 tuan6 thu3 nghiem6 ngat5 mo6 hinh2 bao3 mat65 cua3 Apple, khong can2 quyen2 Accessibility hay EventTap. 
+Alo ban5 oi7, trua nay an8 gi2 nhi3? D9i an8 pho3 bo2 sot1 vang o73 pho1 co3 khong? Hay ra quan1 com7 nieu gan2 cong ty nhe1, tam62 12 gio72 kem1 minh2 qua d9on1 ban5! 
+He5 thong1 microservices d9ang xu73 ly1 khoang3 muoi72 nghin2 requests moi4 giay voi1 latency cuc5 thap1. Hay4 kiem3 tra cac1 file configuration, cap5 nhat5 package dependencies va2 deploy len6 production server ngay trong hom6 nay nhe1. 
+Khai mac5 hoi5 nghi5 thuong75 d9inh3 quoc1 te1 ve2 chuyen3 d9oi3 so1 va2 phat1 trien3 kinh te1 xanh ben2 vung4 nam8 2026. Cac1 chuyen gia nhan1 manh5 tam62 quan trong cua3 viec65 bao3 ve5 du74 lieu5 ca1 nhan va2 an ninh mang5 trong ky3 nguyen so1. 
+Chuc1 mung72 nam8 moi1 an khang thinh5 vuong75 van5 su75 nhu7 y1 phat1 tai2 phat1 loc65 suc1 khoe3 doi2 dao2 gia d9inh2 hanh5 phuc1. 
+toan1<2 nguyen64<5 tie6ng2<1 chao2<1 d9uong75<2 cuoc61<5 
+Hom6 nay ngay2 15 thang1 10 nam8 2026, tong63 doanh thu d9at5 150000000 d9ong62, ma4 san3 pham63 la2 SP102938. 
+https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, retryCount: 3) 
 """
 
     // Compute deterministic reference output (pass 1 cold + pass 2 warm-context) for Telex and VNI to verify 0 lost chars/diacritics
@@ -705,10 +701,10 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
     telexSession.setInputMethod(.telex)
     telexSession.setGrammarProfile(profile)
     telexSession.setModernOrthography(true)
-
+    
     let telexStream = buildRepeatedStream(base: telexRawCorpus, targetCount: 100_000)
     print("  • Chuẩn bị luồng phím: \(telexStream.count) ký tự (văn bản, chat, code, phím backspace)")
-
+    
     var telexMemCheckpoints: [(Int, Double)] = [(0, getMemoryRSS())]
     let telexResult = driveContinuousStream(
         session: telexSession,
@@ -719,11 +715,11 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
         telexMemCheckpoints.append((step, mem))
         print(String(format: "  ↳ [Keystrokes: %6d / 100,000] - Memory RSS: %.2f MB", step, mem))
     }
-
+    
     let telexStats = calculatePercentiles(telexResult.latenciesUs)
     let telexKPS = Double(telexResult.totalKeystrokes) / telexResult.elapsedSec
     let telexWPS = Double(telexResult.wordsCommitted) / telexResult.elapsedSec
-
+    
     let numFmt = NumberFormatter()
     numFmt.numberStyle = .decimal
     func fmt(_ val: Int) -> String { numFmt.string(from: NSNumber(value: val)) ?? "\(val)" }
@@ -768,10 +764,10 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
     let vniSession = configuredSession()
     vniSession.setInputMethod(.vni)
     vniSession.setModernOrthography(true)
-
+    
     let vniStream = buildRepeatedStream(base: vniRawCorpus, targetCount: 100_000)
     print("  • Chuẩn bị luồng phím: \(fmt(vniStream.count)) ký tự (dấu số VNI, số độc lập, sửa backspace)")
-
+    
     var vniMemCheckpoints: [(Int, Double)] = [(0, getMemoryRSS())]
     let vniResult = driveContinuousStream(
         session: vniSession,
@@ -782,7 +778,7 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
         vniMemCheckpoints.append((step, mem))
         print(String(format: "  ↳ [Keystrokes: %6d / 100,000] - Memory RSS: %.2f MB", step, mem))
     }
-
+    
     let vniStats = calculatePercentiles(vniResult.latenciesUs)
     let vniKPS = Double(vniResult.totalKeystrokes) / vniResult.elapsedSec
     let vniWPS = Double(vniResult.wordsCommitted) / vniResult.elapsedSec
@@ -800,7 +796,7 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
         vniResult.backspacesExecuted > 0 &&
         vniAnchorsOk &&
         vniResult.reconstructedText.hasPrefix(vniExpectedPrefix)
-
+    
     print("\n  📊 KẾT QUẢ HIỆU NĂNG VNI:")
     print(String(format: "  • Tổng thời gian gõ       : %.3f giây", vniResult.elapsedSec))
     print("  • Tốc độ thông lượng      : \(fmtD(vniKPS)) phím/giây (~ \(fmtD(vniWPS)) từ/giây)")
@@ -833,15 +829,15 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
     let startMixedRSS = getMemoryRSS()
     var mixedLatencies: [Double] = []
     mixedLatencies.reserveCapacity(mixedTarget)
-
+    
     let tMixedStart = DispatchTime.now().uptimeNanoseconds
     var currentMethod: InputMethodType = .telex
     mixedSession.setInputMethod(currentMethod)
     mixedSession.setGrammarProfile(profile)
-
+    
     let telexTokens = telexRawCorpus.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
     let vniTokens = vniRawCorpus.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
-
+    
     var tokenIdx = 0
     while mixedCount < mixedTarget {
         // Toggle input method every 50 words to simulate real user switching or multi-document workflows
@@ -849,11 +845,11 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
             currentMethod = (currentMethod == .telex) ? .vni : .telex
             mixedSession.setInputMethod(currentMethod)
         }
-
+        
         let token = (currentMethod == .telex)
             ? telexTokens[tokenIdx % telexTokens.count]
             : vniTokens[tokenIdx % vniTokens.count]
-
+        
         for char in token {
             if char == "<" {
                 let priorUTF16 = mixedSession.isComposing ? mixedSession.currentOutput().utf16.count : 1
@@ -881,7 +877,7 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
             mixedCount += 1
             if mixedCount >= mixedTarget { break }
         }
-
+        
         if mixedCount < mixedTarget {
             let t0 = DispatchTime.now().uptimeNanoseconds
             let action = mixedSession.commitWord(smartBilingualEnabled: true, boundaryChar: " ")
@@ -894,7 +890,7 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
         }
         tokenIdx += 1
     }
-
+    
     let tMixedEnd = DispatchTime.now().uptimeNanoseconds
     let mixedElapsedSec = Double(tMixedEnd - tMixedStart) / 1_000_000_000.0
     let mixedStats = calculatePercentiles(mixedLatencies)
@@ -904,7 +900,7 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
         mixedBackspacesExecuted > 0 &&
         mixedReconstructedText.contains("Trăm năm trong cõi người ta") &&
         mixedReconstructedText.contains("toàn nguyện tiếng cháo đường cuộc")
-
+    
     print("  • Hoàn thành           : \(fmt(mixedCount)) phím hỗn hợp trong \(String(format: "%.3f", mixedElapsedSec)) giây")
     print("  • Tốc độ xử lý         : \(fmtD(Double(mixedCount) / mixedElapsedSec)) phím/giây")
     print("  • Thao tác thực thi    : \(fmt(mixedWordsCommitted)) commits | \(fmt(mixedBackspacesExecuted)) backspaces | \(fmt(mixedReplacesExecuted)) replaces")
@@ -912,7 +908,7 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
     print(String(format: "  • Median (p50)         : %.2f µs", mixedStats.p50))
     print(String(format: "  • 99th percentile (p99): %.2f µs", mixedStats.p99))
     print(String(format: "  • Bộ nhớ kết thúc      : %.2f MB (ΔRSS: %+.2f MB)", endMixedRSS, endMixedRSS - startMixedRSS))
-
+    
     // -------------------------------------------------------------------------
     // SUMMARY REPORT
     // -------------------------------------------------------------------------
@@ -922,7 +918,7 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
     let totalTime = telexResult.elapsedSec + vniResult.elapsedSec + mixedElapsedSec
     let avgKPS = Double(totalKeystrokes) / totalTime
     let avgWPM = (avgKPS / 5.0) * 60.0
-
+    
     print("\n================================================================================")
     print("🏆 BÁO CÁO TỔNG HỢP ĐỘ BỀN BỈ & QUAN SÁT RSS TIẾN TRÌNH CLI (STABILITY AUDIT)")
     print("================================================================================")
@@ -932,13 +928,13 @@ https://github.com/stevedat/VieLotus-IM let config = Configuration(timeout: 30, 
     print(String(format: "  • RSS Khởi động          : %.2f MB", initialRSS))
     print(String(format: "  • RSS Hoàn thành         : %.2f MB", finalRSS))
     print(String(format: "  • Biến thiên bộ nhớ tổng : %+.2f MB", finalRSS - initialRSS))
-
+    
     if abs(finalRSS - initialRSS) < 15.0 {
         print("  ✅ QUAN SÁT BỘ NHỚ TIẾN TRÌNH CLI: ΔRSS ổn định (< 15 MB) — Dùng 'leaks <PID>' để kiểm tra rò rỉ trên tiến trình IME.")
     } else {
         print("  ⚠️ CẢNH BÁO BỘ NHỚ: Phát hiện tăng trưởng RSS tiến trình CLI vượt ngưỡng 15 MB.")
     }
-
+    
     if telexStats.p99 <= telexCeiling && vniStats.p99 <= vniCeiling && mixedStats.p99 <= mixedCeiling {
         print("  ✅ KIỂM ĐỊNH ĐỘ TRỄ: ĐẠT CHUẨN RATCHET (Telex ≤ \(Int(telexCeiling)) µs, VNI ≤ \(Int(vniCeiling)) µs, Mixed ≤ \(Int(mixedCeiling)) µs)!")
     }
@@ -1237,9 +1233,6 @@ if args.contains("--scorecard") {
     exit(0)
 }
 
-if args.contains("--mobile-paced") {
-    exit(runMobilePacedBenchmark() ? 0 : 1)
-}
 
 if args.contains("--stress") || args.contains("--endurance") {
     var telexCeil = 500.0
@@ -1328,7 +1321,7 @@ while true {
     print("> ", terminator: "")
     guard let input = readLine() else { break }
     if input == "exit" { break }
-
+    
     if input.hasPrefix(":profile ") {
         let pStr = String(input.dropFirst(9)).trimmingCharacters(in: .whitespaces)
         if let prof = GrammarProfile(rawValue: pStr) {
@@ -1339,7 +1332,7 @@ while true {
         }
         continue
     }
-
+    
     let result = driveInput(session: session, input: input, primeEnglish: false, bilingualEnabled: true)
     print("Kết quả: \(result)")
 }

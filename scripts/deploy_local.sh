@@ -221,19 +221,25 @@ if ! kill -0 "$RUNNING_PID" 2>/dev/null; then
     DO_ROLLBACK "Tiến trình VieLotusIM bị crash đột ngột sau khi khởi động"
 fi
 
-# Health check Phase 3: TIS functional readiness check
+# Health check Phase 3: TIS functional readiness check (retry briefly while TextInputMenuAgent settles)
 echo "→ Verifying TIS input source availability..."
-TIS_CHECK_SCRIPT="
+TIS_CHECK_SCRIPT='
+import Foundation
 import Carbon
-guard let list = TISCreateInputSourceList(nil, true)?.takeRetainedValue() as? [TISInputSource] else { exit(1) }
-let found = list.contains { src in
-    guard let idPtr = TISGetInputSourceProperty(src, kTISPropertyInputSourceID) else { return false }
-    let id = Unmanaged<CFString>.fromOpaque(idPtr).takeUnretainedValue() as String
-    return id.lowercased().contains(\"vielotus\")
+for _ in 0..<8 {
+    if let list = TISCreateInputSourceList(nil, true)?.takeRetainedValue() as? [TISInputSource] {
+        let found = list.contains { src in
+            guard let idPtr = TISGetInputSourceProperty(src, kTISPropertyInputSourceID) else { return false }
+            let id = Unmanaged<CFString>.fromOpaque(idPtr).takeUnretainedValue() as String
+            return id.lowercased().contains("vielotus")
+        }
+        if found { exit(0) }
+    }
+    Thread.sleep(forTimeInterval: 0.4)
 }
-exit(found ? 0 : 2)
-"
-if ! swift -e "$TIS_CHECK_SCRIPT" 2>/dev/null; then
+exit(2)
+'
+if ! swift -target arm64-apple-macos13 -e "$TIS_CHECK_SCRIPT"; then
     DO_ROLLBACK "TIS không tìm thấy nguồn gõ Sen Việt khả dụng"
 fi
 

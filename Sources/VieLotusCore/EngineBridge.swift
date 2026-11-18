@@ -260,6 +260,10 @@ public final class EngineBridge {
         VietnameseEngine.rawKeys(for: text, inputMethod: inputMethod)
     }
 
+    public func transform(_ chars: [Character]) -> String {
+        engine.transform(chars)
+    }
+
     public func semanticTransformations(for text: String) -> [String] {
         VietnameseEngine.extractSemanticTransformations(from: text, inputMethod: engine.inputMethod)
     }

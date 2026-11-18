@@ -5,32 +5,32 @@ import Foundation
 /// Provides exact provenance tracking mapping output character indices to raw keystroke indices.
 internal struct BoundedKeystrokeBuffer: Sendable, Equatable {
     internal static let inlineCapacity: Int = 32
-
+    
     /// Inline storage for raw ASCII/scalar bytes (zero-heap hot path)
     internal private(set) var bytes: [UInt8]
     internal private(set) var count: Int = 0
-
+    
     /// Fallback storage if token exceeds inlineCapacity (overflow preservation policy)
     private var overflowChars: [Character]? = nil
-
+    
     /// Provenance tracking: maps output character index -> raw keystroke index
     internal private(set) var provenance: [Int8]
     internal private(set) var provenanceCount: Int = 0
-
+    
     internal init() {
         self.bytes = [UInt8](repeating: 0, count: Self.inlineCapacity)
         self.provenance = [Int8](repeating: -1, count: Self.inlineCapacity)
     }
-
+    
     internal var isEmpty: Bool {
         return count == 0
     }
-
+    
     internal var isFull: Bool {
         // With overflow preservation, the buffer safely expands rather than dropping input
         return false
     }
-
+    
     /// Appends a raw character byte.
     @discardableResult
     internal mutating func append(_ byte: UInt8) -> Bool {
@@ -39,12 +39,12 @@ internal struct BoundedKeystrokeBuffer: Sendable, Equatable {
             count += 1
             return true
         }
-
+        
         // Transition to overflow preservation
         let ch = Character(UnicodeScalar(byte))
         return append(ch)
     }
-
+    
     /// Appends a Character, preserving full string fidelity.
     @discardableResult
     internal mutating func append(_ char: Character) -> Bool {
@@ -53,7 +53,7 @@ internal struct BoundedKeystrokeBuffer: Sendable, Equatable {
             count += 1
             return true
         }
-
+        
         // Overflow mode
         if overflowChars == nil {
             var chars = [Character]()
@@ -67,12 +67,12 @@ internal struct BoundedKeystrokeBuffer: Sendable, Equatable {
         count += 1
         return true
     }
-
+    
     /// Removes the last keystroke. Returns true if removed, false if empty.
     @discardableResult
     internal mutating func popLast() -> Bool {
         guard count > 0 else { return false }
-
+        
         if let _ = overflowChars {
             overflowChars?.removeLast()
             count -= 1
@@ -89,19 +89,19 @@ internal struct BoundedKeystrokeBuffer: Sendable, Equatable {
             }
             return true
         }
-
+        
         count -= 1
         bytes[count] = 0
         return true
     }
-
+    
     /// Clears all entries without releasing pre-allocated capacity.
     internal mutating func reset() {
         count = 0
         provenanceCount = 0
         overflowChars = nil
     }
-
+    
     /// Subscript to access raw bytes
     internal subscript(index: Int) -> UInt8 {
         get {
@@ -120,7 +120,7 @@ internal struct BoundedKeystrokeBuffer: Sendable, Equatable {
             }
         }
     }
-
+    
     /// Sets provenance for a given output character index
     internal mutating func setProvenance(outIndex: Int, rawIndex: Int) {
         guard outIndex >= 0 else { return }
@@ -132,14 +132,14 @@ internal struct BoundedKeystrokeBuffer: Sendable, Equatable {
             provenanceCount = outIndex + 1
         }
     }
-
+    
     /// Retrieves raw keystroke index for an output character index
     internal func rawIndex(for outIndex: Int) -> Int? {
         guard outIndex >= 0 && outIndex < provenanceCount else { return nil }
         let idx = Int(provenance[outIndex])
         return idx >= 0 ? idx : nil
     }
-
+    
     /// Returns raw string representation
     internal func asString() -> String {
         guard count > 0 else { return "" }
@@ -148,7 +148,7 @@ internal struct BoundedKeystrokeBuffer: Sendable, Equatable {
         }
         return String(decoding: bytes[0..<count], as: UTF8.self)
     }
-
+    
     /// Returns raw characters array
     internal func asCharacters() -> [Character] {
         if let ov = overflowChars {

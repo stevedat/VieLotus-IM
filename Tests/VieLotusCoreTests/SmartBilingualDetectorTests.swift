@@ -196,7 +196,7 @@ final class SmartBilingualDetectorTests: XCTestCase {
             XCTAssertEqual(committed, expected, raw)
         }
     }
-
+    
     func testStructuralHeuristics() {
         XCTAssertTrue(SmartBilingualDetector.isEnglishWord(raw: "MAX_SIZE"))
         XCTAssertTrue(SmartBilingualDetector.isEnglishWord(raw: "/usr/local/bin"))
@@ -798,25 +798,6 @@ final class SmartBilingualDetectorTests: XCTestCase {
             return screen
         }
 
-        final class SimpleProxy: TextDocumentProxyProtocol {
-            var buffer = ""
-            var documentContextBeforeInput: String? { buffer }
-            var documentContextAfterInput: String? { nil }
-            func insertText(_ text: String) { buffer.append(text) }
-            func deleteBackward() { if !buffer.isEmpty { buffer.removeLast() } }
-        }
-
-        func driveIOS(_ input: String) -> String {
-            let adapter = UIKitInputSessionAdapter()
-            adapter.session.clearContext()
-            adapter.session.macroEnabled = false
-            adapter.session.setSmartBilingualEnabled(true)
-            let proxy = SimpleProxy()
-            for ch in input {
-                adapter.handleCharacter(ch, proxy: proxy)
-            }
-            return proxy.buffer
-        }
 
         let bilateralPhrases: [(raw: String, expected: String)] = [
             ("hocj IT sex ", "học IT sẽ "),
@@ -844,7 +825,272 @@ final class SmartBilingualDetectorTests: XCTestCase {
         for (raw, expected) in bilateralPhrases {
             XCTAssertEqual(driveMac(raw, inlineBilingual: false), expected, "macOS commit failed for \(raw.debugDescription)")
             XCTAssertEqual(driveMac(raw, inlineBilingual: true), expected, "macOS inline failed for \(raw.debugDescription)")
-            XCTAssertEqual(driveIOS(raw), expected, "iOS adapter failed for \(raw.debugDescription)")
         }
     }
+
+    private func driveMacSentence(_ input: String, inlineBilingual: Bool, genZMode: Bool = false) -> String {
+        let session = InputSessionManager()
+        session.clearContext()
+        session.macroEnabled = false
+        session.setGrammarProfile(.senFlex)
+        session.setGenZMode(genZMode)
+        session.inlineBilingualEnabled = inlineBilingual
+        var screen = ""
+        for ch in input {
+            if session.isWordBoundary(ch) {
+                let act = session.commitWord(smartBilingualEnabled: true, boundaryChar: ch)
+                if case let .commit(bs, txt, true) = act {
+                    if bs > 0 { screen.removeLast(min(bs, screen.count)) }
+                    screen += txt
+                }
+                screen.append(ch)
+            } else {
+                switch session.handleCharacter(ch) {
+                case let .replace(bs, txt):
+                    if bs > 0 { screen.removeLast(min(bs, screen.count)) }
+                    screen += txt
+                case .passThrough:
+                    screen.append(ch)
+                case let .commit(bs, txt, _):
+                    if bs > 0 { screen.removeLast(min(bs, screen.count)) }
+                    screen += txt
+                case .consumed, .reset:
+                    break
+                }
+            }
+        }
+        return screen
+    }
+
+    func testGenZDefaultOffAndZjHardeningContract() {
+
+        // Default off: z-/j- stay English both inline and on commit
+        for word in ["zist ", "jist ", "zest ", "zero ", "fast ", "west "] {
+            XCTAssertEqual(driveMacSentence(word, inlineBilingual: true, genZMode: false), word)
+            XCTAssertEqual(driveMacSentence(word, inlineBilingual: false, genZMode: false), word)
+        }
+
+        // Opt-in genZMode = true: z-/j- words ending in -st and known z- English words still stay English,
+        // and confident English context keeps them English; valid teen-code remains working.
+        for word in ["zist ", "jist ", "zest ", "zero ", "zip ", "zone ", "the zist ", "the jist "] {
+            XCTAssertEqual(driveMacSentence(word, inlineBilingual: true, genZMode: true), word, "inline genZ=true for \(word)")
+            XCTAssertEqual(driveMacSentence(word, inlineBilingual: false, genZMode: true), word, "commit genZ=true for \(word)")
+        }
+        XCTAssertEqual(driveMacSentence("zaayj ", inlineBilingual: false, genZMode: true), "zậy ")
+        XCTAssertEqual(driveMacSentence("dzoo ", inlineBilingual: false, genZMode: true), "dzô ")
+        XCTAssertEqual(driveMacSentence("zui ", inlineBilingual: false, genZMode: true), "zui ")
+    }
+
+    func testWuInitialStaysEnglishWhileDdwjuocProducesDuoc() {
+        for inline in [false, true] {
+            XCTAssertEqual(driveMacSentence("wu ", inlineBilingual: inline), "wu ")
+            XCTAssertEqual(driveMacSentence("wus ", inlineBilingual: inline), "wus ")
+            XCTAssertEqual(driveMacSentence("the wus ", inlineBilingual: inline), "the wus ")
+            XCTAssertEqual(driveMacSentence("wuz ", inlineBilingual: inline), "wuz ")
+            XCTAssertEqual(driveMacSentence("ddwjuoc ", inlineBilingual: inline), "được ")
+            XCTAssertEqual(driveMacSentence("cwuus ", inlineBilingual: inline), "cứu ")
+            XCTAssertEqual(driveMacSentence("uuw ", inlineBilingual: inline), "ưu ")
+            XCTAssertEqual(driveMacSentence("uwu ", inlineBilingual: inline), "ưu ")
+        }
+        XCTAssertFalse(VietnameseSyllableDictionary.shared.isValidSyllable("ứu"))
+    }
+
+    func testIstOstUstBilingualAndAllCapsArbitration() {
+        let cases: [(raw: String, expected: String)] = [
+            // Standalone most & pist -> English; VN still reachable via s-at-end & compound heads
+            ("most ", "most "),
+            ("Most ", "Most "),
+            ("MOST ", "MOST "),
+            ("pist ", "pist "),
+            ("PIST ", "PIST "),
+            ("mots ", "mót "),
+            ("pits ", "pít "),
+            ("ddi most ", "đi mót "),
+            ("DDI MOST ", "ĐI MÓT "),
+            // Standalone lowercase attested VN syllables survive
+            ("hist ", "hít "),
+            ("mist ", "mít "),
+            ("kist ", "kít "),
+            ("tist ", "tít "),
+            ("rist ", "rít "),
+            ("nist ", "nít "),
+            ("bist ", "bít "),
+            ("vist ", "vít "),
+            ("dist ", "dít "),
+            ("rust ", "rút "),
+            ("tust ", "tút "),
+            ("must ", "mút "),
+            ("dust ", "dút "),
+            // English context preserves English
+            ("the hist ", "the hist "),
+            ("the mist ", "the mist "),
+            ("the kist ", "the kist "),
+            ("the tist ", "the tist "),
+            ("the pist ", "the pist "),
+            ("the rist ", "the rist "),
+            ("the nist ", "the nist "),
+            ("the bist ", "the bist "),
+            ("the vist ", "the vist "),
+            ("the dist ", "the dist "),
+            ("the rust ", "the rust "),
+            ("the tust ", "the tust "),
+            ("the must ", "the must "),
+            ("the dust ", "the dust "),
+            ("tooi ddocj the hist ", "tôi đọc the hist "),
+            ("tooi dungf the rust ", "tôi dùng the rust "),
+            ("tooi dungf the nist ", "tôi dùng the nist "),
+            // ALL-CAPS standalone -> English outside ALL-CAPS VN prose
+            ("NIST ", "NIST "),
+            ("BIST ", "BIST "),
+            ("VIST ", "VIST "),
+            ("TIST ", "TIST "),
+            ("RIST ", "RIST "),
+            ("ZIST ", "ZIST "),
+            ("JIST ", "JIST "),
+            ("DIST ", "DIST "),
+            ("HIST ", "HIST "),
+            ("MIST ", "MIST "),
+            ("KIST ", "KIST "),
+            ("RUST ", "RUST "),
+            ("TUST ", "TUST "),
+            ("TOOI HIST ", "TÔI HÍT "),
+            ("DDIST ", "ĐÍT "),
+            ("HITS ", "HÍT "),
+            ("MITS ", "MÍT "),
+            ("MOTS ", "MÓT "),
+            ("RUTS ", "RÚT "),
+        ]
+
+        for (raw, expected) in cases {
+            XCTAssertEqual(driveMacSentence(raw, inlineBilingual: false), expected, "commit mismatch for \(raw.debugDescription)")
+            XCTAssertEqual(driveMacSentence(raw, inlineBilingual: true), expected, "inline mismatch for \(raw.debugDescription)")
+        }
+    }
+
+    func testMustAndRelatedWordsAcrossPronounAndAuxiliaryContexts() {
+        func driveSession(_ input: String, profile: GrammarProfile, inlineBilingual: Bool) -> String {
+            let session = InputSessionManager()
+            session.clearContext()
+            session.macroEnabled = false
+            session.setGrammarProfile(profile)
+            session.setGenZMode(false)
+            session.inlineBilingualEnabled = inlineBilingual
+            var screen = ""
+            for ch in input {
+                if session.isWordBoundary(ch) {
+                    let act = session.commitWord(smartBilingualEnabled: true, boundaryChar: ch)
+                    if case let .commit(bs, txt, true) = act {
+                        if bs > 0 { screen.removeLast(min(bs, screen.count)) }
+                        screen += txt
+                    }
+                    screen.append(ch)
+                } else {
+                    switch session.handleCharacter(ch) {
+                    case let .replace(bs, txt):
+                        if bs > 0 { screen.removeLast(min(bs, screen.count)) }
+                        screen += txt
+                    case .passThrough:
+                        screen.append(ch)
+                    case let .commit(bs, txt, _):
+                        if bs > 0 { screen.removeLast(min(bs, screen.count)) }
+                        screen += txt
+                    case .consumed, .reset:
+                        break
+                    }
+                }
+            }
+            return screen
+        }
+
+
+        let englishCases: [String] = [
+            // Pronouns & auxiliaries with "must"
+            "He must ", "he must ", "I must ", "i must ",
+            "she must ", "She must ", "they must ", "They must ",
+            "we must ", "We must ", "you must ", "You must ",
+            "it must ", "who must ", "have been must ", "has been must ",
+            "Has been must ", "was must ", "is must ",
+            // Mixed VN + English (both after sentence boundary and mid-sentence)
+            "tooi ddang. He must ", "tooi ddang. I must ", "tooi ddang. she must ",
+            "tooi ddang. we must ", "tooi ddang. you must ", "tooi ddang. they must ",
+            "tooi ddang He must ", "tooi ddang he must ", "tooi ddang I must ",
+            "tooi ddang she must ", "tooi ddang we must ", "tooi ddang they must ",
+            "tooi ddang you must ", "tooi ddang have been must ",
+            // Related English collision words across pronoun & auxiliary contexts
+            "He rust ", "I hist ", "she mist ", "we dust ", "you best ",
+            "they chest ", "He burn ", "I burst ", "she these ", "we terms ",
+            "they virus ", "tooi ddang He rust ", "tooi ddang she mist ",
+            "tooi ddang the nest ", "tooi ddang the cast ", "tooi ddang the burn ",
+            "tooi ddang they chest ", "tooi ddang we burst ", "because must ",
+            "should must ", "would must ", "could must ", "never must ",
+            // Cross-platform synchronized anchor & auxiliary cases
+            "He has ", "She has ", "they has ", "the bees ", "Car must ", "Car should ",
+            "what must ", "when must ", "where must ", "which must ", "while must "
+        ]
+
+        for profile in [GrammarProfile.classic, GrammarProfile.senFlex] {
+            for phrase in englishCases {
+                let expected = phrase.replacingOccurrences(of: "tooi ddang", with: "tôi đang")
+                XCTAssertEqual(driveSession(phrase, profile: profile, inlineBilingual: false), expected, "commit fail profile=\(profile) phrase=\(phrase)")
+                XCTAssertEqual(driveSession(phrase, profile: profile, inlineBilingual: true), expected, "inline fail profile=\(profile) phrase=\(phrase)")
+            }
+        }
+
+        // Vietnamese preservation must remain intact when context or standalone input is Vietnamese
+        let vnCases: [(raw: String, expected: String)] = [
+            ("must ", "mút "),
+            ("has ", "há "),
+            ("has mieengj ", "há miệng "),
+            ("has moofm ", "há mồm "),
+            ("has gan ", "há gan "),
+            ("has leej ", "há lệ "),
+            ("has maus ", "há máu "),
+            ("has maatj ", "há mật "),
+            ("was nuowcs mawts ", "ứa nước mắt "),
+            ("was mieengj ", "ứa miệng "),
+            ("was moofm ", "ứa mồm "),
+            ("was hoocs ", "ứa hốc "),
+            ("This sinh ", "Thí sinh "),
+            ("this thaan ", "thí thân "),
+            ("cofn its vees ", "còn ít vế "),
+            ("cais is ", "cái í "),
+            ("he hes ", "he hé ")
+        ]
+        for (raw, expected) in vnCases {
+            XCTAssertEqual(driveSession(raw, profile: .senFlex, inlineBilingual: false), expected, "VN commit fail for \(raw)")
+            XCTAssertEqual(driveSession(raw, profile: .senFlex, inlineBilingual: true), expected, "VN inline fail for \(raw)")
+        }
+    }
+
+    func testSiriTechWordsAndSupplementaryTokens() {
+        let session = InputSessionManager()
+        session.setGrammarProfile(.senFlex)
+        session.smartBilingualEnabled = true
+        session.inlineBilingualEnabled = true
+
+        for token in ["siri", "Siri", "iphone", "ipad", "macos", "airpods", "carplay", "chatgpt", "zalo"] {
+            session.reset()
+            session.context = ""
+            for ch in token {
+                _ = session.handleCharacter(ch)
+            }
+            XCTAssertEqual(session.currentOutput(), token, "Inline output for '\(token)' must preserve English/tech word")
+            _ = session.commitWord(smartBilingualEnabled: true, boundaryChar: " ")
+            XCTAssertEqual(session.engine.lastCommittedWord ?? token, token)
+        }
+
+        // Dynamic supplementary token injection (mirroring iOS UILexicon Contacts/system words)
+        defer { SmartBilingualDetector.updateSupplementaryKnownTokens([]) }
+        SmartBilingualDetector.updateSupplementaryKnownTokens(["fujitsu", "siri"])
+        XCTAssertTrue(SmartBilingualDetector.isKnownEnglishWord("fujitsu"))
+        session.reset()
+        session.context = ""
+        for ch in "fujitsu" {
+            _ = session.handleCharacter(ch)
+        }
+        XCTAssertEqual(session.currentOutput(), "fujitsu")
+    }
 }
+
+
+

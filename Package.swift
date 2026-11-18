@@ -3,11 +3,12 @@ import PackageDescription
 
 let package = Package(
     name: "VieLotusIM",
-    platforms: [.macOS(.v13), .iOS(.v16)],
+    platforms: [.macOS(.v13)],
     products: [
         .executable(name: "VieLotusIM", targets: ["VieLotusIM"]),
         .executable(name: "VieLotusCLI", targets: ["VieLotusCLI"]),
         .library(name: "VieLotusCore", targets: ["VieLotusCore"]),
+        .library(name: "VieLotusCAPI", type: .dynamic, targets: ["VieLotusCAPI"]),
     ],
     targets: [
         .target(
@@ -18,6 +19,11 @@ let package = Package(
                 .linkedFramework("Cocoa", .when(platforms: [.macOS])),
                 .linkedFramework("NaturalLanguage", .when(platforms: [.macOS])),
             ]
+        ),
+        .target(
+            name: "VieLotusCAPI",
+            dependencies: ["VieLotusCore"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .target(
             name: "VieLotusTrace",
@@ -53,7 +59,7 @@ let package = Package(
         ),
         .testTarget(
             name: "VieLotusCoreTests",
-            dependencies: ["VieLotusCore", "VieLotusTrace"],
+            dependencies: ["VieLotusCore", "VieLotusTrace", "VieLotusCAPI"],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [
                 .linkedFramework("Cocoa", .when(platforms: [.macOS])),

@@ -6,7 +6,7 @@
 param (
     [string]$Configuration = "Release",
     [string]$Version = "2.0.4",
-    [string]$MsixVersion = "2.0.5.0",
+    [string]$MsixVersion = "2.0.6.0",
     [ValidateSet("x64", "arm64", "all")]
     [string]$Arch = "all",
     [switch]$SkipTests = $false
@@ -223,7 +223,7 @@ if ($makeappx) {
     <DisplayName>Sen Việt (VieLotusIM)</DisplayName>
     <PublisherDisplayName>Nido Holdings</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <Description>Bộ gõ tiếng Việt cho Windows 10/11, dùng Text Services Framework (TSF), hỗ trợ Telex, VNI và nhập liệu Anh–Việt.</Description>
+    <Description>Bộ gõ Tiếng Việt thế hệ mới chuẩn Native TSF cho Windows 10/11 (Telex, VNI, Smart Bilingual 100% Offline).</Description>
   </Properties>
 
   <Dependencies>
@@ -245,11 +245,6 @@ if ($makeappx) {
         Square44x44Logo="Assets\Square44x44Logo.png">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
       </uap:VisualElements>
-      <Extensions>
-        <desktop:Extension Category="windows.startupTask" Executable="VieLotusSettings.exe" EntryPoint="Windows.FullTrustApplication">
-          <desktop:StartupTask TaskId="VieLotusStartupActivate" Enabled="true" DisplayName="Sen Việt (VieLotusIM)" />
-        </desktop:Extension>
-      </Extensions>
     </Application>
   </Applications>
 
