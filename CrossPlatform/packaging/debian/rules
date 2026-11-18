@@ -41,17 +41,11 @@ override_dh_auto_install:
 		install -Dm644 Sources/VieLotusCore/Resources/typing-modes.yml $(CURDIR)/debian/ibus-vielotus/usr/share/vielotus/typing-modes.yml; \
 		install -Dm644 Sources/VieLotusCore/Resources/typing-modes.yml $(CURDIR)/debian/ibus-vielotus/usr/share/vielotus/VietLotusIM_VieLotusCore.resources/typing-modes.yml; \
 	fi
-	if [ -f CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf ]; then \
-		install -Dm644 CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf \
-			$(CURDIR)/debian/ibus-vielotus/etc/fonts/conf.d/51-vielotus-vietnamese.conf; \
-	fi
 	install -Dm755 CrossPlatform/packaging/linux/vielotus-settings \
 		$(CURDIR)/debian/ibus-vielotus/usr/bin/vielotus-settings
 	ln -sf vielotus-settings $(CURDIR)/debian/ibus-vielotus/usr/bin/vielotus
 	install -Dm644 CrossPlatform/packaging/linux/vielotus.desktop \
 		$(CURDIR)/debian/ibus-vielotus/usr/share/applications/vielotus.desktop
-	install -Dm644 CrossPlatform/packaging/linux/vielotus-onboard.desktop \
-		$(CURDIR)/debian/ibus-vielotus/etc/xdg/autostart/vielotus-onboard.desktop
 	install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml \
 		$(CURDIR)/debian/ibus-vielotus/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml
 	install -Dm644 CrossPlatform/packaging/linux/vielotus-settings.1 \

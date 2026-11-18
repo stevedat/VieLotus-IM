@@ -1,0 +1,68 @@
+Description: Remove --auto-onboard login helper and Snap fontconfig sync on Debian
+ Debian delegates input method activation and environment setup to im-config and
+ desktop environment settings rather than running an XDG autostart helper on
+ login. Also drop the Snap-specific ~/.config/fontconfig/conf.d sync because
+ Debian does not ship 51-vielotus-vietnamese.conf and VieLotusIM emits NFC.
+Author: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
+Forwarded: not-needed
+Last-Update: 2026-11-18
+
+--- a/CrossPlatform/packaging/linux/vielotus-settings
++++ b/CrossPlatform/packaging/linux/vielotus-settings
+@@ -826,15 +826,6 @@
+             discover_live_ibus_address
+             (ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true) &
+         fi
+     fi
+-
+-    # 5. Sync drop-in fontconfig rules for sandboxed Snap apps (never touches ~/.config/fontconfig/fonts.conf)
+-    if [ -d /snap ] && [ -f /etc/fonts/conf.d/99-vielotus-vietnamese.conf ]; then
+-        mkdir -p "${CONFIG_ROOT}/fontconfig/conf.d" 2>/dev/null || true
+-        if [ -f /etc/fonts/conf.d/51-vielotus-vietnamese.conf ]; then
+-            cp -f /etc/fonts/conf.d/51-vielotus-vietnamese.conf "${CONFIG_ROOT}/fontconfig/conf.d/51-vielotus-vietnamese.conf" 2>/dev/null || true
+-        fi
+-        cp -f /etc/fonts/conf.d/99-vielotus-vietnamese.conf "${CONFIG_ROOT}/fontconfig/conf.d/99-vielotus-vietnamese.conf" 2>/dev/null || true
+-    fi
+ }
+ 
+@@ -3748,28 +3739,6 @@
+ discover_live_ibus_address
+ 
+ case "${1:-}" in
+-    --auto-onboard)
+-        ONBOARD_MARKER="${CONFIG_DIR}/.onboarded"
+-        load_config
+-        FCITX_ONBOARD_IM="vielotus-telex"
+-        [ "${INPUT_METHOD}" = "vni" ] && FCITX_ONBOARD_IM="vielotus-vni"
+-        if [ -f "${ONBOARD_MARKER}" ]; then
+-            ensure_fcitx5_session_ready "${FCITX_ONBOARD_IM}" "1" || true
+-            reload_live_ibus_if_needed
+-            repair_and_sync_gnome_sources "vielotus" "1" "${IBUS_WAS_RELOADED:-0}"
+-            exit 0
+-        fi
+-        save_and_apply "${INPUT_METHOD}" "1" "1"
+-        if ! pgrep -x ibus-daemon >/dev/null 2>&1 || ! command -v ibus >/dev/null 2>&1; then
+-            : > "${ONBOARD_MARKER}" 2>/dev/null || true
+-        else
+-            discover_live_ibus_address
+-            if ibus list-engine 2>/dev/null | grep -q "vielotus"; then
+-                : > "${ONBOARD_MARKER}" 2>/dev/null || true
+-            fi
+-        fi
+-        exit 0
+-        ;;
+     --activate)
+         load_config
+         save_and_apply "${INPUT_METHOD}" "1" "1"
+--- a/CrossPlatform/packaging/linux/vielotus-settings.1
++++ b/CrossPlatform/packaging/linux/vielotus-settings.1
+@@ -14,9 +14,6 @@
+ (Preedit underline, GNOME per-window source state, Smart Bilingual, Modern Orthography, and
+ the IBus/Fcitx5/Wayland Environment Doctor).
+ .SH OPTIONS
+-.TP
+-\fB\-\-auto\-onboard\fR
+-One-shot first-install / first-login onboarding helper used by package installation and XDG Autostart to register Sen Viet automatically.
+ .TP
+ \fB\-\-telex\fR
+ Switch the active input method mode to Telex across IBus and Fcitx5.

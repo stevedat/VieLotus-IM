@@ -15,8 +15,15 @@ vielotus (2.0.4-1) unstable; urgency=medium
     whitelist_safe=never. Swift regression suite: 100.00% (9,091/9,091)
     primary, 97.84% (363/371) ambiguous_both_sides, 100.00% (179/179)
     whitelist_safe=never.
+  * Debian packaging hygiene:
+    - Do not install /etc/fonts/conf.d/51-vielotus-vietnamese.conf or
+      /etc/xdg/autostart/vielotus-onboard.desktop in ibus-vielotus; respect
+      system fontconfig policy and im-config/desktop input-source defaults.
+    - Add 01-debian-disable-autoonboard-and-fontconfig.patch to drop the
+      --auto-onboard login helper and Snap fontconfig sync from
+      vielotus-settings and its manual page.
 
- -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Mon, 16 Nov 2026 08:32:59 +0000
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Wed, 18 Nov 2026 10:10:00 +0700
 
 vielotus (2.0.3-1) unstable; urgency=medium
 
