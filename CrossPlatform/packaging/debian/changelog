@@ -1,3 +1,28 @@
+vielotus (2.0.5-1) unstable; urgency=medium
+
+  * New upstream release 2.0.5:
+    - Enforce strict opt-in desktop input-method activation across all Linux
+      distributions: installing packages, launching ibus-engine-vielotus,
+      opening the vielotus-settings GUI, or toggling engine preferences
+      (--telex, --vni, checkboxes) never alters Fcitx5 profile/DefaultIM,
+      starts or switches active Fcitx5/IBus engines, edits kwinrc or
+      environment.d, or rewrites GNOME Input Sources.
+    - Remove ibus-engine-vielotus auto-spawning of vielotus-settings
+      (--repair-sources on startup and --telex/--vni on panel menu toggle).
+    - Add explicit user confirmation dialog before the GUI doctor "Fix &
+      Activate" action modifies desktop input-method lists, and preserve
+      existing non-VieLotus Fcitx5 DefaultIM unless --set-default is passed.
+    - Remove upstream 51-vielotus-vietnamese.conf, vielotus-onboard.desktop,
+      and --auto-onboard across Debian, Ubuntu, Arch, RPM, and generic Linux
+      installers (VieLotusIM emits precomposed Unicode NFC; drop obsolete
+      debian/patches/ workaround).
+  * Regression suite: Native C++20 100.00% (9,091/9,091) primary, 100.00%
+    (369/369) ambiguous_both_sides, 100.00% (179/179) whitelist_safe=never;
+    Swift 100.00% (9,091/9,091) primary, 98.10% (362/369)
+    ambiguous_both_sides, 100.00% (179/179) whitelist_safe=never.
+
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Thu, 19 Nov 2026 05:00:00 +0700
+
 vielotus (2.0.4-1) unstable; urgency=medium
 
   * New upstream release 2.0.4:

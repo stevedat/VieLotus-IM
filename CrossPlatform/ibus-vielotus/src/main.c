@@ -774,15 +774,9 @@ static void ibus_vielotus_engine_property_activate(
     } else if (g_strcmp0(prop_name, "im-telex") == 0 && prop_state == PROP_STATE_CHECKED) {
         vl_engine->is_vni = FALSE;
         vielotus_set_input_method(vl_engine->session, VIELOTUS_INPUT_TELEX);
-        if (g_file_test("/usr/bin/vielotus-settings", G_FILE_TEST_IS_EXECUTABLE)) {
-            g_spawn_command_line_async("/usr/bin/vielotus-settings --telex", NULL);
-        }
     } else if (g_strcmp0(prop_name, "im-vni") == 0 && prop_state == PROP_STATE_CHECKED) {
         vl_engine->is_vni = TRUE;
         vielotus_set_input_method(vl_engine->session, VIELOTUS_INPUT_VNI);
-        if (g_file_test("/usr/bin/vielotus-settings", G_FILE_TEST_IS_EXECUTABLE)) {
-            g_spawn_command_line_async("/usr/bin/vielotus-settings --vni", NULL);
-        }
     } else if (g_strcmp0(prop_name, "smart-bilingual") == 0) {
         vl_engine->smart_bilingual = (prop_state == PROP_STATE_CHECKED);
         vielotus_set_smart_bilingual(vl_engine->session, vl_engine->smart_bilingual);
@@ -1273,10 +1267,6 @@ int main(int argc, char **argv) {
     IBusFactory *factory = ibus_factory_new(ibus_bus_get_connection(bus));
     ibus_factory_add_engine(factory, "vielotus", IBUS_TYPE_VIELOTUS_ENGINE);
     ibus_factory_add_engine(factory, "vielotus-vni", IBUS_TYPE_VIELOTUS_ENGINE);
-
-    if (g_file_test("/usr/bin/vielotus-settings", G_FILE_TEST_IS_EXECUTABLE)) {
-        g_spawn_command_line_async("/usr/bin/vielotus-settings --repair-sources", NULL);
-    }
 
     if (ibus) {
         ibus_bus_request_name(bus, "org.freedesktop.IBus.VieLotus", 0);

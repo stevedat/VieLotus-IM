@@ -47,5 +47,5 @@ The CI regression suite reports 9,091/9,091 primary cases (100%), 362/369 symmet
 ## Debian status
 
 - `vielotus 2.0.1-1` (sponsored by `byang@debian.org`) was accepted into Debian `unstable` on 2026-11-14: [Debian Package Tracker](https://tracker.debian.org/pkg/vielotus) · [Bug #1152533](https://bugs.debian.org/1152533) · [DFSG review for `vielotus 2.0.1-1`](https://dfsg-new-queue.debian.org/reviews/vielotus/2.0.1-1).
-- [`debian/watch`](../CrossPlatform/packaging/debian/watch) (Version 5) tracks upstream GitHub release tags (`v2.0.4` is currently the latest published tag).
-- Upstream and packaging updates for `2.0.4-1` (incorporating the review follow-ups from [Bug #1152533 message #10](https://bugs.debian.org/1152533#10)) are staged in [`CrossPlatform/packaging/debian/`](../CrossPlatform/packaging/debian) and verified by the `Debian Unstable` CI gate.
+- [`debian/watch`](../CrossPlatform/packaging/debian/watch) (Version 5) tracks upstream GitHub release tags (`v2.0.5` is the latest release tag).
+- Upstream and packaging updates for `2.0.5-1` (incorporating the review follow-ups from [Bug #1152533 message #10](https://bugs.debian.org/1152533#10) and removing unsolicited desktop input-method activation and fontconfig overrides upstream) are maintained in [`CrossPlatform/packaging/debian/`](../CrossPlatform/packaging/debian) and verified by the `Debian Unstable` CI gate.

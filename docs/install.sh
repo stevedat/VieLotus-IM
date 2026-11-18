@@ -1,6 +1,6 @@
 #!/bin/sh
 # ==============================================================================
-# Sen Việt (VieLotusIM) v2.0.4 — Universal Linux (Multi-Distro & Multi-Arch)
+# Sen Việt (VieLotusIM) v2.0.5 — Universal Linux (Multi-Distro & Multi-Arch)
 # & macOS One-Line Installer / Uninstaller
 #
 # Supported Linux Distros:
@@ -564,20 +564,12 @@ try_native_cmake_build() {
              "${STAGE_DIR}/usr/share/applications" \
              "${STAGE_DIR}/usr/share/metainfo" \
              "${STAGE_DIR}/usr/share/man/man1" \
-             "${STAGE_DIR}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources" \
-             "${STAGE_DIR}/etc/fonts/conf.d" \
-             "${STAGE_DIR}/etc/xdg/autostart"
+             "${STAGE_DIR}/usr/share/vielotus/VietLotusIM_VieLotusCore.resources"
 
     cp "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus-settings" "${STAGE_DIR}/usr/bin/vielotus-settings"
     chmod 0755 "${STAGE_DIR}/usr/bin/vielotus-settings"
     ln -sf vielotus-settings "${STAGE_DIR}/usr/bin/vielotus"
     cp "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus.desktop" "${STAGE_DIR}/usr/share/applications/vielotus.desktop"
-    if [ -f "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus-onboard.desktop" ]; then
-        cp "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus-onboard.desktop" "${STAGE_DIR}/etc/xdg/autostart/vielotus-onboard.desktop"
-    fi
-    if [ -f "${SRC_ROOT}/CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf" ]; then
-        cp "${SRC_ROOT}/CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf" "${STAGE_DIR}/etc/fonts/conf.d/51-vielotus-vietnamese.conf"
-    fi
     cp "${SRC_ROOT}/CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml" "${STAGE_DIR}/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml"
     if [ -f "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus-settings.1" ]; then
         cp "${SRC_ROOT}/CrossPlatform/packaging/linux/vielotus-settings.1" "${STAGE_DIR}/usr/share/man/man1/vielotus-settings.1"
@@ -701,7 +693,7 @@ else
     if command -v curl >/dev/null 2>&1 && [ -z "${VIELOTUS_DEB_PATH:-}" ]; then
         LATEST_TAG="$(curl -fsSL --max-time 4 https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest 2>/dev/null | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' | head -n 1 || true)"
     fi
-    VERSION="${LATEST_TAG:-2.0.4}"
+    VERSION="${LATEST_TAG:-2.0.5}"
 fi
 OS_NAME="$(uname -s)"
 ARCH_RAW="$(uname -m)"
@@ -1181,7 +1173,7 @@ fi
 rm -rf "${LINUX_TMP_DIR}"
 trap - EXIT HUP INT TERM
 
-if [ -x /usr/bin/vielotus-settings ]; then
+if [ "${VIELOTUS_ACTIVATE:-0}" = "1" ] && [ -x /usr/bin/vielotus-settings ]; then
     BOOTSTRAP_FCITX5="0"
     if [ -z "${CI:-}" ] && [ -n "${REAL_DISPLAY}${REAL_WAYLAND}" ] && ! printf '%s' "${REAL_DESKTOP}" | grep -qi "gnome"; then
         if ! pgrep -x ibus-daemon >/dev/null 2>&1 || printf '%s' "${REAL_DESKTOP}" | grep -Eqi 'kde|plasma|hyprland|sway|lxqt'; then
@@ -1191,28 +1183,18 @@ if [ -x /usr/bin/vielotus-settings ]; then
     run_as_real_user env VIELOTUS_BOOTSTRAP_FCITX5="${BOOTSTRAP_FCITX5}" /usr/bin/vielotus-settings --activate || true
 fi
 
-SETTINGS_OPENED="0"
-if [ "${VIELOTUS_NO_OPEN_SETTINGS:-0}" != "1" ] && [ -z "${CI:-}" ] && [ -x /usr/bin/vielotus-settings ]; then
-    if [ -n "${REAL_DISPLAY}${REAL_WAYLAND}" ]; then
-        ( run_as_real_user nohup /usr/bin/vielotus-settings </dev/null >/dev/null 2>&1 & ) || true
-        SETTINGS_OPENED="1"
-    fi
-fi
-
 echo ""
 echo "======================================================================"
-echo "✅ Cài đặt & kích hoạt Sen Việt (VieLotusIM v${VERSION}) hoàn tất!"
+echo "✅ Cài đặt Sen Việt (VieLotusIM v${VERSION}) hoàn tất!"
 echo "  • Kiến trúc CPU                 : ${DEB_ARCH} (${ARCH_RAW})"
-if [ "${SETTINGS_OPENED}" = "1" ]; then
-    echo "  • Cửa sổ Cài đặt Sen Việt       : Đã tự động mở — chọn Telex / VNI và gõ ngay!"
-fi
+echo "  • Kích hoạt bộ gõ (tùy chọn)    : Thêm 'Sen Việt' trong Cài đặt Bàn phím (GNOME/Fcitx5)"
+echo "                                    hoặc chạy chủ động: vielotus-settings --activate"
 echo "  • Đổi bộ gõ nhanh trên màn hình : Super + Space / Ctrl + Space"
 echo "  • Mở ứng dụng cài đặt (GUI)     : Tìm 'Sen Việt' trong Menu ứng dụng (hoặc gõ: vielotus)"
-echo "  • Chuyển sang kiểu gõ Telex     : vielotus --telex"
-echo "  • Chuyển sang kiểu gõ VNI       : vielotus --vni"
+echo "  • Chuyển kiểu gõ Telex / VNI    : vielotus --telex  |  vielotus --vni"
 echo "  • Chẩn đoán môi trường Linux    : vielotus --doctor"
-echo "  • Lưu ý lần đầu cài (Wayland)   : Nếu thanh trên cùng chưa hiện '🇻🇳 tex' hoặc"
-echo "                                    ứng dụng đang mở chưa nhận bộ gõ, hãy Log Out & Log In 1 lần."
+echo "  • Lưu ý lần đầu cài (Wayland)   : Nếu nguồn gõ mới chưa hiện hoặc ứng dụng đang mở chưa nhận,"
+echo "                                    hãy Log Out & Log In 1 lần."
 echo "  • Gỡ cài đặt sạch               : sh install.sh --uninstall"
 echo "======================================================================"
 }

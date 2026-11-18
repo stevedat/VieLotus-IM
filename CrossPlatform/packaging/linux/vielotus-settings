@@ -258,12 +258,11 @@ should_manage_fcitx5_profile() {
     return 1
 }
 
-configure_fcitx5_profile() {
-    FCITX_IM="$1"
-    ACTIVATE_PROFILE="${2:-0}"
-    FCITX_WAS_STOPPED_FOR_PROFILE=0
+write_fcitx5_addon_config() {
+    if [ ! -d "${CONFIG_ROOT}/fcitx5" ] && ! has_fcitx5_vielotus_plugin; then
+        return 0
+    fi
     FCITX_PROFILE_DIR="${CONFIG_ROOT}/fcitx5"
-    FCITX_PROFILE="${FCITX_PROFILE_DIR}/profile"
     mkdir -p "${FCITX_PROFILE_DIR}/conf"
 
     FCITX_GRAMMAR="SenFlex"
@@ -303,11 +302,25 @@ DeveloperMode=${FCITX_DM}
 # Hiện gạch chân khi đang gõ dấu (Preedit Underline)
 PreeditUnderline=${FCITX_PU}
 FCITX_CONF_EOF
+}
+
+configure_fcitx5_profile() {
+    FCITX_IM="$1"
+    ACTIVATE_PROFILE="${2:-0}"
+    SET_DEFAULT_IM="${3:-0}"
+    FCITX_WAS_STOPPED_FOR_PROFILE=0
+    FCITX_PROFILE_DIR="${CONFIG_ROOT}/fcitx5"
+    FCITX_PROFILE="${FCITX_PROFILE_DIR}/profile"
+
+    write_fcitx5_addon_config
 
     if [ "${ACTIVATE_PROFILE}" = "1" ] && should_manage_fcitx5_profile && command -v python3 >/dev/null 2>&1; then
+        mkdir -p "${FCITX_PROFILE_DIR}/conf"
         NEED_PROFILE_WRITE=1
-        if [ -f "${FCITX_PROFILE}" ] && grep -q "^Name=${FCITX_IM}\$" "${FCITX_PROFILE}" 2>/dev/null && grep -q "^DefaultIM=${FCITX_IM}\$" "${FCITX_PROFILE}" 2>/dev/null; then
-            NEED_PROFILE_WRITE=0
+        if [ -f "${FCITX_PROFILE}" ] && grep -q "^Name=${FCITX_IM}\$" "${FCITX_PROFILE}" 2>/dev/null; then
+            if [ "${SET_DEFAULT_IM}" != "1" ] || grep -q "^DefaultIM=${FCITX_IM}\$" "${FCITX_PROFILE}" 2>/dev/null; then
+                NEED_PROFILE_WRITE=0
+            fi
         fi
         if [ "${NEED_PROFILE_WRITE}" = "1" ]; then
             if pgrep -x fcitx5 >/dev/null 2>&1; then
@@ -324,10 +337,11 @@ FCITX_CONF_EOF
                     sleep 0.1
                 fi
             fi
-            python3 - "${FCITX_PROFILE}" "${FCITX_IM}" <<'PYEOF' 2>/dev/null || true
+            python3 - "${FCITX_PROFILE}" "${FCITX_IM}" "${SET_DEFAULT_IM}" <<'PYEOF' 2>/dev/null || true
 import os, re, sys
 
 profile_path, im_name = sys.argv[1], sys.argv[2]
+set_default = sys.argv[3] == "1"
 text = ""
 if os.path.exists(profile_path):
     with open(profile_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -357,25 +371,28 @@ Layout=
 0=Default
 """
 
+def update_default_im(content):
+    m = re.search(r"^DefaultIM=(.*)$", content, flags=re.M)
+    if m:
+        cur = m.group(1).strip()
+        if set_default or not cur or cur.startswith("vielotus-"):
+            return re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", content, count=1, flags=re.M)
+        return content
+    return content.replace("[Groups/0]", f"[Groups/0]\nDefaultIM={im_name}", 1)
+
 if "[Groups/0]" not in text:
     with open(profile_path, "w", encoding="utf-8") as f:
         f.write(default_profile)
 elif re.search(r"^Name=vielotus-(telex|vni)$", text, flags=re.M):
     text = re.sub(r"^Name=vielotus-(telex|vni)$", f"Name={im_name}", text, count=1, flags=re.M)
-    if re.search(r"^DefaultIM=.*$", text, flags=re.M):
-        text = re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", text, count=1, flags=re.M)
-    else:
-        text = text.replace("[Groups/0]", f"[Groups/0]\nDefaultIM={im_name}", 1)
+    text = update_default_im(text)
     with open(profile_path, "w", encoding="utf-8") as f:
         f.write(text)
 else:
     indices = [int(m) for m in re.findall(r"^\[Groups/0/Items/(\d+)\]", text, flags=re.M)]
     next_idx = (max(indices) + 1) if indices else 0
     new_item = f"\n[Groups/0/Items/{next_idx}]\nName={im_name}\nLayout=\n"
-    if re.search(r"^DefaultIM=.*$", text, flags=re.M):
-        text = re.sub(r"^DefaultIM=.*$", f"DefaultIM={im_name}", text, count=1, flags=re.M)
-    else:
-        text = text.replace("[Groups/0]", f"[Groups/0]\nDefaultIM={im_name}", 1)
+    text = update_default_im(text)
     if "[GroupOrder]" in text:
         text = text.replace("[GroupOrder]", new_item.lstrip("\n") + "\n[GroupOrder]", 1)
     else:
@@ -387,9 +404,20 @@ PYEOF
     fi
 }
 
+reload_running_fcitx5_config() {
+    if pgrep -x fcitx5 >/dev/null 2>&1 && command -v fcitx5-remote >/dev/null 2>&1; then
+        fcitx5-remote -r >/dev/null 2>&1 || true
+    fi
+}
+
 ensure_fcitx5_session_ready() {
     FCITX_IM_TARGET="$1"
     ACTIVATE_NOW="${2:-0}"
+    SWITCH_NOW="${3:-0}"
+    if [ "${ACTIVATE_NOW}" != "1" ]; then
+        reload_running_fcitx5_config
+        return 0
+    fi
     has_fcitx5_vielotus_plugin || return 0
 
     SHOULD_DRIVE_FCITX5=0
@@ -588,7 +616,7 @@ KWIN_PYEOF
 
     if pgrep -x fcitx5 >/dev/null 2>&1 && command -v fcitx5-remote >/dev/null 2>&1; then
         fcitx5-remote -r >/dev/null 2>&1 || true
-        if [ "${ACTIVATE_NOW}" = "1" ]; then
+        if [ "${SWITCH_NOW}" = "1" ]; then
             fcitx5-remote -s "${FCITX_IM_TARGET}" >/dev/null 2>&1 || true
         fi
     fi
@@ -788,6 +816,8 @@ save_and_apply() {
     MODE="${1:-$INPUT_METHOD}"
     ACTIVATE_SOURCES="${2:-0}"
     FORCE_REBIND_ARG="${3:-0}"
+    SET_DEFAULT_ARG="${4:-0}"
+    SWITCH_NOW_ARG="${5:-0}"
     case "${MODE}" in
         vni|VNI) INPUT_METHOD="vni" ;;
         *) INPUT_METHOD="telex" ;;
@@ -802,39 +832,40 @@ save_and_apply() {
         FCITX_IM_ID="vielotus-vni"
     fi
 
-    # 1. Update Fcitx5 addon config file & ensure Fcitx5 session/Wayland virtual keyboard is ready
-    configure_fcitx5_profile "${FCITX_IM_ID}" "${ACTIVATE_SOURCES}" || true
-    ensure_fcitx5_session_ready "${FCITX_IM_ID}" "${ACTIVATE_SOURCES}" || true
+    # Config-only save path (used by GUI preference changes and --telex/--vni):
+    # Never alter Fcitx5 profile/DefaultIM, start/switch Fcitx5, edit kwinrc/environment.d,
+    # restart IBus, or modify GNOME Input Sources without explicit user activation.
+    if [ "${ACTIVATE_SOURCES}" != "1" ]; then
+        write_fcitx5_addon_config || true
+        reload_running_fcitx5_config || true
+        return 0
+    fi
+
+    # Explicit opt-in activation path (only invoked via --activate or confirmed --doctor --fix)
+    # 1. Update Fcitx5 addon config file & register Fcitx5 session/Wayland virtual keyboard
+    configure_fcitx5_profile "${FCITX_IM_ID}" "1" "${SET_DEFAULT_ARG}" || true
+    ensure_fcitx5_session_ready "${FCITX_IM_ID}" "1" "${SWITCH_NOW_ARG}" || true
 
     # 2. Ensure live ibus-daemon has loaded vielotus.xml before binding GNOME Input Sources
     REBIND_FLAG="${FORCE_REBIND_ARG}"
-    if [ "${ACTIVATE_SOURCES}" = "1" ] && command -v ibus >/dev/null 2>&1; then
-        reload_live_ibus_if_needed
-        if [ "${IBUS_WAS_RELOADED:-0}" = "1" ]; then
-            REBIND_FLAG="1"
+    if command -v ibus >/dev/null 2>&1; then
+        if is_gnome_desktop || pgrep -x ibus-daemon >/dev/null 2>&1 || ! has_fcitx5_vielotus_plugin; then
+            reload_live_ibus_if_needed
+            if [ "${IBUS_WAS_RELOADED:-0}" = "1" ]; then
+                REBIND_FLAG="1"
+            fi
         fi
     fi
 
-    # 3. Repair duplicate GNOME Input Sources and sync active Telex/VNI selection
-    if [ "${ACTIVATE_SOURCES}" = "1" ]; then
-        repair_and_sync_gnome_sources "${ENGINE_ID}" "0" "${REBIND_FLAG}"
-    fi
+    # 3. Register / sync GNOME Input Sources when explicitly requested
+    repair_and_sync_gnome_sources "${ENGINE_ID}" "0" "${REBIND_FLAG}"
 
-    # 4. Switch active IBus engine if IBus daemon is reachable and user explicitly changed mode
-    if [ "${ACTIVATE_SOURCES}" = "1" ] && command -v ibus >/dev/null 2>&1; then
+    # 4. Switch active IBus engine only if explicitly requested and ibus-daemon is running
+    if [ "${SWITCH_NOW_ARG}" = "1" ] && command -v ibus >/dev/null 2>&1; then
         if pgrep -x ibus-daemon >/dev/null 2>&1; then
             discover_live_ibus_address
             (ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true) &
         fi
-    fi
-
-    # 5. Sync drop-in fontconfig rules for sandboxed Snap apps (never touches ~/.config/fontconfig/fonts.conf)
-    if [ -d /snap ] && [ -f /etc/fonts/conf.d/99-vielotus-vietnamese.conf ]; then
-        mkdir -p "${CONFIG_ROOT}/fontconfig/conf.d" 2>/dev/null || true
-        if [ -f /etc/fonts/conf.d/51-vielotus-vietnamese.conf ]; then
-            cp -f /etc/fonts/conf.d/51-vielotus-vietnamese.conf "${CONFIG_ROOT}/fontconfig/conf.d/51-vielotus-vietnamese.conf" 2>/dev/null || true
-        fi
-        cp -f /etc/fonts/conf.d/99-vielotus-vietnamese.conf "${CONFIG_ROOT}/fontconfig/conf.d/99-vielotus-vietnamese.conf" 2>/dev/null || true
     fi
 }
 
@@ -1039,16 +1070,12 @@ if os.path.exists(modes_path):
 else:
     print("• Quy tắc App (typing-modes): ✓ Tự động phân loại theo hệ thống")
 
-# Fontconfig monospace check (prevents DejaVu Sans Mono NFD U+0309 +1 cell offset)
+# Monospace font check (informational only; VieLotusIM emits precomposed Unicode NFC)
 fc_match_bin = shutil.which("fc-match")
 if fc_match_bin:
     try:
         mono_out = subprocess.check_output([fc_match_bin, "monospace"], stderr=subprocess.DEVNULL, timeout=3).decode("utf-8", errors="replace").strip()
-        if "DejaVuSansMono" in mono_out:
-            warnings += 1
-            print(f"• Phông chữ Monospace      : ⚠ {mono_out} (nên cài 'fonts-noto-mono' để tránh lệch dấu hỏi NFD)")
-        else:
-            print(f"• Phông chữ Monospace      : ✓ {mono_out}")
+        print(f"• Phông chữ Monospace      : ✓ {mono_out}")
     except Exception:
         pass
 
@@ -1359,7 +1386,8 @@ def notify_running_engines():
     if smoke_mode:
         return
     try:
-        subprocess.Popen(["fcitx5-remote", "-r"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if subprocess.call(["pgrep", "-x", "fcitx5"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0:
+            subprocess.Popen(["fcitx5-remote", "-r"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
 
@@ -1918,7 +1946,7 @@ ver_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
 ver_box.get_style_context().add_class("bento-ver-pill")
 ver_box.set_valign(Gtk.Align.CENTER)
 ver_lbl = Gtk.Label()
-ver_lbl.set_markup(f"<span size='8500' weight='bold' foreground='{P['accent']}'>v2.0.4</span>")
+ver_lbl.set_markup(f"<span size='8500' weight='bold' foreground='{P['accent']}'>v2.0.5</span>")
 ver_box.pack_start(ver_lbl, False, False, 0)
 brand_top.pack_start(title_lbl, False, False, 0)
 brand_top.pack_start(ver_box, False, False, 0)
@@ -3091,9 +3119,26 @@ def open_linux_sheet(*_, auto_close=False):
     b_scan = Gtk.Button(label="Quét lại")
     b_scan.get_style_context().add_class("bento-btn")
     b_scan.connect("clicked", lambda *_: run_doc(False))
+    def confirm_and_fix(*_):
+        ask = Gtk.MessageDialog(
+            transient_for=dlg,
+            flags=Gtk.DialogFlags.MODAL,
+            message_type=Gtk.MessageType.QUESTION,
+            buttons=Gtk.ButtonsType.YES_NO,
+            text="Xác nhận đăng ký & kích hoạt Sen Việt trong hệ thống?",
+        )
+        ask.format_secondary_text(
+            "Thao tác này sẽ cập nhật danh sách bộ gõ của môi trường desktop hiện tại "
+            "(IBus / GNOME Input Sources hoặc Fcitx5 / KWin) để thêm và kích hoạt Sen Việt."
+        )
+        resp = ask.run()
+        ask.destroy()
+        if resp == Gtk.ResponseType.YES:
+            run_doc(True)
+
     b_fix = Gtk.Button(label="Tự sửa & Kích hoạt")
     b_fix.get_style_context().add_class("bento-btn")
-    b_fix.connect("clicked", lambda *_: run_doc(True))
+    b_fix.connect("clicked", confirm_and_fix)
     b_cp = Gtk.Button(label="Sao chép")
     b_cp.get_style_context().add_class("bento-btn")
     b_cp.connect("clicked", copy_doc)
@@ -3181,7 +3226,7 @@ def open_feedback_sheet(*_, auto_close=False):
     sess_type = (os.environ.get("XDG_SESSION_TYPE") or ("wayland" if os.environ.get("WAYLAND_DISPLAY") else "x11")).upper()
     os_name = detect_os_pretty_name()
     arch_name = platform.machine() or "linux"
-    sys_badge_str = f"Sen Việt v2.0.4 • {os_name} ({arch_name}) • {sess_type} • {im_title}"
+    sys_badge_str = f"Sen Việt v2.0.5 • {os_name} ({arch_name}) • {sess_type} • {im_title}"
 
     meta_pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
     meta_pill.get_style_context().add_class("bento-pill")
@@ -3363,7 +3408,7 @@ def open_feedback_sheet(*_, auto_close=False):
             hdr_topic = k_title
             issue_sum = k_title
 
-        issue_title = f"{k_prefix} {issue_sum} (Linux v2.0.4)"
+        issue_title = f"{k_prefix} {issue_sum} (Linux v2.0.5)"
         lines = [f"### {k_prefix} {hdr_topic}", ""]
         if t_keys or t_act or t_exp:
             lines.append(f"- **Chuỗi phím đã gõ (Typed Keys):** `{t_keys or '—'}`")
@@ -3748,45 +3793,25 @@ fi
 discover_live_ibus_address
 
 case "${1:-}" in
-    --auto-onboard)
-        ONBOARD_MARKER="${CONFIG_DIR}/.onboarded"
-        load_config
-        FCITX_ONBOARD_IM="vielotus-telex"
-        [ "${INPUT_METHOD}" = "vni" ] && FCITX_ONBOARD_IM="vielotus-vni"
-        if [ -f "${ONBOARD_MARKER}" ]; then
-            ensure_fcitx5_session_ready "${FCITX_ONBOARD_IM}" "1" || true
-            reload_live_ibus_if_needed
-            repair_and_sync_gnome_sources "vielotus" "1" "${IBUS_WAS_RELOADED:-0}"
-            exit 0
-        fi
-        save_and_apply "${INPUT_METHOD}" "1" "1"
-        if ! pgrep -x ibus-daemon >/dev/null 2>&1 || ! command -v ibus >/dev/null 2>&1; then
-            : > "${ONBOARD_MARKER}" 2>/dev/null || true
-        else
-            discover_live_ibus_address
-            if ibus list-engine 2>/dev/null | grep -q "vielotus"; then
-                : > "${ONBOARD_MARKER}" 2>/dev/null || true
-            fi
-        fi
-        exit 0
-        ;;
     --activate)
         load_config
-        save_and_apply "${INPUT_METHOD}" "1" "1"
-        echo "✅ Đã kích hoạt bộ gõ Sen Việt (${INPUT_METHOD}) cho cả Fcitx5 và IBus."
+        SET_DEF="0"
+        [ "${2:-}" = "--set-default" ] && SET_DEF="1"
+        save_and_apply "${INPUT_METHOD}" "1" "1" "${SET_DEF}" "1"
+        echo "✅ Đã kích hoạt bộ gõ Sen Việt (${INPUT_METHOD}) theo yêu cầu."
         echo "ℹ Lưu ý Ubuntu/GNOME (Wayland): Nếu thanh trên cùng chưa hiện '🇻🇳 tex' hoặc Settings chỉ hiện chữ 'vielotus', hãy Đăng xuất (Log Out) & Đăng nhập lại 1 lần."
         exit 0
         ;;
     --telex)
         load_config
-        save_and_apply "telex" "1"
-        echo "✅ Đã chuyển Sen Việt sang kiểu gõ Telex (Fcitx5 & IBus)."
+        save_and_apply "telex" "0"
+        echo "✅ Đã lưu cấu hình kiểu gõ Telex cho Sen Việt."
         exit 0
         ;;
     --vni)
         load_config
-        save_and_apply "vni" "1"
-        echo "✅ Đã chuyển Sen Việt sang kiểu gõ VNI (Fcitx5 & IBus)."
+        save_and_apply "vni" "0"
+        echo "✅ Đã lưu cấu hình kiểu gõ VNI cho Sen Việt."
         exit 0
         ;;
     --repair-sources)
@@ -3798,7 +3823,7 @@ case "${1:-}" in
     --doctor)
         load_config
         if [ "${2:-}" = "--fix" ]; then
-            save_and_apply "${INPUT_METHOD}" "1" "1"
+            save_and_apply "${INPUT_METHOD}" "1" "1" "0" "1"
             repair_and_sync_gnome_sources "vielotus" "1" "1"
         fi
         run_doctor
@@ -3824,7 +3849,7 @@ case "${1:-}" in
         exit 0
         ;;
     --check-update|--update)
-        echo "ℹ Sen Việt (VieLotusIM v2.0.4): Bản cập nhật được quản lý qua trình quản lý gói hệ thống."
+        echo "ℹ Sen Việt (VieLotusIM v2.0.5): Bản cập nhật được quản lý qua trình quản lý gói hệ thống."
         if command -v apt-get >/dev/null 2>&1; then
             echo "  • Debian / Ubuntu : sudo apt update && sudo apt upgrade"
         elif command -v pacman >/dev/null 2>&1; then
@@ -3836,16 +3861,9 @@ case "${1:-}" in
         ;;
 esac
 
-# Load current configuration, ensure live Fcitx5 / IBus session is ready, and auto-repair GNOME Input Sources
+# Load current configuration only; opening the settings window must never
+# modify Fcitx5/IBus/GNOME/KWin input-method defaults or active sources.
 load_config
-FCITX_STARTUP_IM="vielotus-telex"
-[ "${INPUT_METHOD}" = "vni" ] && FCITX_STARTUP_IM="vielotus-vni"
-if ! is_gnome_desktop; then
-    configure_fcitx5_profile "${FCITX_STARTUP_IM}" "1" || true
-    ensure_fcitx5_session_ready "${FCITX_STARTUP_IM}" "1" || true
-fi
-reload_live_ibus_if_needed
-repair_and_sync_gnome_sources "vielotus" "1" "${IBUS_WAS_RELOADED:-0}"
 
 # Launch Native GTK3 Desktop Settings Window if graphical session is available
 if command -v python3 >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
@@ -3889,7 +3907,7 @@ if os.path.exists(config_path):
                 cfg[k.strip()] = v.strip().strip('"').strip("'")
 
 root = tk.Tk()
-root.title("Sen Việt (VieLotusIM v2.0.4) — Cài đặt")
+root.title("Sen Việt (VieLotusIM v2.0.5) — Cài đặt")
 root.geometry("460x320")
 root.resizable(False, False)
 
@@ -3940,7 +3958,7 @@ def apply_changes(*_):
 
 frm = ttk.Frame(root, padding=16)
 frm.pack(fill="both", expand=True)
-ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.4)", font=("Sans", 13, "bold")).pack(anchor="w")
+ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.5)", font=("Sans", 13, "bold")).pack(anchor="w")
 ttk.Label(frm, text="Kiểu gõ Tiếng Việt (tự động lưu & áp dụng):").pack(anchor="w", pady=(10, 4))
 ttk.Radiobutton(frm, text="Telex Tự Do (s f r x j w — vieetj → việt)", variable=im_var, value="telex", command=apply_changes).pack(anchor="w")
 ttk.Radiobutton(frm, text="VNI Chuẩn (phím số 1–9 — vie65t → việt)", variable=im_var, value="vni", command=apply_changes).pack(anchor="w")
@@ -3971,8 +3989,8 @@ if command -v zenity >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" 
         "${VNI_TRUE}" "vni" "VNI (Gõ dấu bằng phím số 1–9)" \
         --hide-column=2 2>/dev/null || true)
     if [ -n "${CHOICE}" ]; then
-        save_and_apply "${CHOICE}" "1"
-        zenity --notification --text="Sen Việt: Đã kích hoạt kiểu gõ $(echo "${CHOICE}" | tr 'a-z' 'A-Z')" 2>/dev/null || true
+        save_and_apply "${CHOICE}" "0"
+        zenity --notification --text="Sen Việt: Đã lưu kiểu gõ $(echo "${CHOICE}" | tr 'a-z' 'A-Z')" 2>/dev/null || true
     fi
     exit 0
 fi

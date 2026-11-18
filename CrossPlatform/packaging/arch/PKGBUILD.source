@@ -1,6 +1,6 @@
 # Maintainer: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
 pkgname=vielotus
-pkgver=2.0.4
+pkgver=2.0.5
 pkgrel=1
 pkgdesc="Sen Việt (VieLotusIM) — Next-Gen Vietnamese Input Method for IBus & Fcitx5 (Native C++20 Engine)"
 arch=('x86_64' 'aarch64' 'riscv64' 'armv7h' 'i686' 'powerpc64le')
@@ -79,10 +79,6 @@ package() {
     ln -sf vielotus-settings.1 "${pkgdir}/usr/share/man/man1/vielotus.1"
     install -Dm644 CrossPlatform/packaging/linux/vielotus.desktop \
         "${pkgdir}/usr/share/applications/vielotus.desktop"
-    install -Dm644 CrossPlatform/packaging/linux/vielotus-onboard.desktop \
-        "${pkgdir}/etc/xdg/autostart/vielotus-onboard.desktop"
-    install -Dm644 CrossPlatform/packaging/linux/51-vielotus-vietnamese.conf \
-        "${pkgdir}/etc/fonts/conf.d/51-vielotus-vietnamese.conf"
     install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml \
         "${pkgdir}/usr/share/metainfo/org.vielotus.VieLotus.metainfo.xml"
     for sz in 16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do

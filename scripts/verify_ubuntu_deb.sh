@@ -131,8 +131,8 @@ echo "✅ Tất cả thư viện và binary (.so / engine) liên kết hoàn h�
 echo ""
 echo "▶ [4/7] Kiểm tra công cụ cấu hình & chuyển đổi Telex / VNI (vielotus-settings)..."
 /usr/bin/vielotus-settings --activate
-if [ -e "${HOME}/.config/fcitx5/profile" ] || [ -e "${HOME}/.config/fontconfig/fonts.conf" ]; then
-    echo "❌ LỖI: vielotus-settings tự ý tạo/ghi đè fcitx5/profile hoặc fontconfig/fonts.conf khi chưa có sẵn!"
+if [ -e "${HOME}/.config/fcitx5/profile" ] || [ -e "${HOME}/.config/fontconfig/fonts.conf" ] || [ -e "${HOME}/.config/fontconfig/conf.d/51-vielotus-vietnamese.conf" ]; then
+    echo "❌ LỖI: vielotus-settings tự ý tạo/ghi đè fcitx5/profile hoặc fontconfig khi chưa có sẵn!"
     exit 1
 fi
 
@@ -141,7 +141,7 @@ cat <<'FCITX_SEED_EOF' > "${HOME}/.config/fcitx5/profile"
 [Groups/0]
 Name=Default
 Default Layout=us
-DefaultIM=vielotus-telex
+DefaultIM=keyboard-us
 
 [Groups/0/Items/0]
 Name=keyboard-us
@@ -155,18 +155,29 @@ Layout=
 0=Default
 FCITX_SEED_EOF
 
+# Changing VieLotus Telex/VNI preference must ONLY update config.env and vielotus.conf,
+# never mutating fcitx5/profile or DefaultIM without explicit --activate.
 /usr/bin/vielotus-settings --vni
 STATUS_VNI="$(/usr/bin/vielotus-settings --status)"
 echo "${STATUS_VNI}"
 grep -Fx "INPUT_METHOD=vni" <<<"${STATUS_VNI}" >/dev/null
-grep -Fx "Name=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
+grep -Fx "DefaultIM=keyboard-us" "${HOME}/.config/fcitx5/profile" >/dev/null
+grep -Fx "Name=vielotus-telex" "${HOME}/.config/fcitx5/profile" >/dev/null
 grep -Fx "GrammarProfile=Classic" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/dev/null
 grep -Fx "MacroEnabled=False" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/dev/null
+
+# Explicit --activate updates VieLotus item in fcitx5/profile while preserving non-VieLotus DefaultIM
+/usr/bin/vielotus-settings --activate
+grep -Fx "Name=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
+grep -Fx "DefaultIM=keyboard-us" "${HOME}/.config/fcitx5/profile" >/dev/null
 
 /usr/bin/vielotus-settings --telex
 STATUS_TELEX="$(/usr/bin/vielotus-settings --status)"
 echo "${STATUS_TELEX}"
 grep -Fx "INPUT_METHOD=telex" <<<"${STATUS_TELEX}" >/dev/null
+grep -Fx "DefaultIM=keyboard-us" "${HOME}/.config/fcitx5/profile" >/dev/null
+
+/usr/bin/vielotus-settings --activate
 grep -Fx "Name=vielotus-telex" "${HOME}/.config/fcitx5/profile" >/dev/null
 
 # Ensure no redundant duplicate addon files were written to ~/.local/share/fcitx5
