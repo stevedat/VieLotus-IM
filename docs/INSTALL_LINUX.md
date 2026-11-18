@@ -25,7 +25,7 @@ sudo apt install vielotus
 Download the matching `vielotus_<version>_<arch>.deb` from the latest release (`amd64` for x86_64, `arm64` for ARM64), then install it with APT. Replace the values below with the downloaded file's version and architecture:
 
 ```sh
-version=2.0.3
+version=2.0.5
 arch=amd64 # use arm64 on ARM64
 sudo apt install "./vielotus_${version}_${arch}.deb"
 ```
@@ -51,14 +51,12 @@ vielotus-settings --activate
 
 ## First launch and input source
 
-The package includes a first-login onboarding task. In a supported active desktop session, it refreshes the input-method registry and tries to add/activate Sen Việt. The automatic installer also adds Sen Việt to Ubuntu Language Selector's package choices on supported Ubuntu systems; installing a `.deb` directly does not make that Language Selector change.
-
-On Ubuntu/GNOME, switch input methods with `Super` + `Space` and select **Sen Việt – Telex** (or VNI). On other desktops, use the desktop's configured shortcut and input-source settings. If Sen Việt is missing, run:
+Installing the package registers the IBus engine and/or Fcitx5 addon without changing your active or default input method. Enable **Sen Việt – Telex** (or **VNI**) in your desktop's Keyboard / Input Source settings (GNOME Settings, Fcitx5 Configuration, or `im-config`), or explicitly run:
 
 ```sh
 vielotus-settings --activate
 ```
 
-Then check the desktop's keyboard/input-source settings. On Ubuntu/GNOME Wayland, log out and back in once if the new source is not shown or appears as `vielotus`. On Arch and other non-Debian desktops, there is no Ubuntu Language Selector entry; input-source presentation depends on the desktop and whether IBus or Fcitx5 is active.
+On Ubuntu/GNOME, switch input methods with `Super` + `Space` once added. On GNOME Wayland, log out and back in once if the newly installed source is not shown or appears as `vielotus`. On Arch and other non-Debian desktops, input-source presentation depends on the desktop and whether IBus or Fcitx5 is active.
 
 For diagnostics, run `vielotus-settings --doctor`. See [Linux test status](TEST_STATUS.md) for CI and maintainer-reported manual results.

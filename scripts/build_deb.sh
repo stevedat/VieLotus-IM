@@ -16,7 +16,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-VERSION="${1:-2.0.4}"
+VERSION="${1:-2.0.5}"
 ARCH="${2:-amd64}"
 
 DIST_LINUX="${ROOT_DIR}/dist/linux"
@@ -151,14 +151,12 @@ install_desktop_integration() {
     mkdir -p "${target_root}/usr/bin"
     mkdir -p "${target_root}/usr/share/applications"
     mkdir -p "${target_root}/usr/share/metainfo"
-    mkdir -p "${target_root}/etc/xdg/autostart"
 
     cp "${PACKAGING_LINUX}/vielotus-settings" "${target_root}/usr/bin/vielotus-settings"
     chmod 755 "${target_root}/usr/bin/vielotus-settings"
     ln -sf vielotus-settings "${target_root}/usr/bin/vielotus"
 
     cp "${PACKAGING_LINUX}/vielotus.desktop" "${target_root}/usr/share/applications/vielotus.desktop"
-    cp "${PACKAGING_LINUX}/vielotus-onboard.desktop" "${target_root}/etc/xdg/autostart/vielotus-onboard.desktop"
     for setup_name in ibus-setup-vielotus.desktop ibus-setup-vielotus-vni.desktop; do
         cp "${PACKAGING_LINUX}/vielotus.desktop" "${target_root}/usr/share/applications/${setup_name}"
         echo "NoDisplay=true" >> "${target_root}/usr/share/applications/${setup_name}"
@@ -300,74 +298,6 @@ package_single_arch() {
 
     # 6. Desktop Application Launcher, GUI/CLI Settings Utility & AppStream Metadata
     install_desktop_integration "${pkg_dir}"
-
-    # 7. System-wide Fontconfig rule for Vietnamese Latin Extended Additional & combining marks (NFC + NFD: chuẩn, thử...)
-    # Note: DejaVu Sans Mono lacks OpenType GPOS mkmk/mark anchors for U+0309 (shifting dấu hỏi +1 cell right on NFD),
-    # whereas Noto Sans Mono and Liberation Mono render both NFC and NFD Vietnamese diacritics accurately in one cell.
-    mkdir -p "${pkg_dir}/etc/fonts/conf.d"
-    cat <<'FC_SYS_EOF' > "${pkg_dir}/etc/fonts/conf.d/99-vielotus-vietnamese.conf"
-<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
-<fontconfig>
-  <selectfont>
-    <rejectfont>
-      <glob>/usr/share/fonts/truetype/ubuntu/*</glob>
-      <glob>/usr/share/fonts/opentype/ubuntu/*</glob>
-      <glob>/var/lib/snapd/hostfs/usr/share/fonts/truetype/ubuntu/*</glob>
-      <glob>/var/lib/snapd/hostfs/usr/share/fonts/opentype/ubuntu/*</glob>
-      <glob>/snap/*/usr/share/fonts/truetype/ubuntu/*</glob>
-      <glob>/snap/*/usr/share/fonts/opentype/ubuntu/*</glob>
-    </rejectfont>
-  </selectfont>
-  <match target="pattern">
-    <test qual="any" name="family">
-      <string>Ubuntu</string>
-    </test>
-    <edit name="family" mode="assign" binding="same">
-      <string>Noto Sans</string>
-    </edit>
-  </match>
-  <match target="pattern">
-    <test qual="any" name="family">
-      <string>Ubuntu Sans</string>
-    </test>
-    <edit name="family" mode="assign" binding="same">
-      <string>Noto Sans</string>
-    </edit>
-  </match>
-  <match target="pattern">
-    <test qual="any" name="family">
-      <string>Ubuntu Mono</string>
-    </test>
-    <edit name="family" mode="assign" binding="same">
-      <string>Noto Sans Mono</string>
-    </edit>
-  </match>
-  <match target="pattern">
-    <test qual="any" name="family">
-      <string>Ubuntu Sans Mono</string>
-    </test>
-    <edit name="family" mode="assign" binding="same">
-      <string>Noto Sans Mono</string>
-    </edit>
-  </match>
-  <alias>
-    <family>sans-serif</family>
-    <prefer>
-      <family>Noto Sans</family>
-      <family>DejaVu Sans</family>
-    </prefer>
-  </alias>
-  <alias>
-    <family>monospace</family>
-    <prefer>
-      <family>Noto Sans Mono</family>
-      <family>Liberation Mono</family>
-    </prefer>
-  </alias>
-</fontconfig>
-FC_SYS_EOF
-    cp -f "${pkg_dir}/etc/fonts/conf.d/99-vielotus-vietnamese.conf" "${pkg_dir}/etc/fonts/conf.d/51-vielotus-vietnamese.conf"
 
     local installed_size
     installed_size=$(du -sk "${pkg_dir}" | awk '{print $1}')

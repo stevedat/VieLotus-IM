@@ -1,4 +1,4 @@
-.TH VIELOTUS-SETTINGS 1 "November 2026" "VieLotusIM 2.0.4" "User Commands"
+.TH VIELOTUS-SETTINGS 1 "November 2026" "VieLotusIM 2.0.5" "User Commands"
 .SH NAME
 vielotus-settings \- configuration, macro/app rule manager, and diagnostics utility for Sen Viet (VieLotusIM)
 .SH SYNOPSIS
@@ -13,19 +13,22 @@ backtick code bypass, and inline live typing verification, plus modal sheets for
 Personal Macro Editor, Per-App Presentation Rules, Quick Feedback & Bug Reporter, and Linux-specific settings & diagnostics
 (Preedit underline, GNOME per-window source state, Smart Bilingual, Modern Orthography, and
 the IBus/Fcitx5/Wayland Environment Doctor).
+Opening the window or changing VieLotus preferences only reads/writes VieLotus's own
+configuration files and never alters desktop default input methods or active input sources
+unless explicitly requested via \fB\-\-activate\fR.
 .SH OPTIONS
 .TP
-\fB\-\-auto\-onboard\fR
-One-shot first-install / first-login onboarding helper used by package installation and XDG Autostart to register Sen Viet automatically.
-.TP
 \fB\-\-telex\fR
-Switch the active input method mode to Telex across IBus and Fcitx5.
+Save Telex as the preferred VieLotus input method in VieLotus's own configuration without changing desktop input-source defaults.
 .TP
 \fB\-\-vni\fR
-Switch the active input method mode to VNI across IBus and Fcitx5.
+Save VNI as the preferred VieLotus input method in VieLotus's own configuration without changing desktop input-source defaults.
 .TP
-\fB\-\-activate\fR
-Save and apply the current input method configuration to the active session without clobbering comments or custom keys.
+\fB\-\-activate\fR [\fB\-\-set\-default\fR]
+Explicitly register and activate VieLotus in the current user's Fcitx5 or IBus/GNOME session (pass \fB\-\-set\-default\fR to also overwrite an existing non-VieLotus Fcitx5 DefaultIM).
+.TP
+\fB\-\-repair\-sources\fR
+Explicitly refresh IBus component cache and repair duplicate VieLotus entries in GNOME Input Sources when requested by the user.
 .TP
 \fB\-\-doctor\fR [\fB\-\-fix\fR]
 Inspect Wayland/X11 session variables, running IBus/Fcitx5 daemons, dynamic library linkage (\fBldd \-r\fR),
