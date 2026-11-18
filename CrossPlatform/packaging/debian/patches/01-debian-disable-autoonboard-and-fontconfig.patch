@@ -9,12 +9,10 @@ Last-Update: 2026-11-18
 
 --- a/CrossPlatform/packaging/linux/vielotus-settings
 +++ b/CrossPlatform/packaging/linux/vielotus-settings
-@@ -826,15 +826,6 @@
-             discover_live_ibus_address
-             (ibus engine "${ENGINE_ID}" >/dev/null 2>&1 || true) &
+@@ -828,14 +828,6 @@ save_and_apply() {
          fi
      fi
--
+ 
 -    # 5. Sync drop-in fontconfig rules for sandboxed Snap apps (never touches ~/.config/fontconfig/fonts.conf)
 -    if [ -d /snap ] && [ -f /etc/fonts/conf.d/99-vielotus-vietnamese.conf ]; then
 -        mkdir -p "${CONFIG_ROOT}/fontconfig/conf.d" 2>/dev/null || true
@@ -25,7 +23,8 @@ Last-Update: 2026-11-18
 -    fi
  }
  
-@@ -3748,28 +3739,6 @@
+ run_doctor() {
+@@ -3748,28 +3740,6 @@ fi
  discover_live_ibus_address
  
  case "${1:-}" in
@@ -56,13 +55,13 @@ Last-Update: 2026-11-18
          save_and_apply "${INPUT_METHOD}" "1" "1"
 --- a/CrossPlatform/packaging/linux/vielotus-settings.1
 +++ b/CrossPlatform/packaging/linux/vielotus-settings.1
-@@ -14,9 +14,6 @@
- (Preedit underline, GNOME per-window source state, Smart Bilingual, Modern Orthography, and
+@@ -15,9 +15,6 @@ Personal Macro Editor, Per-App Presentation Rules, Quick Feedback & Bug Reporter
  the IBus/Fcitx5/Wayland Environment Doctor).
  .SH OPTIONS
--.TP
+ .TP
 -\fB\-\-auto\-onboard\fR
 -One-shot first-install / first-login onboarding helper used by package installation and XDG Autostart to register Sen Viet automatically.
- .TP
+-.TP
  \fB\-\-telex\fR
  Switch the active input method mode to Telex across IBus and Fcitx5.
+ .TP
