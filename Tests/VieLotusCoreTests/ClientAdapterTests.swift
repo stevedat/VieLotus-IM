@@ -616,3 +616,4 @@ final class ClientAdapterTests: XCTestCase {
         }
     }
 }
+

@@ -73,11 +73,11 @@ public class InputSessionManager {
         return cachedEvaluateSentenceLanguageState(context)
     }
     public private(set) var sessionGeneration: UInt64 = 0
-    internal var pendingDotPrefix: (raw: String, rendered: String)? = nil
-    internal var activeDotPrefix: (raw: String, rendered: String)? = nil
-    internal var pendingSpacePrefix: (raw: String, rendered: String)? = nil
-    internal var activeSpacePrefix: (raw: String, rendered: String)? = nil
-    internal var precededByTechnicalDelimiter: Bool = false
+    public var pendingDotPrefix: (raw: String, rendered: String)? = nil
+    public var activeDotPrefix: (raw: String, rendered: String)? = nil
+    public var pendingSpacePrefix: (raw: String, rendered: String)? = nil
+    public var activeSpacePrefix: (raw: String, rendered: String)? = nil
+    public var precededByTechnicalDelimiter: Bool = false
     public var precededByLeadingSlash: Bool = false
     private let sessionLock = NSRecursiveLock()
 
@@ -124,7 +124,7 @@ public class InputSessionManager {
     /// (`vn_survives_collision` / `whitelist_safe = never`), yet rarely stand alone before an English second word
     /// (`"This is..."`, `"His car is..."`, `"Her car is..."`, `"This car is..."`, `"Here is..."`, `"Is this..."`, `"Car is..."`).
     private static let sentenceInitialSpacePrefixStarters: Set<String> = [
-        "his", "her", "this", "here", "is", "was", "car"
+        "his", "her", "this", "here", "is", "was", "has", "car"
     ]
 
     /// Valid Vietnamese 2nd-syllable compound continuations after `"hí"` (`"his"`).
@@ -140,7 +140,7 @@ public class InputSessionManager {
 
     /// Valid Vietnamese 2nd-syllable compound continuations after `"thí"` (`"this"`).
     private static let vietnameseContinuationsAfterThi: Set<String> = [
-        "sinh", "nghiệm", "điểm", "dụ", "mạng", "tốt", "chủ", "cho", "pháp", "thực", "võ", "cô", "hồn"
+        "sinh", "nghiệm", "điểm", "dụ", "mạng", "tốt", "thân", "chủ", "cho", "pháp", "thực", "võ", "cô", "hồn"
     ]
 
     /// Valid Vietnamese 2nd-syllable continuations after `"í"` (`"is"`).
@@ -150,7 +150,12 @@ public class InputSessionManager {
 
     /// Valid Vietnamese 2nd-syllable continuations after `"ứa"` (`"was"`).
     private static let vietnameseContinuationsAfterUa: Set<String> = [
-        "nước", "máu", "lệ", "ra", "gan", "mật", "nhựa", "mồ"
+        "nước", "máu", "lệ", "ra", "gan", "mật", "nhựa", "mồ", "hốc", "miệng", "mồm"
+    ]
+
+    /// Valid Vietnamese 2nd-syllable continuations after `"há"` (`"has"`).
+    private static let vietnameseContinuationsAfterHa: Set<String> = [
+        "miệng", "mồm", "dễ", "hốc", "nỡ", "mỏ", "ra", "to", "gan", "lệ", "máu", "mật"
     ]
 
     /// English copulas and modal auxiliaries that unambiguously confirm `"Car <verb>"` (`"Car is..."`, `"Car was..."`).
@@ -163,7 +168,7 @@ public class InputSessionManager {
         "son", "man", "men", "can", "may", "fan", "van", "pan", "pen", "map", "hat", "cup", "plan"
     ]
 
-    internal static func shouldArmSpacePrefix(raw: String, rendered: String) -> Bool {
+    internal static func shouldArmSpacePrefix(raw: String, rendered: String, priorContext: String = "") -> Bool {
         let lower = raw.lowercased()
         guard sentenceInitialSpacePrefixStarters.contains(lower) else { return false }
         if raw == rendered {
@@ -172,6 +177,13 @@ public class InputSessionManager {
         }
         if lower == "her" || lower == "his" || lower == "this" || lower == "here" {
             return true
+        }
+        if lower == "is" || lower == "was" || lower == "has" {
+            let lastPrior = priorContext.split(whereSeparator: \.isWhitespace).last
+            let precededByVN = lastPrior.map { !$0.unicodeScalars.allSatisfy(\.isASCII) } ?? false
+            if !precededByVN {
+                return true
+            }
         }
         return raw.first?.isUppercase == true
     }
@@ -199,6 +211,12 @@ public class InputSessionManager {
             targetLowerVN = vietnameseContinuationsAfterHi.contains(lowerSecondRendered) ? "hí" : nil
         case "her":
             targetLowerVN = (lowerSecondRendered == "hở") ? "hẻ" : nil
+        case "this":
+            targetLowerVN = vietnameseContinuationsAfterThi.contains(lowerSecondRendered) ? "thí" : nil
+        case "was":
+            targetLowerVN = vietnameseContinuationsAfterUa.contains(lowerSecondRendered) ? "ứa" : nil
+        case "has":
+            targetLowerVN = vietnameseContinuationsAfterHa.contains(lowerSecondRendered) ? "há" : nil
         default:
             targetLowerVN = nil
         }
@@ -224,14 +242,8 @@ public class InputSessionManager {
         guard prefixRaw != prefixRendered,
               sentenceInitialSpacePrefixStarters.contains(lowerPrefix),
               secondRaw.count >= 2,
+              lowerSecondRaw.contains(where: { "aeiouy".contains($0) }),
               secondRaw.unicodeScalars.allSatisfy({ $0.isASCII && CharacterSet.letters.contains($0) }) else {
-            return false
-        }
-
-        // Never restore if Word #2 is a valid Vietnamese syllable containing modified Vietnamese vowels/stroke (ă, â, ê, ô, ơ, ư, đ)
-        let untonedSecond = VietnameseSyllableDictionary.stripToneMarks(lowerSecondRendered)
-        if untonedSecond.contains(where: { "ăâêôơưđ".contains($0) }) &&
-           VietnameseSyllableDictionary.shared.isValidSyllable(lowerSecondRendered) {
             return false
         }
 
@@ -246,6 +258,8 @@ public class InputSessionManager {
             if vietnameseContinuationsAfterI.contains(lowerSecondRendered) { return false }
         case "was":
             if vietnameseContinuationsAfterUa.contains(lowerSecondRendered) { return false }
+        case "has":
+            if vietnameseContinuationsAfterHa.contains(lowerSecondRendered) { return false }
         case "car":
             if englishCopulasAndAuxiliariesAfterNoun.contains(lowerSecondRaw) {
                 return true
@@ -254,6 +268,23 @@ public class InputSessionManager {
                 !VietnameseSyllableDictionary.shared.isValidSyllable(lowerSecondRendered)
         default:
             break
+        }
+
+        // Never restore if Word #2 is a valid Vietnamese syllable containing modified Vietnamese vowels/stroke (ă, â, ê, ô, ơ, ư, đ),
+        // unless Word #2 is a curated high-frequency English word recognized in this starter context (e.g. "has been", "was done", "is here").
+        let untonedSecond = VietnameseSyllableDictionary.stripToneMarks(lowerSecondRendered)
+        if untonedSecond.contains(where: { "ăâêôơưđ".contains($0) }) &&
+           VietnameseSyllableDictionary.shared.isValidSyllable(lowerSecondRendered) {
+            let isHighFreqEnglishFollower =
+                (BilingualIntentArbiter.englishCollisionLogFrequencies[lowerSecondRaw] ?? 0) >= 7.0 &&
+                SmartBilingualDetector.isEnglishWord(
+                    raw: secondRaw,
+                    context: prefixRaw,
+                    rendered: secondRendered
+                )
+            if !isHighFreqEnglishFollower {
+                return false
+            }
         }
 
         guard SmartBilingualDetector.isKnownEnglishWord(lowerSecondRaw) else {
@@ -779,7 +810,7 @@ public class InputSessionManager {
             } else {
                 rawWord = engine.rawString()
             }
-
+            
             // Visual logic with UTF-16 code unit precision against actual on-screen composingWord
             var targetComposingWord = engine.currentOutput()
             var wasLiteralLockedStep = false
@@ -955,7 +986,14 @@ public class InputSessionManager {
                    !hasExplicitAccentSelection &&
                    explicitBilingualSelection != .vietnameseTelex &&
                    spacePrefix.raw != spacePrefix.rendered &&
-                   targetComposingWord == rawWord &&
+                   (targetComposingWord == rawWord ||
+                    ((rawWord.count >= 3 || SmartBilingualDetector.isEnglishAnchorTokenForArbiter(rawWord)) &&
+                     SmartBilingualDetector.isEnglishWord(
+                         raw: rawWord,
+                         context: spacePrefix.raw,
+                         rendered: engine.currentOutput(),
+                         genZMode: genZMode
+                     ))) &&
                    Self.shouldRestoreSpacePrefix(
                        prefixRaw: spacePrefix.raw,
                        prefixRendered: spacePrefix.rendered,
@@ -968,16 +1006,17 @@ public class InputSessionManager {
                         syncContextFromRecentWords()
                         hasVietnameseInputEvidence = recentWords.contains(where: { Self.containsVietnameseWord($0) })
                     }
-                    composingWord = targetComposingWord
+                    let restoredSecond = rawWord
+                    composingWord = restoredSecond
                     updateCandidateProvenance(
                         rawWord: rawWord,
                         engineOutput: engine.currentOutput(),
-                        selectedCandidate: targetComposingWord,
+                        selectedCandidate: restoredSecond,
                         priorProvenance: priorProvenance,
                         wasLiteralLockedStep: wasLiteralLockedStep
                     )
                     let totalBackspaces = spacePrefix.rendered.utf16.count + 1 + priorComposingWord.utf16.count
-                    return .replace(backspaces: totalBackspaces, text: spacePrefix.raw + " " + targetComposingWord)
+                    return .replace(backspaces: totalBackspaces, text: spacePrefix.raw + " " + restoredSecond)
                 }
                 if smartBilingualEnabled &&
                    !hasExplicitAccentSelection &&
@@ -1064,7 +1103,7 @@ public class InputSessionManager {
                 cachedEvaluateSentenceLanguageState(context).momentum == .english ? false : nil
         }
         guard VietnameseSyllableDictionary.hasToneMark(rendered), !local.prefersRawEnglish else { return nil }
-        if SmartBilingualDetector.isKnownEnglishWord(raw) {
+        if SmartBilingualDetector.isKnownEnglishWord(raw) || SmartBilingualDetector.isContextSensitiveEnglishCollision(raw) {
             let contextual = BilingualIntentArbiter.arbitrate(
                 raw: raw, rendered: rendered, context: context, noContextPolicy: bilingualNoContextPolicy,
                 hasExplicitUserSelection: false, precededByTechnicalDelimiter: false,
@@ -2119,7 +2158,7 @@ public class InputSessionManager {
                 if !provenanceHistory.isEmpty {
                     provenanceHistory.removeLast()
                 }
-
+                
                 var targetComposingWord = resolveMixedCaseCompoundUnlocked(
                     rawWord: rawWord,
                     wholeRendered: engine.currentOutput(),
@@ -2270,7 +2309,7 @@ public class InputSessionManager {
             precededByLeadingSlash = (boundaryChar == "/")
             return .passThrough
         }
-
+        
         let effectiveGenZMode = genZMode ?? self.genZMode
         let resolvedMixedCompound = resolveMixedCaseCompoundUnlocked(
             rawWord: rawWord,
@@ -2339,7 +2378,7 @@ public class InputSessionManager {
             return (spacePrefix, vnPrefix)
         }()
         activeSpacePrefix = nil
-
+        
         let suppressMacro = MacroEngine.shouldSuppressMacroExpansion(
             precededByTechnicalDelimiter: wasPrecededByTechnicalDelimiter,
             boundaryChar: boundaryChar
@@ -2347,12 +2386,12 @@ public class InputSessionManager {
         let activeMacro = suppressMacro ? nil : (macroEngine ?? (self.macroEnabled ? self.macroEngine : nil))
         let candidateKey = rawWord.isEmpty ? output : rawWord
         let expansion = activeMacro?.lookup(word: candidateKey) ?? (output != candidateKey ? activeMacro?.lookup(word: output) : nil)
-
+        
         // Code delimiter protection (e.g. cfung() -> cfung() without preceding space)
         let isCodeBoundary = smartBilingualEnabled && boundaryChar != nil && "([{".contains(boundaryChar!) &&
             !SmartBilingualDetector.isExplicitTelexEscape(raw: rawWord, rendered: output) &&
             !hasConfirmedNonEnglishSemanticEscapeUnlocked(rawWord: rawWord, rendered: output)
-
+        
         if dotPrefixToRestore != nil {
             finalWord = rawWord.isEmpty ? output : rawWord
             isOverride = (finalWord != composingWord)
@@ -2401,7 +2440,7 @@ public class InputSessionManager {
             )
             lastCommittedProvenance = candidateProvenance
         }
-
+        
         let oldComposingCount = (composingWord.isEmpty ? output : composingWord).utf16.count
         if let dotPrefix = dotPrefixToRestore, !recentWords.isEmpty {
             recentWords[recentWords.count - 1] = dotPrefix.raw
@@ -2415,8 +2454,9 @@ public class InputSessionManager {
             recentWords[recentWords.count - 1] = vnCompound.vnPrefix
             hasVietnameseInputEvidence = true
         }
+        let contextBeforeCommit = context
         appendContext(finalWord)
-
+        
         if boundaryChar == "." {
             pendingDotPrefix = (raw: savedRaw, rendered: finalWord)
             pendingSpacePrefix = nil
@@ -2427,7 +2467,7 @@ public class InputSessionManager {
                   smartBilingualEnabled &&
                   !hasExplicitAccentSelection &&
                   explicitBilingualSelection == nil &&
-                  Self.shouldArmSpacePrefix(raw: savedRaw, rendered: finalWord) {
+                  Self.shouldArmSpacePrefix(raw: savedRaw, rendered: finalWord, priorContext: contextBeforeCommit) {
             pendingDotPrefix = nil
             pendingSpacePrefix = (raw: savedRaw, rendered: finalWord)
         } else {

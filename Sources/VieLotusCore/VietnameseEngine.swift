@@ -39,9 +39,9 @@ internal enum VowelModification: Sendable {
 /// modern & traditional tone placement, Telex & VNI input methods,
 /// w-modifiers, case preservation, and post-commit editing ring buffer.
 internal final class VietnameseEngine: @unchecked Sendable {
-
+    
     // MARK: - Configuration
-
+    
     internal var inputMethod: InputMethodType = .telex {
         didSet {
             if inputMethod != oldValue {
@@ -58,9 +58,9 @@ internal final class VietnameseEngine: @unchecked Sendable {
     internal var genZMode: Bool = false
     internal var simpleTelex: Bool = true
     internal var backspaceStyle: BackspaceStyle = .appleSemantic
-
+    
     // MARK: - Internal Syllable State
-
+    
     /// Raw keystrokes entered for current composing syllable
     private var rawChars: [Character] = []
     private var cachedRawString: String = ""
@@ -69,15 +69,15 @@ internal final class VietnameseEngine: @unchecked Sendable {
     /// - bit 8 (`0x0100`): set if `rawChars` contains any Telex modifier (`s, f, r, x, j, z, w`, non-ASCII, or >= 2 of `d, a, e, o`)
     /// - bit 9 (`0x0200`): set if `rawChars` contains any VNI digit (`0..9`) or non-ASCII
     internal private(set) var rawFastMask: UInt16 = 0
-
+    
     /// Zero-heap bounded keystroke buffer with provenance tracking (capacity 32)
     internal private(set) var keystrokeBuffer = BoundedKeystrokeBuffer()
-
+    
     /// Current rendered output of the active word
     private var renderedOutput: String = ""
     /// Incremental O(1) flag indicating whether `renderedOutput` consists strictly of ASCII bytes (`< 128`).
     internal private(set) var renderedOutputIsASCII: Bool = true
-
+    
     /// History of committed words for post-commit editing (ring buffer)
     /// Stores (rawChars, renderedOutput) pairs
     private var committedHistory: [(raw: [Character], rendered: String)] = []
@@ -128,15 +128,15 @@ internal final class VietnameseEngine: @unchecked Sendable {
     /// True once an explicit tone/modifier cancellation (`CancelToneAndEmitLiteral`) has been confirmed in the active composition (P0.6).
     internal private(set) var hasConfirmedSemanticEscapeInComposition: Bool = false
     private var lastAttemptedKey: Character? = nil
-
+    
     internal var isComposing: Bool {
         return !rawChars.isEmpty
     }
-
+    
     internal var lastCommittedWord: String? {
         return committedHistory.last?.rendered
     }
-
+    
     internal var lastCommittedRaw: String? {
         return committedHistory.last.map { String($0.raw) }
     }
@@ -175,11 +175,11 @@ internal final class VietnameseEngine: @unchecked Sendable {
         }
         return String(previousOutput.dropLast())
     }
-
+    
     internal init() {}
-
+    
     // MARK: - Public Control API
-
+    
     internal func reset() {
         rawChars.removeAll(keepingCapacity: true)
         cachedRawString = ""
@@ -196,11 +196,11 @@ internal final class VietnameseEngine: @unchecked Sendable {
         supersededModifiers.removeAll(keepingCapacity: true)
         compositionHistory.removeAll(keepingCapacity: true)
     }
-
+    
     internal func currentOutput() -> String {
         return renderedOutput
     }
-
+    
     internal func rawString() -> String {
         return cachedRawString
     }
@@ -262,15 +262,15 @@ internal final class VietnameseEngine: @unchecked Sendable {
         renderedOutput = newOutput
         renderedOutputIsASCII = isKnownASCII ?? newOutput.utf8.allSatisfy({ $0 < 128 })
     }
-
+    
     // MARK: - Prefix & Re-composition API
-
+    
     /// Converts a rendered Vietnamese string into canonical raw keystrokes according to the input method.
     internal static func rawKeys(for text: String, inputMethod: InputMethodType) -> String {
         var raw = ""
         var toneKey: Character? = nil
         let isVni = inputMethod == .vni
-
+        
         for scalar in text.decomposedStringWithCanonicalMapping.unicodeScalars {
             switch scalar.value {
             case 0x0111: // đ
@@ -519,7 +519,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
             return false
         }
     }
-
+    
     /// Re-initializes composition state with an existing prefix already rendered on screen.
     internal func setCompositionPrefix(_ text: String) {
         let raw = VietnameseEngine.rawKeys(for: text, inputMethod: inputMethod)
@@ -531,7 +531,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
         // so the subsequent feed/backspace diff computes the exact UTF-16 backspace count on screen.
         setRenderedOutput(text)
     }
-
+    
     // MARK: - Core Feed / Edit / Commit API
 
     /// Feeds a single character literally into the active composition without Telex/VNI transformation.
@@ -606,7 +606,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
         if literalOverrideEnabled || compositionHistory.last?.isExplicitLiteralLock == true {
             return feedLiteral(ch)
         }
-
+        
         let wasEditingCommitted = isEditingCommittedWord
         let prevAttemptedKey = lastAttemptedKey
         lastAttemptedKey = ch
@@ -1011,11 +1011,11 @@ internal final class VietnameseEngine: @unchecked Sendable {
             )
         )
         setRenderedOutput(newOutput, isKnownASCII: newIsASCII)
-
+        
         // Calculate diff between previousOutput and newOutput
         return calculateDiff(oldStr: previousOutput, newStr: newOutput, appendedChar: ch)
     }
-
+    
     /// Handles backspace keypress during composition by reversing the active semantic or literal composition step.
     internal func backspace(displayedAsRaw: Bool = false) -> (backspaces: Int, suffix: String)? {
         guard !rawChars.isEmpty else { return nil }
@@ -1258,7 +1258,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
 
         return ""
     }
-
+    
     /// Commits active composition into word history.
     internal func commit() -> (backspaces: Int, suffix: String)? {
         guard isComposing else { return nil }
@@ -1362,7 +1362,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
         lastCommittedIsDirectToken = false
         lastPostCommitEditTransaction = nil
     }
-
+    
     /// Post-commit editing (LabanKey-style / Apple-style word resurrection).
     /// Caret back index into the committed text (0 = end of newest word).
     internal func editAt(caretBack: Int, char: Character) -> (backspaces: Int, suffix: String)? {
@@ -1386,7 +1386,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
         }
         var rawCopy = baseCanonicalRaw
         guard !rawCopy.isEmpty else { return nil }
-
+        
         if inputMethod == .telex && char.lowercased() == "d" {
             let isTripleD = rawCopy.count >= 3 &&
                 rawCopy[0].lowercased() == "d" &&
@@ -1417,7 +1417,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
             // Append new raw character to raw chars
             rawCopy.append(char)
         }
-
+        
         let newWord = transform(rawCopy)
         guard newWord != lastWord else { return nil }
         let lowerChar = char.lowercased()
@@ -1447,7 +1447,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
         } else if inputMethod == .vni && lastWord.allSatisfy(\.isASCII) && merelyAppended && !isExplicitVowelEscape {
             return nil
         }
-
+        
         let lowerPrevUntoned = VietnameseSyllableDictionary.stripToneMarks(lastWord.lowercased())
         let lowerNewUntoned = VietnameseSyllableDictionary.stripToneMarks(newWord.lowercased())
         let prevToneMod = Self.extractActiveToneModifier(from: lastWord, inputMethod: inputMethod)
@@ -1594,7 +1594,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 hasConfirmedSemanticEscape: newHasEscape
             )
         ]
-
+        
         let backspaces = lastWord.utf16.count
         lastPostCommitEditTransaction = PostCommitEditTransaction(
             inputMethod: inputMethod,
@@ -1618,16 +1618,16 @@ internal final class VietnameseEngine: @unchecked Sendable {
         let lastWord = lastEntry.rendered
         guard !lastWord.isEmpty else { return nil }
         let wasOfficialSuggestion = lastCommittedIsDirectToken
-
+        
         let shortenedWord = String(lastWord.dropLast())
         committedHistory.removeLast()
-
+        
         if shortenedWord.isEmpty {
             lastCommittedIsDirectToken = false
             reset()
             return (lastWord.utf16.count, "")
         }
-
+        
         let droppedRaw = Array(lastEntry.raw.dropLast())
         let rawCopy: [Character]
         if wasOfficialSuggestion {
@@ -1659,13 +1659,13 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 hasConfirmedSemanticEscape: reopenedEscape
             )
         ]
-
+        
         let backspaces = lastWord.utf16.count
         return (backspaces, shortenedWord)
     }
-
+    
     // MARK: - Diff Calculation
-
+    
     private func calculateDiff(oldStr: String, newStr: String, appendedChar: Character?) -> (backspaces: Int, suffix: String) {
         if oldStr.isEmpty {
             return (0, newStr)
@@ -1673,7 +1673,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
         if oldStr == newStr && oldStr.unicodeScalars.elementsEqual(newStr.unicodeScalars) {
             return (0, "")
         }
-
+        
         // Zero-allocation common prefix search via String.Index, requiring scalar-exact
         // equivalence so NFD grapheme clusters on screen are never mistaken for NFC clusters
         // with a different UTF-16 code-unit length.
@@ -1685,25 +1685,25 @@ internal final class VietnameseEngine: @unchecked Sendable {
             oldIdx = oldStr.index(after: oldIdx)
             newIdx = newStr.index(after: newIdx)
         }
-
+        
         let deletedSlice = oldStr[oldIdx...]
         let backspacesUTF16 = deletedSlice.utf16.count
         let suffix = String(newStr[newIdx...])
         return (backspacesUTF16, suffix)
     }
-
+    
     // MARK: - Vietnamese Phonetic Transformation (FSM)
-
+    
     internal func transform(_ chars: [Character]) -> String {
         guard !chars.isEmpty else { return "" }
-
+        
         let lowerRaw = String(chars).lowercased()
-
+        
         // Non-Vietnamese initials: 'f', 'j', 'z' cannot start a Vietnamese syllable
         if let first = lowerRaw.first, (first == "f" || first == "j" || first == "z") && !genZMode {
             return String(chars)
         }
-
+        
         if inputMethod == .vni {
             return transformVNI(chars)
         } else {
@@ -1711,7 +1711,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
             if simpleTelex && chars.allSatisfy({ $0.lowercased() == "w" }) {
                 return String(chars)
             }
-
+            
             // Gen-Z 'w'-initial syllables where 'w' stands for 'qu' (e.g. was/wsa -> wá, war/wra -> wả, waf/wfa -> wà, waayj/wayaj -> wậy)
             if genZMode, let wResolved = Self.transformGenZInitialWIfApplicable(
                 chars,
@@ -1722,13 +1722,13 @@ internal final class VietnameseEngine: @unchecked Sendable {
             ) {
                 return wResolved.rendered
             }
-
+            
             // Phonotactically impossible Vietnamese 'w'-initial words in Telex (e.g. "we", "wi", "wh", "wo", "wy", "wri", "wat", "wan")
             // resolve immediately to raw ASCII on the 2nd/3rd keystroke while preserving "ww" -> "w", "wa" -> "ưa", "wu" -> "ưu", "ws"/"wr" -> "ứ"/"ử".
             if Self.isEnglishWInitial(chars) || SmartBilingualDetector.isPostCodaCircumflexEnglishWord(lowerRaw) {
                 return String(chars)
             }
-
+            
             let rendered: String
             if grammarProfile == .classic {
                 rendered = transformTelex(chars)
@@ -1760,7 +1760,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 )
                 rendered = parsed.rendered
             }
-
+            
             if genZMode, let first = lowerRaw.first, (first == "f" || first == "j" || first == "z"),
                rendered.lowercased() != lowerRaw,
                !Self.isValidGenZInitialTransformation(rendered: rendered, raw: lowerRaw) {
@@ -1769,7 +1769,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
             return rendered
         }
     }
-
+    
     /// Returns true when a `w`-initial keystroke sequence is phonotactically impossible
     /// as a Vietnamese `ư...` word and should immediately render as literal `w...` inline.
     internal static func isEnglishWInitial(_ chars: [Character]) -> Bool {
@@ -1793,10 +1793,14 @@ internal final class VietnameseEngine: @unchecked Sendable {
             return false
         }
 
-        // 2. "wa" and "wu" (2-char) stay literal English "wa"/"wu" (type "uwa"/"uaw" for "ưa", "uwu"/"uuw" for "ưu").
-        //    3+ char "was", "wars", "wus" have optional tone keys only; any non-tone letter at index >= 2
+        // 2. "wa" (2-char) stays literal English "wa" (type "uwa"/"uaw" for "ưa").
+        //    3+ char "was", "wars" have optional tone keys only; any non-tone letter at index >= 2
         //    (e.g. "wat", "wan", "wal", "way", "wai", "warm", "ward") is English.
-        if c1 == "a" || c1 == "u" {
+        //    All "wu..." initials (e.g. "wu", "wus", "wuz", "wut") stay literal English (type "uuw"/"uwu" for "ưu", "cwus" for "cứ").
+        if c1 == "u" {
+            return true
+        }
+        if c1 == "a" {
             if chars.count == 2 {
                 return true
             }
@@ -1839,9 +1843,13 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 return false
             }
         }
+        if (first == "z" || first == "j") && !isDzOnset && effectiveRaw.hasSuffix("st") {
+            return false
+        }
+
         if first == "z" && !isDzOnset &&
            (effectiveRaw == "zero" || effectiveRaw == "zeros" ||
-            (!VietnameseSyllableDictionary.hasToneMark(lower) && SmartBilingualDetector.isKnownEnglishWord(effectiveRaw))) {
+            SmartBilingualDetector.isKnownEnglishWord(effectiveRaw)) {
             return false
         }
         // P0.4.1 Section 2 (j-initial guard):
@@ -1913,7 +1921,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
     /// Transforms `w`-initial Gen-Z words where `w` represents `qu` (e.g. `was`/`wsa` -> `wá`,
     /// `war`/`wra` -> `wả`, `waf`/`wfa` -> `wà`, `waj`/`wja` -> `wạ`, `waayj`/`wayaj` -> `wậy`,
     /// `wans` -> `wán`, `wais` -> `wái`, `wees` -> `wế`, `wys` -> `wý`).
-    /// Preserves `wa` -> `ưa`, `wu`/`wus` -> `ưu`/`ứu`, `ws`/`wr` -> `ứ`/`ử`, and English `w`-words.
+    /// Preserves `wa` -> `ưa`, literal `wu...` English tokens (type `uuw`/`uwu` for `ưu`), `ws`/`wr` -> `ứ`/`ử`, and English `w`-words.
     internal static func transformGenZInitialWIfApplicable(
         _ chars: [Character],
         profile: GrammarProfile,
@@ -1994,13 +2002,13 @@ internal final class VietnameseEngine: @unchecked Sendable {
         intent.isValidVietnamese = true
         return (intent, candidateRendered)
     }
-
+    
     /// Determines whether the keystroke stream contains pre-vowel, infix, or flexible modifier patterns
     /// requiring the FlexPath Intent Solver.
     internal static func hasFlexPathTriggers(_ chars: [Character], genZMode: Bool = false) -> Bool {
         guard chars.count >= 2 else { return false }
         let lower = String(chars).lowercased()
-
+        
         // 0. English collisions in SenFlex: must run through Arbiter
         // Note: "pass" and "boss" use Fast Path so double-s Telex cancellation ("pas", "bos") works identically to Classic.
         if lower != "pass" && lower != "boss" && SyllableCandidateResolver.isEnglishCollision(lower) {
@@ -2009,12 +2017,12 @@ internal final class VietnameseEngine: @unchecked Sendable {
         if genZMode && lower.hasPrefix("dz") {
             return true
         }
-
+        
         // 1. Trailing 'w' after 'uong' or 'ong' (e.g. nsuongw, guongw)
         if lower.hasSuffix("ngw") || lower.hasSuffix("ongw") {
             return true
         }
-
+        
         // 2. Infix tone in diphthong/triphthong (e.g. truowfng, truwfowng, buwsowm, muwfowi, nguwfowi, teest)
         var hasU = false
         var hasW = false
@@ -2042,12 +2050,12 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 if lower.contains(pattern) { return true }
             }
         }
-
+        
         // 3. Pre-vowel modifier patterns ('q' + tone + 'u', "cra"/"cras", or global onset + pre-vowel modifier)
         if Self.hasPreVowelModifierTrigger(chars, genZMode: genZMode) {
             return true
         }
-
+        
         return false
     }
 
@@ -2204,7 +2212,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
     }
 
     // MARK: - Telex Transformation
-
+    
     private func transformTelex(_ chars: [Character]) -> String {
         if Self.isPostCodaEnglishDoubleVowelEscape(chars) {
             return String(chars.dropLast())
@@ -2254,7 +2262,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
         var circumflexCancelledKey: Character? = nil
         var strokeDCancelled = false
         var postStrokeTail: [Character] = []
-
+        
         var i = 0
         while i < chars.count {
             let ch = chars[i]
@@ -2283,7 +2291,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
             if circumflexCancelledKey != nil && lower != circumflexCancelledKey {
                 circumflexCancelledKey = nil
             }
-
+            
             // Check 'dd' / 'DD' -> 'đ' / 'Đ' (only before any vowel has been formed in result, e.g. onset 'dd' or consonant abbreviation 'sddt' -> 'sđt')
             if lower == "d" && !result.contains(where: { Self.isVietnameseVowel($0) }) {
                 if i + 2 < chars.count && Character(chars[i + 1].lowercased()) == "d" && Character(chars[i + 2].lowercased()) == "d" {
@@ -2302,7 +2310,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     continue
                 }
             }
-
+            
             // Check Quick Telex shortcuts
             if quickTelex {
                 if lower == "c" && i + 1 < chars.count && Character(chars[i + 1].lowercased()) == "c" {
@@ -2321,7 +2329,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     continue
                 }
             }
-
+            
             // Check post-coda / non-adjacent circumflex modifier (e.g. nhana -> nhân, nhanas -> nhấn, nhansa -> nhấn, theme -> thêm, trongo -> trông)
             if (lower == "a" || lower == "e" || lower == "o") && !result.isEmpty {
                 if circumflexCancelledKey == lower {
@@ -2653,7 +2661,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     break
                 }
             }
-
+            
             // Check vowel doubling (aa -> â, ee -> ê, oo -> ô) and triple-vowel escape (aaa -> aa, eee -> ee, ooo -> oo)
             // Vietnamese orthography never contains double ASCII vowels (aa, ee, oo).
             // Once escaped via triple vowel, clear any pending tone and consume remaining characters literally.
@@ -2700,7 +2708,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     continue
                 }
             }
-
+            
             // Check w-modifiers (aw -> ă, ow -> ơ, uw -> ư)
             if lower == "w" {
                 if hornCancelled {
@@ -2749,7 +2757,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     i += 1
                     continue
                 }
-
+                
                 let hasCircumflexReshapable = result.contains(where: { $0.lowercased() == "ô" || $0.lowercased() == "â" })
                 let hasAlreadyHornedVowel = result.contains(where: { "ăơư".contains($0.lowercased()) })
                 let endsWithHornableVowel: Bool = {
@@ -2789,7 +2797,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     for idx in stride(from: result.count - 1, through: 0, by: -1) {
                     let lastLower = Character(result[idx].lowercased())
                     let isLastUpper = result[idx].isUppercase
-
+                    
                     if lastLower == "ă" || lastLower == "ư" || lastLower == "ơ" {
                         // Policy 3B+: Semantic Saturation — once the vowel already has breve/horn,
                         // a non-contiguous trailing 'w' does NOT strip the diacritic; it falls through as literal.
@@ -2921,7 +2929,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     }
                     }
                 }
-
+                
                 if transformed {
                     i += 1
                     continue
@@ -2951,7 +2959,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     continue
                 }
             }
-
+            
             // Check tone keys (s, f, r, x, j, z)
             // Tone keys only apply if we already have vowels in result and no literal 'w' cluster!
             let isToneOrGOrD = (lower == "s" || lower == "f" || lower == "r" || lower == "x" || lower == "j" || lower == "z" || lower == "g" || lower == "d")
@@ -2972,7 +2980,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 case "j": toneFound = .dot
                 default: break
                 }
-
+                
                 if let t = toneFound {
                     let hasModifiedChar = result.contains { "ăâđêôơư".contains($0.lowercased()) }
                     let isIllegalStopCodaTone =
@@ -3068,7 +3076,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     }
                 }
             }
-
+            
             // Relaxed coda shortcut: 'g' at end of word (or before trailing modifiers) transforms to 'ng'
             if relaxedCoda && !toneEscapeActive && lower == "g" && hasVowels,
                let lastChar = result.last, Self.isVietnameseVowel(lastChar),
@@ -3077,7 +3085,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 i += 1
                 continue
             }
-
+            
             if lower == "d" && hasVowels && !toneEscapeActive && postStrokeTail.isEmpty,
                let firstChar = result.first, Character(firstChar.lowercased()) == "đ",
                let lastChar = result.last,
@@ -3148,7 +3156,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     continue
                 }
             }
-
+            
             if !(lower == "a" || lower == "e" || lower == "o"),
                let lockedStem = Self.shouldLockPostCodaOverflow(
                 stemChars: result,
@@ -3169,11 +3177,11 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 hornCancelled = true
                 break
             }
-
+            
             result.append(ch)
             i += 1
         }
-
+        
         // Harmonize 'ưo' -> 'ươ' when horn was applied to 'u' before 'o' (e.g. truwongr -> trưởng, dduwocj -> được, nguwoif -> người)
         if !hornCancelled && circumflexCancelledKey != "o" && result.count >= 2 {
             for idx in 0..<(result.count - 1) {
@@ -3183,7 +3191,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 }
             }
         }
-
+        
         // Apply tone mark to the correct vowel position
         if tone != .none {
             Self.applyTone(&result, tone: tone, modern: modernOrthography)
@@ -3191,10 +3199,10 @@ internal final class VietnameseEngine: @unchecked Sendable {
         if !postStrokeTail.isEmpty {
             result.append(contentsOf: postStrokeTail)
         }
-
+        
         return String(result)
     }
-
+    
     // MARK: - VNI Transformation
 
     private static func harmonizeVNIHornCluster(_ chars: inout [Character]) {
@@ -3206,7 +3214,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
             }
         }
     }
-
+    
     private func transformVNI(_ chars: [Character]) -> String {
         if !chars.contains(where: \.isNumber) {
             return String(chars)
@@ -3215,7 +3223,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
         var tone: VietnameseTone = .none
         var escapeActive = false
         var hornCancelled = false
-
+        
         for ch in chars {
             if escapeActive {
                 result.append(ch)
@@ -3501,20 +3509,20 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 result.append(ch)
             }
         }
-
+        
         if !escapeActive && !hornCancelled {
             Self.harmonizeVNIHornCluster(&result)
         }
-
+        
         if tone != .none {
             Self.applyTone(&result, tone: tone, modern: modernOrthography)
         }
-
+        
         return String(result)
     }
-
+    
     // MARK: - Tone Placement Algorithm
-
+    
     /// Applies Vietnamese diacritic tone mark according to standard linguistic orthography.
     /// Returns the string produced by applying `tone` to the vowel(s) in `result`,
     /// without mutating `result`. Used by the non-plausible tone rejection guard
@@ -3530,7 +3538,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
 
     internal static func applyTone(_ chars: inout [Character], tone: VietnameseTone, modern: Bool) {
         guard tone != .none else { return }
-
+        
         // Find indices of all vowels in chars
         var vowelIndices: [Int] = []
         for (idx, ch) in chars.enumerated() {
@@ -3538,7 +3546,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 vowelIndices.append(idx)
             }
         }
-
+        
         // If a single trailing vowel was appended after the coda of a valid untoned Vietnamese syllable
         // (e.g. "nhana", "nhene", "meme", "mongo", "thuôngo", "truôngo", "thươngu", "tiengo", "vieco"),
         // exclude that trailing vowel from nucleus tone placement so the tone lands on the syllable's true nucleus.
@@ -3551,14 +3559,14 @@ internal final class VietnameseEngine: @unchecked Sendable {
             VietnameseSyllableDictionary.shared.isValidRelaxedCodaVietnamese(String(chars.dropLast()), genZMode: true)) {
             vowelIndices.removeLast()
         }
-
+        
         guard !vowelIndices.isEmpty else { return }
-
+        
         let validCodaChars: Set<Character> = ["c", "m", "n", "p", "t", "g", "h"]
-
+        
         // Determine target vowel index
         let targetIndex: Int
-
+        
         if vowelIndices.count == 1 {
             targetIndex = vowelIndices[0]
         } else if vowelIndices.count == 2 {
@@ -3570,7 +3578,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 (secondVowel == "y" && firstVowel != "u")
             let trailingIsValidCoda = hasValidCoda(after: vowelIndices[1], in: chars, validCodaChars: validCodaChars)
             let hasCoda = trailingIsValidCoda && !isFallingOffglide
-
+            
             // Special initial digraphs: 'qu-' and 'gi-'
             // In 'qu', 'u' is part of initial consonant cluster (labialized), not nucleus
             if vowelIndices[0] > 0 && Character(chars[vowelIndices[0] - 1].lowercased()) == "q" && firstVowel == "u" {
@@ -3602,7 +3610,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
             // 3 or more vowels (e.g. "người", "khuỷu", "ngoại", "quỳnh")
             let lastVowelIdx = vowelIndices.last!
             let hasCoda = hasValidCoda(after: lastVowelIdx, in: chars, validCodaChars: validCodaChars)
-
+            
             if hasCoda {
                 // With coda consonant: tone goes to the LAST vowel (nearest to coda = nucleus)
                 // e.g. "nguyễn" = [n,g,u,y,ê,n] → vowels u,y,ê → tone on ê (last vowel)
@@ -3611,11 +3619,11 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 // Without coda: check if last vowel is a glide (i, u, y after nucleus)
                 let lastVowelLower = chars[lastVowelIdx].lowercased()
                 let isLastGlide = lastVowelLower == "i" || lastVowelLower == "y" || lastVowelLower == "u"
-
+                
                 if isLastGlide && vowelIndices.count >= 2 {
                     // Last vowel is a glide → tone on penultimate (the nucleus)
                     // e.g. "người" → ư,ơ,i → tone on ơ (penultimate)
-                    // e.g. "khuỷu" → u,y,u → tone on y (penultimate)
+                    // e.g. "khuỷu" → u,y,u → tone on y (penultimate) 
                     targetIndex = vowelIndices[vowelIndices.count - 2]
                 } else {
                     // Fallback: prefer modified vowels (circumflex/horn/breve)
@@ -3632,7 +3640,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 }
             }
         }
-
+        
         // Replace target vowel with accented version
         let targetChar = chars[targetIndex]
         chars[targetIndex] = addToneToVowel(targetChar, tone: tone)
@@ -3829,7 +3837,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
 
         return tonedStem
     }
-
+    
     // MARK: - Character Utilities
 
     private static let vietnameseVowelCharacters: Set<Character> = [
@@ -3860,7 +3868,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
         "Ứ", "Ừ", "Ử", "Ữ", "Ự",
         "Ý", "Ỳ", "Ỷ", "Ỹ", "Ỵ"
     ]
-
+    
     internal static func isVietnameseVowel(_ ch: Character) -> Bool {
         vietnameseVowelCharacters.contains(ch)
     }
@@ -3890,7 +3898,7 @@ internal final class VietnameseEngine: @unchecked Sendable {
         }
         return map
     }()
-
+    
     internal static func addToneToVowel(_ ch: Character, tone: VietnameseTone) -> Character {
         let isUpper = ch.isUppercase
         let lower = Character(ch.lowercased())

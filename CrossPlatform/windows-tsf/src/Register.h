@@ -22,7 +22,7 @@ HRESULT RegisterProfiles();
 HRESULT UnregisterProfiles();
 HRESULT RegisterCategories();
 HRESULT UnregisterCategories();
-HRESULT ActivateUserProfiles();
+HRESULT ActivateUserProfiles(bool forceLangListSync = false);
 HRESULT DeactivateUserProfiles();
 
 // Persisted user preferences in HKCU\Software\VieLotusIM

@@ -1,8 +1,8 @@
 import Foundation
 
 /// Platform-agnostic O(1) embedded English lexicon digest table.
-internal struct EmbeddedEnglishSpellChecker: SpellCheckerProvider, Sendable {
-    internal static let shared = EmbeddedEnglishSpellChecker()
+public struct EmbeddedEnglishSpellChecker: SpellCheckerProvider, Sendable {
+    public static let shared = EmbeddedEnglishSpellChecker()
 
     private let wordDigests: Set<UInt64>
 
@@ -23,7 +23,7 @@ internal struct EmbeddedEnglishSpellChecker: SpellCheckerProvider, Sendable {
         }
     }
 
-    internal func isWordInEnglishDictionary(_ word: String) -> Bool {
+    public func isWordInEnglishDictionary(_ word: String) -> Bool {
         guard !word.isEmpty else { return false }
         let lower = word.lowercased()
         if word == lower && SmartBilingualDetector.vietnameseProtectedTelexInputs.contains(lower) {

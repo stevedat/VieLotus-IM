@@ -65,7 +65,7 @@ public struct ClientAdapter {
         guard let id = bundleIdentifier?.lowercased(), !id.isEmpty else {
             return .unknown
         }
-
+        
         // Remote Desktop, Screen Sharing, Emulator & Virtual Machine apps:
         // Remote targets and device emulators handle their own IME / keyboard layout or forward raw scancodes.
         if id.contains("com.microsoft.rdc") ||
@@ -111,7 +111,7 @@ public struct ClientAdapter {
            id.hasSuffix(".terminal") {
             return .terminal
         }
-
+        
         // Quick search / Overlay apps
         if id.contains("spotlight") ||
            id.contains("raycast") ||
@@ -121,7 +121,7 @@ public struct ClientAdapter {
            id.contains("sol-app") {
             return .overlay
         }
-
+        
         // Microsoft Office
         if id.contains("com.microsoft.word") ||
            id.contains("com.microsoft.excel") ||
@@ -174,7 +174,7 @@ public struct ClientAdapter {
             // Zalo, Telegram, Slack, VSCode, Orca, Cursor, GenOffice/NidoOffice, etc. use CEF/Electron/Chromium
             return .chromium
         }
-
+        
         if id.contains("safari") ||
            id.contains("apple.notes") ||
            id.contains("apple.mail") ||
@@ -195,7 +195,7 @@ public struct ClientAdapter {
             return .chromium
         }
         #endif
-
+        
         return .standardAppKit
     }
 
@@ -254,7 +254,7 @@ public struct ClientAdapter {
         return isChromium
     }
     #endif
-
+    
     private static let dynamicModeLock = NSLock()
     private static var dynamicMarkedTextBundles: Set<String> = []
 
@@ -808,3 +808,5 @@ public enum DirectReplacementGuard {
         return nil
     }
 }
+
+

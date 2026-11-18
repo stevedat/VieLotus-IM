@@ -5,33 +5,33 @@ final class VietnameseEngineTests: XCTestCase {
     func testTelexBasicTransform() {
         let engine = VietnameseEngine()
         engine.inputMethod = .telex
-
+        
         let inputs = ["t", "o", "o", "i"]
         for char in inputs {
             _ = engine.feed(Character(char))
         }
         XCTAssertEqual(engine.currentOutput(), "tôi")
     }
-
+    
     func testVniBasicTransform() {
         let engine = VietnameseEngine()
         engine.inputMethod = .vni
-
+        
         let inputs = ["t", "o", "i", "6"]
         for char in inputs {
             _ = engine.feed(Character(char))
         }
         XCTAssertEqual(engine.currentOutput(), "tôi")
     }
-
+    
     func testToneCancellation() {
         let engine = VietnameseEngine()
         engine.inputMethod = .telex
-
+        
         let inputs = ["t", "o", "a", "n", "s"]
         for char in inputs { _ = engine.feed(Character(char)) }
         XCTAssertEqual(engine.currentOutput(), "toán")
-
+        
         // Repeating the same tone key ('s') cancels the acute tone and restores the literal key ('toans')
         _ = engine.feed("s")
         XCTAssertEqual(engine.currentOutput(), "toans")
@@ -143,7 +143,7 @@ final class VietnameseEngineTests: XCTestCase {
         }
         XCTAssertTrue(session.isComposing)
         XCTAssertEqual(session.currentOutput(), "việt")
-
+        
         // Simulate Shift+Enter / Return (\n) boundary
         XCTAssertTrue(session.isWordBoundary("\n"))
         let action = session.commitWord(smartBilingualEnabled: true)
@@ -167,7 +167,7 @@ final class VietnameseEngineTests: XCTestCase {
         }
         XCTAssertTrue(session.isComposing)
         XCTAssertEqual(session.currentOutput(), "thẻe")
-
+        
         // Simulate Shift+Enter / Return (\n) boundary
         XCTAssertTrue(session.isWordBoundary("\n"))
         let action = session.commitWord(smartBilingualEnabled: true)
@@ -187,7 +187,7 @@ final class VietnameseEngineTests: XCTestCase {
         }
         XCTAssertTrue(session.isComposing)
         XCTAssertEqual(session.currentOutput(), "việt")
-
+        
         XCTAssertTrue(session.isWordBoundary("\n"))
         let action = session.commitWord(smartBilingualEnabled: true)
         guard case let .commit(_, text, isOverride) = action else {

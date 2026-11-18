@@ -133,7 +133,7 @@ public final class QuickPhraseStore: @unchecked Sendable {
         if let defaults {
             self.defaults = defaults
         } else {
-            self.defaults = UserDefaults(suiteName: KeyboardPreferences.defaultSuiteName) ?? .standard
+            self.defaults = UserDefaults(suiteName: SharedPreferencesConstants.defaultSuiteName) ?? .standard
         }
     }
 
@@ -209,7 +209,7 @@ public final class QuickPhraseStore: @unchecked Sendable {
         #if os(iOS) || os(macOS)
         CFNotificationCenterPostNotification(
             CFNotificationCenterGetDarwinNotifyCenter(),
-            CFNotificationName(KeyboardPreferences.preferencesDidChangeDarwinNotification as CFString),
+            CFNotificationName(SharedPreferencesConstants.preferencesDidChangeDarwinNotification as CFString),
             nil,
             nil,
             true

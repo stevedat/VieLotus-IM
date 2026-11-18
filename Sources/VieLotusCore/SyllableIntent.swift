@@ -4,13 +4,13 @@ import Foundation
 public enum GrammarProfile: String, CaseIterable, Sendable {
     /// Classic Telex (traditional telex, backward compatible).
     case classic = "classic"
-
+    
     /// Pre-vowel Telex: tone and modifier keys placed before or inside the vowel nucleus.
     case preVowel = "preVowel"
-
+    
     /// Smart Hybrid: supports both pre-vowel and classic postfix keys.
     case smartHybrid = "smartHybrid"
-
+    
     /// Unified multi-order Vietnamese input solver.
     case senFlex = "senFlex"
 }
@@ -32,7 +32,7 @@ internal enum ModifierKind: Sendable, Equatable {
 internal struct ModifierIntent: Sendable, Equatable {
     internal let kind: ModifierKind
     internal let rawIndices: [Int]
-
+    
     internal init(kind: ModifierKind, rawIndices: [Int]) {
         self.kind = kind
         self.rawIndices = rawIndices
@@ -61,7 +61,7 @@ internal struct SyllableCandidate: Sendable, Equatable {
     internal let isVietnamese: Bool
     internal let intent: SyllableIntent
     internal let score: Int
-
+    
     internal init(
         raw: String,
         rendered: String,
@@ -84,28 +84,28 @@ internal struct SyllableCandidate: Sendable, Equatable {
 internal struct SyllableIntent: Sendable, Equatable {
     /// Initial consonant or consonant cluster (e.g. "tr", "th", "qu", "r", "c", "đ", "")
     internal var onset: String = ""
-
+    
     /// Vowel nucleus (e.g. "ươ", "uyên", "ê", "o", "a", "u", "iê")
     internal var nucleus: String = ""
-
+    
     /// Final consonant (coda) (e.g. "ng", "n", "t", "m", "c", "ch", "p", "nh", "")
     internal var coda: String = ""
-
+    
     /// Vietnamese tone diacritic
     internal var tone: VietnameseTone = .none
-
+    
     /// Raw keystrokes entering this intent
     internal var rawChars: [Character] = []
-
+    
     /// Whether the intent was resolved as a valid Vietnamese syllable
     internal var isValidVietnamese: Bool = false
-
+    
     /// Whether a pre-vowel tone modifier was detected
     internal var hasPreVowelTone: Bool = false
-
+    
     /// Whether a pre-vowel or infix horn modifier 'w' was detected
     internal var hasHornModifier: Bool = false
-
+    
     internal init(
         onset: String = "",
         nucleus: String = "",

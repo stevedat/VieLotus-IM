@@ -6,8 +6,14 @@ export COPYFILE_DISABLE=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
-VERSION="${1:-$(git describe --tags --always 2>/dev/null || echo '2.0.0')}"
-VERSION="${VERSION#v}" # Strip leading 'v'
+if [ -n "${1:-}" ]; then
+    VERSION="${1#v}"
+else
+    PLIST_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist 2>/dev/null || echo '2.0.4')"
+    GIT_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
+    GIT_TAG="${GIT_TAG#v}"
+    VERSION="$(printf '%s\n%s\n' "$PLIST_VERSION" "$GIT_TAG" | sed '/^$/d' | sort -V | tail -n 1)"
+fi
 
 echo "=== Packaging VieLotusIM v${VERSION} ==="
 

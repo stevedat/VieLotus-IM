@@ -19,8 +19,9 @@ rm -f "${GEN_DIR}/WindowsNativeLexiconGenerated.inc"
 # 1. Verify reference prebuilt/VieLotusLexicon/WindowsNativeLexiconGenerated.inc matches canonical UTF-8 NFC wordlists
 python3 "${ROOT_DIR}/Sources/VieLotusCoreWindows/scripts/generate_lexicon_hashes.py" --check
 
-# 1b. Enforce ODR struct layout parity between Sources/VieLotusCoreWindows/WindowsNativeEngine.h and CrossPlatform/windows-tsf/src/WindowsNativeEngine.h
-if ! cmp -s "${ROOT_DIR}/Sources/VieLotusCoreWindows/WindowsNativeEngine.h" "${ROOT_DIR}/CrossPlatform/windows-tsf/src/WindowsNativeEngine.h"; then
+# 1b. Enforce ODR struct layout parity between Sources/VieLotusCoreWindows/WindowsNativeEngine.h and CrossPlatform/windows-tsf/src/WindowsNativeEngine.h (when present)
+if [ -f "${ROOT_DIR}/CrossPlatform/windows-tsf/src/WindowsNativeEngine.h" ] && \
+   ! cmp -s "${ROOT_DIR}/Sources/VieLotusCoreWindows/WindowsNativeEngine.h" "${ROOT_DIR}/CrossPlatform/windows-tsf/src/WindowsNativeEngine.h"; then
     echo "ERROR: ODR mismatch between Sources/VieLotusCoreWindows/WindowsNativeEngine.h and CrossPlatform/windows-tsf/src/WindowsNativeEngine.h" >&2
     diff -u "${ROOT_DIR}/Sources/VieLotusCoreWindows/WindowsNativeEngine.h" "${ROOT_DIR}/CrossPlatform/windows-tsf/src/WindowsNativeEngine.h" >&2 || true
     exit 1

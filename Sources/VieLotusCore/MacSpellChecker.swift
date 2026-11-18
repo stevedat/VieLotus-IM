@@ -6,7 +6,7 @@ public struct MacSpellChecker: SpellCheckerProvider {
         NSSpellChecker.shared.automaticallyIdentifiesLanguages = false
         _ = NSSpellChecker.shared.setLanguage("en")
     }
-
+    
     public func isWordInEnglishDictionary(_ word: String) -> Bool {
         guard !word.isEmpty else { return false }
         if EmbeddedEnglishSpellChecker.shared.isWordInEnglishDictionary(word) {
@@ -60,11 +60,11 @@ public struct MacSpellChecker: SpellCheckerProvider {
                 return false
             }
         }
-
+        
         return autoreleasepool {
             let checker = NSSpellChecker.shared
             checker.automaticallyIdentifiesLanguages = false
-
+            
             var wordCount = 0
             let range = checker.checkSpelling(
                 of: word,
@@ -77,7 +77,7 @@ public struct MacSpellChecker: SpellCheckerProvider {
             if range.location == NSNotFound && wordCount > 0 {
                 return true
             }
-
+            
             let rangeUS = checker.checkSpelling(
                 of: word,
                 startingAt: 0,
@@ -89,7 +89,7 @@ public struct MacSpellChecker: SpellCheckerProvider {
             if rangeUS.location == NSNotFound && wordCount > 0 {
                 return true
             }
-
+            
             // Also check capitalized form for proper nouns (e.g. "facebook" -> "Facebook", "microsoft" -> "Microsoft")
             let capitalized = word.prefix(1).uppercased() + word.dropFirst()
             if capitalized != word && word.count >= 6 {
@@ -116,7 +116,7 @@ public struct MacSpellChecker: SpellCheckerProvider {
                     return true
                 }
             }
-
+            
             return false
         }
     }

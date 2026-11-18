@@ -91,7 +91,7 @@ extension Bundle {
     /// Resolves the `VieLotusCore` resource bundle from an ordered list of candidate directories
     /// without ever invoking `fatalError`. Internal for deterministic unit testing of relocated
     /// `.app` bundle layouts.
-    internal static func resolveVieLotusCore(
+    public static func resolveVieLotusCore(
         in candidates: [URL?],
         fallbackBundles: [Bundle] = [],
         sourceResourcesURL: URL? = nil
@@ -115,14 +115,8 @@ extension Bundle {
             }
         }
 
-        // Flat resource layout (e.g. resources copied directly into Contents/Resources/ or iOS app bundle)
+        // Flat resource layout (e.g. resources copied directly into Contents/Resources/)
         for fallback in fallbackBundles {
-            #if !VIELOTUS_OPEN_CORE_MACOS
-            if fallback.url(forResource: "TuDienTuGhep", withExtension: "json") != nil
-                || fallback.url(forResource: "TuDienTuGhep", withExtension: "txt") != nil {
-                return fallback
-            }
-            #endif
             if fallback.url(forResource: "typing-modes", withExtension: "yml") != nil {
                 return fallback
             }

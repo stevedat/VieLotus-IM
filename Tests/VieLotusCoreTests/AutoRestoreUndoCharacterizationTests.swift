@@ -91,30 +91,6 @@ final class AutoRestoreUndoCharacterizationTests: XCTestCase {
         }
     }
 
-    private final class MockUIKitProxy: TextDocumentProxyProtocol {
-        var beforeCursor: String = ""
-        var afterCursor: String = ""
-        var selected: String? = nil
-
-        var documentContextBeforeInput: String? { beforeCursor }
-        var documentContextAfterInput: String? { afterCursor }
-        var selectedText: String? { selected }
-
-        func insertText(_ text: String) {
-            selected = nil
-            beforeCursor.append(text)
-        }
-
-        func deleteBackward() {
-            if selected != nil {
-                selected = nil
-                return
-            }
-            if !beforeCursor.isEmpty {
-                beforeCursor.removeLast()
-            }
-        }
-    }
 
     private func makeMacSession(inlineBilingual: Bool) -> InputSessionManager {
         let session = InputSessionManager()
@@ -127,15 +103,6 @@ final class AutoRestoreUndoCharacterizationTests: XCTestCase {
         return session
     }
 
-    private func makeUIKitAdapter() -> UIKitInputSessionAdapter {
-        let adapter = UIKitInputSessionAdapter()
-        adapter.session.clearContext()
-        adapter.session.macroEnabled = false
-        adapter.session.setInputMethod(.telex)
-        adapter.session.setGrammarProfile(.senFlex)
-        adapter.session.setSmartBilingualEnabled(true)
-        return adapter
-    }
 
     // MARK: - 1. macOS Commit-Mode Auto-Restore Trap & Provenance Capture
 
@@ -227,65 +194,8 @@ final class AutoRestoreUndoCharacterizationTests: XCTestCase {
         XCTAssertEqual(inlineSession.lastCommittedProvenance.selectedKind, .rawLiteral)
         XCTAssertEqual(inlineSession.lastCommittedProvenance.explicitEscapeState, .none)
 
-        // B. iOS UIKitInputSessionAdapter (`here`, `been`, and no-context `turn`)
-        let adapter = makeUIKitAdapter()
-        let proxy = MockUIKitProxy()
-
-        for ch in "working in IT here " {
-            adapter.handleCharacter(ch, proxy: proxy)
-        }
-        XCTAssertEqual(proxy.beforeCursor, "working in IT here ")
-        XCTAssertEqual(adapter.session.lastCommittedProvenance.vietnameseCandidate, "hể")
-        XCTAssertEqual(adapter.session.lastCommittedProvenance.selectedCandidate, "here")
-        XCTAssertEqual(adapter.session.lastCommittedProvenance.selectedKind, .rawLiteral)
-
-        // Backspace x2 + "e " on iOS also loops back to "here "
-        adapter.handleBackspace(proxy: proxy)
-        adapter.handleBackspace(proxy: proxy)
-        XCTAssertEqual(proxy.beforeCursor, "working in IT her")
-        adapter.handleCharacter("e", proxy: proxy)
-        adapter.handleCharacter(" ", proxy: proxy)
-        XCTAssertEqual(proxy.beforeCursor, "working in IT here ")
-
-        // `he is been ` (intending "bên")
-        let beenAdapter = makeUIKitAdapter()
-        let beenProxy = MockUIKitProxy()
-        for ch in "he is been " {
-            beenAdapter.handleCharacter(ch, proxy: beenProxy)
-        }
-        XCTAssertEqual(beenProxy.beforeCursor, "he is been ")
-        XCTAssertEqual(beenAdapter.session.lastCommittedProvenance.vietnameseCandidate, "bên")
-        XCTAssertEqual(beenAdapter.session.lastCommittedProvenance.selectedCandidate, "been")
-
-        // No-context lexical restore `turn ` (non-existent VN syllable "tủn" -> "turn")
-        let turnAdapter = makeUIKitAdapter()
-        let turnProxy = MockUIKitProxy()
-        for ch in "turn " {
-            turnAdapter.handleCharacter(ch, proxy: turnProxy)
-        }
-        XCTAssertEqual(turnProxy.beforeCursor, "turn ")
-        XCTAssertEqual(turnAdapter.session.lastCommittedProvenance.vietnameseCandidate, "tủn")
-        XCTAssertEqual(turnAdapter.session.lastCommittedProvenance.selectedCandidate, "turn")
     }
 
-    // MARK: - 3. Pre-Space Explicit Candidate Selection Works Today (Gap Is Specifically Post-Space)
-
-    func testUIKitExplicitVietnameseCandidateCommitBeforeSpace() {
-        let adapter = makeUIKitAdapter()
-        let proxy = MockUIKitProxy()
-
-        for ch in "working in IT here" {
-            adapter.handleCharacter(ch, proxy: proxy)
-        }
-        // Inline display chose "here", while candidateProvenance preserves Vietnamese twin "hể"
-        XCTAssertEqual(proxy.beforeCursor, "working in IT here")
-        XCTAssertEqual(adapter.session.candidateProvenance.selectedCandidate, "here")
-        XCTAssertEqual(adapter.session.candidateProvenance.vietnameseCandidate, "hể")
-
-        // Tapping "hể" on the iOS candidate bar BEFORE Space commits "hể " cleanly
-        adapter.commitCandidate("hể", proxy: proxy, trailingSpace: true)
-        XCTAssertEqual(proxy.beforeCursor, "working in IT hể ")
-    }
 
     // MARK: - 4. Counter-Cases Showing Why Unconditional "2nd Backspace = Undo" Is Unsafe as Default
 
@@ -300,38 +210,8 @@ final class AutoRestoreUndoCharacterizationTests: XCTestCase {
             _ = host.type(",", into: session)
             XCTAssertEqual(host.text, "working in IT theme,")
 
-            let adapter = makeUIKitAdapter()
-            let proxy = MockUIKitProxy()
-            for ch in "working in IT theme " {
-                adapter.handleCharacter(ch, proxy: proxy)
-            }
-            adapter.handleBackspace(proxy: proxy)
-            adapter.handleCharacter(",", proxy: proxy)
-            XCTAssertEqual(proxy.beforeCursor, "working in IT theme,")
         }
 
-        // Counter-case B: Pressing/holding Backspace 2..6 times after "working in IT theme "
-        // must delete characters monotonically without unexpectedly mutating "theme" into "thêm".
-        do {
-            let adapter = makeUIKitAdapter()
-            let proxy = MockUIKitProxy()
-            for ch in "working in IT theme " {
-                adapter.handleCharacter(ch, proxy: proxy)
-            }
-
-            let expectedSteps = [
-                "working in IT theme",
-                "working in IT them",
-                "working in IT the",
-                "working in IT th",
-                "working in IT t",
-                "working in IT "
-            ]
-            for expected in expectedSteps {
-                adapter.handleBackspace(proxy: proxy)
-                XCTAssertEqual(proxy.beforeCursor, expected)
-            }
-        }
     }
 
     // MARK: - 5. Live 3-Scenario Playground Drills End-to-End Verification (Telex & VNI)
@@ -366,17 +246,6 @@ final class AutoRestoreUndoCharacterizationTests: XCTestCase {
             SmartBilingualDetector.spellCheckerProvider = provider
 
             for drill in telexDrills {
-                // 1. iOS UIKitInputSessionAdapter
-                let adapter = makeUIKitAdapter()
-                let proxy = MockUIKitProxy()
-                for ch in drill.input {
-                    adapter.handleCharacter(ch, proxy: proxy)
-                }
-                XCTAssertEqual(
-                    proxy.beforeCursor,
-                    drill.expected,
-                    "[\(providerName) / UIKit] Telex drill \(drill.input.debugDescription) must produce \(drill.expected.debugDescription)"
-                )
 
                 // 2. macOS InputSessionManager (both commit-mode and inline-bilingual mode)
                 for inlineMode in [false, true] {
@@ -409,18 +278,5 @@ final class AutoRestoreUndoCharacterizationTests: XCTestCase {
             ("gu7i3 file update cho nhom1", "gửi file update cho nhóm")
         ]
 
-        for drill in vniDrills {
-            let adapter = makeUIKitAdapter()
-            adapter.session.setInputMethod(.vni)
-            let proxy = MockUIKitProxy()
-            for ch in drill.input {
-                adapter.handleCharacter(ch, proxy: proxy)
-            }
-            XCTAssertEqual(
-                proxy.beforeCursor,
-                drill.expected,
-                "VNI Playground drill \(drill.input.debugDescription) must produce \(drill.expected.debugDescription)"
-            )
-        }
     }
 }

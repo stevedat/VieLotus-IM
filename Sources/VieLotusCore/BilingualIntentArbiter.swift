@@ -576,6 +576,10 @@ public struct BilingualIntentArbiter: Sendable {
         "vít": 6.4,
         "đít": 6.1,
         "xít": 5.8,
+        "nít": 6.0,
+        "rít": 6.1,
+        "dít": 4.2,
+        "pít": 4.5,
         "ịt": 3.8,
         "mịt": 6.4,
         "thịt": 7.9,
@@ -654,6 +658,14 @@ public struct BilingualIntentArbiter: Sendable {
         "ét": 5.6,
         "mể": 4.2,
         "bỏn": 4.4,
+        "mót": 5.6,
+        "rút": 7.4,
+        "tút": 5.6,
+        "mút": 5.9,
+        "dút": 4.5,
+        "bút": 7.1,
+        "gút": 5.4,
+        "lút": 5.5,
         "ó": 3.8,
         "ò": 2.8,
         "ỏ": 2.5,
@@ -779,6 +791,77 @@ public struct BilingualIntentArbiter: Sendable {
         "post": 8.2,
         "last": 8.7,
         "fast": 8.0,
+        "most": 8.9,
+        "pist": 6.2,
+        "mist": 6.8,
+        "hist": 6.0,
+        "kist": 5.5,
+        "nist": 6.0,
+        "bist": 5.6,
+        "vist": 5.4,
+        "tist": 5.3,
+        "rist": 5.3,
+        "rust": 7.1,
+        "tust": 5.2,
+        "must": 8.8,
+        "dust": 7.0,
+        "dist": 6.4,
+        "bust": 6.3,
+        "gust": 5.8,
+        "lust": 6.0,
+        "nest": 6.6,
+        "vest": 6.5,
+        "chest": 7.2,
+        "pest": 6.4,
+        "past": 8.4,
+        "cast": 7.3,
+        "vast": 7.2,
+        "mast": 6.4,
+        "burn": 7.3,
+        "burst": 6.9,
+        "sort": 7.7,
+        "port": 7.5,
+        "part": 8.7,
+        "cart": 7.1,
+        "chart": 7.3,
+        "hurt": 7.6,
+        "short": 8.2,
+        "start": 8.6,
+        "sport": 7.4,
+        "smart": 7.5,
+        "heart": 8.1,
+        "first": 9.0,
+        "worst": 7.4,
+        "sure": 8.5,
+        "pure": 7.4,
+        "cure": 6.9,
+        "soon": 8.2,
+        "root": 7.3,
+        "boot": 6.9,
+        "none": 7.9,
+        "tone": 7.1,
+        "bone": 7.2,
+        "cone": 6.5,
+        "these": 9.0,
+        "its": 8.9,
+        "days": 8.5,
+        "terms": 7.8,
+        "box": 7.8,
+        "air": 8.1,
+        "tax": 7.8,
+        "cars": 8.1,
+        "arts": 7.2,
+        "tips": 7.1,
+        "gas": 7.5,
+        "thus": 7.6,
+        "max": 7.4,
+        "sets": 7.6,
+        "songs": 7.4,
+        "hits": 7.2,
+        "bus": 7.6,
+        "chair": 7.5,
+        "nor": 7.4,
+        "virus": 7.3,
         "turn": 8.2,
         "down": 9.1,
         "toast": 6.4,
@@ -860,6 +943,7 @@ public struct BilingualIntentArbiter: Sendable {
         "last": ["cắt", "mỗi", "từng"],
         "best": ["hạng", "đứng", "chót"],
         "lost": ["miếng", "tấm", "đệm", "thảm", "lớp", "áo", "quần", "đồ", "giấy", "khăn"],
+        "most": ["đi", "nhặt", "lượm", "bòn", "chín", "ăn", "cúi", "mót"],
         "down": ["hoa", "hoa lay", "cây", "củ", "bông", "bó", "cành", "vườn", "luống"],
         "car": ["tất", "với", "cho"],
         "bar": ["bánh", "thuốc", "mồi"],
@@ -935,11 +1019,11 @@ public struct BilingualIntentArbiter: Sendable {
         rendered: String,
         context: String = ""
     ) -> Bool {
-        let cleanRaw = raw.trimmingCharacters(in: .punctuationCharacters)
-        let cleanRendered = rendered.trimmingCharacters(in: .punctuationCharacters)
+        let cleanRaw = SmartBilingualDetector.trimPunctuationFast(raw)
+        let cleanRendered = SmartBilingualDetector.trimPunctuationFast(rendered)
         let effectiveRendered = cleanRendered.isEmpty ? rendered : cleanRendered
-        let lowerRaw = cleanRaw.lowercased()
-        let lowerRendered = effectiveRendered.lowercased()
+        let lowerRaw = SmartBilingualDetector.asciiLowercasedFast(cleanRaw)
+        let lowerRendered = SmartBilingualDetector.asciiLowercasedFast(effectiveRendered)
         guard cleanRaw.count >= 2,
               cleanRaw != lowerRaw,
               lowerRaw != lowerRendered,
@@ -980,12 +1064,14 @@ public struct BilingualIntentArbiter: Sendable {
         // 2. Short ALL-CAPS technical/time-zone/Roman abbreviations (`OS`, `IR`, `IX`, `EST`) that are NOT already no-context defaults:
         //    Only applies when a tone mark was produced (preserving untoned `AA -> Â`, `EE -> Ê`, `OO -> Ô`, `AW -> Ă`, `OW -> Ơ`, `UW -> Ư`)
         //    and outside ALL-CAPS Vietnamese prose clauses (`TOÁN`, `CÓ THỂ`).
-        guard (2...4).contains(cleanRaw.count),
+        let isIstOstUst = (4...5).contains(cleanRaw.count) &&
+            (lowerRaw.hasSuffix("ist") || lowerRaw.hasSuffix("ost") || lowerRaw.hasSuffix("ust"))
+        guard ((2...4).contains(cleanRaw.count) || isIstOstUst),
               !lowerRaw.hasPrefix("dd"),
               cleanRaw == cleanRaw.uppercased(),
-              !prefersEnglishInDefaultNoContext(lowerRaw: lowerRaw, lowerRendered: lowerRendered),
+              (!prefersEnglishInDefaultNoContext(lowerRaw: lowerRaw, lowerRendered: lowerRendered) || isIstOstUst),
               VietnameseSyllableDictionary.hasToneMark(effectiveRendered),
-              (lowerRendered.count == 1 || lowerRaw.first.map({ "aeiouy".contains($0) }) == true) else {
+              (isIstOstUst || lowerRendered.count == 1 || lowerRaw.first.map({ "aeiouy".contains($0) }) == true) else {
             return false
         }
 
@@ -1018,11 +1104,14 @@ public struct BilingualIntentArbiter: Sendable {
             }
             return VietnameseSyllableDictionary.shared.isValidSyllable(lowerRendered) ? 6.2 : 0.0
         }()
+        if isIstOstUst && !hasExplicitVietnameseCompoundHead(context, lowerRaw: lowerRaw) {
+            return true
+        }
         return enFreq >= 5.0 && vnFreq < 6.0
     }
 
     private static let explicitCollocationRequiredShortTokens: Set<String> = [
-        "is", "or", "of", "if", "down", "lost"
+        "is", "or", "of", "if", "down", "lost", "most"
     ]
 
     /// Returns `true` strictly when `context` ends with an explicit Vietnamese compound head registered
@@ -1127,7 +1216,14 @@ public struct BilingualIntentArbiter: Sendable {
 
     /// Tracks English vs Vietnamese momentum across recent tokens while allowing instant bidirectional mid-sentence code-switching.
     public static func evaluateSentenceLanguageState(_ context: String) -> SentenceLanguageState {
-        let trimmed = context.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !context.isEmpty else { return .empty }
+        let hasOuterWhitespace: Bool = {
+            guard let first = context.utf8.first, let last = context.utf8.last else { return false }
+            let firstWS = first == 0x20 || first == 0x0A || first == 0x09 || first == 0x0D || first >= 0x80
+            let lastWS = last == 0x20 || last == 0x0A || last == 0x09 || last == 0x0D || last >= 0x80
+            return firstWS || lastWS
+        }()
+        let trimmed = hasOuterWhitespace ? context.trimmingCharacters(in: .whitespacesAndNewlines) : context
         guard !trimmed.isEmpty else { return .empty }
         let cachedHit: SentenceLanguageState? = {
             sentenceStateCacheLock.lock()
@@ -1141,7 +1237,7 @@ public struct BilingualIntentArbiter: Sendable {
         let allTokens = trimmed
             .split(whereSeparator: \.isWhitespace)
             .suffix(6)
-            .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+            .map { SmartBilingualDetector.trimPunctuationFast(String($0)) }
             .filter { !$0.isEmpty }
         guard !allTokens.isEmpty else { return .empty }
         let window = Array(allTokens.suffix(5))
@@ -1603,11 +1699,11 @@ public struct BilingualIntentArbiter: Sendable {
             return cached
         }
         arbitrationCacheLock.unlock()
-        let cleanRaw = raw.trimmingCharacters(in: .punctuationCharacters)
-        let cleanRendered = rendered.trimmingCharacters(in: .punctuationCharacters)
+        let cleanRaw = SmartBilingualDetector.trimPunctuationFast(raw)
+        let cleanRendered = SmartBilingualDetector.trimPunctuationFast(rendered)
         let effectiveRendered = cleanRendered.isEmpty ? rendered : cleanRendered
-        let lowerRaw = cleanRaw.lowercased()
-        let lowerRendered = effectiveRendered.lowercased()
+        let lowerRaw = SmartBilingualDetector.asciiLowercasedFast(cleanRaw)
+        let lowerRendered = SmartBilingualDetector.asciiLowercasedFast(effectiveRendered)
 
         // 1. Check Explicit Escape or User Selection first
         let isExplicitEscape = SmartBilingualDetector.isExplicitTelexEscape(raw: cleanRaw, rendered: effectiveRendered)
@@ -1742,6 +1838,12 @@ public struct BilingualIntentArbiter: Sendable {
                 enContextScore += 8.5
                 if ["is", "as", "if", "of", "or", "us", "up", "it", "at", "in", "on", "mix", "est", "os", "ir", "ix", "rest", "theme", "sex", "here", "there", "were", "more", "born", "mere", "tree", "queen", "teen", "been", "seen", "bee", "bees", "beer", "moon", "noon", "room", "too", "boots", "six", "cats", "hats", "last", "best", "car", "bar", "now", "cow"].contains(lowerRaw) {
                     enCollocationScore += 3.5
+                }
+                if SmartBilingualDetector.isEnglishAnchorTokenForArbiter(lastContextToken) &&
+                   (4...6).contains(lowerRaw.count) &&
+                   !lowerRaw.hasPrefix("dd") &&
+                   (lowerRaw.hasSuffix("st") || lowerRaw.hasSuffix("rn") || lowerRaw.hasSuffix("rt")) {
+                    enCollocationScore += 5.0
                 }
             } else if prefersEnglishInDefaultNoContext(lowerRaw: lowerRaw, lowerRendered: lowerRendered) &&
                       !isVietnameseContextForTonePrimitive(trimmedContext, lowerRaw: lowerRaw) {
@@ -1986,6 +2088,7 @@ public struct BilingualIntentArbiter: Sendable {
         "bét": "best",
         "lát": "last",
         "lót": "lost",
+        "mót": "most",
         "dơn": "down",
         "cát": "cats",
         "hát": "hats",
@@ -2086,11 +2189,28 @@ public struct BilingualFullCorpusEvaluationReport: Sendable, Equatable {
 }
 
 extension BilingualIntentArbiter {
+    public struct SecondaryConsistencySession {
+        public let feed: (Character) -> Void
+        public let commitSpace: () -> Void
+        public let composingWord: () -> String
+
+        public init(
+            feed: @escaping (Character) -> Void,
+            commitSpace: @escaping () -> Void,
+            composingWord: @escaping () -> String
+        ) {
+            self.feed = feed
+            self.commitSpace = commitSpace
+            self.composingWord = composingWord
+        }
+    }
+
     /// Sweeps an offline English vocabulary across Standard Telex, Gen-Z Mode, and VUIS (`senFlex`),
     /// and evaluates Vietnamese, English, and Mixed/Code-Switching sentences split into a Calibration set
     /// and a strictly disjoint Independent Holdout set (P0.4.1 Section 6).
     public static func evaluateFullCollisionCorpus(
-        additionalEnglishWords: [String] = []
+        additionalEnglishWords: [String] = [],
+        secondarySessionFactory: (() -> SecondaryConsistencySession)? = nil
     ) -> BilingualFullCorpusEvaluationReport {
         var baseEnglishLexicon = Set(englishCollisionLogFrequencies.keys)
         let extraOfflineEnglish: [String] = [
@@ -2253,14 +2373,7 @@ extension BilingualIntentArbiter {
                 macSession.smartBilingualEnabled = true
                 macSession.inlineBilingualEnabled = true
 
-                #if !VIELOTUS_OPEN_CORE_MACOS
-                let iosAdapter = UIKitInputSessionAdapter(session: InputSessionManager())
-                iosAdapter.session.setInputMethod(.telex)
-                iosAdapter.session.setGrammarProfile(.senFlex)
-                iosAdapter.session.smartBilingualEnabled = true
-                iosAdapter.session.inlineBilingualEnabled = true
-                let iosProxy = InMemoryConsistencyProxy()
-                #endif
+                let secondarySession = secondarySessionFactory?()
 
                 for token in scenario.tokens {
                     totalTokens += 1
@@ -2269,23 +2382,21 @@ extension BilingualIntentArbiter {
                     for ch in token.raw {
                         _ = macSession.handleCharacter(ch)
                         totalKeystrokes += 1
-                        #if !VIELOTUS_OPEN_CORE_MACOS
-                        iosAdapter.handleCharacter(ch, proxy: iosProxy)
-                        if macSession.composingWord == iosAdapter.session.composingWord {
+                        if let secondarySession {
+                            secondarySession.feed(ch)
+                            if macSession.composingWord == secondarySession.composingWord() {
+                                consistentKeystrokes += 1
+                            }
+                        } else {
                             consistentKeystrokes += 1
                         }
-                        #else
-                        consistentKeystrokes += 1
-                        #endif
                     }
 
                     let flipsInWord = macSession.candidateProvenance.flipCount
                     totalFlips += flipsInWord
 
                     let commitAction = macSession.commitWord(smartBilingualEnabled: true, boundaryChar: " ")
-                    #if !VIELOTUS_OPEN_CORE_MACOS
-                    iosAdapter.handleCharacter(" ", proxy: iosProxy)
-                    #endif
+                    secondarySession?.commitSpace()
                     let committedWord: String
                     if case let .commit(_, text, _) = commitAction {
                         committedWord = text
@@ -2345,14 +2456,3 @@ extension BilingualIntentArbiter {
         )
     }
 }
-
-#if !VIELOTUS_OPEN_CORE_MACOS
-private final class InMemoryConsistencyProxy: TextDocumentProxyProtocol {
-    var buffer: String = ""
-    var documentContextBeforeInput: String? { buffer.isEmpty ? nil : buffer }
-    var documentContextAfterInput: String? { nil }
-    var selectedText: String? { nil }
-    func insertText(_ text: String) { buffer.append(text) }
-    func deleteBackward() { if !buffer.isEmpty { buffer.removeLast() } }
-}
-#endif

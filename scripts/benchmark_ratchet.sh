@@ -178,6 +178,16 @@ if [[ $DO_LATENCY -eq 1 ]]; then
         fi
         echo "   stress run $srun: $lat_payload"
 
+        if ! echo "$lat_payload" | grep -q '"output_verified":true'; then
+            echo "❌ Stress run $srun failed output_verified gate." >&2
+            FAILED=1
+        fi
+        r_bs="$(extract_metric "backspaces" "$lat_payload")"
+        if [[ -z "$r_bs" ]] || awk -v b="$r_bs" 'BEGIN { exit !(b <= 0) }'; then
+            echo "❌ Stress run $srun executed 0 backspaces." >&2
+            FAILED=1
+        fi
+
         r_telex="$(extract_metric "telex_p99" "$lat_payload")"
         r_vni="$(extract_metric "vni_p99" "$lat_payload")"
         r_mixed="$(extract_metric "mixed_p99" "$lat_payload")"

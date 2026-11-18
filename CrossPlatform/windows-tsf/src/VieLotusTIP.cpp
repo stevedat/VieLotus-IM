@@ -403,13 +403,16 @@ void CVieLotusTIP::SyncActiveLanguageProfile() {
     m_inProfileSync = true;
 
     bool desiredVni = m_isVniMode;
-    LoadPersistedVniPreference(desiredVni);
-    if (m_isVniMode != desiredVni) {
-        ApplyVniMode(desiredVni, false);
+    const bool hasSettingsOverride = ConsumeSettingsVniOverride(desiredVni);
+    if (!hasSettingsOverride) {
+        LoadPersistedVniPreference(desiredVni);
     }
 
     ITfInputProcessorProfiles *pProfiles = nullptr;
     if (FAILED(CoCreateInstance(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER, IID_ITfInputProcessorProfiles, reinterpret_cast<void **>(&pProfiles))) || !pProfiles) {
+        if (m_isVniMode != desiredVni) {
+            ApplyVniMode(desiredVni, false);
+        }
         m_inProfileSync = false;
         return;
     }
@@ -417,37 +420,64 @@ void CVieLotusTIP::SyncActiveLanguageProfile() {
     ITfInputProcessorProfileMgr *pProfileMgr = nullptr;
     pProfiles->QueryInterface(IID_ITfInputProcessorProfileMgr, reinterpret_cast<void **>(&pProfileMgr));
 
-    // Consume legacy flag if set
-    bool unusedOverride = false;
-    ConsumeSettingsVniOverride(unusedOverride);
+    TF_INPUTPROCESSORPROFILE activeProfile{};
+    const bool gotActive = (pProfileMgr != nullptr) &&
+        SUCCEEDED(pProfileMgr->GetActiveProfile(GUID_TFCAT_TIP_KEYBOARD, &activeProfile));
+    const bool selfTipActive = gotActive && IsEqualCLSID(activeProfile.clsid, CLSID_VieLotusTIP);
 
-    // Check if the current thread's active TSF profile already matches the user's persisted preference
-    bool activeMatchesDesired = false;
-    if (pProfileMgr) {
-        TF_INPUTPROCESSORPROFILE activeProfile{};
-        if (SUCCEEDED(pProfileMgr->GetActiveProfile(GUID_TFCAT_TIP_KEYBOARD, &activeProfile)) &&
-            IsEqualCLSID(activeProfile.clsid, CLSID_VieLotusTIP)) {
-            const GUID &expectedGuid = desiredVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
-            if (IsEqualGUID(activeProfile.guidProfile, expectedGuid)) {
-                activeMatchesDesired = true;
+    if (hasSettingsOverride) {
+        // Explicit Telex/VNI change triggered from Settings UI or Tray Menu.
+        if (m_isVniMode != desiredVni) {
+            ApplyVniMode(desiredVni, false);
+        }
+        if (selfTipActive || m_inActivateEx) {
+            const GUID &targetGuid = desiredVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
+            if (!selfTipActive || !IsEqualGUID(activeProfile.guidProfile, targetGuid)) {
+                pProfiles->SetDefaultLanguageProfile(VI_LANGID, CLSID_VieLotusTIP, targetGuid);
+                pProfiles->ActivateLanguageProfile(CLSID_VieLotusTIP, VI_LANGID, targetGuid);
+                if (pProfileMgr) {
+                    pProfileMgr->ActivateProfile(
+                        TF_PROFILETYPE_INPUTPROCESSOR,
+                        VI_LANGID,
+                        CLSID_VieLotusTIP,
+                        targetGuid,
+                        nullptr,
+                        TF_IPPMF_FORSESSION | TF_IPPMF_FORPROCESS | TF_IPPMF_ENABLEPROFILE | 0x00000004
+                    );
+                }
             }
         }
-    }
-
-    if (!activeMatchesDesired) {
-        const GUID &targetGuid = desiredVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
-        pProfiles->SetDefaultLanguageProfile(VI_LANGID, CLSID_VieLotusTIP, targetGuid);
-        pProfiles->ActivateLanguageProfile(CLSID_VieLotusTIP, VI_LANGID, targetGuid);
-        if (pProfileMgr) {
-            pProfileMgr->ActivateProfile(
-                TF_PROFILETYPE_INPUTPROCESSOR,
-                VI_LANGID,
-                CLSID_VieLotusTIP,
-                targetGuid,
-                nullptr,
-                TF_IPPMF_FORSESSION | TF_IPPMF_FORPROCESS | TF_IPPMF_ENABLEPROFILE | 0x00000004
-            );
+    } else if (selfTipActive) {
+        // Respect Windows Taskbar / Win+Space profile selection when Sen Viet is already the active TIP.
+        if (IsEqualGUID(activeProfile.guidProfile, GUID_VieLotusProfileVNI)) {
+            ApplyVniMode(true, !m_isVniMode);
+        } else if (IsEqualGUID(activeProfile.guidProfile, GUID_VieLotusProfile)) {
+            ApplyVniMode(false, m_isVniMode);
+        } else if (m_isVniMode != desiredVni) {
+            ApplyVniMode(desiredVni, false);
         }
+    } else if (m_inActivateEx) {
+        // TSF just activated Sen Viet before reporting an active profile; align engine without stealing another active TIP on focus switches.
+        if (m_isVniMode != desiredVni) {
+            ApplyVniMode(desiredVni, false);
+        }
+        if (!gotActive || IsEqualGUID(activeProfile.clsid, GUID_NULL)) {
+            const GUID &targetGuid = desiredVni ? GUID_VieLotusProfileVNI : GUID_VieLotusProfile;
+            pProfiles->SetDefaultLanguageProfile(VI_LANGID, CLSID_VieLotusTIP, targetGuid);
+            pProfiles->ActivateLanguageProfile(CLSID_VieLotusTIP, VI_LANGID, targetGuid);
+            if (pProfileMgr) {
+                pProfileMgr->ActivateProfile(
+                    TF_PROFILETYPE_INPUTPROCESSOR,
+                    VI_LANGID,
+                    CLSID_VieLotusTIP,
+                    targetGuid,
+                    nullptr,
+                    TF_IPPMF_FORSESSION | TF_IPPMF_FORPROCESS | TF_IPPMF_ENABLEPROFILE | 0x00000004
+                );
+            }
+        }
+    } else if (m_isVniMode != desiredVni) {
+        ApplyVniMode(desiredVni, false);
     }
 
     if (pProfileMgr) {
@@ -845,7 +875,9 @@ STDMETHODIMP CVieLotusTIP::ActivateEx(ITfThreadMgr *ptim, TfClientId tid, DWORD 
     m_pThreadMgr->AddRef();
     m_tfClientId = tid;
 
+    m_inActivateEx = true;
     InitSession();
+    m_inActivateEx = false;
 
     // 1. Advise KeyEventSink
     ITfKeystrokeMgr *pKeystrokeMgr = nullptr;

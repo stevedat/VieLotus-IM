@@ -1,11 +1,11 @@
 import Foundation
 
-internal struct VietnameseSyllableDictionary {
-    internal static let shared = VietnameseSyllableDictionary()
-
-    internal let syllables: Set<String>
+public struct VietnameseSyllableDictionary: Sendable {
+    public static let shared = VietnameseSyllableDictionary()
+    
+    public let syllables: Set<String>
     internal let supplementalTonedSyllables: Set<String>
-    internal let untonedSyllables: Set<String>
+    public let untonedSyllables: Set<String>
     internal let unmodifiedVowelSyllables: Set<String>
     internal let untonedUnmodifiedSyllables: Set<String>
     private let strictPrefixes: Set<String>
@@ -32,7 +32,7 @@ internal struct VietnameseSyllableDictionary {
     ]
 
     private static let eCircumflexVowels: Set<Character> = ["ê", "ế", "ề", "ể", "ễ", "ệ"]
-
+    
     // Canonical Vietnamese syllable dictionary (Unicode NFC UTF-8 plain text; DFSG #2 transparent source)
     private static let baseSyllableList: String = """
         a á à ã ả ạ ẻ ể ỏ ác ắc ậc ặc ách ạch ai ái ải am ám âm ăm ấm ầm ẫm ẵm ảm ẩm ậm an án ân ăn ấn ẩn
@@ -355,7 +355,7 @@ internal struct VietnameseSyllableDictionary {
         xừ xử xự xua xưa xửa xuân xuẩn xuất xuây xúc xục xức xực xuê xuề xuể xuệch xuềnh xui xúi xùi xụi xum
         xúm xùm xun xung xúng xùng xủng xưng xứng xừng xửng xước xược xuôi xười xuộm xuống xuồng xuổng xương
         xướng xường xưởng xúp xụp xút xuy xuý xuỳ xúy xùy xuya xuyên xuyến xuyết xuynh xuýt xuỵt y ý ỳ ỷ yếm
-        yểm yên yến yêng yểng yết yêu yếu yểu nều ứu
+        yểm yên yến yêng yểng yết yêu yếu yểu nều
         """
 
     private init() {
@@ -378,7 +378,7 @@ internal struct VietnameseSyllableDictionary {
         ]
         self.supplementalTonedSyllables = supplementalTonedSyllables
         self.syllables = baseSyllables.union(supplementalTonedSyllables)
-
+        
         let loanwordOutliers: Set<String> = ["basoi", "palăng", "tout", "v"]
         var strict = Set<String>()
         strict.reserveCapacity(9000)
@@ -421,14 +421,14 @@ internal struct VietnameseSyllableDictionary {
         self.untonedUnmodifiedSyllables = untonedUnmodSyls
         self.strictPrefixes = strict
         self.validRhymes = rhymes
-
+        
         var unmod = Set<String>()
         unmod.reserveCapacity(strict.count)
         var untoned = Set<String>()
         untoned.reserveCapacity(strict.count)
         var untonedUnmod = Set<String>()
         untonedUnmod.reserveCapacity(strict.count)
-
+        
         for prefix in strict {
             let strippedShape = Self.stripVowelShapeModifiers(prefix)
             let strippedTone = Self.stripToneMarks(prefix)
@@ -470,8 +470,8 @@ internal struct VietnameseSyllableDictionary {
         self.untonedRhymePrefixes = untonedRhymePref
         self.untonedUnmodifiedRhymePrefixes = untonedUnmodRhymePref
     }
-
-    internal func isValidSyllable(_ word: String) -> Bool {
+    
+    public func isValidSyllable(_ word: String) -> Bool {
         return syllables.contains(word.lowercased())
     }
 
@@ -539,8 +539,8 @@ internal struct VietnameseSyllableDictionary {
                 untonedUnmodifiedRhymePrefixes.contains(Self.stripVowelShapeModifiers(lower))
         }
     }
-
-    internal func isValidUntonedSyllable(_ word: String, genZMode: Bool = false) -> Bool {
+    
+    public func isValidUntonedSyllable(_ word: String, genZMode: Bool = false) -> Bool {
         let lower = word.lowercased()
         if untonedSyllables.contains(lower) {
             return true
@@ -634,7 +634,7 @@ internal struct VietnameseSyllableDictionary {
         }
         return false
     }
-
+    
     /// Returns `true` if `word` is either in `syllables` or is a phonotactically valid
     /// Vietnamese syllable whose untoned skeleton contains a Vietnamese modified character (`ă, â, ê, ô, ơ, ư, đ`),
     /// exists in `untonedSyllables` (or is a valid open circumflex/breve prefix like `mấ`, `mậ`, `cấ`, `cắ`),
@@ -724,7 +724,7 @@ internal struct VietnameseSyllableDictionary {
 
     /// Returns the expanded full Vietnamese syllables for a relaxed-coda word (e.g. `khôg` -> `["không"]`,
     /// `kêh` -> `["kênh", "kêch"]`, `ưg` -> `["ưng"]`, `mìh` -> `["mình"]`, `đượk` -> `["được"]`).
-    internal func expandedRelaxedCodaSyllables(_ word: String) -> [String] {
+    public func expandedRelaxedCodaSyllables(_ word: String) -> [String] {
         let lower = word.lowercased()
         guard !syllables.contains(lower) else { return [] }
         var candidates: [String] = []
@@ -739,7 +739,7 @@ internal struct VietnameseSyllableDictionary {
         }
         return candidates.filter { syllables.contains($0) || isValidUntonedSyllable($0) }
     }
-
+    
     /// Returns `true` if `word` matches a valid Vietnamese syllable when vowel shape modifiers
     /// (`^`, `ă`, `ơ/ư`) are ignored, while still enforcing tone marks and `đ` (including stop-coda tone rules).
     internal func isValidSyllableIgnoringVowelShape(_ word: String) -> Bool {
@@ -769,7 +769,7 @@ internal struct VietnameseSyllableDictionary {
         }
         return true
     }
-
+    
     /// Returns `true` if `word` matches a valid untoned Vietnamese syllable when both tone marks
     /// and vowel shape modifiers (`^`, `ă`, `ơ/ư`) are ignored.
     internal func isValidUntonedSyllableIgnoringVowelShape(_ word: String) -> Bool {
@@ -785,7 +785,7 @@ internal struct VietnameseSyllableDictionary {
         }
         return untonedUnmodifiedSyllables.contains(Self.stripVowelShapeModifiers(Self.stripToneMarks(lower)))
     }
-
+    
     /// Returns `true` if `word` is a valid Vietnamese syllable or a phonotactically plausible
     /// in-progress prefix of a Vietnamese syllable (including pre-horn/pre-circumflex states like
     /// `nuóng` -> `nướng`, `tuyẻn` -> `tuyển`, or pre-tone stop-coda states like `viêt` -> `việt`, `đăc` -> `đặc`).
@@ -806,7 +806,7 @@ internal struct VietnameseSyllableDictionary {
         return true
     }
 
-    internal func isPlausibleInProgressVietnamese(
+    public func isPlausibleInProgressVietnamese(
         _ word: String,
         relaxedCoda: Bool = false,
         genZMode: Bool = false
@@ -821,7 +821,7 @@ internal struct VietnameseSyllableDictionary {
         if lower.count > 8 || Self.hasBreveFollowedByVowel(lower) {
             return false
         }
-
+        
         let toned = Self.hasToneMark(lower)
         var baseCandidates: [String] = [lower]
         if relaxedCoda || genZMode {
@@ -835,7 +835,7 @@ internal struct VietnameseSyllableDictionary {
                 baseCandidates.append(String(lower.dropLast()) + "nh")
             }
         }
-
+        
         var candidates = baseCandidates
         if genZMode {
             for c in baseCandidates {
@@ -866,7 +866,7 @@ internal struct VietnameseSyllableDictionary {
                 }
             }
         }
-
+        
         for candidate in candidates {
             if toned {
                 if strictPrefixes.contains(candidate) ||
@@ -958,7 +958,7 @@ internal struct VietnameseSyllableDictionary {
         }
         return false
     }
-
+    
     private static let breveVowels: Set<Character> = ["ă", "ắ", "ằ", "ẳ", "ẵ", "ặ"]
     private static let allVietnameseVowels: Set<Character> = [
         "a", "e", "i", "o", "u", "y", "ă", "â", "ê", "ô", "ơ", "ư",
@@ -969,7 +969,7 @@ internal struct VietnameseSyllableDictionary {
         "ớ", "ờ", "ở", "ỡ", "ợ", "ú", "ù", "ủ", "ũ", "ụ",
         "ứ", "ừ", "ử", "ữ", "ự", "ý", "ỳ", "ỷ", "ỹ", "ỵ"
     ]
-
+    
     private static func hasBreveFollowedByVowel(_ lower: String) -> Bool {
         if lower.unicodeScalars.allSatisfy(\.isASCII) { return false }
         let chars = Array(lower)
@@ -981,7 +981,7 @@ internal struct VietnameseSyllableDictionary {
         }
         return false
     }
-
+    
     @inline(__always)
     private static func toneKindOfScalar(_ v: UInt32) -> UInt8 {
         // 0 = none, 1 = acute/dot, 2 = grave/hook/tilde, 3 = combining mark fallback
@@ -1129,7 +1129,7 @@ internal struct VietnameseSyllableDictionary {
         }
         return false
     }
-
+    
     private static func stripVowelShapeModifiers(_ str: String) -> String {
         var needsChange = false
         var hasCombining = false
@@ -1165,8 +1165,8 @@ internal struct VietnameseSyllableDictionary {
         }
         return String(out)
     }
-
-    internal static func stripToneMarks(_ str: String) -> String {
+    
+    public static func stripToneMarks(_ str: String) -> String {
         var needsChange = false
         var hasCombining = false
         for s in str.unicodeScalars {
