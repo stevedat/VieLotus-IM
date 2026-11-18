@@ -1,6 +1,6 @@
 # Test status
 
-Updated 2026-11-16. CI evidence: [CI workflow runs (`main`)](https://github.com/stevedat/VieLotus-IM/actions/workflows/ci.yml?query=branch%3Amain). Manual results below are reported by the maintainer; this repository does not contain device logs for those sessions.
+Updated 2026-11-18. CI evidence: [CI workflow runs (`main`)](https://github.com/stevedat/VieLotus-IM/actions/workflows/ci.yml?query=branch%3Amain). Manual results below are reported by the maintainer; this repository does not contain device logs for those sessions.
 
 ## Manual platform tests
 
@@ -42,10 +42,10 @@ The app-to-platform mapping, app versions, OS builds, and test cases were not re
 
 ## Engine regression results
 
-The CI regression suite reports 9,091/9,091 primary cases (100%), 365/373 symmetric no-context collision cases (97.86%) on Swift and 373/373 (100%) on the C++20 desktop engine, and 180/180 unique Vietnamese paths (100%). These are fixture results, not host-app acceptance results. See [benchmark report](BENCHMARK_REPORT.md).
+The CI regression suite reports 9,091/9,091 primary cases (100%), 362/369 symmetric no-context collision cases (98.10%) on Swift and 369/369 (100%) on the C++20 desktop engine, and 179/179 unique Vietnamese paths (100%). These are fixture results, not host-app acceptance results. See [benchmark report](BENCHMARK_REPORT.md).
 
 ## Debian status
 
 - `vielotus 2.0.1-1` (sponsored by `byang@debian.org`) was accepted into Debian `unstable` on 2026-11-14: [Debian Package Tracker](https://tracker.debian.org/pkg/vielotus) · [Bug #1152533](https://bugs.debian.org/1152533) · [DFSG review for `vielotus 2.0.1-1`](https://dfsg-new-queue.debian.org/reviews/vielotus/2.0.1-1).
-- [`debian/watch`](../CrossPlatform/packaging/debian/watch) (Version 5) tracks upstream GitHub release tags (`v2.0.2` is currently the latest published tag).
-- Upstream and packaging updates for `2.0.3-1` (including the review follow-ups from [Bug #1152533 message #10](https://bugs.debian.org/1152533#10)) are staged in [`CrossPlatform/packaging/debian/`](../CrossPlatform/packaging/debian); publishing tag `v2.0.3` and uploading the signed `2.0.3-1` source package are pending final release sign-off.
+- [`debian/watch`](../CrossPlatform/packaging/debian/watch) (Version 5) tracks upstream GitHub release tags (`v2.0.4` is currently the latest published tag).
+- Upstream and packaging updates for `2.0.4-1` (incorporating the review follow-ups from [Bug #1152533 message #10](https://bugs.debian.org/1152533#10)) are staged in [`CrossPlatform/packaging/debian/`](../CrossPlatform/packaging/debian) and verified by the `Debian Unstable` CI gate.

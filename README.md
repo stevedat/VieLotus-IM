@@ -1,5 +1,7 @@
 # VieLotusIM (Sen Việt)
 
+<p align="center"><strong>English</strong> · <a href="README.vi.md">Tiếng Việt</a></p>
+
 Vietnamese input methods for macOS, Windows, and Linux.
 
 This repository contains the Swift engine and macOS InputMethodKit shell, plus the C++20 Windows and Linux engines and adapters. iOS and Android applications are distributed separately; their application source is not in this repository.
@@ -35,13 +37,13 @@ CI verifies Linux IBus/Fcitx5 typing in GTK3 and Qt5 test widgets. The maintaine
 
 ## Benchmark snapshot
 
-Measured on 2026-11-14 from the source snapshot published with this README using `swift run VieLotusCLI --benchmark --json`:
+Measured on 2026-11-18 from the source snapshot published with this README using `swift run VieLotusCLI --benchmark --json`:
 
 | Metric | Result |
 | --- | ---: |
 | Primary suite | 9,091 / 9,091 (100.00%) |
-| Symmetric no-context collisions | 365 / 373 (97.86%) |
-| Unique Vietnamese paths (`whitelist_safe = never`) | 180 / 180 (100.00%) |
+| Symmetric no-context collisions | 362 / 369 (98.10%) |
+| Unique Vietnamese paths (`whitelist_safe = never`) | 179 / 179 (100.00%) |
 
 These are regression-suite results, not a claim of error-free typing in every application or device. See [`docs/BENCHMARK_REPORT.md`](docs/BENCHMARK_REPORT.md) for the test conditions.
 
