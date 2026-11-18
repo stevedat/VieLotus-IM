@@ -1,6 +1,6 @@
 #!/bin/sh
 # ==============================================================================
-# Sen Việt (VieLotusIM) v2.0.3 — Universal Linux (Multi-Distro & Multi-Arch)
+# Sen Việt (VieLotusIM) v2.0.4 — Universal Linux (Multi-Distro & Multi-Arch)
 # & macOS One-Line Installer / Uninstaller
 #
 # Supported Linux Distros:
@@ -701,7 +701,7 @@ else
     if command -v curl >/dev/null 2>&1 && [ -z "${VIELOTUS_DEB_PATH:-}" ]; then
         LATEST_TAG="$(curl -fsSL --max-time 4 https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest 2>/dev/null | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' | head -n 1 || true)"
     fi
-    VERSION="${LATEST_TAG:-2.0.2}"
+    VERSION="${LATEST_TAG:-2.0.4}"
 fi
 OS_NAME="$(uname -s)"
 ARCH_RAW="$(uname -m)"

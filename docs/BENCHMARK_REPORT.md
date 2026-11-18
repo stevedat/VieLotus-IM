@@ -1,16 +1,16 @@
 # Regression benchmark
 
-**Measured:** 14 November 2026
+**Measured:** 18 November 2026
 **Command:** `swift run VieLotusCLI --benchmark --json`
-**Build:** SwiftPM debug configuration on an Apple Silicon Mac. The command measures the engine test harness, not a physical keyboard or host application.
+**Build:** SwiftPM release/CLI benchmark on an Apple Silicon Mac. The command measures the engine test harness, not a physical keyboard or host application.
 
 ## Results
 
 | Metric | Result |
 | --- | ---: |
 | Primary regression suite | 9,091 / 9,091 (100.00%) |
-| Symmetric no-context collisions (`ambiguous_both_sides`) | 365 / 373 (97.86%) |
-| Vietnamese unique paths (`whitelist_safe = never`) | 180 / 180 (100.00%) |
+| Symmetric no-context collisions (`ambiguous_both_sides`) | 362 / 369 (98.10%) |
+| Vietnamese unique paths (`whitelist_safe = never`) | 179 / 179 (100.00%) |
 
 The primary suite contains transformations, English preservation, modifier cancellation, raw-word restoration, and ambiguous words driven with English context. The symmetric metric replays collision words without context; it measures the English/Vietnamese tradeoff that the primary result does not cover.
 

@@ -16,13 +16,13 @@
     <li>Project-owned source is MIT licensed; third-party materials retain their own terms.</li>
   </ul>
   <h2>Regression results</h2>
-  <p>Measured from the checked-in CLI suite on 2026-11-14. Run <code>swift run VieLotusCLI --benchmark --json</code> to reproduce.</p>
+  <p>Measured from the checked-in CLI suite on 2026-11-18. Run <code>swift run VieLotusCLI --benchmark --json</code> to reproduce.</p>
   <table>
     <thead><tr><th>Metric</th><th>Result</th><th>Scope</th></tr></thead>
     <tbody>
       <tr><td>Primary regression suite</td><td>9,091 / 9,091 (100.00%)</td><td>Automated fixtures in this repository</td></tr>
-      <tr><td>Symmetric no-context collisions</td><td>365 / 373 (97.86%)</td><td>Ambiguous inputs replayed without English context</td></tr>
-      <tr><td>Unique Vietnamese paths</td><td>180 / 180 (100.00%)</td><td><code>whitelist_safe = never</code></td></tr>
+      <tr><td>Symmetric no-context collisions</td><td>362 / 369 (98.10%)</td><td>Ambiguous inputs replayed without English context</td></tr>
+      <tr><td>Unique Vietnamese paths</td><td>179 / 179 (100.00%)</td><td><code>whitelist_safe = never</code></td></tr>
     </tbody>
   </table>
   <p>These are fixture results. They do not establish compatibility or latency on every device, operating system, or host application.</p>

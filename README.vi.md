@@ -1,5 +1,7 @@
 # VieLotusIM (Sen Việt)
 
+<p align="center"><a href="README.md">English</a> · <strong>Tiếng Việt</strong></p>
+
 Bộ gõ tiếng Việt cho macOS, Windows và Linux.
 
 Kho này có engine Swift và lớp InputMethodKit cho macOS, cùng engine C++20 và lớp tích hợp cho Windows, Linux. Ứng dụng iOS và Android được phân phối riêng; mã nguồn ứng dụng không nằm trong kho này.
@@ -35,13 +37,13 @@ CI đã kiểm tra gõ qua IBus/Fcitx5 trong widget GTK3 và Qt5 trên Ubuntu. M
 
 ## Kết quả benchmark
 
-Đo ngày 14/11/2026 trên source snapshot đi kèm README bằng `swift run VieLotusCLI --benchmark --json`:
+Đo ngày 18/11/2026 trên source snapshot đi kèm README bằng `swift run VieLotusCLI --benchmark --json`:
 
 | Chỉ số | Kết quả |
 | --- | ---: |
 | Bộ hồi quy chính | 9.091 / 9.091 (100,00%) |
-| Va chạm song ngữ không ngữ cảnh | 365 / 373 (97,86%) |
-| Đường gõ tiếng Việt duy nhất (`whitelist_safe = never`) | 180 / 180 (100,00%) |
+| Va chạm song ngữ không ngữ cảnh | 362 / 369 (98,10%) |
+| Đường gõ tiếng Việt duy nhất (`whitelist_safe = never`) | 179 / 179 (100,00%) |
 
 Đây là kết quả của bộ kiểm thử hồi quy, không có nghĩa bộ gõ không lỗi trong mọi ứng dụng hoặc thiết bị. Xem điều kiện đo tại [`docs/BENCHMARK_REPORT.md`](docs/BENCHMARK_REPORT.md).
 
