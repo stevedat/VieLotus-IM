@@ -386,7 +386,7 @@ jobs:
 
       - name: Verify KDE Plasma Wayland and GNOME Wayland activation & doctor checks
         run: |
-          # 1. KDE Plasma Wayland simulation
+          # 1. KDE Plasma Wayland simulation (fresh profile)
           cat > /tmp/check_kde.sh <<'KDE_EOF'
           #!/bin/bash
           set -euo pipefail
@@ -396,6 +396,8 @@ jobs:
           vielotus-settings --doctor | tee /tmp/doc-kde.txt
           grep -Fxq 'Name=vielotus-telex' "$XDG_CONFIG_HOME/fcitx5/profile"
           grep -Fxq 'DefaultIM=keyboard-us' "$XDG_CONFIG_HOME/fcitx5/profile"
+          fcitx5-remote -e >/dev/null 2>&1 || true
+          for _w in 1 2 3 4 5 6 7 8 9 10; do pgrep -x fcitx5 >/dev/null 2>&1 || break; sleep 0.1; done
           grep -q '^XMODIFIERS=@im=fcitx$' "$XDG_CONFIG_HOME/environment.d/fcitx5-vielotus.conf"
           if grep -q '^QT_IM_MODULE=fcitx$' "$XDG_CONFIG_HOME/environment.d/fcitx5-vielotus.conf"; then
             echo "::error::KDE Wayland environment.d must not set QT_IM_MODULE=fcitx"
@@ -407,19 +409,41 @@ jobs:
             echo "::error::KDE --doctor reported failure"
             exit 1
           fi
-          # Existing VNI-default profile: --telex + --activate keeps VNI and DefaultIM=vielotus-vni until --set-default
-          printf '[Groups/0]\nName=Default\nDefault Layout=us\nDefaultIM=vielotus-vni\n\n[Groups/0/Items/0]\nName=keyboard-us\nLayout=\n\n[Groups/0/Items/1]\nName=vielotus-vni\nLayout=\n\n[GroupOrder]\n0=Default\n' > "$XDG_CONFIG_HOME/fcitx5/profile"
-          vielotus-settings --telex
-          vielotus-settings --activate
-          grep -Fxq 'Name=vielotus-vni' "$XDG_CONFIG_HOME/fcitx5/profile"
-          grep -Fxq 'Name=vielotus-telex' "$XDG_CONFIG_HOME/fcitx5/profile"
-          grep -Fxq 'DefaultIM=vielotus-vni' "$XDG_CONFIG_HOME/fcitx5/profile"
-          vielotus-settings --activate --set-default
-          grep -Fxq 'Name=vielotus-vni' "$XDG_CONFIG_HOME/fcitx5/profile"
-          grep -Fxq 'DefaultIM=vielotus-telex' "$XDG_CONFIG_HOME/fcitx5/profile"
           KDE_EOF
           chmod 755 /tmp/check_kde.sh
           su - builder -c 'HOME=/tmp/home-kde XDG_CONFIG_HOME=/tmp/home-kde/.config XDG_DATA_HOME=/tmp/home-kde/.local/share XDG_CACHE_HOME=/tmp/home-kde/.cache XDG_CURRENT_DESKTOP=KDE XDG_SESSION_TYPE=wayland WAYLAND_DISPLAY=wayland-0 dbus-run-session -- /tmp/check_kde.sh'
+
+          # 1b. Existing VNI-default profile with live running Fcitx5 daemon + exit-save persistence
+          cat > /tmp/check_kde_vni.sh <<'KDE_VNI_EOF'
+          #!/bin/bash
+          set -euo pipefail
+          mkdir -p "$XDG_CONFIG_HOME/fcitx5" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+          printf '[Groups/0]\nName=Default\nDefault Layout=us\nDefaultIM=vielotus-vni\n\n[Groups/0/Items/0]\nName=keyboard-us\nLayout=\n\n[Groups/0/Items/1]\nName=vielotus-vni\nLayout=\n\n[GroupOrder]\n0=Default\n' > "$XDG_CONFIG_HOME/fcitx5/profile"
+          fcitx5 -d >/dev/null 2>&1 || true
+          for _w in 1 2 3 4 5 6 7 8 9 10; do fcitx5-remote >/dev/null 2>&1 && break; sleep 0.1; done
+          vielotus-settings --telex
+          if grep -Fxq 'Name=vielotus-telex' "$XDG_CONFIG_HOME/fcitx5/profile"; then
+            echo "::error::--telex must not add vielotus-telex to fcitx5/profile before --activate"
+            exit 1
+          fi
+          grep -Fxq 'DefaultIM=vielotus-vni' "$XDG_CONFIG_HOME/fcitx5/profile"
+          vielotus-settings --activate
+          fcitx5-remote -e >/dev/null 2>&1 || true
+          for _w in 1 2 3 4 5 6 7 8 9 10; do pgrep -x fcitx5 >/dev/null 2>&1 || break; sleep 0.1; done
+          grep -Fxq 'Name=vielotus-vni' "$XDG_CONFIG_HOME/fcitx5/profile"
+          grep -Fxq 'Name=vielotus-telex' "$XDG_CONFIG_HOME/fcitx5/profile"
+          grep -Fxq 'DefaultIM=vielotus-vni' "$XDG_CONFIG_HOME/fcitx5/profile"
+          fcitx5 -d >/dev/null 2>&1 || true
+          for _w in 1 2 3 4 5 6 7 8 9 10; do fcitx5-remote >/dev/null 2>&1 && break; sleep 0.1; done
+          vielotus-settings --activate --set-default
+          fcitx5-remote -e >/dev/null 2>&1 || true
+          for _w in 1 2 3 4 5 6 7 8 9 10; do pgrep -x fcitx5 >/dev/null 2>&1 || break; sleep 0.1; done
+          grep -Fxq 'Name=vielotus-vni' "$XDG_CONFIG_HOME/fcitx5/profile"
+          grep -Fxq 'Name=vielotus-telex' "$XDG_CONFIG_HOME/fcitx5/profile"
+          grep -Fxq 'DefaultIM=vielotus-telex' "$XDG_CONFIG_HOME/fcitx5/profile"
+          KDE_VNI_EOF
+          chmod 755 /tmp/check_kde_vni.sh
+          su - builder -c 'HOME=/tmp/home-kde-vni XDG_CONFIG_HOME=/tmp/home-kde-vni/.config XDG_DATA_HOME=/tmp/home-kde-vni/.local/share XDG_CACHE_HOME=/tmp/home-kde-vni/.cache XDG_CURRENT_DESKTOP=KDE XDG_SESSION_TYPE=wayland WAYLAND_DISPLAY=wayland-0 dbus-run-session -- /tmp/check_kde_vni.sh'
 
           # 2. GNOME Wayland simulation
           cat > /tmp/check_gnome.sh <<'GNOME_EOF'

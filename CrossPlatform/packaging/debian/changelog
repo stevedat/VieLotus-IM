@@ -6,9 +6,11 @@ vielotus (2.0.6-1) unstable; urgency=medium
       and append the newly activated entry instead of replacing it.
     - Never modify Fcitx5 DefaultIM (including when DefaultIM is already
       vielotus-vni or when initializing a new profile) unless --set-default
-      is explicitly passed.
+      is explicitly passed, and gate fcitx5-remote -s behind --set-default
+      so Fcitx5's SetCurrentIM does not overwrite DefaultIM on auto-save/exit.
     - Add regression coverage for the VNI-default + Telex activation
-      scenario across Debian Unstable, Ubuntu 24.04, and Arch KDE CI gates.
+      scenario (including live Fcitx5 daemon exit-save) across Debian Unstable,
+      Ubuntu 24.04, and Arch KDE CI gates.
 
  -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Fri, 20 Nov 2026 05:40:00 +0700
 
