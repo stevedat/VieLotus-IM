@@ -864,9 +864,11 @@ save_and_apply() {
     fi
 
     # Explicit opt-in activation path (only invoked via --activate or confirmed --doctor --fix)
-    # 1. Update Fcitx5 addon config file & register Fcitx5 session/Wayland virtual keyboard
+    # 1. Update Fcitx5 addon config file & register Fcitx5 session/Wayland virtual keyboard.
+    #    Only pass SET_DEFAULT_ARG to fcitx5-remote -s: Fcitx5's D-Bus SetCurrentIM calls
+    #    InputMethodManager::setDefaultInputMethod() and overwrites DefaultIM on auto-save/exit.
     configure_fcitx5_profile "${FCITX_IM_ID}" "1" "${SET_DEFAULT_ARG}" || true
-    ensure_fcitx5_session_ready "${FCITX_IM_ID}" "1" "${SWITCH_NOW_ARG}" || true
+    ensure_fcitx5_session_ready "${FCITX_IM_ID}" "1" "${SET_DEFAULT_ARG}" || true
 
     # 2. Ensure live ibus-daemon has loaded vielotus.xml before binding GNOME Input Sources
     REBIND_FLAG="${FORCE_REBIND_ARG}"
