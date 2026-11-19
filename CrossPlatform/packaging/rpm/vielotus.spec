@@ -1,5 +1,5 @@
 Name:           vielotus
-Version:        2.0.5
+Version:        2.0.6
 Release:        1%{?dist}
 Summary:        Sen Việt (VieLotusIM) - Bộ gõ tiếng Việt thế hệ mới cho Linux (IBus & Fcitx5)
 
@@ -78,6 +78,9 @@ fi
 /usr/share/vielotus/*
 
 %changelog
+* Fri Nov 20 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.6-1
+- Preserve existing Fcitx5 profile entries and DefaultIM during --activate unless --set-default is passed
+
 * Thu Nov 19 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.5-1
 - Remove unsolicited IM activation, XDG autostart onboarding, and global fontconfig overrides on Linux
 

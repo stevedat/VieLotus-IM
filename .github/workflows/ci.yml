@@ -71,7 +71,7 @@ jobs:
         id: version
         run: |
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          echo "version=${VERSION:-2.0.5}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION:-2.0.6}" >> "$GITHUB_OUTPUT"
 
       - name: Install build tools, Fcitx5, and IBus dev dependencies
         run: |
@@ -181,7 +181,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          VERSION="${VERSION:-2.0.5}"
+          VERSION="${VERSION:-2.0.6}"
           rm -rf /tmp/deb-src
           mkdir -p /tmp/deb-src
           git archive --format=tar.gz --prefix="VieLotus-IM-${VERSION}/" HEAD > "/tmp/deb-src/vielotus_${VERSION}.orig.tar.gz"
@@ -190,10 +190,10 @@ jobs:
           (cd "/tmp/deb-src/VieLotus-IM-${VERSION}" && dpkg-buildpackage -us -uc)
           ls -lh /tmp/deb-src
 
-      - name: Verify Debian 2.0.5-1 update metadata (.dsc and .changes)
+      - name: Verify Debian 2.0.6-1 update metadata (.dsc and .changes)
         run: |
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          VERSION="${VERSION:-2.0.5}"
+          VERSION="${VERSION:-2.0.6}"
           DSC="/tmp/deb-src/vielotus_${VERSION}-1.dsc"
           CHANGES="$(ls /tmp/deb-src/vielotus_${VERSION}-1_*.changes | head -n 1)"
           grep -q '^Vcs-Git: https://github.com/stevedat/VieLotus-IM.git \[CrossPlatform/packaging\]$' "$DSC"
@@ -213,7 +213,7 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          VERSION="${VERSION:-2.0.5}"
+          VERSION="${VERSION:-2.0.6}"
           LIB_DEB="$(ls /tmp/deb-src/libvielotus0_${VERSION}-1_*.deb | head -n 1)"
           FCITX_DEB="$(ls /tmp/deb-src/fcitx5-vielotus_${VERSION}-1_*.deb | head -n 1)"
           IBUS_DEB="$(ls /tmp/deb-src/ibus-vielotus_${VERSION}-1_*.deb | head -n 1)"
@@ -263,7 +263,7 @@ jobs:
           apt-get purge -y vielotus ibus-vielotus libvielotus0
           apt-get autoremove -y
 
-          echo "=== 3. Co-installation of all 4 packages, ldd -r & clean purge ==="
+          echo "=== 3. Co-installation of all 4 packages, ldd -r, Fcitx5 DefaultIM preservation & clean purge ==="
           apt-get install -y --no-install-recommends /tmp/deb-src/*_${VERSION}-1_*.deb
           for bin in /usr/lib/*/libVieLotusCAPI.so.0 /usr/lib/*/fcitx5/vielotus.so /usr/libexec/ibus-engine-vielotus; do
             OUT="$(LC_ALL=C ldd -r "$bin" 2>&1)"
@@ -274,6 +274,18 @@ jobs:
               exit 1
             fi
           done
+          TMP_FCITX_HOME="$(mktemp -d)"
+          mkdir -p "$TMP_FCITX_HOME/.config/fcitx5"
+          printf '[Groups/0]\nName=Default\nDefault Layout=us\nDefaultIM=vielotus-vni\n\n[Groups/0/Items/0]\nName=keyboard-us\nLayout=\n\n[Groups/0/Items/1]\nName=vielotus-vni\nLayout=\n\n[GroupOrder]\n0=Default\n' > "$TMP_FCITX_HOME/.config/fcitx5/profile"
+          HOME="$TMP_FCITX_HOME" XDG_CONFIG_HOME="$TMP_FCITX_HOME/.config" /usr/bin/vielotus-settings --telex
+          HOME="$TMP_FCITX_HOME" XDG_CONFIG_HOME="$TMP_FCITX_HOME/.config" /usr/bin/vielotus-settings --activate
+          grep -Fxq 'Name=vielotus-vni' "$TMP_FCITX_HOME/.config/fcitx5/profile"
+          grep -Fxq 'Name=vielotus-telex' "$TMP_FCITX_HOME/.config/fcitx5/profile"
+          grep -Fxq 'DefaultIM=vielotus-vni' "$TMP_FCITX_HOME/.config/fcitx5/profile"
+          HOME="$TMP_FCITX_HOME" XDG_CONFIG_HOME="$TMP_FCITX_HOME/.config" /usr/bin/vielotus-settings --activate --set-default
+          grep -Fxq 'Name=vielotus-vni' "$TMP_FCITX_HOME/.config/fcitx5/profile"
+          grep -Fxq 'DefaultIM=vielotus-telex' "$TMP_FCITX_HOME/.config/fcitx5/profile"
+          rm -rf "$TMP_FCITX_HOME"
           apt-get purge -y vielotus fcitx5-vielotus ibus-vielotus libvielotus0
           apt-get autoremove -y
 
@@ -379,9 +391,11 @@ jobs:
           #!/bin/bash
           set -euo pipefail
           mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+          # Fresh profile: --activate adds vielotus-telex without forcing DefaultIM away from keyboard-us
           vielotus-settings --activate
           vielotus-settings --doctor | tee /tmp/doc-kde.txt
-          grep -q '^DefaultIM=vielotus-telex$' "$XDG_CONFIG_HOME/fcitx5/profile"
+          grep -Fxq 'Name=vielotus-telex' "$XDG_CONFIG_HOME/fcitx5/profile"
+          grep -Fxq 'DefaultIM=keyboard-us' "$XDG_CONFIG_HOME/fcitx5/profile"
           grep -q '^XMODIFIERS=@im=fcitx$' "$XDG_CONFIG_HOME/environment.d/fcitx5-vielotus.conf"
           if grep -q '^QT_IM_MODULE=fcitx$' "$XDG_CONFIG_HOME/environment.d/fcitx5-vielotus.conf"; then
             echo "::error::KDE Wayland environment.d must not set QT_IM_MODULE=fcitx"
@@ -393,6 +407,16 @@ jobs:
             echo "::error::KDE --doctor reported failure"
             exit 1
           fi
+          # Existing VNI-default profile: --telex + --activate keeps VNI and DefaultIM=vielotus-vni until --set-default
+          printf '[Groups/0]\nName=Default\nDefault Layout=us\nDefaultIM=vielotus-vni\n\n[Groups/0/Items/0]\nName=keyboard-us\nLayout=\n\n[Groups/0/Items/1]\nName=vielotus-vni\nLayout=\n\n[GroupOrder]\n0=Default\n' > "$XDG_CONFIG_HOME/fcitx5/profile"
+          vielotus-settings --telex
+          vielotus-settings --activate
+          grep -Fxq 'Name=vielotus-vni' "$XDG_CONFIG_HOME/fcitx5/profile"
+          grep -Fxq 'Name=vielotus-telex' "$XDG_CONFIG_HOME/fcitx5/profile"
+          grep -Fxq 'DefaultIM=vielotus-vni' "$XDG_CONFIG_HOME/fcitx5/profile"
+          vielotus-settings --activate --set-default
+          grep -Fxq 'Name=vielotus-vni' "$XDG_CONFIG_HOME/fcitx5/profile"
+          grep -Fxq 'DefaultIM=vielotus-telex' "$XDG_CONFIG_HOME/fcitx5/profile"
           KDE_EOF
           chmod 755 /tmp/check_kde.sh
           su - builder -c 'HOME=/tmp/home-kde XDG_CONFIG_HOME=/tmp/home-kde/.config XDG_DATA_HOME=/tmp/home-kde/.local/share XDG_CACHE_HOME=/tmp/home-kde/.cache XDG_CURRENT_DESKTOP=KDE XDG_SESSION_TYPE=wayland WAYLAND_DISPLAY=wayland-0 dbus-run-session -- /tmp/check_kde.sh'
@@ -465,7 +489,7 @@ jobs:
           if ($plist -match '<key>CFBundleShortVersionString</key>\s*<string>([^<]+)</string>') {
             $version = $Matches[1]
           } else {
-            $version = "2.0.5"
+            $version = "2.0.6"
           }
           ./scripts/build_windows.ps1 -Version $version -Arch all -SkipTests
           foreach ($installer in @("dist\windows\VieLotus-Setup-x64.exe", "dist\windows\VieLotus-Setup-arm64.exe")) {

@@ -141,44 +141,54 @@ cat <<'FCITX_SEED_EOF' > "${HOME}/.config/fcitx5/profile"
 [Groups/0]
 Name=Default
 Default Layout=us
-DefaultIM=keyboard-us
+DefaultIM=vielotus-vni
 
 [Groups/0/Items/0]
 Name=keyboard-us
 Layout=
 
 [Groups/0/Items/1]
-Name=vielotus-telex
+Name=vielotus-vni
 Layout=
 
 [GroupOrder]
 0=Default
 FCITX_SEED_EOF
 
-# Changing VieLotus Telex/VNI preference must ONLY update config.env and vielotus.conf,
-# never mutating fcitx5/profile or DefaultIM without explicit --activate.
-/usr/bin/vielotus-settings --vni
-STATUS_VNI="$(/usr/bin/vielotus-settings --status)"
-echo "${STATUS_VNI}"
-grep -Fx "INPUT_METHOD=vni" <<<"${STATUS_VNI}" >/dev/null
-grep -Fx "DefaultIM=keyboard-us" "${HOME}/.config/fcitx5/profile" >/dev/null
-grep -Fx "Name=vielotus-telex" "${HOME}/.config/fcitx5/profile" >/dev/null
-grep -Fx "GrammarProfile=Classic" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/dev/null
-grep -Fx "MacroEnabled=False" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/dev/null
-
-# Explicit --activate updates VieLotus item in fcitx5/profile while preserving non-VieLotus DefaultIM
-/usr/bin/vielotus-settings --activate
-grep -Fx "Name=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
-grep -Fx "DefaultIM=keyboard-us" "${HOME}/.config/fcitx5/profile" >/dev/null
-
+# 1. Saving Telex preference (--telex) must NOT touch fcitx5/profile or DefaultIM
 /usr/bin/vielotus-settings --telex
 STATUS_TELEX="$(/usr/bin/vielotus-settings --status)"
 echo "${STATUS_TELEX}"
 grep -Fx "INPUT_METHOD=telex" <<<"${STATUS_TELEX}" >/dev/null
-grep -Fx "DefaultIM=keyboard-us" "${HOME}/.config/fcitx5/profile" >/dev/null
+grep -Fx "DefaultIM=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
+grep -Fx "Name=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
+if grep -Fxq "Name=vielotus-telex" "${HOME}/.config/fcitx5/profile"; then
+    echo "❌ LỖI: --telex tự ý thêm vielotus-telex vào fcitx5/profile khi chưa gọi --activate!"
+    exit 1
+fi
+grep -Fx "GrammarProfile=Classic" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/dev/null
+grep -Fx "MacroEnabled=False" "${HOME}/.config/fcitx5/conf/vielotus.conf" >/dev/null
 
+# 2. Explicit --activate WITHOUT --set-default must keep vielotus-vni, append vielotus-telex,
+#    and preserve DefaultIM=vielotus-vni
 /usr/bin/vielotus-settings --activate
+grep -Fx "Name=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
 grep -Fx "Name=vielotus-telex" "${HOME}/.config/fcitx5/profile" >/dev/null
+grep -Fx "DefaultIM=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
+
+# 3. Explicit --activate --set-default updates DefaultIM=vielotus-telex while still keeping vielotus-vni
+/usr/bin/vielotus-settings --activate --set-default
+grep -Fx "Name=vielotus-vni" "${HOME}/.config/fcitx5/profile" >/dev/null
+grep -Fx "Name=vielotus-telex" "${HOME}/.config/fcitx5/profile" >/dev/null
+grep -Fx "DefaultIM=vielotus-telex" "${HOME}/.config/fcitx5/profile" >/dev/null
+
+# 4. Saving VNI preference (--vni) updates config.env without altering DefaultIM
+/usr/bin/vielotus-settings --vni
+STATUS_VNI="$(/usr/bin/vielotus-settings --status)"
+echo "${STATUS_VNI}"
+grep -Fx "INPUT_METHOD=vni" <<<"${STATUS_VNI}" >/dev/null
+grep -Fx "DefaultIM=vielotus-telex" "${HOME}/.config/fcitx5/profile" >/dev/null
+/usr/bin/vielotus-settings --telex >/dev/null
 
 # Ensure no redundant duplicate addon files were written to ~/.local/share/fcitx5
 if [ -f "${HOME}/.local/share/fcitx5/addon/vielotus.conf" ]; then
