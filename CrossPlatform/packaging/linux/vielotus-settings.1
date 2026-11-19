@@ -1,4 +1,4 @@
-.TH VIELOTUS-SETTINGS 1 "November 2026" "VieLotusIM 2.0.5" "User Commands"
+.TH VIELOTUS-SETTINGS 1 "November 2026" "VieLotusIM 2.0.6" "User Commands"
 .SH NAME
 vielotus-settings \- configuration, macro/app rule manager, and diagnostics utility for Sen Viet (VieLotusIM)
 .SH SYNOPSIS
@@ -25,7 +25,7 @@ Save Telex as the preferred VieLotus input method in VieLotus's own configuratio
 Save VNI as the preferred VieLotus input method in VieLotus's own configuration without changing desktop input-source defaults.
 .TP
 \fB\-\-activate\fR [\fB\-\-set\-default\fR]
-Explicitly register and activate VieLotus in the current user's Fcitx5 or IBus/GNOME session (pass \fB\-\-set\-default\fR to also overwrite an existing non-VieLotus Fcitx5 DefaultIM).
+Explicitly register and activate VieLotus in the current user's Fcitx5 or IBus/GNOME session while keeping existing profile entries and Fcitx5 DefaultIM unchanged (pass \fB\-\-set\-default\fR to also update Fcitx5 DefaultIM).
 .TP
 \fB\-\-repair\-sources\fR
 Explicitly refresh IBus component cache and repair duplicate VieLotus entries in GNOME Input Sources when requested by the user.

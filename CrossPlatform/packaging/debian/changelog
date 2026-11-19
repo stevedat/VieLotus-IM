@@ -1,3 +1,17 @@
+vielotus (2.0.6-1) unstable; urgency=medium
+
+  * New upstream release 2.0.6:
+    - Fix Fcitx5 profile management in vielotus-settings --activate:
+      keep existing VieLotus entries (e.g. vielotus-vni) in [Groups/0]
+      and append the newly activated entry instead of replacing it.
+    - Never modify Fcitx5 DefaultIM (including when DefaultIM is already
+      vielotus-vni or when initializing a new profile) unless --set-default
+      is explicitly passed.
+    - Add regression coverage for the VNI-default + Telex activation
+      scenario across Debian Unstable, Ubuntu 24.04, and Arch KDE CI gates.
+
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Fri, 20 Nov 2026 05:40:00 +0700
+
 vielotus (2.0.5-1) unstable; urgency=medium
 
   * New upstream release 2.0.5:

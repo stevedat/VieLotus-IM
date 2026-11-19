@@ -5,7 +5,7 @@
 
 param (
     [string]$Configuration = "Release",
-    [string]$Version = "2.0.5",
+    [string]$Version = "2.0.6",
     [string]$MsixVersion = "2.0.6.0",
     [ValidateSet("x64", "arm64", "all")]
     [string]$Arch = "all",
