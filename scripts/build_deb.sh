@@ -16,7 +16,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-VERSION="${1:-2.0.6}"
+VERSION="${1:-2.0.7}"
 ARCH="${2:-amd64}"
 
 DIST_LINUX="${ROOT_DIR}/dist/linux"

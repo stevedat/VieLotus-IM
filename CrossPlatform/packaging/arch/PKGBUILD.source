@@ -1,6 +1,6 @@
 # Maintainer: Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>
 pkgname=vielotus
-pkgver=2.0.6
+pkgver=2.0.7
 pkgrel=1
 pkgdesc="Sen Việt (VieLotusIM) — Next-Gen Vietnamese Input Method for IBus & Fcitx5 (Native C++20 Engine)"
 arch=('x86_64' 'aarch64' 'riscv64' 'armv7h' 'i686' 'powerpc64le')
