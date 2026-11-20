@@ -98,16 +98,13 @@ static int RunElevatedSelfCommand(const wchar_t *params, DWORD timeoutMs, DWORD 
     return static_cast<int>(exitCode);
 }
 
-static bool IsTipRegisteredAndUpToDate(const std::wstring &localDll) {
-    if (!vielotus_win_installer::IsUninstallEntryRegistered()) {
-        return false;
-    }
+static bool IsTipViewRegisteredAndUpToDate(const std::wstring &localDll, REGSAM wow64View) {
     HKEY hKey = nullptr;
     LSTATUS st = RegOpenKeyExW(
         HKEY_LOCAL_MACHINE,
         L"SOFTWARE\\Classes\\CLSID\\{C7B08E9D-4762-4C97-8B1F-522197A598DE}\\InprocServer32",
         0,
-        KEY_READ | KEY_WOW64_64KEY,
+        KEY_READ | wow64View,
         &hKey
     );
     if (st == ERROR_SUCCESS && hKey) {
@@ -131,6 +128,57 @@ static bool IsTipRegisteredAndUpToDate(const std::wstring &localDll) {
         }
     }
     return false;
+}
+
+static bool IsTipRegisteredAndUpToDate(const std::wstring &localDll, const std::wstring &localDll32) {
+    if (!vielotus_win_installer::IsUninstallEntryRegistered()) {
+        return false;
+    }
+    if (!IsTipViewRegisteredAndUpToDate(localDll, KEY_WOW64_64KEY)) {
+        return false;
+    }
+    DWORD local32Attrs = GetFileAttributesW(localDll32.c_str());
+    if (local32Attrs != INVALID_FILE_ATTRIBUTES && !(local32Attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        if (!IsTipViewRegisteredAndUpToDate(localDll32, KEY_WOW64_32KEY)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool DeployDllWithHotReplace(const std::wstring &srcDir, const std::wstring &dstDir, const wchar_t *baseName) {
+    std::wstring srcDll = srcDir + L"\\" + baseName + L".dll";
+    std::wstring dstDll = dstDir + L"\\" + baseName + L".dll";
+    std::wstring oldDll = dstDir + L"\\" + baseName + L".old.dll";
+
+    DeleteFileW(oldDll.c_str());
+    for (int i = 1; i <= 99; ++i) {
+        WCHAR slot[MAX_PATH] = {};
+        StringCchPrintfW(slot, MAX_PATH, L"%s\\%s.old.%d.dll", dstDir.c_str(), baseName, i);
+        DeleteFileW(slot);
+    }
+
+    if (!srcDir.empty() && _wcsicmp(srcDir.c_str(), dstDir.c_str()) != 0) {
+        DWORD srcAttrs = GetFileAttributesW(srcDll.c_str());
+        if (srcAttrs == INVALID_FILE_ATTRIBUTES || (srcAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            return false;
+        }
+        if (CopyFileW(srcDll.c_str(), dstDll.c_str(), FALSE)) {
+            return true;
+        }
+        for (int i = 1; i <= 99; ++i) {
+            WCHAR slot[MAX_PATH] = {};
+            StringCchPrintfW(slot, MAX_PATH, L"%s\\%s.old.%d.dll", dstDir.c_str(), baseName, i);
+            DeleteFileW(slot);
+            if (MoveFileExW(dstDll.c_str(), slot, MOVEFILE_REPLACE_EXISTING)) {
+                break;
+            }
+        }
+        return (CopyFileW(srcDll.c_str(), dstDll.c_str(), FALSE) != FALSE);
+    }
+
+    DWORD dstAttrs = GetFileAttributesW(dstDll.c_str());
+    return (dstAttrs != INVALID_FILE_ATTRIBUTES && !(dstAttrs & FILE_ATTRIBUTE_DIRECTORY));
 }
 
 static void CopyDirectoryPngAssets(const std::wstring &srcAssetsDir, const std::wstring &dstAssetsDir) {
@@ -161,43 +209,13 @@ static int PerformElevatedMsixTipProvisioning() {
     // Remove any obsolete VieLotusCAPI.dll from older builds so it can never shadow the embedded engine
     DeleteFileW((dstDir + L"\\VieLotusCAPI.dll").c_str());
 
-    std::wstring srcDll = srcDir + L"\\VieLotusTIP.dll";
     std::wstring dstDll = dstDir + L"\\VieLotusTIP.dll";
-    std::wstring oldDll = dstDir + L"\\VieLotusTIP.old.dll";
-
-    DeleteFileW(oldDll.c_str());
-    for (int i = 1; i <= 99; ++i) {
-        WCHAR slot[MAX_PATH] = {};
-        StringCchPrintfW(slot, MAX_PATH, L"%s\\VieLotusTIP.old.%d.dll", dstDir.c_str(), i);
-        DeleteFileW(slot);
-    }
-
-    bool deployedDll = false;
-    if (!srcDir.empty() && _wcsicmp(srcDir.c_str(), dstDir.c_str()) != 0) {
-        DWORD srcAttrs = GetFileAttributesW(srcDll.c_str());
-        if (srcAttrs != INVALID_FILE_ATTRIBUTES && !(srcAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
-            if (!CopyFileW(srcDll.c_str(), dstDll.c_str(), FALSE)) {
-                for (int i = 1; i <= 99; ++i) {
-                    WCHAR slot[MAX_PATH] = {};
-                    StringCchPrintfW(slot, MAX_PATH, L"%s\\VieLotusTIP.old.%d.dll", dstDir.c_str(), i);
-                    DeleteFileW(slot);
-                    if (MoveFileExW(dstDll.c_str(), slot, MOVEFILE_REPLACE_EXISTING)) {
-                        break;
-                    }
-                }
-                deployedDll = (CopyFileW(srcDll.c_str(), dstDll.c_str(), FALSE) != FALSE);
-            } else {
-                deployedDll = true;
-            }
-        }
-    } else {
-        DWORD dstAttrs = GetFileAttributesW(dstDll.c_str());
-        deployedDll = (dstAttrs != INVALID_FILE_ATTRIBUTES && !(dstAttrs & FILE_ATTRIBUTE_DIRECTORY));
-    }
-
-    if (!deployedDll) {
+    std::wstring dstDll32 = dstDir + L"\\VieLotusTIP32.dll";
+    if (!DeployDllWithHotReplace(srcDir, dstDir, L"VieLotusTIP")) {
         return 2;
     }
+    // Also deploy 32-bit WOW64 TIP DLL (VieLotusTIP32.dll) when bundled alongside VieLotusSettings.exe
+    const bool hasDll32 = DeployDllWithHotReplace(srcDir, dstDir, L"VieLotusTIP32");
 
     if (!srcDir.empty() && _wcsicmp(srcDir.c_str(), dstDir.c_str()) != 0) {
         WCHAR selfExe[MAX_PATH] = {};
@@ -219,6 +237,9 @@ static int PerformElevatedMsixTipProvisioning() {
     // Grant AppContainer Read & Execute permissions using native Win32 Security APIs so UWP / WinUI 3 / Edge / Windows 11 Search can load VieLotusTIP.dll
     vielotus_win_installer::GrantAppContainerReadExecuteAcl(dstDir);
     vielotus_win_installer::GrantAppContainerReadExecuteAcl(dstDll);
+    if (hasDll32) {
+        vielotus_win_installer::GrantAppContainerReadExecuteAcl(dstDll32);
+    }
 
     HRESULT hr = E_FAIL;
     HMODULE hDll = LoadLibraryW(dstDll.c_str());
@@ -678,11 +699,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
 
     std::wstring exeDir = GetExecutableDir();
     std::wstring localDll = exeDir + L"\\VieLotusTIP.dll";
+    std::wstring localDll32 = exeDir + L"\\VieLotusTIP32.dll";
     std::wstring pfDll = GetProgramFilesInstallDir() + L"\\VieLotusTIP.dll";
 
     // If launched interactively (never during silent --startup at Windows login) before HKLM TSF registration
-    // or after an MSIX Store update, elevate once to provision %ProgramFiles%\VieLotusIM\VieLotusTIP.dll.
-    if (!isStartupMode && !IsTipRegisteredAndUpToDate(localDll)) {
+    // or after an MSIX Store update, elevate once to provision %ProgramFiles%\VieLotusIM\VieLotusTIP.dll (+ VieLotusTIP32.dll).
+    if (!isStartupMode && !IsTipRegisteredAndUpToDate(localDll, localDll32)) {
         if (vielotus_win_installer::IsProcessElevated()) {
             PerformElevatedMsixTipProvisioning();
         } else {

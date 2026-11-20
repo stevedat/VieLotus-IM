@@ -1,5 +1,3 @@
-LIBRARY "VieLotusTIP.dll"
-
 EXPORTS
     DllGetClassObject        PRIVATE
     DllCanUnloadNow          PRIVATE

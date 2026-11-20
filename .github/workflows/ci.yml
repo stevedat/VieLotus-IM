@@ -521,6 +521,7 @@ jobs:
             "scripts\windows\bin\x64\VieLotusSettings.exe",
             "scripts\windows\bin\arm64\VieLotusTIP.dll",
             "scripts\windows\bin\arm64\VieLotusSettings.exe",
+            "scripts\windows\bin\x86\VieLotusTIP32.dll",
             "dist\windows\msix\VieLotus_${version}.0_x64_arm64.msixbundle",
             "dist\windows\VieLotus-Store-Setup.exe"
           )
@@ -537,7 +538,7 @@ jobs:
             Write-Host "Verified $($item.Name) ($($item.Length) bytes)"
           }
 
-      - name: Upload Windows build artifacts (x64 & ARM64 MSIX + Store Stub)
+      - name: Upload Windows build artifacts (x64, ARM64X & x86 MSIX + Store Stub)
         uses: actions/upload-artifact@v4
         with:
           name: VieLotus-Windows
@@ -545,4 +546,5 @@ jobs:
             dist/windows/VieLotus-Store-Setup.exe
             scripts/windows/bin/x64/*
             scripts/windows/bin/arm64/*
+            scripts/windows/bin/x86/*
             dist/windows/msix/*

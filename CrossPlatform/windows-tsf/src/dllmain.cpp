@@ -30,7 +30,12 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void **ppvObj) {
     WCHAR selfPath[MAX_PATH] = {0};
     if (GetModuleFileNameW(g_hInst, selfPath, MAX_PATH) > 0 && wcsstr(selfPath, L".old.") != nullptr) {
         WCHAR canonicalPath[MAX_PATH] = {0};
-        if (ExpandEnvironmentStringsW(L"%ProgramW6432%\\VieLotusIM\\VieLotusTIP.dll", canonicalPath, MAX_PATH) > 0) {
+#if defined(_WIN64)
+        const wchar_t *canonicalTemplate = L"%ProgramW6432%\\VieLotusIM\\VieLotusTIP.dll";
+#else
+        const wchar_t *canonicalTemplate = L"%ProgramW6432%\\VieLotusIM\\VieLotusTIP32.dll";
+#endif
+        if (ExpandEnvironmentStringsW(canonicalTemplate, canonicalPath, MAX_PATH) > 0) {
             HMODULE hNew = LoadLibraryW(canonicalPath);
             if (hNew && hNew != g_hInst) {
                 using PFN_DllGetClassObject = HRESULT(STDAPICALLTYPE *)(REFCLSID, REFIID, void **);
