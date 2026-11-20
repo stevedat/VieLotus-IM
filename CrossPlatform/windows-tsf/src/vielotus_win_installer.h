@@ -1,6 +1,8 @@
 #pragma once
 
 #include <windows.h>
+#include <aclapi.h>
+#include <sddl.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <objbase.h>
@@ -116,20 +118,78 @@ inline bool CloseConflictingHookImes(const std::vector<ConflictingImeInfo> &item
         reinterpret_cast<LPARAM>(&ctx)
     );
 
-    bool allClosed = true;
+    // Gracefully request closure via WM_CLOSE only (never force-kill other processes).
+    Sleep(500);
+    auto remaining = DetectConflictingHookImes();
     for (const auto &item : items) {
-        HANDLE hProc = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, FALSE, item.pid);
-        if (!hProc) continue;
-        if (WaitForSingleObject(hProc, 600) != WAIT_OBJECT_0) {
-            if (!TerminateProcess(hProc, 0)) {
-                allClosed = false;
-            } else {
-                WaitForSingleObject(hProc, 1000);
+        for (const auto &rem : remaining) {
+            if (rem.pid == item.pid) {
+                return false;
             }
         }
-        CloseHandle(hProc);
     }
-    return allClosed;
+    return true;
+}
+
+inline bool GrantAppContainerReadExecuteAcl(const std::wstring &targetPath) {
+    if (targetPath.empty()) return false;
+    PSID sidAllApps = nullptr;
+    PSID sidRestrictedApps = nullptr;
+    BOOL ok1 = ConvertStringSidToSidW(L"S-1-15-2-1", &sidAllApps);
+    BOOL ok2 = ConvertStringSidToSidW(L"S-1-15-2-2", &sidRestrictedApps);
+
+    EXPLICIT_ACCESSW ea[2] = {};
+    ULONG count = 0;
+    auto addSid = [&](PSID sid) {
+        if (!sid) return;
+        EXPLICIT_ACCESSW &entry = ea[count++];
+        entry.grfAccessPermissions = FILE_GENERIC_READ | FILE_GENERIC_EXECUTE;
+        entry.grfAccessMode = GRANT_ACCESS;
+        entry.grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+        entry.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        entry.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+        entry.Trustee.ptstrName = reinterpret_cast<LPWSTR>(sid);
+    };
+    if (ok1) addSid(sidAllApps);
+    if (ok2) addSid(sidRestrictedApps);
+
+    bool succeeded = false;
+    if (count > 0) {
+        PACL oldDacl = nullptr;
+        PSECURITY_DESCRIPTOR pSD = nullptr;
+        std::wstring mutablePath = targetPath;
+        DWORD status = GetNamedSecurityInfoW(
+            mutablePath.c_str(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            nullptr,
+            nullptr,
+            &oldDacl,
+            nullptr,
+            &pSD
+        );
+        if (status == ERROR_SUCCESS) {
+            PACL newDacl = nullptr;
+            status = SetEntriesInAclW(count, ea, oldDacl, &newDacl);
+            if (status == ERROR_SUCCESS && newDacl) {
+                status = SetNamedSecurityInfoW(
+                    mutablePath.data(),
+                    SE_FILE_OBJECT,
+                    DACL_SECURITY_INFORMATION,
+                    nullptr,
+                    nullptr,
+                    newDacl,
+                    nullptr
+                );
+                succeeded = (status == ERROR_SUCCESS);
+                LocalFree(newDacl);
+            }
+            if (pSD) LocalFree(pSD);
+        }
+    }
+    if (sidAllApps) LocalFree(sidAllApps);
+    if (sidRestrictedApps) LocalFree(sidRestrictedApps);
+    return succeeded;
 }
 
 static constexpr const wchar_t *kUninstallRegSubKey =
@@ -216,24 +276,6 @@ inline void CloseRunningSettingsAndTrayWindow() {
     }
 }
 
-inline bool ExtractRcDataToFile(int resourceId, const std::wstring &dstPath) {
-    HMODULE hMod = GetModuleHandleW(nullptr);
-    HRSRC hRes = FindResourceW(hMod, MAKEINTRESOURCEW(resourceId), MAKEINTRESOURCEW(10) /* RT_RCDATA */);
-    if (!hRes) return false;
-    DWORD sz = SizeofResource(hMod, hRes);
-    if (sz == 0) return false;
-    HGLOBAL hLoad = LoadResource(hMod, hRes);
-    if (!hLoad) return false;
-    const void *pData = LockResource(hLoad);
-    if (!pData) return false;
-    HANDLE hFile = CreateFileW(dstPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile == INVALID_HANDLE_VALUE) return false;
-    DWORD written = 0;
-    BOOL ok = WriteFile(hFile, pData, sz, &written, nullptr);
-    CloseHandle(hFile);
-    return (ok && written == sz);
-}
-
 inline void CreateShortcutLink(
     const std::wstring &shortcutPath,
     const std::wstring &targetPath,
@@ -275,10 +317,6 @@ inline void RegisterWindowsInstalledAppAndShortcuts(const std::wstring &installD
     std::wstring icoFile = installDir + L"\\VieLotusIM.ico";
     std::wstring assetsDir = installDir + L"\\assets";
     CreateDirectoryW(assetsDir.c_str(), nullptr);
-
-    // Always extract embedded VieLotusIM.ico (resource 103) and app-icon-128x128.png (resource 102)
-    ExtractRcDataToFile(103, icoFile);
-    ExtractRcDataToFile(102, assetsDir + L"\\app-icon-128x128.png");
 
     WCHAR selfPath[MAX_PATH] = {};
     if (GetModuleFileNameW(nullptr, selfPath, MAX_PATH) > 0) {
@@ -506,17 +544,6 @@ inline int RunFullUninstallFlow(bool quiet) {
     if (!RemoveDirectoryW(installDir.c_str())) {
         MoveFileExW(installDir.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
     }
-
-    // Spawn a short delayed cleanup command so Uninstall-VieLotusIM.exe itself is removed after process exit
-    std::wstring cmdArgs = L"/c ping 127.0.0.1 -n 2 > nul & del /f /q \"" + installDir + L"\\*\" > nul 2>&1 & rmdir /s /q \"" + installDir + L"\" > nul 2>&1";
-    SHELLEXECUTEINFOW seiClean{};
-    seiClean.cbSize = sizeof(seiClean);
-    seiClean.fMask = SEE_MASK_FLAG_NO_UI;
-    seiClean.lpVerb = L"open";
-    seiClean.lpFile = L"cmd.exe";
-    seiClean.lpParameters = cmdArgs.c_str();
-    seiClean.nShow = SW_HIDE;
-    ShellExecuteExW(&seiClean);
 
     if (SUCCEEDED(hrCo)) {
         CoUninitialize();

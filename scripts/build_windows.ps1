@@ -1,18 +1,23 @@
 ﻿# ==============================================================================
 # Sen Việt (VieLotusIM) - Windows Native TSF Build & Packaging Script (PowerShell)
-# Builds Universal x64 + ARM64 VieLotusTIP.dll & Inno Setup Installers
+# Builds Universal x64 + ARM64 VieLotusTIP.dll, VieLotusSettings.exe & Store MSIXBundle
 # ==============================================================================
 
 param (
     [string]$Configuration = "Release",
     [string]$Version = "2.0.6",
-    [string]$MsixVersion = "2.0.6.0",
+    [string]$MsixVersion = "",
     [ValidateSet("x64", "arm64", "all")]
     [string]$Arch = "all",
-    [switch]$SkipTests = $false
+    [switch]$SkipTests = $false,
+    [switch]$FetchStoreStub = $false
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($MsixVersion)) {
+    $MsixVersion = "$Version.0"
+}
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $rootDir = (Resolve-Path "$scriptDir\..").Path
@@ -139,33 +144,46 @@ foreach ($extraArch in @("x64", "arm64")) {
     }
 }
 
-# 4. Embed dual-arch (x64 + ARM64) VieLotusTIP.dll into VieLotusSettings.exe and stage native Win32 Setup Installers
-if ((Test-Path "$binStagingDir\x64\VieLotusTIP.dll") -and (Test-Path "$binStagingDir\arm64\VieLotusTIP.dll") -and (Get-Command python -ErrorAction SilentlyContinue)) {
-    foreach ($rebuildArch in @("x64", "arm64")) {
-        $tsfBuildDir = "$rootDir\build-tsf-$rebuildArch"
-        if (Test-Path $tsfBuildDir) {
-            python "$tsfSourceDir\embed_file_to_header.py" --x64 "$binStagingDir\x64\VieLotusTIP.dll" --arm64 "$binStagingDir\arm64\VieLotusTIP.dll" "$tsfBuildDir\EmbeddedTipDll.h"
-            cmake --build $tsfBuildDir --config $Configuration --target VieLotusSettings
-            $rebuiltSettings = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusSettings.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($rebuiltSettings) {
-                Copy-Item $rebuiltSettings.FullName -Destination "$binStagingDir\$rebuildArch\VieLotusSettings.exe" -Force
+# 4. Verify PE hygiene (no embedded secondary PE headers and no AV-trigger LOLBin/MOTW strings)
+Write-Host "🛡️ Bước 4: Kiểm tra vệ sinh PE (không nhúng PE kép, không chuỗi AV false-positive)..." -ForegroundColor Green
+$forbiddenStrings = @(
+    "Zone.Identifier",
+    "ExecutionPolicy Bypass",
+    "ping 127.0.0.1",
+    "icacls.exe",
+    "wininet.dll",
+    "VieLotusSetupElevated"
+)
+foreach ($checkArch in @("x64", "arm64")) {
+    foreach ($binName in @("VieLotusSettings.exe", "VieLotusTIP.dll")) {
+        $binPath = "$binStagingDir\$checkArch\$binName"
+        if (-not (Test-Path $binPath)) { continue }
+        $bytes = [System.IO.File]::ReadAllBytes($binPath)
+
+        # Scan for any embedded secondary PE header (MZ + valid PE\0\0) beyond offset 0
+        for ($i = 1; $i -lt ($bytes.Length - 64); $i++) {
+            if ($bytes[$i] -eq 0x4D -and $bytes[$i + 1] -eq 0x5A) {
+                $peOff = [System.BitConverter]::ToUInt32($bytes, $i + 0x3C)
+                if ($peOff -ge 0x40 -and $peOff -le 0x400 -and ($i + $peOff + 4) -lt $bytes.Length) {
+                    if ($bytes[$i + $peOff] -eq 0x50 -and $bytes[$i + $peOff + 1] -eq 0x45 -and
+                        $bytes[$i + $peOff + 2] -eq 0x00 -and $bytes[$i + $peOff + 3] -eq 0x00) {
+                        Write-Error "❌ Phát hiện PE nhúng bên trong $binPath tại offset 0x$($i.ToString('X'))!"
+                        exit 1
+                    }
+                }
             }
         }
-    }
-    if (Test-Path "$binStagingDir\x64\VieLotusSettings.exe") {
-        Copy-Item "$binStagingDir\x64\VieLotusSettings.exe" -Destination "$binStagingDir\VieLotusSettings.exe" -Force
-    }
-}
 
-$installersToBuild = if ($Arch -eq "all") { @("x64", "arm64") } else { @($Arch) }
-foreach ($instArch in $installersToBuild) {
-    if (Test-Path "$binStagingDir\$instArch\VieLotusSettings.exe") {
-        Copy-Item "$binStagingDir\$instArch\VieLotusSettings.exe" -Destination "$distWindowsDir\VieLotus-Setup-$instArch.exe" -Force
-        Write-Host "✅ Tạo bộ cài đặt Native Win32 Setup Wizard thành công tại: $distWindowsDir\VieLotus-Setup-$instArch.exe" -ForegroundColor Cyan
+        $asciiText = [System.Text.Encoding]::ASCII.GetString($bytes)
+        $utf16Text = [System.Text.Encoding]::Unicode.GetString($bytes)
+        foreach ($needle in $forbiddenStrings) {
+            if ($asciiText.Contains($needle) -or $utf16Text.Contains($needle)) {
+                Write-Error "❌ Phát hiện chuỗi bị cấm '$needle' bên trong $binPath!"
+                exit 1
+            }
+        }
+        Write-Host "   ✅ PE hygiene PASS: $checkArch\$binName ($($bytes.Length) bytes)"
     }
-}
-if (Test-Path "$distWindowsDir\VieLotus-Setup-x64.exe") {
-    Copy-Item "$distWindowsDir\VieLotus-Setup-x64.exe" -Destination "$distWindowsDir\VieLotus-Store-Setup.exe" -Force
 }
 
 # 5. Package Microsoft Store MSIX & MSIXBundle (Partner Center: NidoHoldings.SenVitVieLotusIM)
@@ -267,8 +285,32 @@ if ($makeappx) {
     $outBundle = "$msixDistDir\VieLotus_${MsixVersion}_x64_arm64.msixbundle"
     if (Test-Path $outBundle) { Remove-Item $outBundle -Force }
     & $makeappx bundle /d $bundleInputDir /p $outBundle /bv "$MsixVersion" /o | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Đã tạo gói Microsoft Store MSIXBundle tại: $outBundle" -ForegroundColor Cyan
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "❌ Lỗi: makeappx bundle thất bại (exit code $LASTEXITCODE)."
+        exit $LASTEXITCODE
     }
+    Write-Host "✅ Đã tạo gói Microsoft Store MSIXBundle tại: $outBundle" -ForegroundColor Cyan
     Remove-Item $msixStageBase -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# 6. Fetch & cryptographically verify the official Microsoft Store Signed Web Installer stub (9PF5K64GXXSH)
+if ($FetchStoreStub) {
+    $storeStubPath = "$distWindowsDir\VieLotus-Store-Setup.exe"
+    $storeStubUrl = "https://get.microsoft.com/installer/download/9PF5K64GXXSH?ocid=badge"
+    Write-Host "🔏 Bước 6: Tải & xác thực chữ ký Microsoft Corporation cho VieLotus-Store-Setup.exe..." -ForegroundColor Green
+    Invoke-WebRequest -Uri $storeStubUrl -OutFile $storeStubPath -UseBasicParsing
+    if (-not (Test-Path $storeStubPath) -or (Get-Item $storeStubPath).Length -lt 100000) {
+        Remove-Item $storeStubPath -Force -ErrorAction SilentlyContinue
+        Write-Error "❌ Lỗi: Không thể tải Microsoft Store Web Installer hợp lệ từ $storeStubUrl."
+        exit 1
+    }
+    $sig = Get-AuthenticodeSignature -FilePath $storeStubPath
+    if ($sig.Status -ne "Valid" -or -not $sig.SignerCertificate -or $sig.SignerCertificate.Subject -notlike "*CN=Microsoft Corporation*") {
+        $statusStr = "$($sig.Status)"
+        $subjStr = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { "<none>" }
+        Remove-Item $storeStubPath -Force -ErrorAction SilentlyContinue
+        Write-Error "❌ Lỗi: Chữ ký Authenticode của VieLotus-Store-Setup.exe không hợp lệ (Status=$statusStr, Subject=$subjStr)."
+        exit 1
+    }
+    Write-Host "✅ Xác thực thành công Microsoft Corporation Signed Web Installer: $storeStubPath ($((Get-Item $storeStubPath).Length) bytes)" -ForegroundColor Cyan
 }

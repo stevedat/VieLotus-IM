@@ -5,7 +5,6 @@
 #include <gdiplus.h>
 #include <dwmapi.h>
 #include <shellapi.h>
-#include <wincrypt.h>
 #include <string>
 #include <vector>
 
@@ -615,102 +614,6 @@ HRESULT RegisterProfiles() {
     return hr;
 }
 
-static bool AreBothTipsRegisteredInViProfile() {
-    HKEY hViKey = nullptr;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Control Panel\\International\\User Profile\\vi-VN", 0, KEY_READ, &hViKey) != ERROR_SUCCESS || !hViKey) {
-        return false;
-    }
-    DWORD dummy = 0;
-    bool hasTelex = ReadRegDword(hViKey, c_szTipTelexLayoutString, dummy);
-    bool hasVni = ReadRegDword(hViKey, c_szTipVniLayoutString, dummy);
-    RegCloseKey(hViKey);
-    return hasTelex && hasVni;
-}
-
-static void SyncWinUserLanguageListViaPowerShell(bool preferVni, bool forceSync) {
-    static constexpr DWORD kTargetCleanVer = 10u;
-    HKEY hPrefs = nullptr;
-    DWORD cleanVer = 0;
-    if (RegCreateKeyExW(
-            HKEY_CURRENT_USER,
-            c_szPrefsSubKey,
-            0,
-            nullptr,
-            REG_OPTION_NON_VOLATILE,
-            KEY_READ | KEY_WRITE,
-            nullptr,
-            &hPrefs,
-            nullptr
-        ) == ERROR_SUCCESS && hPrefs) {
-        ReadRegDword(hPrefs, L"WinLangListCleanVer", cleanVer);
-        RegCloseKey(hPrefs);
-    }
-    if (!forceSync && cleanVer >= kTargetCleanVer && AreBothTipsRegisteredInViProfile()) {
-        return;
-    }
-
-    WCHAR cmdLine[3072] = {0};
-    StringCchPrintfW(
-        cmdLine,
-        3072,
-        L"powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command \""
-        L"$ErrorActionPreference='Stop';"
-        L"$telex='042A:{C7B08E9D-4762-4C97-8B1F-522197A598DE}{8E2A7B44-5A1F-4B82-9B7C-123456789ABC}';"
-        L"$vni='042A:{C7B08E9D-4762-4C97-8B1F-522197A598DE}{8E2A7B45-5A1F-4B82-9B7C-123456789ABC}';"
-        L"$pref=%s;$other=%s;"
-        L"$list=Get-WinUserLanguageList;"
-        L"if(-not $list){$list=New-WinUserLanguageList 'vi-VN'};"
-        L"foreach($item in $list){if($item.LanguageTag -notlike 'vi*'){"
-        L"$rem=@($item.InputMethodTips|Where-Object{$_ -like '*C7B08E9D*'});"
-        L"foreach($r in $rem){[void]$item.InputMethodTips.Remove($r)}"
-        L"}};"
-        L"$v=$list|Where-Object{$_.LanguageTag -like 'vi*'}|Select-Object -First 1;"
-        L"if(-not $v){$v=(New-WinUserLanguageList 'vi-VN')[0];$kept=@()}else{"
-        L"$kept=@($v.InputMethodTips|Where-Object{$_ -and ($_ -notlike '*C7B08E9D*') -and ($_ -ne '042A:00000409') -and ($_ -ne '042A:0000042A')})"
-        L"};"
-        L"$v.InputMethodTips.Clear();"
-        L"[void]$v.InputMethodTips.Add($pref);"
-        L"[void]$v.InputMethodTips.Add($other);"
-        L"foreach($k in $kept){[void]$v.InputMethodTips.Add($k)};"
-        L"$out=New-Object 'System.Collections.Generic.List[Microsoft.InternationalSettings.Commands.WinUserLanguage]';"
-        L"[void]$out.Add($v);"
-        L"foreach($item in $list){if($item.LanguageTag -notlike 'vi*'){$out.Add($item)}};"
-        L"Set-WinUserLanguageList $out -Force;"
-        L"Set-WinDefaultInputMethodOverride -InputTip $pref\"",
-        preferVni ? L"$vni" : L"$telex",
-        preferVni ? L"$telex" : L"$vni"
-    );
-
-    STARTUPINFOW si{};
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
-    PROCESS_INFORMATION pi{};
-    if (CreateProcessW(nullptr, cmdLine, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
-        WaitForSingleObject(pi.hProcess, 8000);
-        DWORD exitCode = 1;
-        GetExitCodeProcess(pi.hProcess, &exitCode);
-        CloseHandle(pi.hThread);
-        CloseHandle(pi.hProcess);
-        if (exitCode == 0) {
-            if (RegCreateKeyExW(
-                    HKEY_CURRENT_USER,
-                    c_szPrefsSubKey,
-                    0,
-                    nullptr,
-                    REG_OPTION_NON_VOLATILE,
-                    KEY_WRITE,
-                    nullptr,
-                    &hPrefs,
-                    nullptr
-                ) == ERROR_SUCCESS && hPrefs) {
-                WriteRegDword(hPrefs, L"WinLangListCleanVer", kTargetCleanVer);
-                RegCloseKey(hPrefs);
-            }
-        }
-    }
-}
-
 static void EnsureVietnameseUserProfileLanguage(bool preferVni) {
     LPCWSTR preferredTipString = preferVni ? c_szTipVniLayoutString : c_szTipTelexLayoutString;
 
@@ -897,8 +800,8 @@ HRESULT ActivateUserProfiles(bool forceLangListSync) {
     LPCWSTR preferredTipString = preferVni ? c_szTipVniLayoutString : c_szTipTelexLayoutString;
     LPCWSTR otherTipString = preferVni ? c_szTipTelexLayoutString : c_szTipVniLayoutString;
 
+    (void)forceLangListSync;
     EnsureVietnameseUserProfileLanguage(preferVni);
-    SyncWinUserLanguageListViaPowerShell(preferVni, forceLangListSync);
 
     HMODULE hInputDll = LoadLibraryExW(L"input.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (hInputDll) {
@@ -1114,23 +1017,10 @@ enum class HitRegion : int {
     FooterFeedback
 };
 
-enum class WinUpdateStatus : int {
-    Idle = 0,
-    Checking = 1,
-    UpToDate = 2,
-    UpdateAvailable = 3,
-    Downloading = 4,
-    Installing = 5,
-    Error = 6
-};
-
 struct BentoSettingsState {
     VieLotusWindowsPrefs prefs{};
     int selectedTab{0}; // 0 = Cài đặt, 1 = Thông tin
     HitRegion hoveredRegion{HitRegion::None};
-    WinUpdateStatus updateStatus{WinUpdateStatus::Idle};
-    WCHAR latestVersion[32]{};
-    bool updateWorkerBusy{false};
     float dpiScale{1.0f};
     bool isDark{false};
     bool trayRegistered{false};
@@ -1589,56 +1479,16 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             -1, &fVersion, modePill, &sfCenter, &greenTextBrush
         );
 
-        // On-Demand Update Status / 1-Click Verified Update Pill in header (x=332..446)
+        // Microsoft Store Update Pill in header (x=332..446) — 100% offline, opens Microsoft Store directly
         {
             RectF updPill(332.0f * s, 10.0f * s, 114.0f * s, 17.0f * s);
             bool updHovered = (st->hoveredRegion == HitRegion::BtnCheckUpdate);
-            WCHAR updLabel[64] = L"\u21BB Ki\u1EC3m tra c\u1EADp nh\u1EADt";
             Color updFill = updHovered
                 ? (isDark ? Color(255, 54, 54, 70) : Color(255, 228, 230, 238))
                 : (isDark ? Color(255, 42, 42, 54) : Color(255, 236, 236, 242));
-            Color updFg = fgSecondary;
-
-            switch (st->updateStatus) {
-            case WinUpdateStatus::Checking:
-                StringCchCopyW(updLabel, ARRAYSIZE(updLabel), L"\u23F3 \u0110ang ki\u1EC3m tra...");
-                break;
-            case WinUpdateStatus::UpToDate:
-                StringCchCopyW(updLabel, ARRAYSIZE(updLabel), L"\u2713 B\u1EA3n m\u1EDBi nh\u1EA5t");
-                updFill = isDark ? Color(255, 28, 54, 42) : Color(255, 232, 250, 238);
-                updFg = isDark ? Color(255, 74, 222, 128) : Color(255, 22, 163, 74);
-                break;
-            case WinUpdateStatus::UpdateAvailable:
-                StringCchPrintfW(
-                    updLabel, ARRAYSIZE(updLabel),
-                    L"\u2B07 C\u1EADp nh\u1EADt v%s",
-                    st->latestVersion[0] ? st->latestVersion : L"m\u1EDBi"
-                );
-                updFill = updHovered ? Color(255, 21, 128, 61) : Color(255, 22, 163, 74);
-                updFg = Color(255, 255, 255, 255);
-                break;
-            case WinUpdateStatus::Downloading:
-                StringCchCopyW(updLabel, ARRAYSIZE(updLabel), L"\u23F3 \u0110ang t\u1EA3i g\u00F3i...");
-                updFill = Color(isDark ? 65 : 42, blueCol.GetR(), blueCol.GetG(), blueCol.GetB());
-                updFg = blueCol;
-                break;
-            case WinUpdateStatus::Installing:
-                StringCchCopyW(updLabel, ARRAYSIZE(updLabel), L"\u2699 \u0110ang c\u00E0i \u0111\u1EB7t...");
-                updFill = Color(isDark ? 65 : 42, blueCol.GetR(), blueCol.GetG(), blueCol.GetB());
-                updFg = blueCol;
-                break;
-            case WinUpdateStatus::Error:
-                StringCchCopyW(updLabel, ARRAYSIZE(updLabel), L"\u26A0 Th\u1EED l\u1EA1i c\u1EADp nh\u1EADt");
-                updFill = isDark ? Color(255, 64, 42, 24) : Color(255, 254, 243, 199);
-                updFg = isDark ? Color(255, 251, 146, 60) : Color(255, 217, 119, 6);
-                break;
-            case WinUpdateStatus::Idle:
-            default:
-                break;
-            }
             FillRoundRect(g, updPill, 8.5f * s, updFill);
-            SolidBrush updBrush(updFg);
-            g.DrawString(updLabel, -1, &fVersion, updPill, &sfCenter, &updBrush);
+            SolidBrush updBrush(fgSecondary);
+            g.DrawString(L"Microsoft Store \u2197", -1, &fVersion, updPill, &sfCenter, &updBrush);
         }
 
         RectF subBrandRect(64.0f * s, 29.0f * s, 380.0f * s, 17.0f * s);
@@ -1997,7 +1847,6 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 enum {
     WM_VIELOTUS_ACTIVATE_PROFILES = WM_USER + 100,
     WM_VIELOTUS_SHOW_SETTINGS     = WM_USER + 101,
-    WM_VIELOTUS_UPDATE_RESULT     = WM_USER + 105,
     WM_VIELOTUS_QUIT_TRAY         = WM_USER + 199,
     WM_VIELOTUS_TRAY_CALLBACK     = WM_USER + 200,
 
@@ -2012,408 +1861,24 @@ enum {
     IDM_TRAY_EXIT                 = 2909
 };
 
-static bool IsHostWindowsArm64ForUpdate() {
-    HMODULE hKernel = GetModuleHandleW(L"kernel32.dll");
-    if (hKernel) {
-        using PFN_IsWow64Process2 = BOOL(WINAPI *)(HANDLE, USHORT *, USHORT *);
-        auto pfn = reinterpret_cast<PFN_IsWow64Process2>(GetProcAddress(hKernel, "IsWow64Process2"));
-        if (pfn) {
-            USHORT processMachine = 0;
-            USHORT nativeMachine = 0;
-            if (pfn(GetCurrentProcess(), &processMachine, &nativeMachine)) {
-                return (nativeMachine == 0xAA64 /* IMAGE_FILE_MACHINE_ARM64 */);
-            }
-        }
-    }
-#if defined(_M_ARM64) || defined(__aarch64__)
-    return true;
-#else
-    return false;
-#endif
-}
-
-static bool WinInetFetchHttpsBuffer(const WCHAR *url, std::string &outBytes, DWORD maxBytes) {
-    outBytes.clear();
-    if (!url || !url[0]) return false;
-
-    HMODULE hWinInet = LoadLibraryExW(L"wininet.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if (!hWinInet) return false;
-
-    using HINTERNET_HANDLE = void *;
-    using PFN_InternetOpenW = HINTERNET_HANDLE(WINAPI *)(LPCWSTR, DWORD, LPCWSTR, LPCWSTR, DWORD);
-    using PFN_InternetOpenUrlW = HINTERNET_HANDLE(WINAPI *)(HINTERNET_HANDLE, LPCWSTR, LPCWSTR, DWORD, DWORD, DWORD_PTR);
-    using PFN_HttpQueryInfoW = BOOL(WINAPI *)(HINTERNET_HANDLE, DWORD, LPVOID, LPDWORD, LPDWORD);
-    using PFN_InternetReadFile = BOOL(WINAPI *)(HINTERNET_HANDLE, LPVOID, DWORD, LPDWORD);
-    using PFN_InternetCloseHandle = BOOL(WINAPI *)(HINTERNET_HANDLE);
-
-    auto pInternetOpenW = reinterpret_cast<PFN_InternetOpenW>(GetProcAddress(hWinInet, "InternetOpenW"));
-    auto pInternetOpenUrlW = reinterpret_cast<PFN_InternetOpenUrlW>(GetProcAddress(hWinInet, "InternetOpenUrlW"));
-    auto pHttpQueryInfoW = reinterpret_cast<PFN_HttpQueryInfoW>(GetProcAddress(hWinInet, "HttpQueryInfoW"));
-    auto pInternetReadFile = reinterpret_cast<PFN_InternetReadFile>(GetProcAddress(hWinInet, "InternetReadFile"));
-    auto pInternetCloseHandle = reinterpret_cast<PFN_InternetCloseHandle>(GetProcAddress(hWinInet, "InternetCloseHandle"));
-
-    bool ok = false;
-    if (pInternetOpenW && pInternetOpenUrlW && pHttpQueryInfoW && pInternetReadFile && pInternetCloseHandle) {
-        HINTERNET_HANDLE hInet = pInternetOpenW(
-            L"VieLotusIM/2.0.6 (Windows; SettingsUpdater)",
-            0 /* INTERNET_OPEN_TYPE_PRECONFIG */,
-            nullptr,
-            nullptr,
-            0
-        );
-        if (hInet) {
-            const DWORD flags = 0x80000000u /* INTERNET_FLAG_RELOAD */
-                              | 0x04000000u /* INTERNET_FLAG_NO_CACHE_WRITE */
-                              | 0x00800000u /* INTERNET_FLAG_SECURE */;
-            HINTERNET_HANDLE hUrl = pInternetOpenUrlW(
-                hInet,
-                url,
-                L"Accept: application/vnd.github+json\r\n",
-                static_cast<DWORD>(-1L),
-                flags,
-                0
-            );
-            if (hUrl) {
-                DWORD statusCode = 0;
-                DWORD statusSize = sizeof(statusCode);
-                if (pHttpQueryInfoW(
-                        hUrl,
-                        19u | 0x20000000u /* HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER */,
-                        &statusCode,
-                        &statusSize,
-                        nullptr
-                    ) && statusCode >= 200 && statusCode < 300) {
-                    char chunk[8192];
-                    DWORD bytesRead = 0;
-                    ok = true;
-                    while (pInternetReadFile(hUrl, chunk, sizeof(chunk), &bytesRead) && bytesRead > 0) {
-                        if (outBytes.size() + bytesRead > maxBytes) {
-                            ok = false;
-                            break;
-                        }
-                        outBytes.append(chunk, bytesRead);
-                        bytesRead = 0;
-                    }
-                }
-                pInternetCloseHandle(hUrl);
-            }
-            pInternetCloseHandle(hInet);
-        }
-    }
-    FreeLibrary(hWinInet);
-    return ok && !outBytes.empty();
-}
-
-static std::string ComputeBufferSha256Hex(const std::string &data) {
-    HCRYPTPROV hProv = 0;
-    HCRYPTHASH hHash = 0;
-    std::string hexOut;
-    if (!CryptAcquireContextW(&hProv, nullptr, nullptr, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) {
-        return hexOut;
-    }
-    if (CryptCreateHash(hProv, CALG_SHA_256, 0, 0, &hHash)) {
-        if (CryptHashData(
-                hHash,
-                reinterpret_cast<const BYTE *>(data.data()),
-                static_cast<DWORD>(data.size()),
-                0
-            )) {
-            BYTE hashBytes[32] = {};
-            DWORD hashLen = sizeof(hashBytes);
-            if (CryptGetHashParam(hHash, HP_HASHVAL, hashBytes, &hashLen, 0) && hashLen == 32) {
-                static const char kHex[] = "0123456789abcdef";
-                hexOut.reserve(64);
-                for (DWORD i = 0; i < 32; ++i) {
-                    hexOut.push_back(kHex[(hashBytes[i] >> 4) & 0x0F]);
-                    hexOut.push_back(kHex[hashBytes[i] & 0x0F]);
-                }
-            }
-        }
-        CryptDestroyHash(hHash);
-    }
-    CryptReleaseContext(hProv, 0);
-    return hexOut;
-}
-
-static std::string NormalizeAsciiVersion(const std::string &raw) {
-    size_t start = 0;
-    while (start < raw.size() && (raw[start] == ' ' || raw[start] == '\t' || raw[start] == 'v' || raw[start] == 'V')) {
-        ++start;
-    }
-    std::string s = raw.substr(start);
-    size_t dashPos = s.find('-');
-    if (dashPos != std::string::npos) {
-        s = s.substr(0, dashPos);
-    }
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r' || s.back() == '\n')) {
-        s.pop_back();
-    }
-    return s;
-}
-
-static bool IsRemoteVersionNewer(const std::string &remoteRaw, const std::string &localRaw) {
-    std::string rStr = NormalizeAsciiVersion(remoteRaw);
-    std::string lStr = NormalizeAsciiVersion(localRaw);
-    auto splitNums = [](const std::string &ver) {
-        std::vector<int> parts;
-        int cur = 0;
-        bool hasDigit = false;
-        for (char c : ver) {
-            if (c >= '0' && c <= '9') {
-                cur = cur * 10 + (c - '0');
-                hasDigit = true;
-            } else if (c == '.') {
-                parts.push_back(hasDigit ? cur : 0);
-                cur = 0;
-                hasDigit = false;
-            }
-        }
-        if (hasDigit) parts.push_back(cur);
-        return parts;
-    };
-    std::vector<int> rParts = splitNums(rStr);
-    std::vector<int> lParts = splitNums(lStr);
-    size_t n = (rParts.size() > lParts.size()) ? rParts.size() : lParts.size();
-    for (size_t i = 0; i < n; ++i) {
-        int rv = (i < rParts.size()) ? rParts[i] : 0;
-        int lv = (i < lParts.size()) ? lParts[i] : 0;
-        if (rv != lv) return (rv > lv);
-    }
-    return false;
-}
-
-static std::string ExtractJsonTagVersion(const std::string &json) {
-    const std::string key = "\"tag_name\"";
-    size_t pos = json.find(key);
-    if (pos == std::string::npos) return "";
-    size_t colon = json.find(':', pos + key.size());
-    if (colon == std::string::npos) return "";
-    size_t q1 = json.find('"', colon + 1);
-    if (q1 == std::string::npos) return "";
-    size_t q2 = json.find('"', q1 + 1);
-    if (q2 == std::string::npos || q2 <= q1 + 1) return "";
-    return NormalizeAsciiVersion(json.substr(q1 + 1, q2 - q1 - 1));
-}
-
-static std::string ParseChecksumForAsset(const std::string &checksumsText, const std::string &assetName) {
-    size_t lineStart = 0;
-    while (lineStart < checksumsText.size()) {
-        size_t lineEnd = checksumsText.find('\n', lineStart);
-        if (lineEnd == std::string::npos) lineEnd = checksumsText.size();
-        std::string line = checksumsText.substr(lineStart, lineEnd - lineStart);
-        lineStart = lineEnd + 1;
-
-        while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) {
-            line.pop_back();
-        }
-        if (line.size() < 66) continue;
-        std::string hashHex = line.substr(0, 64);
-        bool validHex = true;
-        for (char &ch : hashHex) {
-            if (ch >= 'A' && ch <= 'F') ch = static_cast<char>(ch - 'A' + 'a');
-            else if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))) {
-                validHex = false;
-                break;
-            }
-        }
-        if (!validHex) continue;
-        if (line.find(assetName, 64) != std::string::npos) {
-            return hashHex;
-        }
-    }
-    return "";
-}
-
-struct WinUpdateTaskParams {
-    HWND hwnd{nullptr};
-    bool downloadAndInstall{false};
-    WCHAR targetVersion[32]{};
-};
-
-static DWORD WINAPI WindowsUpdateWorkerThreadProc(LPVOID lpParam) {
-    WinUpdateTaskParams *params = reinterpret_cast<WinUpdateTaskParams *>(lpParam);
-    if (!params) return 0;
-    HWND hwnd = params->hwnd;
-    bool doInstall = params->downloadAndInstall;
-    WCHAR targetVerW[32] = {};
-    StringCchCopyW(targetVerW, ARRAYSIZE(targetVerW), params->targetVersion);
-    delete params;
-
-    if (!doInstall) {
-        std::string json;
-        if (!WinInetFetchHttpsBuffer(
-                L"https://api.github.com/repos/stevedat/VieLotus-IM/releases/latest",
-                json,
-                2 * 1024 * 1024
-            )) {
-            if (IsWindow(hwnd)) {
-                PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::Error), 0);
-            }
-            return 0;
-        }
-        std::string remoteVer = ExtractJsonTagVersion(json);
-        if (remoteVer.empty()) {
-            if (IsWindow(hwnd)) {
-                PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::Error), 0);
-            }
-            return 0;
-        }
-        if (IsRemoteVersionNewer(remoteVer, "2.0.6")) {
-            WCHAR *verHeap = new WCHAR[32]();
-            MultiByteToWideChar(CP_UTF8, 0, remoteVer.c_str(), -1, verHeap, 31);
-            if (IsWindow(hwnd)) {
-                PostMessageW(
-                    hwnd,
-                    WM_VIELOTUS_UPDATE_RESULT,
-                    static_cast<WPARAM>(WinUpdateStatus::UpdateAvailable),
-                    reinterpret_cast<LPARAM>(verHeap)
-                );
-            } else {
-                delete[] verHeap;
-            }
-        } else {
-            if (IsWindow(hwnd)) {
-                PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::UpToDate), 0);
-            }
-        }
-        return 0;
-    }
-
-    // Download & SHA-256 Verified Silent Upgrade Flow
-    bool isArm64 = IsHostWindowsArm64ForUpdate();
-    const char *assetNameA = isArm64 ? "VieLotus-Setup-arm64.exe" : "VieLotus-Setup-x64.exe";
-    const WCHAR *assetNameW = isArm64 ? L"VieLotus-Setup-arm64.exe" : L"VieLotus-Setup-x64.exe";
-
-    WCHAR checksumsUrl[256] = {};
-    WCHAR installerUrl[256] = {};
-    if (targetVerW[0]) {
-        StringCchPrintfW(
-            checksumsUrl, ARRAYSIZE(checksumsUrl),
-            L"https://github.com/stevedat/VieLotus-IM/releases/download/v%s/checksums.sha256",
-            targetVerW
-        );
-        StringCchPrintfW(
-            installerUrl, ARRAYSIZE(installerUrl),
-            L"https://github.com/stevedat/VieLotus-IM/releases/download/v%s/%s",
-            targetVerW, assetNameW
-        );
-    } else {
-        StringCchCopyW(
-            checksumsUrl, ARRAYSIZE(checksumsUrl),
-            L"https://github.com/stevedat/VieLotus-IM/releases/latest/download/checksums.sha256"
-        );
-        StringCchPrintfW(
-            installerUrl, ARRAYSIZE(installerUrl),
-            L"https://github.com/stevedat/VieLotus-IM/releases/latest/download/%s",
-            assetNameW
-        );
-    }
-
-    std::string checksumsText;
-    if (!WinInetFetchHttpsBuffer(checksumsUrl, checksumsText, 256 * 1024)) {
-        if (IsWindow(hwnd)) {
-            PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::Error), 0);
-        }
-        return 0;
-    }
-
-    std::string expectedSha = ParseChecksumForAsset(checksumsText, assetNameA);
-    if (expectedSha.size() != 64) {
-        if (IsWindow(hwnd)) {
-            PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::Error), 0);
-        }
-        return 0;
-    }
-
-    std::string exeBytes;
-    if (!WinInetFetchHttpsBuffer(installerUrl, exeBytes, 64 * 1024 * 1024)) {
-        if (IsWindow(hwnd)) {
-            PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::Error), 0);
-        }
-        return 0;
-    }
-
-    std::string actualSha = ComputeBufferSha256Hex(exeBytes);
-    if (actualSha != expectedSha) {
-        if (IsWindow(hwnd)) {
-            PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::Error), 0);
-        }
-        return 0;
-    }
-
-    WCHAR tempDir[MAX_PATH] = {};
-    if (GetTempPathW(MAX_PATH, tempDir) == 0) {
-        if (IsWindow(hwnd)) {
-            PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::Error), 0);
-        }
-        return 0;
-    }
-
-    WCHAR outExePath[MAX_PATH] = {};
-    StringCchPrintfW(
-        outExePath, ARRAYSIZE(outExePath),
-        L"%sVieLotus-Update-%u-%s",
-        tempDir, GetCurrentProcessId(), assetNameW
-    );
-
-    HANDLE hFile = CreateFileW(
-        outExePath,
-        GENERIC_WRITE,
-        0,
+static void OpenMicrosoftStorePage(HWND hwnd) {
+    HINSTANCE res = ShellExecuteW(
+        hwnd,
+        L"open",
+        L"ms-windows-store://pdp/?productid=9PF5K64GXXSH",
         nullptr,
-        CREATE_ALWAYS,
-        FILE_ATTRIBUTE_NORMAL,
-        nullptr
+        nullptr,
+        SW_SHOWNORMAL
     );
-    if (hFile == INVALID_HANDLE_VALUE) {
-        if (IsWindow(hwnd)) {
-            PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::Error), 0);
-        }
-        return 0;
-    }
-    DWORD written = 0;
-    BOOL writeOk = WriteFile(hFile, exeBytes.data(), static_cast<DWORD>(exeBytes.size()), &written, nullptr);
-    CloseHandle(hFile);
-    if (!writeOk || written != static_cast<DWORD>(exeBytes.size())) {
-        DeleteFileW(outExePath);
-        if (IsWindow(hwnd)) {
-            PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::Error), 0);
-        }
-        return 0;
-    }
-
-    if (IsWindow(hwnd)) {
-        PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::Installing), 0);
-    }
-
-    HINSTANCE hExec = ShellExecuteW(hwnd, L"open", outExePath, L"--silent", nullptr, SW_SHOWNORMAL);
-    if (reinterpret_cast<INT_PTR>(hExec) <= 32) {
-        if (IsWindow(hwnd)) {
-            PostMessageW(hwnd, WM_VIELOTUS_UPDATE_RESULT, static_cast<WPARAM>(WinUpdateStatus::UpdateAvailable), 0);
-        }
-    }
-    return 0;
-}
-
-static void StartWindowsUpdateWorker(HWND hwnd, BentoSettingsState *st, bool downloadAndInstall) {
-    if (!hwnd || !st || st->updateWorkerBusy) return;
-    st->updateWorkerBusy = true;
-    st->updateStatus = downloadAndInstall ? WinUpdateStatus::Downloading : WinUpdateStatus::Checking;
-    InvalidateRect(hwnd, nullptr, FALSE);
-
-    auto *params = new WinUpdateTaskParams();
-    params->hwnd = hwnd;
-    params->downloadAndInstall = downloadAndInstall;
-    StringCchCopyW(params->targetVersion, ARRAYSIZE(params->targetVersion), st->latestVersion);
-
-    HANDLE hThread = CreateThread(nullptr, 0, WindowsUpdateWorkerThreadProc, params, 0, nullptr);
-    if (hThread) {
-        CloseHandle(hThread);
-    } else {
-        delete params;
-        st->updateWorkerBusy = false;
-        st->updateStatus = WinUpdateStatus::Error;
-        InvalidateRect(hwnd, nullptr, FALSE);
+    if (reinterpret_cast<INT_PTR>(res) <= 32) {
+        ShellExecuteW(
+            hwnd,
+            L"open",
+            L"https://apps.microsoft.com/detail/9PF5K64GXXSH",
+            nullptr,
+            nullptr,
+            SW_SHOWNORMAL
+        );
     }
 }
 
@@ -2487,7 +1952,7 @@ static void ShowTrayContextMenu(HWND hwnd, BentoSettingsState *st) {
     );
     AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(hMenu, MF_STRING, IDM_TRAY_OPEN_SETTINGS, L"M\u1EDF B\u1EA3ng \u0110i\u1EC1u Khi\u1EC3n Sen Vi\u1EC7t...");
-    AppendMenuW(hMenu, MF_STRING, IDM_TRAY_CHECK_UPDATE, L"Ki\u1EC3m tra c\u1EADp nh\u1EADt...");
+    AppendMenuW(hMenu, MF_STRING, IDM_TRAY_CHECK_UPDATE, L"C\u1EADp nh\u1EADt qua Microsoft Store...");
     AppendMenuW(hMenu, MF_STRING, IDM_TRAY_FEEDBACK, L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i nhanh...");
     AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(hMenu, MF_STRING, IDM_TRAY_EXIT, L"Tho\u00E1t khay h\u1EC7 th\u1ED1ng");
@@ -2544,21 +2009,10 @@ static void ShowTrayContextMenu(HWND hwnd, BentoSettingsState *st) {
             vielotus_win_installer::DetectConflictingHookImes()
         );
         ActivateUserProfiles(false);
-        if (st->updateStatus == WinUpdateStatus::Idle && !st->updateWorkerBusy) {
-            StartWindowsUpdateWorker(hwnd, st, false);
-        }
         if (st->hTestEdit && st->selectedTab == 0) SetFocus(st->hTestEdit);
         break;
     case IDM_TRAY_CHECK_UPDATE:
-        ShowWindow(hwnd, SW_SHOW);
-        ShowWindow(hwnd, SW_RESTORE);
-        SetForegroundWindow(hwnd);
-        st->conflictImeSummary = vielotus_win_installer::FormatConflictingImeNames(
-            vielotus_win_installer::DetectConflictingHookImes()
-        );
-        ActivateUserProfiles(false);
-        StartWindowsUpdateWorker(hwnd, st, st->updateStatus == WinUpdateStatus::UpdateAvailable);
-        if (st->hTestEdit && st->selectedTab == 0) SetFocus(st->hTestEdit);
+        OpenMicrosoftStorePage(hwnd);
         break;
     case IDM_TRAY_FEEDBACK:
         ShowVieLotusFeedbackDialog(hwnd, st->prefs);
@@ -3296,23 +2750,6 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
         if (st->hTestEdit) {
             SetFocus(st->hTestEdit);
         }
-        if ((GetWindowLongW(hwnd, GWL_STYLE) & WS_VISIBLE) != 0) {
-            StartWindowsUpdateWorker(hwnd, st, false);
-        }
-        return 0;
-    }
-
-    case WM_VIELOTUS_UPDATE_RESULT: {
-        WCHAR *verHeap = reinterpret_cast<WCHAR *>(lParam);
-        if (st) {
-            st->updateWorkerBusy = false;
-            st->updateStatus = static_cast<WinUpdateStatus>(wParam);
-            if (verHeap && verHeap[0]) {
-                StringCchCopyW(st->latestVersion, ARRAYSIZE(st->latestVersion), verHeap);
-            }
-            InvalidateRect(hwnd, nullptr, FALSE);
-        }
-        delete[] verHeap;
         return 0;
     }
 
@@ -3352,9 +2789,6 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                 vielotus_win_installer::DetectConflictingHookImes()
             );
             UpdateTrayIconState(hwnd, st);
-            if (st->updateStatus == WinUpdateStatus::Idle && !st->updateWorkerBusy) {
-                StartWindowsUpdateWorker(hwnd, st, false);
-            }
             InvalidateRect(hwnd, nullptr, FALSE);
         }
         ActivateUserProfiles(false);
@@ -3379,9 +2813,6 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             if (st) {
                 LoadVieLotusPrefs(st->prefs);
                 UpdateTrayIconState(hwnd, st);
-                if (st->updateStatus == WinUpdateStatus::Idle && !st->updateWorkerBusy) {
-                    StartWindowsUpdateWorker(hwnd, st, false);
-                }
                 InvalidateRect(hwnd, nullptr, FALSE);
                 if (st->hTestEdit && st->selectedTab == 0) SetFocus(st->hTestEdit);
             }
@@ -3470,10 +2901,7 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
             }
             break;
         case HitRegion::BtnCheckUpdate:
-            if (!st->updateWorkerBusy) {
-                bool shouldInstall = (st->updateStatus == WinUpdateStatus::UpdateAvailable);
-                StartWindowsUpdateWorker(hwnd, st, shouldInstall);
-            }
+            OpenMicrosoftStorePage(hwnd);
             break;
         case HitRegion::BadgeImeConflict: {
             auto conflicts = vielotus_win_installer::DetectConflictingHookImes();
@@ -3484,7 +2912,13 @@ LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPA
                     L") \u0111ang ch\u1EA1y n\u1EC1n c\u00F3 th\u1EC3 ch\u1EB7n ph\u00EDm v\u00E0 g\u00E2y l\u1ED7i l\u1EB7p ch\u1EEF khi d\u00F9ng Sen Vi\u1EC7t.\n\n"
                     L"B\u1EA1n c\u00F3 mu\u1ED1n \u0111\u00F3ng " + names + L" \u0111\u1EC3 tr\u00E1nh xung \u0111\u1ED9t kh\u00F4ng?";
                 if (MessageBoxW(hwnd, prompt.c_str(), L"Sen Vi\u1EC7t \u2014 Tr\u00E1nh xung \u0111\u1ED9t b\u1ED9 g\u00F5", MB_YESNO | MB_ICONWARNING) == IDYES) {
-                    vielotus_win_installer::CloseConflictingHookImes(conflicts);
+                    if (!vielotus_win_installer::CloseConflictingHookImes(conflicts)) {
+                        std::wstring info =
+                            L"Kh\u00F4ng th\u1EC3 t\u1EF1 \u0111\u1ED9ng \u0111\u00F3ng " + names +
+                            L". Vui l\u00F2ng nh\u1EA5p chu\u1ED9t ph\u1EA3i v\u00E0o bi\u1EC3u t\u01B0\u1EE3ng " + names +
+                            L" \u1EDF khay h\u1EC7 th\u1ED1ng (System Tray) v\u00E0 ch\u1ECDn Tho\u00E1t.";
+                        MessageBoxW(hwnd, info.c_str(), L"Sen Vi\u1EC7t \u2014 Tr\u00E1nh xung \u0111\u1ED9t b\u1ED9 g\u00F5", MB_OK | MB_ICONINFORMATION);
+                    }
                     ActivateUserProfiles(true);
                 }
             }

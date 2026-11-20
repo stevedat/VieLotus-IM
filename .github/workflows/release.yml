@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   windows-build:
-    name: Build Windows Installers (x64 & ARM64)
+    name: Build Windows TSF MSIXBundle & Verify Store Signed Installer
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -38,18 +38,17 @@ jobs:
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Build Windows TSF COM Shell & Inno Setup Installers (x64 & ARM64)
+      - name: Build Windows TSF (x64 & ARM64), MSIXBundle & Fetch Microsoft Store Signed Installer
         shell: pwsh
         run: |
-          ./scripts/build_windows.ps1 -Version "${{ steps.version.outputs.version }}" -Arch all -SkipTests
+          ./scripts/build_windows.ps1 -Version "${{ steps.version.outputs.version }}" -Arch all -SkipTests -FetchStoreStub
 
-      - name: Upload Windows release installers
+      - name: Upload Microsoft Store Signed Windows Installer
         uses: actions/upload-artifact@v4
         with:
           name: VieLotus-Windows-Installers
           path: |
-            dist/windows/VieLotus-Setup-x64.exe
-            dist/windows/VieLotus-Setup-arm64.exe
+            dist/windows/VieLotus-Store-Setup.exe
 
       - name: Upload Windows Store MSIX bundle
         uses: actions/upload-artifact@v4
@@ -293,15 +292,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if [ ! -f .build/dist/VieLotus-Store-Setup.exe ] && [ -f .build/dist/VieLotus-Setup-x64.exe ]; then
-            cp .build/dist/VieLotus-Setup-x64.exe .build/dist/VieLotus-Store-Setup.exe
+          if [ ! -f .build/dist/VieLotus-Store-Setup.exe ]; then
+            echo "::error::Missing Microsoft Store Signed VieLotus-Store-Setup.exe! Refusing to publish an unsigned Windows executable."
+            exit 1
           fi
           cd .build/dist
           shasum -a 256 \
             VieLotusIM.pkg \
             VieLotus-Store-Setup.exe \
-            VieLotus-Setup-x64.exe \
-            VieLotus-Setup-arm64.exe \
             "vielotus_${VERSION}_amd64.deb" \
             "vielotus_${VERSION}_arm64.deb" > checksums.sha256
           cat checksums.sha256
@@ -326,7 +324,7 @@ jobs:
           ## Downloads
 
           macOS: VieLotusIM.pkg
-          Windows: VieLotus-Setup-x64.exe, VieLotus-Setup-arm64.exe, VieLotus-Store-Setup.exe
+          Windows: VieLotus-Store-Setup.exe (Microsoft Store Signed, Universal x64 & ARM64 — https://apps.microsoft.com/detail/9PF5K64GXXSH)
           Linux: vielotus_{os.environ["VER"]}_amd64.deb, vielotus_{os.environ["VER"]}_arm64.deb
 
           ## Swift CLI regression benchmark
@@ -350,8 +348,6 @@ jobs:
           files: |
             .build/dist/VieLotusIM.pkg
             .build/dist/VieLotus-Store-Setup.exe
-            .build/dist/VieLotus-Setup-x64.exe
-            .build/dist/VieLotus-Setup-arm64.exe
             .build/dist/vielotus_*.deb
             .build/dist/checksums.sha256
           draft: false
@@ -364,13 +360,11 @@ jobs:
           TAG_NAME: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          for stale in vielotus-linux-amd64.deb vielotus-linux-arm64.deb SHA256SUMS.txt VieLotusCore.xcframework.zip; do
+          for stale in vielotus-linux-amd64.deb vielotus-linux-arm64.deb SHA256SUMS.txt VieLotusCore.xcframework.zip VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe; do
             gh release delete-asset "$TAG_NAME" "$stale" -y >/dev/null 2>&1 || true
           done
           ACTUAL=$(gh release view "$TAG_NAME" --json assets -q '.assets[].name' | sort)
           EXPECTED=$(printf "%s\n" \
-            "VieLotus-Setup-arm64.exe" \
-            "VieLotus-Setup-x64.exe" \
             "VieLotus-Store-Setup.exe" \
             "VieLotusIM.pkg" \
             "checksums.sha256" \
