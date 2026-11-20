@@ -225,12 +225,23 @@ $forbiddenStrings = @(
     "VieLotusSetupElevated"
 )
 $expectedBinaries = @(
-    @{ RelPath = "x64\VieLotusSettings.exe";   Machine = 0x8664; RequireArm64X = $false },
-    @{ RelPath = "x64\VieLotusTIP.dll";        Machine = 0x8664; RequireArm64X = $false },
-    @{ RelPath = "arm64\VieLotusSettings.exe"; Machine = 0xAA64; RequireArm64X = $false },
-    @{ RelPath = "arm64\VieLotusTIP.dll";      Machine = 0xAA64; RequireArm64X = $true  },
-    @{ RelPath = "x86\VieLotusTIP32.dll";      Machine = 0x014C; RequireArm64X = $false }
+    @{ RelPath = "x64\VieLotusSettings.exe";   Machines = @(0x8664);         RequireArm64X = $false },
+    @{ RelPath = "x64\VieLotusTIP.dll";        Machines = @(0x8664);         RequireArm64X = $false },
+    @{ RelPath = "arm64\VieLotusSettings.exe"; Machines = @(0xAA64);         RequireArm64X = $false },
+    @{ RelPath = "arm64\VieLotusTIP.dll";      Machines = @(0xAA64, 0x8664); RequireArm64X = $true  },
+    @{ RelPath = "x86\VieLotusTIP32.dll";      Machines = @(0x014C);         RequireArm64X = $false }
 )
+$dumpbinExe = $null
+$dumpbinCmd = Get-Command dumpbin.exe -ErrorAction SilentlyContinue
+if ($dumpbinCmd) {
+    $dumpbinExe = $dumpbinCmd.Source
+} else {
+    $vsDumpbin = Get-ChildItem -Path "${env:ProgramFiles}\Microsoft Visual Studio" -Filter "dumpbin.exe" -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match "Hostx64\\x64\\dumpbin\.exe$" } |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
+    if ($vsDumpbin) { $dumpbinExe = $vsDumpbin.FullName }
+}
 foreach ($spec in $expectedBinaries) {
     $binPath = Join-Path $binStagingDir $spec.RelPath
     if (-not (Test-Path $binPath)) { continue }
@@ -268,8 +279,9 @@ foreach ($spec in $expectedBinaries) {
         exit 1
     }
     $machine = [System.BitConverter]::ToUInt16($bytes, $peOff + 4)
-    if ($machine -ne $spec.Machine) {
-        Write-Error ("❌ Sai kiến trúc PE cho {0}: kỳ vọng 0x{1:X4}, thực tế 0x{2:X4}!" -f $spec.RelPath, $spec.Machine, $machine)
+    if ($spec.Machines -notcontains $machine) {
+        $expStr = ($spec.Machines | ForEach-Object { "0x{0:X4}" -f $_ }) -join "|"
+        Write-Error ("❌ Sai kiến trúc PE cho {0}: kỳ vọng {1}, thực tế 0x{2:X4}!" -f $spec.RelPath, $expStr, $machine)
         exit 1
     }
 
@@ -317,6 +329,27 @@ foreach ($spec in $expectedBinaries) {
         $chpeMetaPtr = [System.BitConverter]::ToUInt64($bytes, $loadCfgFileOff + 200)
         $dvrtOffset = [System.BitConverter]::ToUInt32($bytes, $loadCfgFileOff + 224)
         $dvrtSection = [System.BitConverter]::ToUInt16($bytes, $loadCfgFileOff + 228)
+        Write-Host ("   🔎 ARM64X inspect: {0} ({1} bytes, Machine=0x{2:X4}, LCSize={3}, CHPE=0x{4:X}, DVRT_Sec={5}, DVRT_Off=0x{6:X})" -f $spec.RelPath, $bytes.Length, $machine, $lcStructSize, $chpeMetaPtr, $dvrtSection, $dvrtOffset)
+
+        if ($dumpbinExe) {
+            $hdrOut = (& $dumpbinExe /headers $binPath 2>&1) -join "`n"
+            $lcOut = (& $dumpbinExe /loadconfig $binPath 2>&1) -join "`n"
+            ($hdrOut -split "`n" | Where-Object { $_ -match "machine \(|ARM64X|ARM64EC" } | Select-Object -First 6) | ForEach-Object {
+                Write-Host "      [dumpbin /headers] $($_.Trim())"
+            }
+            ($lcOut -split "`n" | Where-Object { $_ -match "Hybrid|ARM64|Dynamic Value|Code Range|Metadata|Relocation" } | Select-Object -First 18) | ForEach-Object {
+                Write-Host "      [dumpbin /loadconfig] $($_.Trim())"
+            }
+            if ($hdrOut -notmatch "\(ARM64X\)") {
+                Write-Error "❌ dumpbin /headers không xác nhận (ARM64X) trên $($spec.RelPath)!"
+                exit 1
+            }
+            if ($lcOut -notmatch "ARM64EC" -or $lcOut -notmatch "ARM64X") {
+                Write-Error "❌ dumpbin /loadconfig thiếu metadata ARM64EC/ARM64X trên $($spec.RelPath)!"
+                exit 1
+            }
+        }
+
         if ($lcStructSize -lt 230 -or $chpeMetaPtr -eq 0 -or $dvrtSection -eq 0) {
             Write-Error ("❌ {0} KHÔNG phải binary ARM64X (LCSize={1}, CHPEMetadata=0x{2:X}, DVRT_Sec={3}, DVRT_Off=0x{4:X})!" -f $spec.RelPath, $lcStructSize, $chpeMetaPtr, $dvrtSection, $dvrtOffset)
             exit 1
