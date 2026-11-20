@@ -506,7 +506,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Remove-Item -Recurse -Force build-win-lab
 
-      - name: Build Windows TSF COM Shell, Inno Setup Installers & Microsoft Store MSIX (x64 & ARM64)
+      - name: Build Windows TSF COM Shell & Microsoft Store MSIXBundle (x64 & ARM64)
         shell: pwsh
         run: |
           $plist = Get-Content Sources/VieLotusIM/Info.plist -Raw
@@ -515,27 +515,34 @@ jobs:
           } else {
             $version = "2.0.6"
           }
-          ./scripts/build_windows.ps1 -Version $version -Arch all -SkipTests
-          foreach ($installer in @("dist\windows\VieLotus-Setup-x64.exe", "dist\windows\VieLotus-Setup-arm64.exe")) {
-            if (-not (Test-Path $installer)) {
-              Write-Error "Missing built installer: $installer"
+          ./scripts/build_windows.ps1 -Version $version -Arch all -SkipTests -FetchStoreStub
+          $requiredArtifacts = @(
+            "scripts\windows\bin\x64\VieLotusTIP.dll",
+            "scripts\windows\bin\x64\VieLotusSettings.exe",
+            "scripts\windows\bin\arm64\VieLotusTIP.dll",
+            "scripts\windows\bin\arm64\VieLotusSettings.exe",
+            "dist\windows\msix\VieLotus_${version}.0_x64_arm64.msixbundle",
+            "dist\windows\VieLotus-Store-Setup.exe"
+          )
+          foreach ($artifact in $requiredArtifacts) {
+            if (-not (Test-Path $artifact)) {
+              Write-Error "Missing built Windows artifact: $artifact"
               exit 1
             }
-            $item = Get-Item $installer
+            $item = Get-Item $artifact
             if ($item.Length -le 0) {
-              Write-Error "Empty installer: $installer"
+              Write-Error "Empty Windows artifact: $artifact"
               exit 1
             }
             Write-Host "Verified $($item.Name) ($($item.Length) bytes)"
           }
 
-      - name: Upload Windows build artifacts (x64 & ARM64)
+      - name: Upload Windows build artifacts (x64 & ARM64 MSIX + Store Stub)
         uses: actions/upload-artifact@v4
         with:
           name: VieLotus-Windows
           path: |
-            dist/windows/VieLotus-Setup-x64.exe
-            dist/windows/VieLotus-Setup-arm64.exe
+            dist/windows/VieLotus-Store-Setup.exe
             scripts/windows/bin/x64/*
             scripts/windows/bin/arm64/*
             dist/windows/msix/*

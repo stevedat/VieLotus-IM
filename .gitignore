@@ -14,8 +14,18 @@ DerivedData/
 Binaries/
 Frameworks/
 dist/
+build-tsf-*/
+build-msix/
+scripts/windows/bin/
 *.pkg
 *.dmg
+*.exe
+*.msi
+*.msix
+*.msixbundle
+*.deb
+*.rpm
+*.AppImage
 *.zip
 *.ipa
 *.xcarchive
@@ -36,6 +46,7 @@ CrossPlatform/**/local.properties
 *.key
 *.cer
 *.mobileprovision
+*.provisionprofile
 *.jks
 *.keystore
 key.properties

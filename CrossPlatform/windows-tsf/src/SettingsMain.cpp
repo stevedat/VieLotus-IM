@@ -5,13 +5,6 @@
 #include <string>
 #include "vielotus_win_installer.h"
 
-#if __has_include("EmbeddedTipDll.h")
-#ifndef VIELOTUS_HAS_EMBEDDED_TIP
-#define VIELOTUS_HAS_EMBEDDED_TIP 1
-#endif
-#include "EmbeddedTipDll.h"
-#endif
-
 typedef HRESULT(STDAPICALLTYPE *PFN_DllRegisterServer)(void);
 typedef HRESULT(STDAPICALLTYPE *PFN_DllUnregisterServer)(void);
 typedef void(CALLBACK *PFN_RundllEntryW)(HWND, HINSTANCE, LPWSTR, int);
@@ -79,74 +72,6 @@ static bool AreFilesIdentical(const std::wstring &pathA, const std::wstring &pat
     return identical;
 }
 
-static bool DoesFileMatchBuffer(const std::wstring &path, const unsigned char *buf, size_t len) {
-    if (!buf || len == 0) return false;
-    HANDLE h = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return false;
-    LARGE_INTEGER sz{};
-    if (!GetFileSizeEx(h, &sz) || static_cast<size_t>(sz.QuadPart) != len) {
-        CloseHandle(h);
-        return false;
-    }
-    BYTE chunk[8192];
-    size_t offset = 0;
-    DWORD readBytes = 0;
-    bool match = true;
-    while (offset < len && ReadFile(h, chunk, sizeof(chunk), &readBytes, nullptr) && readBytes > 0) {
-        if (offset + readBytes > len || memcmp(chunk, buf + offset, readBytes) != 0) {
-            match = false;
-            break;
-        }
-        offset += readBytes;
-    }
-    CloseHandle(h);
-    return match && (offset == len);
-}
-
-static bool WriteBufferToFile(const std::wstring &path, const unsigned char *buf, size_t len) {
-    if (!buf || len == 0) return false;
-    HANDLE h = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return false;
-    DWORD written = 0;
-    BOOL ok = WriteFile(h, buf, static_cast<DWORD>(len), &written, nullptr);
-    CloseHandle(h);
-    return (ok && written == static_cast<DWORD>(len));
-}
-
-static bool RunSystemToolWait(const wchar_t *exeName, const std::wstring &args, DWORD timeoutMs, DWORD *outExitCode = nullptr) {
-    WCHAR winDir[MAX_PATH] = {};
-    std::wstring fullExe;
-    if (GetSystemWindowsDirectoryW(winDir, MAX_PATH) > 0) {
-        fullExe = std::wstring(winDir) + L"\\System32\\" + exeName;
-    } else if (GetSystemDirectoryW(winDir, MAX_PATH) > 0) {
-        fullExe = std::wstring(winDir) + L"\\" + exeName;
-    } else {
-        fullExe = exeName;
-    }
-    std::wstring cmdLine = L"\"" + fullExe + L"\" " + args;
-    STARTUPINFOW si{};
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
-    PROCESS_INFORMATION pi{};
-    PVOID oldWow64Value = nullptr;
-    BOOL redirDisabled = Wow64DisableWow64FsRedirection(&oldWow64Value);
-    BOOL created = CreateProcessW(nullptr, &cmdLine[0], nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
-    if (redirDisabled) {
-        Wow64RevertWow64FsRedirection(oldWow64Value);
-    }
-    if (!created) {
-        return false;
-    }
-    WaitForSingleObject(pi.hProcess, timeoutMs);
-    DWORD code = 1;
-    GetExitCodeProcess(pi.hProcess, &code);
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
-    if (outExitCode) *outExitCode = code;
-    return code == 0;
-}
-
 static int RunElevatedSelfCommand(const wchar_t *params, DWORD timeoutMs, DWORD *outShellErr = nullptr) {
     if (outShellErr) *outShellErr = 0;
     WCHAR selfExe[MAX_PATH] = {};
@@ -155,37 +80,11 @@ static int RunElevatedSelfCommand(const wchar_t *params, DWORD timeoutMs, DWORD 
         return 10;
     }
 
-    // Copy selfExe to local %TEMP% before invoking UAC "runas" so launching from a Parallels/VMware
-    // Mac shared folder (\\Mac\... or mapped network drive Z:\...) never fails in the elevated token!
-    std::wstring runnerExe = selfExe;
-    WCHAR tempDir[MAX_PATH] = {};
-    if (GetTempPathW(MAX_PATH, tempDir) > 0) {
-        std::wstring origDir = GetExecutableDir();
-        if (!origDir.empty()) {
-            CopyFileW((origDir + L"\\VieLotusIM.ico").c_str(), (std::wstring(tempDir) + L"VieLotusIM.ico").c_str(), FALSE);
-        }
-        for (int i = 0; i < 10; ++i) {
-            WCHAR candidate[MAX_PATH] = {};
-            if (i == 0) {
-                StringCchPrintfW(candidate, MAX_PATH, L"%sVieLotusSetupElevated.exe", tempDir);
-            } else {
-                StringCchPrintfW(candidate, MAX_PATH, L"%sVieLotusSetupElevated_%d.exe", tempDir, i);
-            }
-            DeleteFileW(candidate);
-            if (CopyFileW(selfExe, candidate, FALSE)) {
-                std::wstring zoneAds = std::wstring(candidate) + L":Zone.Identifier";
-                DeleteFileW(zoneAds.c_str());
-                runnerExe = candidate;
-                break;
-            }
-        }
-    }
-
     SHELLEXECUTEINFOW sei{};
     sei.cbSize = sizeof(sei);
     sei.fMask = SEE_MASK_NOCLOSEPROCESS;
     sei.lpVerb = L"runas";
-    sei.lpFile = runnerExe.c_str();
+    sei.lpFile = selfExe;
     sei.lpParameters = params;
     sei.nShow = SW_HIDE;
     if (!ShellExecuteExW(&sei) || !sei.hProcess) {
@@ -220,16 +119,6 @@ static bool IsTipRegisteredAndUpToDate(const std::wstring &localDll) {
         if (qst == ERROR_SUCCESS && dllPath[0] != L'\0') {
             DWORD attrs = GetFileAttributesW(dllPath);
             if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
-#if defined(VIELOTUS_HAS_EMBEDDED_TIP)
-                (void)localDll;
-                const uint8_t *embData = nullptr;
-                size_t embSize = 0;
-                GetEmbeddedTipDllForHostOs(embData, embSize);
-                if (!DoesFileMatchBuffer(dllPath, embData, embSize)) {
-                    return false;
-                }
-                return true;
-#else
                 DWORD localAttrs = GetFileAttributesW(localDll.c_str());
                 if (localAttrs != INVALID_FILE_ATTRIBUTES && !(localAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
                     if (_wcsicmp(localDll.c_str(), dllPath) != 0 && !AreFilesIdentical(localDll, dllPath)) {
@@ -238,7 +127,6 @@ static bool IsTipRegisteredAndUpToDate(const std::wstring &localDll) {
                     return true;
                 }
                 return true;
-#endif
             }
         }
     }
@@ -285,27 +173,7 @@ static int PerformElevatedMsixTipProvisioning() {
     }
 
     bool deployedDll = false;
-#if defined(VIELOTUS_HAS_EMBEDDED_TIP)
-    const uint8_t *embData = nullptr;
-    size_t embSize = 0;
-    GetEmbeddedTipDllForHostOs(embData, embSize);
-    if (embData && embSize > 0) {
-        if (!WriteBufferToFile(dstDll, embData, embSize)) {
-            for (int i = 1; i <= 99; ++i) {
-                WCHAR slot[MAX_PATH] = {};
-                StringCchPrintfW(slot, MAX_PATH, L"%s\\VieLotusTIP.old.%d.dll", dstDir.c_str(), i);
-                DeleteFileW(slot);
-                if (MoveFileExW(dstDll.c_str(), slot, MOVEFILE_REPLACE_EXISTING)) {
-                    break;
-                }
-            }
-            deployedDll = WriteBufferToFile(dstDll, embData, embSize);
-        } else {
-            deployedDll = true;
-        }
-    }
-#endif
-    if (!deployedDll && !srcDir.empty() && _wcsicmp(srcDir.c_str(), dstDir.c_str()) != 0) {
+    if (!srcDir.empty() && _wcsicmp(srcDir.c_str(), dstDir.c_str()) != 0) {
         DWORD srcAttrs = GetFileAttributesW(srcDll.c_str());
         if (srcAttrs != INVALID_FILE_ATTRIBUTES && !(srcAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
             if (!CopyFileW(srcDll.c_str(), dstDll.c_str(), FALSE)) {
@@ -322,6 +190,13 @@ static int PerformElevatedMsixTipProvisioning() {
                 deployedDll = true;
             }
         }
+    } else {
+        DWORD dstAttrs = GetFileAttributesW(dstDll.c_str());
+        deployedDll = (dstAttrs != INVALID_FILE_ATTRIBUTES && !(dstAttrs & FILE_ATTRIBUTE_DIRECTORY));
+    }
+
+    if (!deployedDll) {
+        return 2;
     }
 
     if (!srcDir.empty() && _wcsicmp(srcDir.c_str(), dstDir.c_str()) != 0) {
@@ -338,12 +213,12 @@ static int PerformElevatedMsixTipProvisioning() {
         std::wstring srcIco = srcDir + L"\\VieLotusIM.ico";
         std::wstring dstIco = dstDir + L"\\VieLotusIM.ico";
         CopyFileW(srcIco.c_str(), dstIco.c_str(), FALSE);
-        CopyDirectoryPngAssets(srcDir + L"\\assets", dstDir + L"\\assets");
+        CopyDirectoryPngAssets(srcDir + L"\\Assets", dstDir + L"\\assets");
     }
 
-    // Grant AppContainer Read & Execute permissions so UWP / WinUI 3 / Edge / Windows 11 Search can load VieLotusTIP.dll
-    std::wstring icaclsArgs = L"\"" + dstDir + L"\" /grant \"*S-1-15-2-1:(OI)(CI)(RX)\" /grant \"*S-1-15-2-2:(OI)(CI)(RX)\" /T /C /Q";
-    RunSystemToolWait(L"icacls.exe", icaclsArgs, 10000);
+    // Grant AppContainer Read & Execute permissions using native Win32 Security APIs so UWP / WinUI 3 / Edge / Windows 11 Search can load VieLotusTIP.dll
+    vielotus_win_installer::GrantAppContainerReadExecuteAcl(dstDir);
+    vielotus_win_installer::GrantAppContainerReadExecuteAcl(dstDll);
 
     HRESULT hr = E_FAIL;
     HMODULE hDll = LoadLibraryW(dstDll.c_str());
@@ -356,15 +231,6 @@ static int PerformElevatedMsixTipProvisioning() {
             pfnAct(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
         }
         FreeLibrary(hDll);
-    } else {
-        // Fallback when an x64 installer .exe runs under emulation on an ARM64 Windows OS
-        // while dstDll is a native ARM64 DLL: invoke native system regsvr32.exe & rundll32.exe!
-        std::wstring regArgs = L"/s \"" + dstDll + L"\"";
-        if (RunSystemToolWait(L"regsvr32.exe", regArgs, 15000)) {
-            hr = S_OK;
-        }
-        std::wstring actArgs = L"\"" + dstDll + L"\",ActivateUserProfilesW";
-        RunSystemToolWait(L"rundll32.exe", actArgs, 15000);
     }
 
     HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -373,7 +239,6 @@ static int PerformElevatedMsixTipProvisioning() {
         CoUninitialize();
     }
 
-    ShellExecuteW(nullptr, L"open", L"ctfmon.exe", nullptr, nullptr, SW_HIDE);
     return SUCCEEDED(hr) ? 0 : 3;
 }
 
@@ -524,6 +389,9 @@ static void ExecuteWizardInstallSteps(SetupWizardState *st) {
             if (vielotus_win_installer::CloseConflictingHookImes(conflicts)) {
                 std::wstring closedLine = L"    \u2713 \u0110\u00E3 \u0111\u00F3ng " + names + L" an to\u00E0n.\r\n";
                 AppendWizardLog(st->hLogEdit, closedLine.c_str());
+            } else {
+                std::wstring manualLine = L"    [!] Vui l\u00F2ng tho\u00E1t " + names + L" t\u1EEB khay h\u1EC7 th\u1ED1ng (System Tray) \u0111\u1EC3 tr\u00E1nh xung \u0111\u1ED9t.\r\n";
+                AppendWizardLog(st->hLogEdit, manualLine.c_str());
             }
         }
     }
@@ -540,9 +408,6 @@ static void ExecuteWizardInstallSteps(SetupWizardState *st) {
             pfnAct(st->hWnd, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
         }
         FreeLibrary(hDll);
-    } else {
-        std::wstring actArgs = L"\"" + pfDll + L"\",ActivateUserProfilesW";
-        RunSystemToolWait(L"rundll32.exe", actArgs, 15000);
     }
 
     AppendWizardLog(st->hLogEdit, L"\r\n\u2728 C\u00C0I \u0110\u1EB6T HO\u00C0N T\u1EA4T 100%! B\u1ED9 g\u00F5 Sen Vi\u1EC7t (Telex / VNI) \u0111\u00E3 s\u1EB5n s\u00E0ng tr\u00EAn m\u1ECDi \u1EE9ng d\u1EE5ng Windows.\r\n");
@@ -773,8 +638,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
                     pfnAct(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
                 }
                 FreeLibrary(hDll);
-            } else if (GetFileAttributesW(pfDll.c_str()) != INVALID_FILE_ATTRIBUTES) {
-                RunSystemToolWait(L"rundll32.exe", L"\"" + pfDll + L"\",ActivateUserProfilesW", 15000);
             }
         }
         return rc;
@@ -828,24 +691,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     }
 
     HMODULE hDll = LoadLibraryW(pfDll.c_str());
-    if (!hDll && GetFileAttributesW(pfDll.c_str()) != INVALID_FILE_ATTRIBUTES) {
-        if (cmdLine.find(L"--activate") != std::wstring::npos || cmdLine.find(L"/activate") != std::wstring::npos) {
-            RunSystemToolWait(L"rundll32.exe", L"\"" + pfDll + L"\",ActivateUserProfilesW", 15000);
-            return 0;
-        }
-        if (cmdLine.find(L"--deactivate") != std::wstring::npos || cmdLine.find(L"/deactivate") != std::wstring::npos) {
-            RunSystemToolWait(L"rundll32.exe", L"\"" + pfDll + L"\",DeactivateUserProfilesW", 15000);
-            return 0;
-        }
-        RunSystemToolWait(L"rundll32.exe", L"\"" + pfDll + L"\",ActivateUserProfilesW", 15000);
-        if (isStartupMode) {
-            std::wstring trayArgs = L"\"" + pfDll + L"\",ShowSettingsDialogW --startup";
-            ShellExecuteW(nullptr, L"open", L"rundll32.exe", trayArgs.c_str(), nullptr, SW_HIDE);
-        } else {
-            RunSystemToolWait(L"rundll32.exe", L"\"" + pfDll + L"\",ShowSettingsDialogW", INFINITE);
-        }
-        return 0;
-    }
     if (!hDll) {
         hDll = LoadLibraryW(localDll.c_str());
     }

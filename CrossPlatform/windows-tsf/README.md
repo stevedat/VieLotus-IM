@@ -51,5 +51,5 @@ Ngay sau lệnh này, Windows sẽ nhận diện `Tiếng Việt (Sen Việt - T
 regsvr32 /u /s VieLotusTIP.dll
 ```
 
-### Đóng gói tự động:
-File kịch bản Inno Setup tại `scripts/windows/VieLotus-Setup.iss` sẽ tự động tạo file cài đặt `VieLotus-Setup-x64.exe` một cú click chuột: tự động đăng ký DLL COM vào hệ thống và kích hoạt ngay tức thì.
+### Đóng gói tự động (Microsoft Store MSIXBundle — x64 & ARM64):
+Chạy `pwsh scripts/build_windows.ps1 -Arch all` để biên dịch `VieLotusTIP.dll` và `VieLotusSettings.exe` cho cả `x64` và `ARM64`, kiểm tra vệ sinh PE, và đóng gói `.msixbundle` cho Microsoft Store (kênh cài đặt chính thức đã ký số bởi Microsoft Corporation: `VieLotus-Store-Setup.exe` / Microsoft Store `9PF5K64GXXSH`).

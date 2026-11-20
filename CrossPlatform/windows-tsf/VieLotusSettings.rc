@@ -5,8 +5,6 @@
 1 24 "VieLotusSettings.manifest"
 #endif
 101 ICON "../../scripts/windows/assets/VieLotusIM.ico"
-102 RCDATA "../../scripts/windows/assets/app-icon-128x128.png"
-103 RCDATA "../../scripts/windows/assets/VieLotusIM.ico"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 2,0,6,0
