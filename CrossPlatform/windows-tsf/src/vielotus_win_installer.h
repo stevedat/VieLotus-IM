@@ -100,10 +100,7 @@ inline bool CloseConflictingHookImes(const std::vector<ConflictingImeInfo> &item
     if (items.empty()) return true;
     struct EnumCtx {
         const std::vector<ConflictingImeInfo> *list;
-    } ctx{&items};
-
-    EnumWindows(
-        [](HWND hwnd, LPARAM lp) -> BOOL {
+        static BOOL CALLBACK EnumProc(HWND hwnd, LPARAM lp) {
             auto *c = reinterpret_cast<EnumCtx *>(lp);
             DWORD pid = 0;
             GetWindowThreadProcessId(hwnd, &pid);
@@ -114,9 +111,10 @@ inline bool CloseConflictingHookImes(const std::vector<ConflictingImeInfo> &item
                 }
             }
             return TRUE;
-        },
-        reinterpret_cast<LPARAM>(&ctx)
-    );
+        }
+    } ctx{&items};
+
+    EnumWindows(&EnumCtx::EnumProc, reinterpret_cast<LPARAM>(&ctx));
 
     // Gracefully request closure via WM_CLOSE only (never force-kill other processes).
     Sleep(500);
@@ -468,13 +466,15 @@ inline int RunFullUninstallFlow(bool quiet) {
         FreeLibrary(hDll);
     }
 
-    // 3. Clean up HKLM & HKCU Registry entries
-    RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kTipClsidInprocSubKey, KEY_WOW64_64KEY, 0);
-    RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kTipClsidRootSubKey, KEY_WOW64_64KEY, 0);
-    RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacyTipClsidInprocSubKey, KEY_WOW64_64KEY, 0);
-    RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacyTipClsidRootSubKey, KEY_WOW64_64KEY, 0);
-    RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacy2TipClsidInprocSubKey, KEY_WOW64_64KEY, 0);
-    RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacy2TipClsidRootSubKey, KEY_WOW64_64KEY, 0);
+    // 3. Clean up HKLM (both 64-bit native & 32-bit WOW6432Node) & HKCU Registry entries
+    for (REGSAM view : { static_cast<REGSAM>(KEY_WOW64_64KEY), static_cast<REGSAM>(KEY_WOW64_32KEY) }) {
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kTipClsidInprocSubKey, view, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kTipClsidRootSubKey, view, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacyTipClsidInprocSubKey, view, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacyTipClsidRootSubKey, view, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacy2TipClsidInprocSubKey, view, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacy2TipClsidRootSubKey, view, 0);
+    }
     RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kUninstallRegSubKey, KEY_WOW64_64KEY, 0);
     RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacyInnoUninstallRegSubKey, KEY_WOW64_64KEY, 0);
 

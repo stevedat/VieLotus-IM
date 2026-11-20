@@ -393,30 +393,79 @@ void SavePerAppBypassPreference(const wchar_t *exeName, bool bypass) {
     g_localPrefsRevision.fetch_add(1, std::memory_order_relaxed);
 }
 
+static bool RegisterComServerForView(const WCHAR *szCLSID, const WCHAR *dllPath, REGSAM wow64View) {
+    WCHAR szKey[MAX_PATH];
+    StringCchPrintfW(szKey, MAX_PATH, L"SOFTWARE\\Classes\\%s%s", c_szSubKeyPrefix, szCLSID);
+
+    HKEY hKey = nullptr;
+    if (RegCreateKeyExW(
+            HKEY_LOCAL_MACHINE,
+            szKey,
+            0,
+            nullptr,
+            REG_OPTION_NON_VOLATILE,
+            KEY_WRITE | wow64View,
+            nullptr,
+            &hKey,
+            nullptr
+        ) != ERROR_SUCCESS || !hKey) {
+        return false;
+    }
+    RegSetValueExW(hKey, nullptr, 0, REG_SZ, (const BYTE *)c_szDesc, (DWORD)(wcslen(c_szDesc) + 1) * sizeof(WCHAR));
+
+    HKEY hInprocKey = nullptr;
+    bool inprocOk = false;
+    if (RegCreateKeyExW(
+            hKey,
+            c_szInprocServer32,
+            0,
+            nullptr,
+            REG_OPTION_NON_VOLATILE,
+            KEY_WRITE | wow64View,
+            nullptr,
+            &hInprocKey,
+            nullptr
+        ) == ERROR_SUCCESS && hInprocKey) {
+        RegSetValueExW(hInprocKey, nullptr, 0, REG_SZ, (const BYTE *)dllPath, (DWORD)(wcslen(dllPath) + 1) * sizeof(WCHAR));
+        RegSetValueExW(hInprocKey, c_szThreadingModel, 0, REG_SZ, (const BYTE *)c_szApartment, (DWORD)(wcslen(c_szApartment) + 1) * sizeof(WCHAR));
+        RegCloseKey(hInprocKey);
+        inprocOk = true;
+    }
+    RegCloseKey(hKey);
+    return inprocOk;
+}
+
 HRESULT RegisterServer() {
     WCHAR szCLSID[CLSID_STRLEN + 1];
     if (!CLSIDToString(CLSID_VieLotusTIP, szCLSID)) {
         return E_FAIL;
     }
 
-    WCHAR szKey[MAX_PATH];
-    StringCchPrintfW(szKey, MAX_PATH, L"%s%s", c_szSubKeyPrefix, szCLSID);
-
-    HKEY hKey = nullptr;
-    if (RegCreateKeyExW(HKEY_CLASSES_ROOT, szKey, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr) != ERROR_SUCCESS) {
+    WCHAR szFilePath[MAX_PATH] = {0};
+    if (GetModuleFileNameW(g_hInst, szFilePath, MAX_PATH) == 0) {
         return E_FAIL;
     }
-    RegSetValueExW(hKey, nullptr, 0, REG_SZ, (const BYTE *)c_szDesc, (DWORD)(wcslen(c_szDesc) + 1) * sizeof(WCHAR));
 
-    HKEY hInprocKey = nullptr;
-    if (RegCreateKeyExW(hKey, c_szInprocServer32, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hInprocKey, nullptr) == ERROR_SUCCESS) {
-        WCHAR szFilePath[MAX_PATH];
-        GetModuleFileNameW(g_hInst, szFilePath, MAX_PATH);
-        RegSetValueExW(hInprocKey, nullptr, 0, REG_SZ, (const BYTE *)szFilePath, (DWORD)(wcslen(szFilePath) + 1) * sizeof(WCHAR));
-        RegSetValueExW(hInprocKey, c_szThreadingModel, 0, REG_SZ, (const BYTE *)c_szApartment, (DWORD)(wcslen(c_szApartment) + 1) * sizeof(WCHAR));
-        RegCloseKey(hInprocKey);
+#if defined(_WIN64)
+    if (!RegisterComServerForView(szCLSID, szFilePath, KEY_WOW64_64KEY)) {
+        return E_FAIL;
     }
-    RegCloseKey(hKey);
+    // Also register the sibling 32-bit (x86) TIP DLL under WOW6432Node so 32-bit apps
+    // (e.g. 32-bit Zalo PC, Steam, legacy Win32 apps) can load VieLotusTIP32.dll in-process.
+    std::wstring dllDir(szFilePath);
+    size_t slashPos = dllDir.find_last_of(L"\\/");
+    if (slashPos != std::wstring::npos) {
+        std::wstring dll32Path = dllDir.substr(0, slashPos + 1) + L"VieLotusTIP32.dll";
+        DWORD attrs32 = GetFileAttributesW(dll32Path.c_str());
+        if (attrs32 != INVALID_FILE_ATTRIBUTES && !(attrs32 & FILE_ATTRIBUTE_DIRECTORY)) {
+            RegisterComServerForView(szCLSID, dll32Path.c_str(), KEY_WOW64_32KEY);
+        }
+    }
+#else
+    if (!RegisterComServerForView(szCLSID, szFilePath, KEY_WOW64_32KEY)) {
+        return E_FAIL;
+    }
+#endif
 
     HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     RegisterCategories();
@@ -443,12 +492,14 @@ HRESULT UnregisterServer() {
         CoUninitialize();
     }
 
-    WCHAR szKey[MAX_PATH];
-    StringCchPrintfW(szKey, MAX_PATH, L"%s%s\\%s", c_szSubKeyPrefix, szCLSID, c_szInprocServer32);
-    RegDeleteKeyW(HKEY_CLASSES_ROOT, szKey);
-
-    StringCchPrintfW(szKey, MAX_PATH, L"%s%s", c_szSubKeyPrefix, szCLSID);
-    RegDeleteKeyW(HKEY_CLASSES_ROOT, szKey);
+    WCHAR szInprocKey[MAX_PATH];
+    WCHAR szRootKey[MAX_PATH];
+    StringCchPrintfW(szInprocKey, MAX_PATH, L"SOFTWARE\\Classes\\%s%s\\%s", c_szSubKeyPrefix, szCLSID, c_szInprocServer32);
+    StringCchPrintfW(szRootKey, MAX_PATH, L"SOFTWARE\\Classes\\%s%s", c_szSubKeyPrefix, szCLSID);
+    for (REGSAM view : { static_cast<REGSAM>(KEY_WOW64_64KEY), static_cast<REGSAM>(KEY_WOW64_32KEY) }) {
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, szInprocKey, view, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, szRootKey, view, 0);
+    }
 
     return S_OK;
 }
@@ -527,10 +578,12 @@ static void CleanupLegacyClsid98DC() {
         RegCloseKey(hEnKey);
     }
 
-    RegDeleteKeyW(HKEY_CLASSES_ROOT, L"CLSID\\{C7B08E9D-4762-4C97-8B1F-522197A598DC}\\InprocServer32");
-    RegDeleteKeyW(HKEY_CLASSES_ROOT, L"CLSID\\{C7B08E9D-4762-4C97-8B1F-522197A598DC}");
-    RegDeleteKeyW(HKEY_CLASSES_ROOT, L"CLSID\\{C7B08E9D-4762-4C97-8B1F-522197A598DD}\\InprocServer32");
-    RegDeleteKeyW(HKEY_CLASSES_ROOT, L"CLSID\\{C7B08E9D-4762-4C97-8B1F-522197A598DD}");
+    for (REGSAM view : { static_cast<REGSAM>(KEY_WOW64_64KEY), static_cast<REGSAM>(KEY_WOW64_32KEY) }) {
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Classes\\CLSID\\{C7B08E9D-4762-4C97-8B1F-522197A598DC}\\InprocServer32", view, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Classes\\CLSID\\{C7B08E9D-4762-4C97-8B1F-522197A598DC}", view, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Classes\\CLSID\\{C7B08E9D-4762-4C97-8B1F-522197A598DD}\\InprocServer32", view, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Classes\\CLSID\\{C7B08E9D-4762-4C97-8B1F-522197A598DD}", view, 0);
+    }
 }
 
 HRESULT RegisterProfiles() {

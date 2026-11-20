@@ -88,26 +88,86 @@ target_link_libraries(VieLotusTIP PRIVATE
     shell32
 )
 
+option(VIELOTUS_BUILD_SETTINGS "Build VieLotusSettings.exe" ON)
+set(VIELOTUS_ARM64X_PASS "" CACHE STRING "Two-pass ARM64X build phase: ARM64 or ARM64EC")
+set(VIELOTUS_ARM64X_REPRO_DIR "" CACHE PATH "Directory holding native ARM64 /LINKREPRO artifacts for ARM64X linking")
+
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set(VIELOTUS_TIP_OUTPUT_NAME "VieLotusTIP32")
+else()
+    set(VIELOTUS_TIP_OUTPUT_NAME "VieLotusTIP")
+endif()
+
 set_target_properties(VieLotusTIP PROPERTIES
-    OUTPUT_NAME "VieLotusTIP"
+    OUTPUT_NAME "${VIELOTUS_TIP_OUTPUT_NAME}"
     PREFIX ""
 )
 
-add_executable(VieLotusSettings WIN32
-    src/SettingsMain.cpp
-    VieLotusSettings.rc
-    VieLotusSettings.manifest
-)
+if(MSVC AND VIELOTUS_ARM64X_PASS STREQUAL "ARM64")
+    if(NOT VIELOTUS_ARM64X_REPRO_DIR)
+        message(FATAL_ERROR "VIELOTUS_ARM64X_REPRO_DIR is required when VIELOTUS_ARM64X_PASS=ARM64")
+    endif()
+    file(MAKE_DIRECTORY "${VIELOTUS_ARM64X_REPRO_DIR}")
+    target_link_options(VieLotusTIP PRIVATE "/LINKREPROFULLPATHRSP:${VIELOTUS_ARM64X_REPRO_DIR}/VieLotusTIP.rsp")
+elseif(MSVC AND VIELOTUS_ARM64X_PASS STREQUAL "ARM64EC")
+    set(VIELOTUS_ARM64_RSP "${VIELOTUS_ARM64X_REPRO_DIR}/VieLotusTIP.rsp")
+    if(NOT EXISTS "${VIELOTUS_ARM64_RSP}")
+        message(FATAL_ERROR "ARM64 link repro RSP '${VIELOTUS_ARM64_RSP}' not found. Run ARM64 pass first.")
+    endif()
+    file(STRINGS "${VIELOTUS_ARM64_RSP}" VIELOTUS_ARM64_RSP_LINES)
+    set(VIELOTUS_ARM64_OBJS "")
+    set(VIELOTUS_ARM64_LIBS "")
+    foreach(_rsp_line IN LISTS VIELOTUS_ARM64_RSP_LINES)
+        string(STRIP "${_rsp_line}" _clean)
+        string(REGEX REPLACE "^\"(.*)\"$" "\\1" _unquoted "${_clean}")
+        if(_unquoted MATCHES "^[/-]")
+            continue()
+        endif()
+        file(TO_CMAKE_PATH "${_unquoted}" _norm_path)
+        string(TOLOWER "${_norm_path}" _lower)
+        if(_lower MATCHES "\\.obj$" AND EXISTS "${_norm_path}")
+            list(APPEND VIELOTUS_ARM64_OBJS "${_norm_path}")
+        elseif(_lower MATCHES "\\.lib$" AND EXISTS "${_norm_path}")
+            list(APPEND VIELOTUS_ARM64_LIBS "${_norm_path}")
+        endif()
+    endforeach()
+    if(NOT VIELOTUS_ARM64_OBJS)
+        message(FATAL_ERROR "No ARM64 .obj entries parsed from '${VIELOTUS_ARM64_RSP}'")
+    endif()
+    list(REMOVE_DUPLICATES VIELOTUS_ARM64_OBJS)
+    if(VIELOTUS_ARM64_LIBS)
+        list(REMOVE_DUPLICATES VIELOTUS_ARM64_LIBS)
+    endif()
+    list(LENGTH VIELOTUS_ARM64_OBJS _arm64_obj_count)
+    list(LENGTH VIELOTUS_ARM64_LIBS _arm64_lib_count)
+    message(STATUS "ARM64X link pass: ${_arm64_obj_count} ARM64 .obj + ${_arm64_lib_count} ARM64 .lib inputs from ${VIELOTUS_ARM64_RSP}")
+    target_sources(VieLotusTIP PRIVATE ${VIELOTUS_ARM64_OBJS})
+    if(VIELOTUS_ARM64_LIBS)
+        target_link_libraries(VieLotusTIP PRIVATE ${VIELOTUS_ARM64_LIBS})
+    endif()
+    target_link_options(VieLotusTIP PRIVATE
+        /MACHINE:ARM64X
+        "/defArm64Native:${CMAKE_CURRENT_SOURCE_DIR}/VieLotusTIP.def"
+    )
+endif()
 
-target_link_libraries(VieLotusSettings PRIVATE
-    user32
-    gdi32
-    shell32
-    advapi32
-    ole32
-    uuid
-)
+if(VIELOTUS_BUILD_SETTINGS AND NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
+    add_executable(VieLotusSettings WIN32
+        src/SettingsMain.cpp
+        VieLotusSettings.rc
+        VieLotusSettings.manifest
+    )
 
-set_target_properties(VieLotusSettings PROPERTIES
-    OUTPUT_NAME "VieLotusSettings"
-)
+    target_link_libraries(VieLotusSettings PRIVATE
+        user32
+        gdi32
+        shell32
+        advapi32
+        ole32
+        uuid
+    )
+
+    set_target_properties(VieLotusSettings PROPERTIES
+        OUTPUT_NAME "VieLotusSettings"
+    )
+endif()
