@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 2.0.6)'
+        description: 'Release version (e.g. 2.0.7)'
         required: false
         default: ''
 
@@ -34,21 +34,26 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-            VERSION="${VERSION:-2.0.6}"
+            VERSION="${VERSION:-2.0.7}"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Build Windows TSF (x64 & ARM64), MSIXBundle & Fetch Microsoft Store Signed Installer
+      - name: Build Windows TSF (x64, ARM64X & x86), Inno Setup .exe, MSIXBundle & Store Signed Installer
         shell: pwsh
         run: |
+          if (-not (Get-Command iscc.exe -ErrorAction SilentlyContinue) -and -not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
           ./scripts/build_windows.ps1 -Version "${{ steps.version.outputs.version }}" -Arch all -SkipTests -FetchStoreStub
 
-      - name: Upload Microsoft Store Signed Windows Installer
+      - name: Upload Windows Release Installers (Store Signed + Inno Setup x64 & ARM64)
         uses: actions/upload-artifact@v4
         with:
           name: VieLotus-Windows-Installers
           path: |
             dist/windows/VieLotus-Store-Setup.exe
+            dist/windows/VieLotus-Setup-x64.exe
+            dist/windows/VieLotus-Setup-arm64.exe
 
       - name: Upload Windows Store MSIX bundle
         uses: actions/upload-artifact@v4
@@ -83,7 +88,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-            VERSION="${VERSION:-2.0.6}"
+            VERSION="${VERSION:-2.0.7}"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -166,7 +171,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist)"
-            VERSION="${VERSION:-2.0.6}"
+            VERSION="${VERSION:-2.0.7}"
             TAG="v${VERSION}"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
@@ -292,14 +297,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if [ ! -f .build/dist/VieLotus-Store-Setup.exe ]; then
-            echo "::error::Missing Microsoft Store Signed VieLotus-Store-Setup.exe! Refusing to publish an unsigned Windows executable."
-            exit 1
-          fi
+          for req in VieLotus-Store-Setup.exe VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe; do
+            if [ ! -f ".build/dist/$req" ]; then
+              echo "::error::Missing required Windows installer: $req"
+              exit 1
+            fi
+          done
           cd .build/dist
           shasum -a 256 \
             VieLotusIM.pkg \
             VieLotus-Store-Setup.exe \
+            VieLotus-Setup-x64.exe \
+            VieLotus-Setup-arm64.exe \
             "vielotus_${VERSION}_amd64.deb" \
             "vielotus_${VERSION}_arm64.deb" > checksums.sha256
           cat checksums.sha256
@@ -323,19 +332,27 @@ jobs:
 
           ## Downloads
 
-          macOS: VieLotusIM.pkg
-          Windows: VieLotus-Store-Setup.exe (Microsoft Store Signed, Universal x64 & ARM64 — https://apps.microsoft.com/detail/9PF5K64GXXSH)
-          Linux: vielotus_{os.environ["VER"]}_amd64.deb, vielotus_{os.environ["VER"]}_arm64.deb
+          - **macOS:** `VieLotusIM.pkg` (Universal Apple Silicon & Intel)
+          - **Windows (Microsoft Store — Recommended, Microsoft Corporation Signed):** `VieLotus-Store-Setup.exe` ([Microsoft Store](https://apps.microsoft.com/detail/9PF5K64GXXSH))
+          - **Windows (Offline Inno Setup — x64 & ARM64X + 32-bit WOW64):** `VieLotus-Setup-x64.exe`, `VieLotus-Setup-arm64.exe`
+          - **Linux (All-in-One `.deb`):** `vielotus_{os.environ["VER"]}_amd64.deb`, `vielotus_{os.environ["VER"]}_arm64.deb`
+
+          ## What's New in {os.environ["TAG"]}
+
+          - **Full Windows Multi-Architecture TSF Support (fixes Zalo PC & 32-bit/x64 apps on Windows ARM64 & x64):**
+            - `VieLotusTIP.dll` on ARM64 is now a true **ARM64X** dual-ABI binary (`ARM64` + `ARM64EC` with `IMAGE_DYNAMIC_RELOCATION_ARM64X`), loading seamlessly in both native ARM64 apps (Notepad, Edge, Terminal, Search) and emulated x64 apps (Chrome x64, VS Code x64, Electron x64).
+            - Bundled 32-bit **`VieLotusTIP32.dll`** (`Win32 / x86`) registered under `HKLM\\SOFTWARE\\WOW6432Node\\Classes\\CLSID\\...\\InprocServer32` in both x64 and ARM64 packages so 32-bit apps (including **Zalo PC `Zalo.exe [x86]`**, Steam, and legacy Win32 apps) type Vietnamese cleanly.
+            - Clean AV-hygienic Windows installers: zero embedded PE payloads, zero `icacls` / `rundll32` / hidden PowerShell LOLBin calls.
 
           ## Swift CLI regression benchmark
 
           These results are from the Swift test suite at this source revision. They do not verify the Windows/Linux engines or behavior in every host application.
 
           - Primary suite: **{os.environ["BENCH_PRIMARY"]} / {os.environ["BENCH_CASES"]} ({os.environ["BENCH_PRIMARY_RATE"]}%)**
-          - Symmetric no-context collisions (ambiguous_both_sides): **{os.environ["BENCH_BOTH"]} / {os.environ["BENCH_VN_CASES"]} ({os.environ["BENCH_BOTH_RATE"]}%)**
-          - Unique Vietnamese paths (whitelist_safe = never): **{os.environ["BENCH_NEVER"]} / {os.environ["BENCH_NEVER_TOTAL"]} ({os.environ["BENCH_NEVER_RATE"]}%)**
+          - Symmetric no-context collisions (`ambiguous_both_sides`): **{os.environ["BENCH_BOTH"]} / {os.environ["BENCH_VN_CASES"]} ({os.environ["BENCH_BOTH_RATE"]}%)**
+          - Unique Vietnamese paths (`whitelist_safe = never`): **{os.environ["BENCH_NEVER"]} / {os.environ["BENCH_NEVER_TOTAL"]} ({os.environ["BENCH_NEVER_RATE"]}%)**
 
-          Checksums for the downloadable installers are in checksums.sha256.
+          Checksums for the downloadable installers are in `checksums.sha256`.
           ''')
           Path("release_notes.md").write_text(body)
           PY
@@ -348,6 +365,8 @@ jobs:
           files: |
             .build/dist/VieLotusIM.pkg
             .build/dist/VieLotus-Store-Setup.exe
+            .build/dist/VieLotus-Setup-x64.exe
+            .build/dist/VieLotus-Setup-arm64.exe
             .build/dist/vielotus_*.deb
             .build/dist/checksums.sha256
           draft: false
@@ -360,11 +379,13 @@ jobs:
           TAG_NAME: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          for stale in vielotus-linux-amd64.deb vielotus-linux-arm64.deb SHA256SUMS.txt VieLotusCore.xcframework.zip VieLotus-Setup-x64.exe VieLotus-Setup-arm64.exe; do
+          for stale in vielotus-linux-amd64.deb vielotus-linux-arm64.deb SHA256SUMS.txt VieLotusCore.xcframework.zip; do
             gh release delete-asset "$TAG_NAME" "$stale" -y >/dev/null 2>&1 || true
           done
           ACTUAL=$(gh release view "$TAG_NAME" --json assets -q '.assets[].name' | sort)
           EXPECTED=$(printf "%s\n" \
+            "VieLotus-Setup-arm64.exe" \
+            "VieLotus-Setup-x64.exe" \
             "VieLotus-Store-Setup.exe" \
             "VieLotusIM.pkg" \
             "checksums.sha256" \

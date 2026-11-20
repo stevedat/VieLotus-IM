@@ -71,7 +71,7 @@ jobs:
         id: version
         run: |
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          echo "version=${VERSION:-2.0.6}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION:-2.0.7}" >> "$GITHUB_OUTPUT"
 
       - name: Install build tools, Fcitx5, and IBus dev dependencies
         run: |
@@ -181,7 +181,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          VERSION="${VERSION:-2.0.6}"
+          VERSION="${VERSION:-2.0.7}"
           rm -rf /tmp/deb-src
           mkdir -p /tmp/deb-src
           git archive --format=tar.gz --prefix="VieLotus-IM-${VERSION}/" HEAD > "/tmp/deb-src/vielotus_${VERSION}.orig.tar.gz"
@@ -190,10 +190,10 @@ jobs:
           (cd "/tmp/deb-src/VieLotus-IM-${VERSION}" && dpkg-buildpackage -us -uc)
           ls -lh /tmp/deb-src
 
-      - name: Verify Debian 2.0.6-1 update metadata (.dsc and .changes)
+      - name: Verify Debian 2.0.7-1 update metadata (.dsc and .changes)
         run: |
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          VERSION="${VERSION:-2.0.6}"
+          VERSION="${VERSION:-2.0.7}"
           DSC="/tmp/deb-src/vielotus_${VERSION}-1.dsc"
           CHANGES="$(ls /tmp/deb-src/vielotus_${VERSION}-1_*.changes | head -n 1)"
           grep -q '^Vcs-Git: https://github.com/stevedat/VieLotus-IM.git \[CrossPlatform/packaging\]$' "$DSC"
@@ -213,7 +213,7 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          VERSION="${VERSION:-2.0.6}"
+          VERSION="${VERSION:-2.0.7}"
           LIB_DEB="$(ls /tmp/deb-src/libvielotus0_${VERSION}-1_*.deb | head -n 1)"
           FCITX_DEB="$(ls /tmp/deb-src/fcitx5-vielotus_${VERSION}-1_*.deb | head -n 1)"
           IBUS_DEB="$(ls /tmp/deb-src/ibus-vielotus_${VERSION}-1_*.deb | head -n 1)"
@@ -506,14 +506,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Remove-Item -Recurse -Force build-win-lab
 
-      - name: Build Windows TSF COM Shell & Microsoft Store MSIXBundle (x64 & ARM64)
+      - name: Build Windows TSF COM Shell, Inno Setup Installers & Microsoft Store MSIXBundle (x64, ARM64X & x86)
         shell: pwsh
         run: |
+          if (-not (Get-Command iscc.exe -ErrorAction SilentlyContinue) -and -not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
           $plist = Get-Content Sources/VieLotusIM/Info.plist -Raw
           if ($plist -match '<key>CFBundleShortVersionString</key>\s*<string>([^<]+)</string>') {
             $version = $Matches[1]
           } else {
-            $version = "2.0.6"
+            $version = "2.0.7"
           }
           ./scripts/build_windows.ps1 -Version $version -Arch all -SkipTests -FetchStoreStub
           $requiredArtifacts = @(
@@ -523,7 +526,9 @@ jobs:
             "scripts\windows\bin\arm64\VieLotusSettings.exe",
             "scripts\windows\bin\x86\VieLotusTIP32.dll",
             "dist\windows\msix\VieLotus_${version}.0_x64_arm64.msixbundle",
-            "dist\windows\VieLotus-Store-Setup.exe"
+            "dist\windows\VieLotus-Store-Setup.exe",
+            "dist\windows\VieLotus-Setup-x64.exe",
+            "dist\windows\VieLotus-Setup-arm64.exe"
           )
           foreach ($artifact in $requiredArtifacts) {
             if (-not (Test-Path $artifact)) {
@@ -538,12 +543,14 @@ jobs:
             Write-Host "Verified $($item.Name) ($($item.Length) bytes)"
           }
 
-      - name: Upload Windows build artifacts (x64, ARM64X & x86 MSIX + Store Stub)
+      - name: Upload Windows build artifacts (x64, ARM64X & x86 MSIX + Installers)
         uses: actions/upload-artifact@v4
         with:
           name: VieLotus-Windows
           path: |
             dist/windows/VieLotus-Store-Setup.exe
+            dist/windows/VieLotus-Setup-x64.exe
+            dist/windows/VieLotus-Setup-arm64.exe
             scripts/windows/bin/x64/*
             scripts/windows/bin/arm64/*
             scripts/windows/bin/x86/*

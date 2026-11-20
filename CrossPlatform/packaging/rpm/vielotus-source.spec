@@ -1,5 +1,5 @@
 Name:           vielotus
-Version:        2.0.6
+Version:        2.0.7
 Release:        1%{?dist}
 Summary:        VieLotusIM (Sen Viet) — Next-Gen Vietnamese Input Method for IBus & Fcitx5
 License:        MIT AND FSFAP

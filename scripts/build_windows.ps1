@@ -6,7 +6,7 @@
 
 param (
     [string]$Configuration = "Release",
-    [string]$Version = "2.0.6",
+    [string]$Version = "2.0.7",
     [string]$MsixVersion = "",
     [ValidateSet("x64", "arm64", "all")]
     [string]$Arch = "all",
@@ -572,6 +572,42 @@ if ($makeappx) {
     }
     Write-Host "✅ Đã tạo gói Microsoft Store MSIXBundle tại: $outBundle" -ForegroundColor Cyan
     Remove-Item $msixStageBase -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# 5b. Package clean offline Inno Setup 6 standalone installers (VieLotus-Setup-x64.exe & VieLotus-Setup-arm64.exe)
+$issPath = "$windowsDir\VieLotus-Setup.iss"
+if (Test-Path $issPath) {
+    $isccExe = $null
+    $isccCmd = Get-Command iscc.exe -ErrorAction SilentlyContinue
+    if ($isccCmd) {
+        $isccExe = $isccCmd.Source
+    } else {
+        foreach ($cand in @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "${env:ProgramFiles}\Inno Setup 6\ISCC.exe")) {
+            if (Test-Path $cand) { $isccExe = $cand; break }
+        }
+    }
+    if (-not $isccExe) {
+        Write-Error "❌ Lỗi: Không tìm thấy Inno Setup 6 (ISCC.exe) để đóng gói VieLotus-Setup-*.exe."
+        exit 1
+    }
+    foreach ($instArch in $archesToBuild) {
+        if ((Test-Path "$binStagingDir\$instArch\VieLotusTIP.dll") -and
+            (Test-Path "$binStagingDir\$instArch\VieLotusSettings.exe") -and
+            (Test-Path "$binStagingDir\x86\VieLotusTIP32.dll")) {
+            Write-Host "📦 Bước 5b ($instArch): Đóng gói Inno Setup 6 (VieLotus-Setup-$instArch.exe)..." -ForegroundColor Green
+            & $isccExe "/DMyAppVersion=$Version" "/DMyAppArch=$instArch" $issPath
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "❌ Lỗi: ISCC.exe thất bại cho kiến trúc $instArch (exit code $LASTEXITCODE)."
+                exit $LASTEXITCODE
+            }
+            $outExe = "$distWindowsDir\VieLotus-Setup-$instArch.exe"
+            if (-not (Test-Path $outExe) -or (Get-Item $outExe).Length -le 0) {
+                Write-Error "❌ Lỗi: Không tìm thấy $outExe sau khi đóng gói Inno Setup."
+                exit 1
+            }
+            Write-Host "   ✅ Đã tạo: $outExe ($((Get-Item $outExe).Length) bytes)" -ForegroundColor Cyan
+        }
+    }
 }
 
 # 6. Fetch & cryptographically verify the official Microsoft Store Signed Web Installer stub (9PF5K64GXXSH)
