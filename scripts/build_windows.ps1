@@ -93,7 +93,7 @@ function Invoke-BuildTsfArch {
     param([string]$TargetArch)
 
     if ($TargetArch -eq "arm64") {
-        Write-Host "🔨 Bước 3 (arm64 — Pass 1/2): Biên dịch ARM64 native + ghi /LINKREPROFULLPATHRSP cho ARM64X..." -ForegroundColor Green
+        Write-Host "🔨 Bước 3 (arm64 — Pass 1/3): Biên dịch ARM64 native + ghi /LINKREPROFULLPATHRSP..." -ForegroundColor Green
         $tsfBuildArm64 = "$rootDir\build-tsf-arm64"
         $tsfBuildArm64Ec = "$rootDir\build-tsf-arm64ec"
         $arm64ReproDir = "$rootDir\build-tsf-arm64-repro"
@@ -125,33 +125,134 @@ function Invoke-BuildTsfArch {
         Copy-Item $builtSettingsExe.FullName -Destination "$binStagingDir\VieLotusSettings.exe" -Force
         Write-Host "   ✅ Đã copy: $($builtSettingsExe.FullName) -> $binStagingDir\arm64\VieLotusSettings.exe"
 
-        $rspPath = "$arm64ReproDir\VieLotusTIP.rsp"
-        if (-not (Test-Path $rspPath)) {
-            Write-Error "❌ Lỗi: Không tìm thấy $rspPath sau ARM64 /LINKREPROFULLPATHRSP pass 1."
+        $rspArm64 = "$arm64ReproDir\VieLotusTIP-arm64.rsp"
+        if (-not (Test-Path $rspArm64)) {
+            Write-Error "❌ Lỗi: Không tìm thấy $rspArm64 sau ARM64 /LINKREPROFULLPATHRSP pass 1."
             exit 1
         }
 
-        Write-Host "🔨 Bước 3 (arm64 — Pass 2/2): Biên dịch ARM64EC + hợp nhất ARM64X dual-ABI VieLotusTIP.dll..." -ForegroundColor Green
+        Write-Host "🔨 Bước 3 (arm64 — Pass 2/3): Biên dịch ARM64EC + ghi /LINKREPROFULLPATHRSP..." -ForegroundColor Green
         cmake -B $tsfBuildArm64Ec -S $tsfSourceDir -A ARM64EC -DCMAKE_BUILD_TYPE=$Configuration -DVIELOTUS_BUILD_SETTINGS=OFF -DVIELOTUS_ARM64X_PASS=ARM64EC "-DVIELOTUS_ARM64X_REPRO_DIR=$arm64ReproDir"
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "❌ Lỗi: cmake configure VieLotusTIP (ARM64EC/ARM64X pass 2) thất bại (exit code $LASTEXITCODE)."
+            Write-Error "❌ Lỗi: cmake configure VieLotusTIP (ARM64EC pass 2) thất bại (exit code $LASTEXITCODE)."
             exit $LASTEXITCODE
         }
         cmake --build $tsfBuildArm64Ec --config $Configuration
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "❌ Lỗi: cmake build VieLotusTIP (ARM64EC/ARM64X pass 2) thất bại (exit code $LASTEXITCODE)."
+            Write-Error "❌ Lỗi: cmake build VieLotusTIP (ARM64EC pass 2) thất bại (exit code $LASTEXITCODE)."
             exit $LASTEXITCODE
         }
 
-        $builtTipDll = Get-ChildItem -Path $tsfBuildArm64Ec -Filter "VieLotusTIP.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        if (-not $builtTipDll) {
-            Write-Error "❌ Lỗi: Không tìm thấy VieLotusTIP.dll (ARM64X) sau Pass 2."
+        $rspArm64Ec = "$arm64ReproDir\VieLotusTIP-arm64ec.rsp"
+        if (-not (Test-Path $rspArm64Ec)) {
+            Write-Error "❌ Lỗi: Không tìm thấy $rspArm64Ec sau ARM64EC /LINKREPROFULLPATHRSP pass 2."
             exit 1
         }
-        Copy-Item $builtTipDll.FullName -Destination "$binStagingDir\arm64\VieLotusTIP.dll" -Force
-        Copy-Item $builtTipDll.FullName -Destination "$binStagingDir\VieLotusTIP.dll" -Force
-        Copy-Item $builtTipDll.FullName -Destination "$distWindowsDir\VieLotusTIP-arm64.dll" -Force
-        Write-Host "   ✅ Đã copy ARM64X: $($builtTipDll.FullName) -> $binStagingDir\arm64\VieLotusTIP.dll"
+
+        Write-Host "🔗 Bước 3 (arm64 — Pass 3/3): Liên kết trực tiếp link.exe /MACHINE:ARM64X (ARM64 + ARM64EC dual-ABI)..." -ForegroundColor Green
+        $vsLink = Get-ChildItem -Path "${env:ProgramFiles}\Microsoft Visual Studio" -Filter "link.exe" -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "Hostx64\\arm64\\link\.exe$" } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+        if (-not $vsLink) {
+            $vsLink = Get-ChildItem -Path "${env:ProgramFiles}\Microsoft Visual Studio" -Filter "link.exe" -Recurse -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match "Hostx64\\x64\\link\.exe$" } |
+                Sort-Object FullName -Descending |
+                Select-Object -First 1
+        }
+        if (-not $vsLink) {
+            Write-Error "❌ Lỗi: Không tìm thấy MSVC link.exe để liên kết ARM64X."
+            exit 1
+        }
+        $linkExe = $vsLink.FullName
+
+        $allObjs = New-Object System.Collections.Generic.List[string]
+        $allLibs = New-Object System.Collections.Generic.List[string]
+        $libPaths = New-Object System.Collections.Generic.List[string]
+        $seenObjs = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+        $seenLibs = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+        $seenLibPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+        $resFile = $null
+
+        foreach ($rspFile in @($rspArm64, $rspArm64Ec)) {
+            foreach ($rawLine in (Get-Content -Path $rspFile)) {
+                $line = $rawLine.Trim()
+                if ([string]::IsNullOrWhiteSpace($line)) { continue }
+                if ($line.StartsWith('"') -and $line.EndsWith('"') -and $line.Length -ge 2) {
+                    $line = $line.Substring(1, $line.Length - 2)
+                }
+                if ($line -match '^[/-]LIBPATH:(.+)$') {
+                    $lp = $Matches[1].Trim('"')
+                    if ((Test-Path $lp) -and $seenLibPaths.Add($lp)) { $libPaths.Add($lp) }
+                    continue
+                }
+                if ($line.StartsWith('/') -or $line.StartsWith('-')) { continue }
+                if (-not (Test-Path $line)) { continue }
+                if ($line -match '\.obj$') {
+                    if ($seenObjs.Add($line)) { $allObjs.Add($line) }
+                } elseif ($line -match '\.res$') {
+                    if (-not $resFile) { $resFile = $line }
+                } elseif ($line -match '\.lib$') {
+                    if ($seenLibs.Add($line)) { $allLibs.Add($line) }
+                }
+            }
+        }
+
+        # Derive MSVC CRT & Windows SDK arm64 / arm64ec library directories so /DEFAULTLIB resolves for both slices
+        $msvcRoot = Split-Path (Split-Path (Split-Path (Split-Path $linkExe)))
+        foreach ($cand in @("$msvcRoot\lib\arm64", "$msvcRoot\lib\arm64ec", "$msvcRoot\lib\arm64\arm64ec")) {
+            if ((Test-Path $cand) -and $seenLibPaths.Add($cand)) { $libPaths.Add($cand) }
+        }
+        foreach ($libPath in $allLibs) {
+            if ($libPath -match '^(.*Windows Kits\\10\\Lib\\[^\\]+)\\') {
+                $sdkVerDir = $Matches[1]
+                foreach ($cand in @("$sdkVerDir\um\arm64", "$sdkVerDir\ucrt\arm64")) {
+                    if ((Test-Path $cand) -and $seenLibPaths.Add($cand)) { $libPaths.Add($cand) }
+                }
+            }
+        }
+        if ($allObjs.Count -lt 2) {
+            Write-Error "❌ Lỗi: Không đủ .obj inputs để liên kết ARM64X ($($allObjs.Count) objects)."
+            exit 1
+        }
+
+        $arm64xOutDir = "$rootDir\build-tsf-arm64x"
+        New-Item -ItemType Directory -Force -Path $arm64xOutDir | Out-Null
+        $arm64xOutDll = "$arm64xOutDir\VieLotusTIP.dll"
+        $arm64xOutLib = "$arm64xOutDir\VieLotusTIP.lib"
+        $arm64xLinkRsp = "$arm64ReproDir\arm64x-link.rsp"
+
+        $rspLines = New-Object System.Collections.Generic.List[string]
+        $rspLines.Add("/NOLOGO")
+        $rspLines.Add("/DLL")
+        $rspLines.Add("/MACHINE:ARM64X")
+        $rspLines.Add("/OPT:REF")
+        $rspLines.Add("/OPT:ICF")
+        $rspLines.Add("/INCREMENTAL:NO")
+        $rspLines.Add("/DYNAMICBASE")
+        $rspLines.Add("/NXCOMPAT")
+        $rspLines.Add("/SUBSYSTEM:WINDOWS")
+        $rspLines.Add("/OUT:`"$arm64xOutDll`"")
+        $rspLines.Add("/IMPLIB:`"$arm64xOutLib`"")
+        $rspLines.Add("/DEF:`"$tsfSourceDir\VieLotusTIP.def`"")
+        $rspLines.Add("/DEFARM64NATIVE:`"$tsfSourceDir\VieLotusTIP.def`"")
+        foreach ($lp in $libPaths) { $rspLines.Add("/LIBPATH:`"$lp`"") }
+        foreach ($obj in $allObjs) { $rspLines.Add("`"$obj`"") }
+        if ($resFile) { $rspLines.Add("`"$resFile`"") }
+        foreach ($lib in $allLibs) { $rspLines.Add("`"$lib`"") }
+
+        [System.IO.File]::WriteAllLines($arm64xLinkRsp, $rspLines.ToArray(), [System.Text.UTF8Encoding]::new($false))
+        Write-Host "   🔧 Linking ARM64X: $($allObjs.Count) .obj + $($allLibs.Count) .lib + $($libPaths.Count) libpaths via $linkExe"
+        & $linkExe "@$arm64xLinkRsp"
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $arm64xOutDll)) {
+            Write-Error "❌ Lỗi: link.exe /MACHINE:ARM64X thất bại (exit code $LASTEXITCODE)."
+            exit 1
+        }
+
+        Copy-Item $arm64xOutDll -Destination "$binStagingDir\arm64\VieLotusTIP.dll" -Force
+        Copy-Item $arm64xOutDll -Destination "$binStagingDir\VieLotusTIP.dll" -Force
+        Copy-Item $arm64xOutDll -Destination "$distWindowsDir\VieLotusTIP-arm64.dll" -Force
+        Write-Host "   ✅ Đã liên kết ARM64X: $arm64xOutDll -> $binStagingDir\arm64\VieLotusTIP.dll"
         return
     }
 
