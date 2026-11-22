@@ -4,10 +4,10 @@ set +e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 consoleUser="$(stat -f%Su /dev/console)"
 
-if [ -z "$consoleUser" ] || [ "$consoleUser" = "root" ]; then
+if [ -z "$consoleUser" ] || [ "$consoleUser" = "root" ] || [ "$consoleUser" = "loginwindow" ] || [ "$consoleUser" = "_windowserver" ]; then
     consoleUser="$(id -un)"
 fi
-if [ "$consoleUser" = "root" ]; then
+if [ "$consoleUser" = "root" ] || [ "$consoleUser" = "loginwindow" ] || [ "$consoleUser" = "_windowserver" ]; then
     echo "postinstall: cannot determine console user — skipping registration" >&2
     exit 0
 fi
@@ -45,8 +45,8 @@ else
     APP="/Library/Input Methods/VieLotusIM.app"
 fi
 
-# Kill old running instance
-run_as_user pkill -9 VieLotusIM 2>/dev/null
+# Kill old running instance (exact process name -x so installer CLI is never matched)
+pkill -9 -x VieLotusIM 2>/dev/null || true
 
 # Register with LaunchServices
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
@@ -57,10 +57,11 @@ if ! run_as_user "$DIR/register-source" "$APP"; then
     echo "postinstall: register-source failed" >&2
 fi
 
-# Refresh macOS TextInputMenuAgent and pre-warm VieLotusIM server so typing works immediately
+# Refresh macOS TextInputMenuAgent and pre-warm VieLotusIM server via LaunchServices
+# (`open -g` detaches cleanly under launchd so CLI/Homebrew `installer` never hangs)
 run_as_user killall TextInputMenuAgent 2>/dev/null || true
 if [ -x "$APP/Contents/MacOS/VieLotusIM" ]; then
-    run_as_user "$APP/Contents/MacOS/VieLotusIM" >/dev/null 2>&1 &
+    run_as_user /usr/bin/open -g "$APP" </dev/null >/dev/null 2>&1 || true
 fi
 
 # Clean up temporary previous backups

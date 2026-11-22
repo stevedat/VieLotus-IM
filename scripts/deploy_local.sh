@@ -60,7 +60,7 @@ fi
 DO_ROLLBACK() {
     local reason="$1"
     echo "⚠️ BẮT ĐẦU HOÀN TÁC (ROLLBACK): $reason"
-    pkill -9 VieLotusIM 2>/dev/null || true
+    pkill -9 -x VieLotusIM 2>/dev/null || true
     
     # Restore primary target from backup if backup exists
     if [ -d "$BAK_TARGET/Contents" ]; then
@@ -115,7 +115,7 @@ if [ "$TARGET" = "$SYS_TARGET" ] && [ -d "$USER_TARGET" ]; then
 fi
 
 echo "→ Stopping active VieLotusIM process before swap..."
-pkill -9 VieLotusIM 2>/dev/null || true
+pkill -9 -x VieLotusIM 2>/dev/null || true
 
 # Atomic swap with immediate rollback fallback
 echo "→ Swapping live application bundle atomically..."
@@ -158,9 +158,9 @@ killall -9 TextInputMenuAgent 2>/dev/null || true
 
 # Terminate any lingering or auto-respawned processes from prior/backup bundles
 echo "→ Terminating any lingering or auto-spawned processes before launching..."
-pkill -9 -f VieLotusIM 2>/dev/null || true
+pkill -9 -x VieLotusIM 2>/dev/null || true
 for _ in {1..15}; do
-    if ! pgrep -f VieLotusIM >/dev/null 2>&1; then
+    if ! pgrep -x VieLotusIM >/dev/null 2>&1; then
         break
     fi
     sleep 0.1

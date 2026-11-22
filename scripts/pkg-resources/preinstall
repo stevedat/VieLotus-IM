@@ -19,8 +19,9 @@ fi
 
 SYS_TARGET="/Library/Input Methods/VieLotusIM.app"
 
-# Terminate running instance first
-pkill -9 -f VieLotusIM 2>/dev/null || true
+# Terminate running instance first (use exact process name -x so CLI/Homebrew
+# `installer -pkg .../VieLotusIM.pkg -target /` never gets killed by -f)
+pkill -9 -x VieLotusIM 2>/dev/null || true
 
 # Clean / backup old system bundle to prevent dirty payload merge
 if [ -d "$SYS_TARGET" ]; then

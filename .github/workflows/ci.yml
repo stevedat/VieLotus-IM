@@ -42,7 +42,7 @@ jobs:
       - name: Build installer package (VieLotusIM.pkg)
         run: ./scripts/build_pkg.sh "${{ steps.version.outputs.version }}"
 
-      - name: Verify packaged VieLotusIM.pkg resource payload
+      - name: Verify packaged VieLotusIM.pkg resource payload and CLI-safe scripts
         run: |
           PAYLOAD="$(pkgutil --payload-files .build/dist/VieLotusIM.pkg)"
           for req in "VieLotusIM_VieLotusCore.bundle" "scowl-en.txt" "SCOWL-Copyright.txt" "typing-modes.yml"; do
@@ -51,6 +51,13 @@ jobs:
               exit 1
             fi
           done
+          rm -rf .build/pkg-verify
+          pkgutil --expand .build/dist/VieLotusIM.pkg .build/pkg-verify
+          if grep -rnE 'pkill[[:space:]].*-f.*VieLotusIM' .build/pkg-verify; then
+            echo "::error::pkg script uses 'pkill -f VieLotusIM' which SIGKILLs CLI/Homebrew 'installer -pkg VieLotusIM.pkg'"
+            exit 1
+          fi
+          rm -rf .build/pkg-verify
 
       - name: Upload macOS build artifacts
         uses: actions/upload-artifact@v4
