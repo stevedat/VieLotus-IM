@@ -555,3 +555,31 @@ jobs:
             scripts/windows/bin/arm64/*
             scripts/windows/bin/x86/*
             dist/windows/msix/*
+
+  wasm-sdk:
+    name: WebAssembly SDK (Freestanding C++20 wasm32 + 9,091-Case Gate)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install LLVM clang and wasm-ld
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang lld
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build freestanding wasm32 core and verify 0-import binary
+        run: |
+          ./CrossPlatform/wasm-sdk/scripts/build.sh --stage-pages /tmp/vielotus-pages-check
+          test -f /tmp/vielotus-pages-check/index.html
+          test -f /tmp/vielotus-pages-check/dist/vielotus-core.wasm
+
+      - name: Run WebAssembly 9,091-case regression, parity & DOM adapter tests
+        run: |
+          cd CrossPlatform/wasm-sdk
+          npm test

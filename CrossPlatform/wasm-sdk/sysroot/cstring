@@ -1,0 +1,25 @@
+/*
+ * VieLotusIM (Sen Việt) — Freestanding wasm32 sysroot shim
+ * License: MIT
+ */
+#pragma once
+
+#include <stddef.h>
+#include <stdint.h>
+
+extern "C" {
+void *memcpy(void *dst, const void *src, size_t n);
+void *memmove(void *dst, const void *src, size_t n);
+void *memset(void *dst, int c, size_t n);
+int memcmp(const void *a, const void *b, size_t n);
+size_t strlen(const char *s);
+}
+
+namespace std {
+using ::size_t;
+using ::memcpy;
+using ::memmove;
+using ::memset;
+using ::memcmp;
+using ::strlen;
+}

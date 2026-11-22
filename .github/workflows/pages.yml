@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - 'docs/**'
+      - 'CrossPlatform/wasm-sdk/**'
+      - 'Sources/VieLotusCoreWindows/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -28,13 +30,44 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install LLVM clang and wasm-ld
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang lld
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build WebAssembly SDK and stage /try/ playground
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp -R docs/. _site/
+          ./CrossPlatform/wasm-sdk/scripts/build.sh --stage-pages _site/try
+
+      - name: Verify WebAssembly SDK (9,091-case + parity + DOM adapter gate)
+        run: |
+          cd CrossPlatform/wasm-sdk
+          npm test
+
+      - name: Verify staged GitHub Pages site layout
+        run: |
+          test -f _site/index.html
+          test -f _site/try/index.html
+          test -f _site/try/dist/core.mjs
+          test -f _site/try/dist/vielotus-external.mjs
+          test -f _site/try/dist/vielotus-core.wasm
+          ! grep -q '../dist/vielotus.mjs' _site/try/index.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'docs'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment

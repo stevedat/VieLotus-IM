@@ -1,0 +1,66 @@
+/*
+ * VieLotusIM (Sen Việt) — Freestanding wasm32 sysroot shim
+ * License: MIT
+ */
+#pragma once
+
+#include <string>
+
+namespace std {
+
+template <typename K, typename V>
+class unordered_map {
+    struct Entry {
+        K first;
+        V second;
+    };
+    static constexpr size_t kCap = 128;
+    Entry m_entries[kCap]{};
+    Entry m_overflow{};
+    size_t m_count{0};
+
+public:
+    Entry *end() { return m_entries + m_count; }
+    const Entry *end() const { return m_entries + m_count; }
+
+    Entry *find(const K &k) {
+        for (size_t i = 0; i < m_count; ++i) {
+            if (m_entries[i].first == k) return &m_entries[i];
+        }
+        return end();
+    }
+
+    V &operator[](const K &k) {
+        for (size_t i = 0; i < m_count; ++i) {
+            if (m_entries[i].first == k) return m_entries[i].second;
+        }
+        if (m_count < kCap) {
+            Entry &e = m_entries[m_count++];
+            e.first = k;
+            e.second = V{};
+            return e.second;
+        }
+        m_overflow.first = k;
+        m_overflow.second = V{};
+        return m_overflow.second;
+    }
+
+    void clear() { m_count = 0; }
+
+    void swap(unordered_map &o) {
+        const size_t maxN = (m_count > o.m_count) ? m_count : o.m_count;
+        for (size_t i = 0; i < maxN; ++i) {
+            Entry tmp = m_entries[i];
+            m_entries[i] = o.m_entries[i];
+            o.m_entries[i] = tmp;
+        }
+        const size_t t = m_count;
+        m_count = o.m_count;
+        o.m_count = t;
+    }
+
+    bool empty() const { return m_count == 0; }
+    size_t size() const { return m_count; }
+};
+
+} // namespace std

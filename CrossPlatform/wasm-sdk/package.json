@@ -1,0 +1,48 @@
+{
+  "name": "@vielotus/core",
+  "version": "2.0.7",
+  "description": "Sen Việt (VieLotusIM) WebAssembly Vietnamese IME SDK — zero-dependency C++20 core compiled to freestanding wasm32 with Telex/VNI, Smart Bilingual, and OS IME auto-yield.",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "main": "./dist/vielotus.mjs",
+  "module": "./dist/vielotus.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/vielotus.mjs"
+    },
+    "./external": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/vielotus-external.mjs"
+    },
+    "./vielotus-core.wasm": "./dist/vielotus-core.wasm"
+  },
+  "files": [
+    "dist/vielotus.mjs",
+    "dist/vielotus-external.mjs",
+    "dist/core.mjs",
+    "dist/vielotus-core.wasm",
+    "dist/index.d.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "./scripts/build.sh",
+    "test": "node test/test_suite.mjs && node test/test_attach.mjs"
+  },
+  "keywords": [
+    "vietnamese",
+    "ime",
+    "telex",
+    "vni",
+    "wasm",
+    "webassembly",
+    "vielotus",
+    "senviet",
+    "bilingual"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

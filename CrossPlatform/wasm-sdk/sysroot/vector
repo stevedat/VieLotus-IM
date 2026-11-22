@@ -1,0 +1,33 @@
+/*
+ * VieLotusIM (Sen Việt) — Freestanding wasm32 sysroot shim
+ * License: MIT
+ */
+#pragma once
+
+#include <stddef.h>
+
+namespace std {
+
+template <typename T>
+class vector {
+    static constexpr size_t kCap = 256;
+    T m_buf[kCap]{};
+    size_t m_len{0};
+
+public:
+    void reserve(size_t) {}
+    void clear() { m_len = 0; }
+    void push_back(const T &v) {
+        if (m_len < kCap) m_buf[m_len++] = v;
+    }
+    size_t size() const { return m_len; }
+    bool empty() const { return m_len == 0; }
+    T &operator[](size_t i) { return m_buf[i]; }
+    const T &operator[](size_t i) const { return m_buf[i]; }
+    T *begin() { return m_buf; }
+    T *end() { return m_buf + m_len; }
+    const T *begin() const { return m_buf; }
+    const T *end() const { return m_buf + m_len; }
+};
+
+} // namespace std

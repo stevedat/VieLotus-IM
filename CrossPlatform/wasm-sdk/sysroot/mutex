@@ -1,0 +1,16 @@
+/*
+ * VieLotusIM (Sen Việt) — Freestanding wasm32 sysroot shim (single-threaded WASM)
+ * License: MIT
+ */
+#pragma once
+
+namespace std {
+
+struct mutex {};
+
+template <typename M>
+struct lock_guard {
+    explicit lock_guard(M &) {}
+};
+
+} // namespace std

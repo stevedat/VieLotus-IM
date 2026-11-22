@@ -1,0 +1,1311 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sen Việt (VieLotusIM) — WebAssembly Playground</title>
+  <meta name="description" content="Try the Sen Việt (VieLotusIM) C++20 Vietnamese IME engine directly in your browser via freestanding WebAssembly — Telex, VNI, Smart Bilingual, 100% local." />
+  <style>
+    :root {
+      --bg: #f2f5f3;
+      --surface: #ffffff;
+      --surface-subtle: #e8efea;
+      --ink: #11221e;
+      --ink-muted: #4a5e58;
+      --accent: #0b6b56;
+      --accent-hover: #085544;
+      --accent-soft: #d9efe8;
+      --signal: #9e324b;
+      --signal-soft: #fae9ed;
+      --border: #cedad3;
+      --border-strong: #9eb5a8;
+      --font-sans: "Be Vietnam Pro", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .shell {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 14px 24px 48px;
+    }
+
+    /* Slim site navigation + VI/EN language switcher */
+    .sitenav {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px 18px;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13.5px;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .nav-links a {
+      color: var(--ink-muted);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .nav-links a.nav-home {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .lang-switch {
+      display: inline-flex;
+      padding: 2px;
+      border-radius: 8px;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+    }
+
+    .lang-switch button {
+      border: 0;
+      background: transparent;
+      color: var(--ink-muted);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 4px 10px;
+      min-height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .lang-switch button[aria-pressed="true"] {
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 1px 2px rgba(17, 34, 30, 0.08);
+    }
+
+    /* Compact hero bar — keeps writing sheet pinned above the fold */
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 20px;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+
+    .brand-tag {
+      font-size: 13px;
+      color: var(--ink-muted);
+    }
+
+    .status-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .state-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      min-height: 40px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      font-weight: 550;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+      transition: background-color 120ms ease, border-color 120ms ease;
+    }
+
+    .state-pill:hover {
+      border-color: var(--border-strong);
+    }
+
+    .state-pill:focus-visible,
+    button:focus-visible,
+    a:focus-visible,
+    textarea:focus-visible,
+    input:focus-visible,
+    [contenteditable]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .state-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .state-pill[data-state="off"] .state-dot,
+    .state-pill[data-state="yielded"] .state-dot {
+      background: var(--signal);
+    }
+
+    .state-pill[data-state="yielded"] {
+      background: var(--signal-soft);
+      border-color: #e4bac4;
+      color: #6b1d30;
+    }
+
+    .kbd-hint {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--surface-subtle);
+      color: var(--ink-muted);
+      border: 1px solid var(--border);
+    }
+
+    /* OS-IME Auto-Yield Banner (only shown when triggered or on load error) */
+    .notice {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      border-radius: var(--radius-md);
+      background: var(--signal-soft);
+      border: 1px solid #e4bac4;
+      color: #6b1d30;
+      font-size: 14px;
+    }
+
+    .notice.visible {
+      display: flex;
+    }
+
+    .notice-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      min-height: 40px;
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      font-weight: 550;
+      cursor: pointer;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-quiet {
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 13px;
+      min-height: 40px;
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .btn-quiet:hover {
+      background: var(--surface-subtle);
+      border-color: var(--border-strong);
+    }
+
+    /* Asymmetric workbench: spacious writing sheet + focused control rail */
+    .workbench {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr);
+      gap: 22px;
+      align-items: start;
+    }
+
+    .sheet-col {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .tip-bar {
+      margin: 0;
+      padding: 9px 14px;
+      border-radius: var(--radius-md);
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--ink-muted);
+    }
+
+    .sheet-frame {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 16px;
+      background: #fafcfa;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--ink-muted);
+    }
+
+    .sheet-title {
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .sheet-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sheet-actions button {
+      min-height: 32px;
+      padding: 4px 10px;
+      font-size: 12.5px;
+    }
+
+    #editor {
+      display: block;
+      width: 100%;
+      min-height: 224px;
+      padding: 18px 20px;
+      border: 0;
+      resize: vertical;
+      background: var(--surface);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 19px;
+      line-height: 1.65;
+    }
+
+    #editor::placeholder {
+      color: #84968f;
+    }
+
+    #editor:focus {
+      outline: none;
+    }
+
+    .sheet-frame:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(11, 107, 86, 0.12);
+    }
+
+    /* Live composing & latency inspector bar */
+    .telemetry-bar {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      border-top: 1px solid var(--border);
+      background: #fafcfa;
+    }
+
+    .telemetry-cell {
+      padding: 10px 16px;
+      border-right: 1px solid var(--border);
+      min-width: 0;
+    }
+
+    .telemetry-cell:last-child {
+      border-right: 0;
+    }
+
+    .telemetry-label {
+      display: block;
+      font-size: 12px;
+      color: var(--ink-muted);
+      margin-bottom: 2px;
+    }
+
+    .telemetry-value {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 550;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .telemetry-value.composing {
+      color: var(--accent);
+    }
+
+    /* Secondary fields to prove DOM adapter on contenteditable & password guardrail */
+    .secondary-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .field-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+    }
+
+    .field-label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12.5px;
+      font-weight: 550;
+      color: var(--ink-muted);
+      margin-bottom: 8px;
+      white-space: nowrap;
+    }
+
+    .field-label span:first-child {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .ce-input {
+      min-height: 44px;
+      padding: 9px 11px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: #fafcfa;
+      font-size: 14.5px;
+      color: var(--ink);
+    }
+
+    .ce-input:empty::before {
+      content: attr(data-placeholder);
+      color: #84968f;
+    }
+
+    .pwd-input {
+      width: 100%;
+      min-height: 44px;
+      padding: 9px 11px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: #fafcfa;
+      font-family: var(--font-sans);
+      font-size: 14.5px;
+      color: var(--ink);
+    }
+
+    .pwd-input::placeholder {
+      color: #84968f;
+    }
+
+    /* Right rail: Engine controls + Interactive replay chips */
+    .rail {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px 18px;
+    }
+
+    .panel-title {
+      margin: 0 0 12px;
+      font-size: 14.5px;
+      font-weight: 650;
+      color: var(--ink);
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      padding: 4px;
+      background: var(--surface-subtle);
+      border-radius: var(--radius-md);
+      margin-bottom: 14px;
+    }
+
+    .segmented button {
+      min-height: 40px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--ink-muted);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 1px 2px rgba(17, 34, 30, 0.08);
+    }
+
+    .toggle-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 2px;
+      min-height: 44px;
+      border-bottom: 1px solid #edf2ef;
+      cursor: pointer;
+    }
+
+    .toggle-row:last-child {
+      border-bottom: 0;
+    }
+
+    .toggle-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .toggle-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ink);
+    }
+
+    .toggle-desc {
+      font-size: 12px;
+      color: var(--ink-muted);
+    }
+
+    .toggle-row input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* Interactive keystroke replay chips */
+    .chip-intro {
+      margin: -4px 0 12px;
+      font-size: 13px;
+      color: var(--ink-muted);
+    }
+
+    .chip-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .sample-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      width: 100%;
+      min-height: 48px;
+      padding: 8px 11px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: #fafcfa;
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 100ms ease, background-color 100ms ease;
+    }
+
+    .sample-chip:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .sample-chip code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--ink-muted);
+    }
+
+    .sample-chip strong {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    /* Bottom facts + minimal embed code + honest scope note */
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 22px;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .metrics-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 18px;
+      margin: 0;
+    }
+
+    .metrics-list dt {
+      font-size: 12.5px;
+      color: var(--ink-muted);
+    }
+
+    .metrics-list dd {
+      margin: 2px 0 0;
+      font-size: 15px;
+      font-weight: 650;
+      color: var(--ink);
+    }
+
+    .snippet-block {
+      margin: 0;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      background: #142621;
+      color: #e3f0ea;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      overflow-x: auto;
+    }
+
+    .snippet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .scope-note {
+      margin: 18px 0 0;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 12.5px;
+      color: var(--ink-muted);
+      line-height: 1.6;
+    }
+
+    @media (max-width: 860px) {
+      .shell {
+        padding: 14px 14px 36px;
+      }
+      .workbench,
+      .secondary-inputs,
+      .footer-grid {
+        grid-template-columns: 1fr;
+      }
+      .telemetry-bar {
+        grid-template-columns: 1fr 1fr;
+      }
+      .telemetry-cell:last-child {
+        grid-column: 1 / -1;
+        border-top: 1px solid var(--border);
+        border-right: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav class="sitenav" aria-label="Điều hướng chính">
+      <div class="nav-links">
+        <a class="nav-home" href="../index.html" data-i18n="navHome">VieLotusIM (Sen Việt)</a>
+        <a href="../index.html#downloads" data-i18n="navDownloads">Tải xuống</a>
+        <a href="../privacy.html" data-i18n="navPrivacy">Quyền riêng tư</a>
+        <a href="https://github.com/stevedat/VieLotus-IM" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <div class="lang-switch" role="group" aria-label="Language">
+        <button id="lang-vi" type="button" aria-pressed="true">VI</button>
+        <button id="lang-en" type="button" aria-pressed="false">EN</button>
+      </div>
+    </nav>
+
+    <header class="topbar">
+      <div class="brand">
+        <h1 data-i18n="pageTitle">Sen Việt WebAssembly</h1>
+        <span class="brand-tag" id="engine-meta">Đang khởi tạo lõi C++20 WebAssembly…</span>
+      </div>
+      <div class="status-controls">
+        <button id="state-toggle" class="state-pill" type="button" data-state="on">
+          <span class="state-dot" aria-hidden="true"></span>
+          <span id="state-label">Đang bật (Telex)</span>
+          <span class="kbd-hint">Ctrl+Space</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="yield-notice" class="notice" role="status" aria-live="polite">
+      <span id="yield-message"></span>
+      <div class="notice-actions">
+        <button id="resume-btn" class="btn-primary" type="button" data-i18n="resumeBtn">Bật lại Sen Việt Web</button>
+      </div>
+    </div>
+
+    <main class="workbench">
+      <section class="sheet-col" aria-label="Vùng soạn thảo thử nghiệm">
+        <p class="tip-bar" data-i18n="imeTip">Đang bật sẵn bộ gõ máy (Sen Việt, EVKey, UniKey)? Hãy chuyển bàn phím sang tiếng Anh (ABC/EN) để gõ thử lõi WebAssembly, hoặc bấm các nút mô phỏng phím thật bên phải.</p>
+
+        <div class="sheet-frame">
+          <div class="sheet-header">
+            <span class="sheet-title" data-i18n="sheetTitle">Gõ thử trực tiếp (Telex / VNI + Song ngữ)</span>
+            <div class="sheet-actions">
+              <button id="sim-ime-btn" class="btn-quiet" type="button" data-i18n="simImeBtn">Thử xung đột IME</button>
+              <button id="clear-btn" class="btn-quiet" type="button" data-i18n="clearBtn">Xoá nội dung</button>
+            </div>
+          </div>
+
+          <textarea
+            id="editor"
+            spellcheck="false"
+            autofocus
+            placeholder="Thử gõ bằng bàn phím tiếng Anh: Vieejt Nam, DDawsk Lawsk, same as vs chi as, download vs dongdof, github..."
+          ></textarea>
+
+          <div class="telemetry-bar" aria-live="off">
+            <div class="telemetry-cell">
+              <span class="telemetry-label" data-i18n="telComposingLabel">Đang ghép</span>
+              <span class="telemetry-value composing" id="tel-composing">—</span>
+            </div>
+            <div class="telemetry-cell">
+              <span class="telemetry-label" data-i18n="telRawLabel">Phím thô</span>
+              <span class="telemetry-value" id="tel-raw">—</span>
+            </div>
+            <div class="telemetry-cell">
+              <span class="telemetry-label" data-i18n="telLatencyLabel">Độ trễ phím gần nhất</span>
+              <span class="telemetry-value" id="tel-latency">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="secondary-inputs">
+          <div class="field-box">
+            <div class="field-label">
+              <span data-i18n="ceLabel">Ô contenteditable</span>
+              <span>DOM Range</span>
+            </div>
+            <div
+              id="ce-editor"
+              class="ce-input"
+              contenteditable="true"
+              spellcheck="false"
+              data-placeholder="Gõ tiếng Việt trong thẻ div..."
+            ></div>
+          </div>
+
+          <div class="field-box">
+            <div class="field-label">
+              <span data-i18n="pwdLabel">Ô mật khẩu</span>
+              <span data-i18n="pwdBadge">Tự bỏ qua</span>
+            </div>
+            <input
+              id="pwd-guard"
+              class="pwd-input"
+              type="password"
+              autocomplete="off"
+              placeholder="Giữ nguyên ký tự gốc"
+            />
+          </div>
+        </div>
+      </section>
+
+      <aside class="rail" aria-label="Cấu hình bộ gõ và mẫu kiểm thử">
+        <section class="panel">
+          <h2 class="panel-title" data-i18n="configTitle">Cấu hình lõi engine</h2>
+          <div class="segmented" role="group" aria-label="Input method">
+            <button id="mode-telex" type="button" aria-pressed="true">Telex</button>
+            <button id="mode-vni" type="button" aria-pressed="false">VNI</button>
+          </div>
+
+          <div class="toggle-list">
+            <label class="toggle-row">
+              <span class="toggle-text">
+                <span class="toggle-name" data-i18n="optBilingualName">Song ngữ thông minh</span>
+                <span class="toggle-desc" data-i18n="optBilingualDesc">Tự giữ tiếng Anh theo ngữ cảnh (same as, github)</span>
+              </span>
+              <input id="opt-bilingual" type="checkbox" checked />
+            </label>
+
+            <label class="toggle-row">
+              <span class="toggle-text">
+                <span class="toggle-name" data-i18n="optModernName">Bỏ dấu kiểu mới</span>
+                <span class="toggle-desc" data-i18n="optModernDesc">hoà, thuỷ (tắt để dùng hòa, thủy)</span>
+              </span>
+              <input id="opt-modern" type="checkbox" checked />
+            </label>
+
+            <label class="toggle-row">
+              <span class="toggle-text">
+                <span class="toggle-name" data-i18n="optQuickName">Telex nhanh</span>
+                <span class="toggle-desc">cc → ch, gg → gi, qq → qu</span>
+              </span>
+              <input id="opt-quick" type="checkbox" />
+            </label>
+
+            <label class="toggle-row">
+              <span class="toggle-text">
+                <span class="toggle-name" data-i18n="optRelaxedName">Nới vần cuối</span>
+                <span class="toggle-desc" data-i18n="optRelaxedDesc">Cho phép ghép âm địa danh mở rộng</span>
+              </span>
+              <input id="opt-relaxed" type="checkbox" />
+            </label>
+
+            <label class="toggle-row">
+              <span class="toggle-text">
+                <span class="toggle-name" data-i18n="optMacroName">Gõ tắt (Macro)</span>
+                <span class="toggle-desc" data-i18n="optMacroDesc">Thử gõ hn, hcm, sg, cty + dấu cách</span>
+              </span>
+              <input id="opt-macro" type="checkbox" />
+            </label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title" data-i18n="chipsTitle">Bấm để chạy mô phỏng phím thật</h2>
+          <p class="chip-intro" data-i18n="chipsIntro">Mỗi nút gửi từng phím ASCII thực tế qua WASM vào khung soạn thảo.</p>
+          <div class="chip-grid" id="sample-chips">
+            <button class="sample-chip" type="button" data-mode="telex" data-seq="DDawsk Lawsk ">
+              <code>DDawsk Lawsk</code>
+              <strong>Đắk Lắk</strong>
+            </button>
+            <button class="sample-chip" type="button" data-mode="telex" data-seq="Kroong Pawcs ">
+              <code>Kroong Pawcs</code>
+              <strong>Krông Pắc</strong>
+            </button>
+            <button class="sample-chip" type="button" data-mode="telex" data-seq="towio ddowifo ">
+              <code>towio ddowifo</code>
+              <strong>tôi đồi</strong>
+            </button>
+            <button class="sample-chip" type="button" data-mode="telex" data-seq="chi as, same as ">
+              <code>chi as, same as</code>
+              <strong>chi á, same as</strong>
+            </button>
+            <button class="sample-chip" type="button" data-mode="telex" data-seq="dongdof download ">
+              <code>dongdof download</code>
+              <strong>đồng download</strong>
+            </button>
+            <button class="sample-chip" type="button" data-mode="telex" data-seq="err github google ">
+              <code>err github google</code>
+              <strong>err github google</strong>
+            </button>
+            <button class="sample-chip" type="button" data-mode="telex" data-seq="hoa downw< ">
+              <code>hoa downw⌫</code>
+              <strong>hoa dơn</strong>
+            </button>
+            <button class="sample-chip" type="button" data-mode="vni" data-seq="Tie61ng Vie65t ">
+              <code>Tie61ng Vie65t (VNI)</code>
+              <strong>Tiếng Việt</strong>
+            </button>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="footer-grid">
+      <section>
+        <div class="snippet-head">
+          <span data-i18n="metricsTitle">Kiểm chứng hồi quy thực tế (2026-11-22)</span>
+        </div>
+        <dl class="metrics-list">
+          <div>
+            <dt data-i18n="metricPrimaryLabel">Bộ chuẩn 9.091 ca</dt>
+            <dd>9,091 / 9,091 (100.00%)</dd>
+          </div>
+          <div>
+            <dt data-i18n="metricSymmetricLabel">Song ngữ 2 chiều (không ngữ cảnh)</dt>
+            <dd>369 / 369 (100.00%)</dd>
+          </div>
+          <div>
+            <dt data-i18n="metricNeverLabel">Bảo toàn tiếng Việt đơn đường</dt>
+            <dd>179 / 179 (100.00%)</dd>
+          </div>
+          <div>
+            <dt data-i18n="metricSizeLabel">Kích thước lõi WASM</dt>
+            <dd>80.6 KB (35.2 KB Brotli)</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section>
+        <div class="snippet-head">
+          <span data-i18n="snippetTitle">Tích hợp vào ứng dụng web</span>
+          <button id="copy-snippet" class="btn-quiet" type="button" data-i18n="copyBtn" style="min-height: 32px; padding: 4px 10px; font-size: 12.5px;">Sao chép</button>
+        </div>
+        <pre class="snippet-block" id="embed-snippet">import { attach } from "@vielotus/core";
+
+const ime = await attach(document.querySelector("textarea"), {
+  inputMethod: "telex",
+  smartBilingual: true,
+  yieldToSystemIme: true,
+});</pre>
+      </section>
+    </footer>
+
+    <p class="scope-note" data-i18n="scopeNote">Chạy lõi C++20 (Sources/VieLotusCoreWindows) biên dịch sang WebAssembly cục bộ 100% trên trình duyệt — không gửi phím bấm ra mạng. Bản macOS sử dụng lõi Swift 6 qua Apple InputMethodKit; trang này kiểm thử thuật toán gõ &amp; song ngữ trên trình duyệt, không phản ánh tương tác IME cấp hệ điều hành trong từng ứng dụng native.</p>
+  </div>
+
+  <script type="module">
+    import { attach, ACTION } from "../dist/vielotus.mjs";
+
+    const STRINGS = {
+      vi: {
+        navHome: "VieLotusIM (Sen Việt)",
+        navDownloads: "Tải xuống",
+        navPrivacy: "Quyền riêng tư",
+        pageTitle: "Sen Việt WebAssembly",
+        booting: "Đang khởi tạo lõi C++20 WebAssembly…",
+        ready: (ms) => `Lõi C++20 WebAssembly, sẵn sàng sau ${ms} ms`,
+        loadFail: "Không thể nạp module WASM",
+        loadFailDetail: (msg) =>
+          `Lỗi nạp SDK (${msg}). Nếu đang mở qua file://, hãy chạy máy chủ tĩnh: python3 -m http.server 8765 tại CrossPlatform/wasm-sdk/`,
+        stateOn: (mode) => `Đang bật (${mode})`,
+        stateOff: "Đang tắt",
+        stateYielded: "Tạm nhường bộ gõ máy",
+        resumeBtn: "Bật lại Sen Việt Web",
+        imeTip:
+          "Đang bật sẵn bộ gõ máy (Sen Việt, EVKey, UniKey)? Hãy chuyển bàn phím sang tiếng Anh (ABC/EN) để gõ thử lõi WebAssembly, hoặc bấm các nút mô phỏng phím thật bên phải.",
+        sheetTitle: "Gõ thử trực tiếp (Telex / VNI + Song ngữ)",
+        simImeBtn: "Thử xung đột IME",
+        clearBtn: "Xoá nội dung",
+        editorPlaceholder:
+          "Thử gõ bằng bàn phím tiếng Anh: Vieejt Nam, DDawsk Lawsk, same as vs chi as, download vs dongdof, github...",
+        telComposingLabel: "Đang ghép",
+        telRawLabel: "Phím thô",
+        telLatencyLabel: "Độ trễ phím gần nhất",
+        ceLabel: "Ô contenteditable",
+        cePlaceholder: "Gõ tiếng Việt trong thẻ div...",
+        pwdLabel: "Ô mật khẩu",
+        pwdBadge: "Tự bỏ qua",
+        pwdPlaceholder: "Giữ nguyên ký tự gốc",
+        configTitle: "Cấu hình lõi engine",
+        optBilingualName: "Song ngữ thông minh",
+        optBilingualDesc: "Tự giữ tiếng Anh theo ngữ cảnh (same as, github)",
+        optModernName: "Bỏ dấu kiểu mới",
+        optModernDesc: "hoà, thuỷ (tắt để dùng hòa, thủy)",
+        optQuickName: "Telex nhanh",
+        optRelaxedName: "Nới vần cuối",
+        optRelaxedDesc: "Cho phép ghép âm địa danh mở rộng",
+        optMacroName: "Gõ tắt (Macro)",
+        optMacroDesc: "Thử gõ hn, hcm, sg, cty + dấu cách",
+        chipsTitle: "Bấm để chạy mô phỏng phím thật",
+        chipsIntro: "Mỗi nút gửi từng phím ASCII thực tế qua WASM vào khung soạn thảo.",
+        metricsTitle: "Kiểm chứng hồi quy thực tế (2026-11-22)",
+        metricPrimaryLabel: "Bộ chuẩn 9.091 ca",
+        metricSymmetricLabel: "Song ngữ 2 chiều (không ngữ cảnh)",
+        metricNeverLabel: "Bảo toàn tiếng Việt đơn đường",
+        metricSizeLabel: "Kích thước lõi WASM",
+        snippetTitle: "Tích hợp vào ứng dụng web",
+        copyBtn: "Sao chép",
+        copiedBtn: "Đã sao chép",
+        copyFallback: "Chọn & Ctrl+C",
+        scopeNote:
+          "Chạy lõi C++20 (Sources/VieLotusCoreWindows) biên dịch sang WebAssembly cục bộ 100% trên trình duyệt — không gửi phím bấm ra mạng. Bản macOS sử dụng lõi Swift 6 qua Apple InputMethodKit; trang này kiểm thử thuật toán gõ & song ngữ trên trình duyệt, không phản ánh tương tác IME cấp hệ điều hành trong từng ứng dụng native.",
+        yieldedBanner: (reasonDesc) =>
+          `Đã phát hiện ${reasonDesc} — Sen Việt Web tự động tạm dừng để tránh xung đột dấu.`,
+        reasons: {
+          compositionstart: "sự kiện compositionstart từ bộ gõ hệ điều hành",
+          "key-composing": "tín hiệu IME đang ghép chữ (keyCode 229)",
+          "key-diacritic": "ký tự tiếng Việt có dấu được bơm trực tiếp từ bộ gõ máy",
+          "input-diacritic": "văn bản có dấu phát sinh từ bộ gõ bên ngoài",
+          persisted: "bộ gõ hệ thống đã được ghi nhận trước đó",
+        },
+      },
+      en: {
+        navHome: "VieLotusIM (Sen Việt)",
+        navDownloads: "Downloads",
+        navPrivacy: "Privacy",
+        pageTitle: "Sen Việt WebAssembly",
+        booting: "Loading C++20 WebAssembly core…",
+        ready: (ms) => `C++20 WebAssembly core, ready in ${ms} ms`,
+        loadFail: "Failed to load WASM module",
+        loadFailDetail: (msg) =>
+          `SDK load error (${msg}). If opening via file://, serve over HTTP: python3 -m http.server 8765 in CrossPlatform/wasm-sdk/`,
+        stateOn: (mode) => `Active (${mode})`,
+        stateOff: "Paused",
+        stateYielded: "Yielded to system IME",
+        resumeBtn: "Re-enable Sen Việt Web",
+        imeTip:
+          "Already running a system Vietnamese IME? Switch your keyboard to English (ABC/EN) to test the WebAssembly core directly, or click any live keystroke replay chip on the right.",
+        sheetTitle: "Live typing sandbox (Telex / VNI + Smart Bilingual)",
+        simImeBtn: "Simulate OS IME",
+        clearBtn: "Clear",
+        editorPlaceholder:
+          "Type with an English keyboard: Vieejt Nam, DDawsk Lawsk, same as vs chi as, download vs dongdof, github...",
+        telComposingLabel: "Composing",
+        telRawLabel: "Raw keys",
+        telLatencyLabel: "Last keystroke latency",
+        ceLabel: "contenteditable field",
+        cePlaceholder: "Type Vietnamese inside a contenteditable div...",
+        pwdLabel: "Password input",
+        pwdBadge: "Auto-skipped",
+        pwdPlaceholder: "Keystrokes stay untouched",
+        configTitle: "Engine options",
+        optBilingualName: "Smart Bilingual",
+        optBilingualDesc: "Keep English words in context (same as, github)",
+        optModernName: "Modern orthography",
+        optModernDesc: "hoà, thuỷ (off for hòa, thủy)",
+        optQuickName: "Quick Telex",
+        optRelaxedName: "Relaxed coda",
+        optRelaxedDesc: "Allow extended place-name syllables",
+        optMacroName: "Text macros",
+        optMacroDesc: "Try hn, hcm, sg, cty + Space",
+        chipsTitle: "Click to replay real keystrokes",
+        chipsIntro: "Each chip feeds live ASCII keys through the WASM core into the editor.",
+        metricsTitle: "Verified regression suite (2026-11-22)",
+        metricPrimaryLabel: "Primary 9,091-case suite",
+        metricSymmetricLabel: "Symmetric no-context (ambiguous_both_sides)",
+        metricNeverLabel: "Single-path VN (whitelist_safe = never)",
+        metricSizeLabel: "WASM binary size",
+        snippetTitle: "Embed in any web app",
+        copyBtn: "Copy",
+        copiedBtn: "Copied",
+        copyFallback: "Select & Ctrl+C",
+        scopeNote:
+          "Runs the C++20 engine (Sources/VieLotusCoreWindows) compiled to freestanding WebAssembly 100% locally in your browser — no keystrokes leave your device. The macOS app uses the Swift 6 engine via Apple InputMethodKit; this page tests engine and bilingual logic rather than OS-level app integration.",
+        yieldedBanner: (reasonDesc) =>
+          `Detected ${reasonDesc} — Sen Việt Web paused automatically to avoid double diacritics.`,
+        reasons: {
+          compositionstart: "a compositionstart event from the OS IME",
+          "key-composing": "an active OS IME composition signal (keyCode 229)",
+          "key-diacritic": "a precomposed Vietnamese character injected by a system IME",
+          "input-diacritic": "accented Vietnamese text inserted by an external IME",
+          persisted: "a previously detected system IME",
+        },
+      },
+    };
+
+    const editor = document.getElementById("editor");
+    const ceEditor = document.getElementById("ce-editor");
+    const pwdGuard = document.getElementById("pwd-guard");
+    const engineMeta = document.getElementById("engine-meta");
+    const stateToggle = document.getElementById("state-toggle");
+    const stateLabel = document.getElementById("state-label");
+    const yieldNotice = document.getElementById("yield-notice");
+    const yieldMessage = document.getElementById("yield-message");
+    const resumeBtn = document.getElementById("resume-btn");
+    const telComposing = document.getElementById("tel-composing");
+    const telRaw = document.getElementById("tel-raw");
+    const telLatency = document.getElementById("tel-latency");
+    const langViBtn = document.getElementById("lang-vi");
+    const langEnBtn = document.getElementById("lang-en");
+
+    const modeTelex = document.getElementById("mode-telex");
+    const modeVni = document.getElementById("mode-vni");
+    const optBilingual = document.getElementById("opt-bilingual");
+    const optModern = document.getElementById("opt-modern");
+    const optQuick = document.getElementById("opt-quick");
+    const optRelaxed = document.getElementById("opt-relaxed");
+    const optMacro = document.getElementById("opt-macro");
+
+    function detectInitialLang() {
+      const q = new URLSearchParams(window.location.search).get("lang");
+      if (q === "vi" || q === "en") return q;
+      return (navigator.language || "vi").toLowerCase().startsWith("vi") ? "vi" : "en";
+    }
+
+    let currentLang = detectInitialLang();
+    let lastBootMs = null;
+    let lastYieldReason = null;
+    let mainCtrl = null;
+    let ceCtrl = null;
+    let replayToken = 0;
+
+    function t() {
+      return STRINGS[currentLang];
+    }
+
+    function applyLanguage(lang) {
+      currentLang = lang === "en" ? "en" : "vi";
+      document.documentElement.lang = currentLang;
+      langViBtn.setAttribute("aria-pressed", String(currentLang === "vi"));
+      langEnBtn.setAttribute("aria-pressed", String(currentLang === "en"));
+
+      const dict = t();
+      for (const el of document.querySelectorAll("[data-i18n]")) {
+        const key = el.dataset.i18n;
+        if (typeof dict[key] === "string") el.textContent = dict[key];
+      }
+      editor.placeholder = dict.editorPlaceholder;
+      ceEditor.setAttribute("data-placeholder", dict.cePlaceholder);
+      pwdGuard.placeholder = dict.pwdPlaceholder;
+
+      if (lastBootMs !== null) {
+        engineMeta.textContent = dict.ready(lastBootMs);
+      } else {
+        engineMeta.textContent = dict.booting;
+      }
+      if (lastYieldReason) {
+        const reasonDesc = dict.reasons[lastYieldReason] ?? lastYieldReason;
+        yieldMessage.textContent = dict.yieldedBanner(reasonDesc);
+      }
+      refreshStatusUi();
+    }
+
+    function currentOptions() {
+      return {
+        inputMethod: modeVni.getAttribute("aria-pressed") === "true" ? "vni" : "telex",
+        smartBilingual: optBilingual.checked,
+        modernOrthography: optModern.checked,
+        quickTelex: optQuick.checked,
+        relaxedCoda: optRelaxed.checked,
+        macroEnabled: optMacro.checked,
+      };
+    }
+
+    function refreshStatusUi() {
+      if (!mainCtrl) return;
+      const dict = t();
+      const modeName = currentOptions().inputMethod === "vni" ? "VNI" : "Telex";
+      if (mainCtrl.isYielded()) {
+        stateToggle.dataset.state = "yielded";
+        stateLabel.textContent = dict.stateYielded;
+        yieldNotice.classList.add("visible");
+      } else if (mainCtrl.isEnabled()) {
+        stateToggle.dataset.state = "on";
+        stateLabel.textContent = dict.stateOn(modeName);
+        yieldNotice.classList.remove("visible");
+      } else {
+        stateToggle.dataset.state = "off";
+        stateLabel.textContent = dict.stateOff;
+        yieldNotice.classList.remove("visible");
+      }
+    }
+
+    function handleForeignIme({ reason }) {
+      lastYieldReason = reason;
+      const dict = t();
+      const desc = dict.reasons[reason] ?? reason;
+      yieldMessage.textContent = dict.yieldedBanner(desc);
+      refreshStatusUi();
+    }
+
+    function handleKeyProcessed({ result, elapsedUs }) {
+      telComposing.textContent = result.composing ? result.composingText : "—";
+      telRaw.textContent = result.composing ? result.rawText : "—";
+      telLatency.textContent = elapsedUs > 0 ? `${elapsedUs.toFixed(1)} µs` : "< 1 µs";
+    }
+
+    function syncAllOptions() {
+      const opts = currentOptions();
+      mainCtrl?.setOptions(opts);
+      ceCtrl?.setOptions(opts);
+      refreshStatusUi();
+    }
+
+    function setInputMethod(method) {
+      modeTelex.setAttribute("aria-pressed", String(method === "telex"));
+      modeVni.setAttribute("aria-pressed", String(method === "vni"));
+      syncAllOptions();
+    }
+
+    async function init() {
+      applyLanguage(currentLang);
+      const t0 = performance.now();
+      mainCtrl = await attach(editor, {
+        ...currentOptions(),
+        yieldToSystemIme: true,
+        persistForeignIme: false,
+        onForeignIme: handleForeignIme,
+        onStateChange: refreshStatusUi,
+        onKeyProcessed: handleKeyProcessed,
+      });
+
+      ceCtrl = await attach(ceEditor, {
+        ...currentOptions(),
+        yieldToSystemIme: true,
+        persistForeignIme: false,
+        onKeyProcessed: handleKeyProcessed,
+      });
+
+      await attach(pwdGuard);
+
+      lastBootMs = (performance.now() - t0).toFixed(1);
+      engineMeta.textContent = t().ready(lastBootMs);
+      refreshStatusUi();
+    }
+
+    langViBtn.addEventListener("click", () => applyLanguage("vi"));
+    langEnBtn.addEventListener("click", () => applyLanguage("en"));
+    modeTelex.addEventListener("click", () => setInputMethod("telex"));
+    modeVni.addEventListener("click", () => setInputMethod("vni"));
+    for (const cb of [optBilingual, optModern, optQuick, optRelaxed, optMacro]) {
+      cb.addEventListener("change", syncAllOptions);
+    }
+
+    stateToggle.addEventListener("click", () => {
+      if (!mainCtrl) return;
+      const next = !mainCtrl.isEnabled();
+      mainCtrl.setEnabled(next);
+      ceCtrl?.setEnabled(next);
+      if (next) lastYieldReason = null;
+      refreshStatusUi();
+      editor.focus();
+    });
+
+    resumeBtn.addEventListener("click", () => {
+      mainCtrl?.setEnabled(true);
+      ceCtrl?.setEnabled(true);
+      lastYieldReason = null;
+      refreshStatusUi();
+      editor.focus();
+    });
+
+    document.getElementById("clear-btn").addEventListener("click", () => {
+      replayToken++;
+      editor.value = "";
+      mainCtrl?.resetContext();
+      telComposing.textContent = "—";
+      telRaw.textContent = "—";
+      telLatency.textContent = "—";
+      editor.focus();
+    });
+
+    document.getElementById("sim-ime-btn").addEventListener("click", () => {
+      editor.dispatchEvent(new Event("compositionstart"));
+    });
+
+    document.getElementById("copy-snippet").addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      const text = document.getElementById("embed-snippet").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = t().copiedBtn;
+        setTimeout(() => { btn.textContent = t().copyBtn; }, 1600);
+      } catch {
+        btn.textContent = t().copyFallback;
+      }
+    });
+
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    document.getElementById("sample-chips").addEventListener("click", async (e) => {
+      const chip = e.target.closest(".sample-chip");
+      if (!chip || !mainCtrl) return;
+
+      const myToken = ++replayToken;
+      const mode = chip.dataset.mode || "telex";
+      const seq = chip.dataset.seq || "";
+
+      setInputMethod(mode);
+      if (!mainCtrl.isEnabled()) {
+        mainCtrl.setEnabled(true);
+        lastYieldReason = null;
+      }
+      editor.focus();
+
+      if (editor.value.length > 0 && !/\s$/.test(editor.value)) {
+        editor.setRangeText(" ", editor.value.length, editor.value.length, "end");
+      }
+      editor.setSelectionRange(editor.value.length, editor.value.length);
+      mainCtrl.resetContext();
+
+      for (const ch of seq) {
+        if (myToken !== replayToken) return;
+        const isBs = ch === "<";
+        const t0 = performance.now();
+        const res = isBs ? mainCtrl.engine.backspace() : mainCtrl.engine.feed(ch);
+        const elapsedUs = (performance.now() - t0) * 1000;
+
+        const pos = editor.selectionEnd;
+        if (res.action === ACTION.REPLACE) {
+          editor.setRangeText(res.text, Math.max(0, pos - res.backspaces), pos, "end");
+        } else if (res.action === ACTION.COMMIT) {
+          if (res.isOverride) {
+            editor.setRangeText(res.text + ch, Math.max(0, pos - res.backspaces), pos, "end");
+          } else {
+            editor.setRangeText(ch, pos, pos, "end");
+          }
+        } else if (res.action === ACTION.PASSTHROUGH) {
+          if (isBs && pos > 0) {
+            editor.setRangeText("", pos - 1, pos, "end");
+          } else if (!isBs) {
+            editor.setRangeText(ch, pos, pos, "end");
+          }
+        }
+        handleKeyProcessed({ result: res, elapsedUs });
+        if (!reducedMotion) {
+          await new Promise((r) => setTimeout(r, 24));
+        }
+      }
+    });
+
+    init().catch((err) => {
+      engineMeta.textContent = t().loadFail;
+      yieldMessage.textContent = t().loadFailDetail(err.message);
+      yieldNotice.classList.add("visible");
+    });
+  </script>
+</body>
+</html>

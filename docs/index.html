@@ -18,8 +18,8 @@
 <body>
   <header>
     <h1>VieLotusIM (Sen Việt)</h1>
-    <p>Vietnamese input method. This repository contains the macOS Swift engine and InputMethodKit app, and the C++20 Windows and Linux engines and adapters.</p>
-    <p><a href="https://github.com/stevedat/VieLotus-IM">Source repository</a> · <a href="https://github.com/stevedat/VieLotus-IM/releases/latest">Releases</a> · <a href="#sec-upstream">Upstream contributions</a> · <a href="https://github.com/stevedat/VieLotus-IM/blob/main/README.vi.md">Tiếng Việt</a></p>
+    <p>Vietnamese input method. This repository contains the macOS Swift engine and InputMethodKit app, the C++20 Windows and Linux engines and adapters, and a freestanding WebAssembly SDK.</p>
+    <p><a href="try/">Try online (WebAssembly)</a> · <a href="https://github.com/stevedat/VieLotus-IM">Source repository</a> · <a href="https://github.com/stevedat/VieLotus-IM/releases/latest">Releases</a> · <a href="#sec-upstream">Upstream contributions</a> · <a href="https://github.com/stevedat/VieLotus-IM/blob/main/README.vi.md">Tiếng Việt</a></p>
   </header>
 
   <main>
@@ -27,6 +27,7 @@
     <ul>
       <li>macOS: Swift engine, InputMethodKit app, tests and CLI regression suite.</li>
       <li>Windows and Linux: C++20 engine and native input method adapters.</li>
+      <li>WebAssembly: freestanding C++20 <code>wasm32</code> SDK (<code>CrossPlatform/wasm-sdk/</code>) and <a href="try/">browser playground</a> built from the same C++20 engine source.</li>
       <li>iOS and Android app projects are distributed separately and are not in this repository.</li>
     </ul>
 
@@ -38,7 +39,7 @@ swift run VieLotusCLI --benchmark --json</code></pre>
     <h2>Regression suite</h2>
     <p>The checked-in 9,091-case primary suite currently passes 9,091/9,091. In the symmetric no-context replay, 362/369 (98.10%) pass; the unique-path preservation group passes 179/179 (100%). These figures describe the checked-in CLI suite, not behavior in every app or device. Run the command above to reproduce them.</p>
 
-    <h2>Downloads</h2>
+    <h2 id="downloads">Downloads</h2>
     <table>
       <thead><tr><th>Platform</th><th>Source / download</th></tr></thead>
       <tbody>
