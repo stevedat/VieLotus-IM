@@ -26,6 +26,18 @@
 #ifndef TF_ES_READ
 #define TF_ES_READ 0x00000002
 #endif
+#ifndef TF_ES_READWRITE
+#define TF_ES_READWRITE 0x00000006
+#endif
+#ifndef TF_ES_ASYNCDONTCARE
+#define TF_ES_ASYNCDONTCARE 0x80000000
+#endif
+#ifndef TF_SD_READONLY
+#define TF_SD_READONLY 0x00000001
+#endif
+#ifndef TF_SS_TRANSITORY
+#define TF_SS_TRANSITORY 0x00000004
+#endif
 
 namespace {
 
@@ -695,6 +707,7 @@ bool IsTargetContextReadOnly(ITfContext *pic) {
     return false;
 }
 
+
 } // namespace
 
 void CVieLotusTIP::SyncWin32EditCaretBeforeKey() {
@@ -807,16 +820,50 @@ void CVieLotusTIP::EndActiveComposition(ITfContext *pic) {
         &m_pCompositionContext,
         static_cast<ITfCompositionSink *>(this)
     );
+    HRESULT hrReq = E_OUTOFMEMORY;
+    HRESULT hrSession = E_OUTOFMEMORY;
+    bool wasExecuted = false;
+    bool usedAsyncFallback = false;
     if (pEdit) {
-        HRESULT hrSession = S_OK;
-        HRESULT hrReq = targetCtx->RequestEditSession(m_tfClientId, pEdit, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hrSession);
-        if (FAILED(hrReq) || FAILED(hrSession)) {
+        // Prefer a synchronous edit session so ITfComposition::EndComposition finishes
+        // before non-eaten keys (e.g. Enter/Tab/Arrows in Chromium web editors) reach the host.
+        // If the document lock rejects TF_ES_SYNC (TS_E_SYNCHRONOUS / TF_E_SYNCHRONOUS / TF_E_LOCKED)
+        // without running DoEditSession, fall back once to TF_ES_ASYNCDONTCARE | TF_ES_READWRITE.
+        hrSession = S_OK;
+        hrReq = targetCtx->RequestEditSession(
+            m_tfClientId,
+            pEdit,
+            TF_ES_SYNC | TF_ES_READWRITE,
+            &hrSession
+        );
+        wasExecuted = pEdit->WasExecuted();
+        if (vielotus_tsf_guard::ShouldFallbackEndCompositionAsync(
+                static_cast<int32_t>(hrReq),
+                static_cast<int32_t>(hrSession),
+                wasExecuted
+            )) {
+            usedAsyncFallback = true;
+            hrSession = S_OK;
+            hrReq = targetCtx->RequestEditSession(
+                m_tfClientId,
+                pEdit,
+                TF_ES_ASYNCDONTCARE | TF_ES_READWRITE,
+                &hrSession
+            );
+            wasExecuted = pEdit->WasExecuted();
+        }
+        if (vielotus_tsf_guard::ShouldReleaseCompositionAfterEndAttempt(
+                static_cast<int32_t>(hrReq),
+                static_cast<int32_t>(hrSession),
+                wasExecuted
+            )) {
             ReleaseCompositionRefs();
         }
         pEdit->Release();
     } else {
         ReleaseCompositionRefs();
     }
+    (void)usedAsyncFallback;
     targetCtx->Release();
 }
 

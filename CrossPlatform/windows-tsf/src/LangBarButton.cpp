@@ -7,14 +7,46 @@
 
 namespace {
 
-// Renders a crisp, DPI-aware, premultiplied 32-bit BGRA rounded-square badge icon ('V' or 'E')
-// using pure Win32 GDI (no GDI+ initialization inside arbitrary host processes).
-// Ownership of the returned HICON transfers to the caller (Windows Shell calls DestroyIcon).
-HICON CreateModeBadgeIcon(bool isVietnamese) {
+constexpr UINT kLangBarSvIconResourceId = 102u;
+constexpr UINT kFallbackAppIconResourceId = 101u;
+
+int ResolveLangBarIconSize() {
     int size = GetSystemMetrics(SM_CXSMICON);
     if (size < 16) size = 16;
     if (size > 64) size = 64;
+    return size;
+}
 
+// Loads the tight-cropped Sen Viet lotus 'SV' icon embedded in VieLotusTIP.dll (resource 102).
+// Deliberately omits LR_SHARED because ITfLangBarItemButton::GetIcon transfers HICON ownership
+// to the Windows Shell, which calls DestroyIcon() on the returned handle.
+HICON LoadVietnameseSvIcon(int size) {
+    if (!g_hInst) return nullptr;
+    HICON hIcon = static_cast<HICON>(LoadImageW(
+        g_hInst,
+        MAKEINTRESOURCEW(kLangBarSvIconResourceId),
+        IMAGE_ICON,
+        size,
+        size,
+        LR_DEFAULTCOLOR
+    ));
+    if (!hIcon) {
+        hIcon = static_cast<HICON>(LoadImageW(
+            g_hInst,
+            MAKEINTRESOURCEW(kFallbackAppIconResourceId),
+            IMAGE_ICON,
+            size,
+            size,
+            LR_DEFAULTCOLOR
+        ));
+    }
+    return hIcon;
+}
+
+// Renders a crisp, DPI-aware, premultiplied 32-bit BGRA rounded-square badge icon ('V' or 'E')
+// using pure Win32 GDI (no GDI+ initialization inside arbitrary host processes).
+// Ownership of the returned HICON transfers to the caller (Windows Shell calls DestroyIcon).
+HICON CreateModeBadgeIcon(bool isVietnamese, int size) {
     HDC hScreenDc = GetDC(nullptr);
     if (!hScreenDc) return nullptr;
 
@@ -383,7 +415,16 @@ STDMETHODIMP CLangBarItemButton::OnMenuSelect(UINT wID) {
 
 STDMETHODIMP CLangBarItemButton::GetIcon(HICON *phIcon) {
     if (!phIcon) return E_INVALIDARG;
-    *phIcon = CreateModeBadgeIcon(m_isVietnamese);
+    const int size = ResolveLangBarIconSize();
+    if (vielotus_tsf_guard::ResolveLangBarIconKind(m_isVietnamese) ==
+        vielotus_tsf_guard::LangBarIconKind::VietnameseSvLogo) {
+        HICON hSv = LoadVietnameseSvIcon(size);
+        if (hSv) {
+            *phIcon = hSv;
+            return S_OK;
+        }
+    }
+    *phIcon = CreateModeBadgeIcon(m_isVietnamese, size);
     return (*phIcon != nullptr) ? S_OK : E_FAIL;
 }
 

@@ -84,8 +84,14 @@ void EnsureDefaultPrefsInitializedOnce() {
             WriteRegDword(hKey, c_szPrefsMacroEnabledVal, 1u);
         }
         if (!ReadRegDword(hKey, c_szPrefsStartWithWindowsVal, dummy)) {
-            WriteRegDword(hKey, c_szPrefsStartWithWindowsVal, 1u);
+            WriteRegDword(hKey, c_szPrefsStartWithWindowsVal, 0u);
         }
+    }
+    if (!ReadRegDword(hKey, c_szPrefsDefaultMigrationVal, migVer) || migVer < 12u) {
+        // One-time v2.0.9+ zero-background-process migration:
+        // Disable legacy System Tray autostart cleanly while preserving all user typing preferences.
+        WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 12u);
+        WriteRegDword(hKey, c_szPrefsStartWithWindowsVal, 0u);
     }
 
     RegCloseKey(hKey);
@@ -136,7 +142,7 @@ void SavePersistedVniPreference(bool isVni) {
             &hKey,
             nullptr
         ) == ERROR_SUCCESS && hKey) {
-        WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 11u);
+        WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 12u);
         WriteRegDword(hKey, c_szPrefsInputMethodVal, isVni ? 1u : 0u);
         RegCloseKey(hKey);
     }
@@ -258,7 +264,7 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs, bool fromSettingsApp) 
             &hKey,
             nullptr
         ) == ERROR_SUCCESS && hKey) {
-        WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 11u);
+        WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 12u);
         WriteRegDword(hKey, c_szPrefsInputMethodVal, prefs.isVni ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsVnEnabledVal, prefs.vietnameseEnabled ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsSmartBilingualVal, prefs.smartBilingual ? 1u : 0u);

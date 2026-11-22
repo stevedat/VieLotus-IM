@@ -6,7 +6,10 @@ namespace vielotus_tsf_guard {
 
 // Standard Windows TSF HRESULT values represented portably (no <windows.h> dependency)
 // so unit tests can execute natively on macOS/Linux as well as Windows.
-inline constexpr int32_t kTfSAsync = 0x00040300;
+inline constexpr int32_t kTfSAsync       = 0x00040300;
+inline constexpr int32_t kTsESynchronous = static_cast<int32_t>(0x80040208u);
+inline constexpr int32_t kTfESynchronous = static_cast<int32_t>(0x80040508u);
+inline constexpr int32_t kTfELocked      = static_cast<int32_t>(0x80040500u);
 inline constexpr uint32_t kVkSpace = 0x20u;
 inline constexpr uint32_t kVkKeyS = 0x53u;
 
@@ -157,6 +160,40 @@ inline bool ShouldEatKeyAfterEdit(TsfEditOutcome outcome) {
            outcome == TsfEditOutcome::QueuedAsync;
 }
 
+// Sync-first ITfComposition::EndComposition retry & ref-release policy.
+// EndActiveComposition tries TF_ES_SYNC | TF_ES_READWRITE first so compositionend
+// finishes synchronously before non-eaten keys (e.g. Enter/Tab/Arrows in Chromium web
+// editors) are dispatched by the host; if the document lock rejects TF_ES_SYNC
+// (TS_E_SYNCHRONOUS / TF_E_SYNCHRONOUS / TF_E_LOCKED) without running DoEditSession,
+// fall back once to TF_ES_ASYNCDONTCARE | TF_ES_READWRITE.
+inline bool ShouldFallbackEndCompositionAsync(
+    int32_t hrReq,
+    int32_t hrSession,
+    bool wasExecuted
+) {
+    if (wasExecuted) {
+        return false;
+    }
+    if (hrReq >= 0 && hrSession == kTfSAsync) {
+        return false;
+    }
+    return true;
+}
+
+inline bool ShouldReleaseCompositionAfterEndAttempt(
+    int32_t hrReq,
+    int32_t hrSession,
+    bool wasExecuted
+) {
+    if (wasExecuted) {
+        return hrReq < 0 || hrSession < 0;
+    }
+    if (hrReq >= 0 && hrSession == kTfSAsync) {
+        return false;
+    }
+    return true;
+}
+
 inline const char *EditOutcomeName(TsfEditOutcome outcome) {
     switch (outcome) {
     case TsfEditOutcome::Succeeded:     return "OK";
@@ -239,6 +276,18 @@ inline bool ShouldNotifyLangBarUpdate(
     bool forceRefresh
 ) {
     return forceRefresh || (prevVietnamese != nextVietnamese) || (prevVni != nextVni);
+}
+
+// Language Bar icon policy:
+//  - Vietnamese ON  -> crisp tight-cropped Sen Viet lotus 'SV' icon (resource 102 in VieLotusTIP.dll)
+//  - English OFF    -> neutral Slate '[E]' rounded-square badge for instant visual contrast
+enum class LangBarIconKind {
+    VietnameseSvLogo = 0,
+    EnglishSlateBadge = 1
+};
+
+inline LangBarIconKind ResolveLangBarIconKind(bool isVietnamese) {
+    return isVietnamese ? LangBarIconKind::VietnameseSvLogo : LangBarIconKind::EnglishSlateBadge;
 }
 
 } // namespace vielotus_tsf_guard

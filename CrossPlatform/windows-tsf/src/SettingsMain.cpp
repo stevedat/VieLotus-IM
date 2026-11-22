@@ -769,10 +769,20 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         return 0;
     }
 
+    // Zero-background-process UX: legacy --startup / --tray launches clean up any stale Run entry and exit immediately.
+    if (isStartupMode) {
+        SyncStartWithWindowsRegistry(false);
+        return 0;
+    }
+
     // If invoked as VieLotus-Setup-*.exe (or with --setup), run the interactive Setup Wizard UI
-    if (!isStartupMode && IsSetupExecutableInvocation(cmdLine)) {
+    if (IsSetupExecutableInvocation(cmdLine)) {
         bool openSettings = false;
         if (!RunInteractiveSetupWizard(hInstance, openSettings)) {
+            return 0;
+        }
+        SyncStartWithWindowsRegistry(false);
+        if (!openSettings) {
             return 0;
         }
         std::wstring installedExe = GetProgramFilesInstallDir() + L"\\VieLotusSettings.exe";
@@ -781,19 +791,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
                 nullptr,
                 L"open",
                 installedExe.c_str(),
-                openSettings ? L"--settings" : L"--startup",
+                L"--settings",
                 GetProgramFilesInstallDir().c_str(),
-                openSettings ? SW_SHOWNORMAL : SW_HIDE
+                SW_SHOWNORMAL
             );
-            return 0;
-        }
-        if (!openSettings) {
             return 0;
         }
     }
 
     // Fast-path single-instance wake for explicit --settings launches (<5ms, zero UAC, zero DLL load).
-    if (!isStartupMode && isExplicitSettings && WakeExistingSettingsWindow()) {
+    if (isExplicitSettings && WakeExistingSettingsWindow()) {
         return 0;
     }
 
@@ -801,31 +808,29 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     std::wstring localDll = exeDir + L"\\VieLotusTIP.dll";
     std::wstring localDll32 = exeDir + L"\\VieLotusTIP32.dll";
 
-    // Auto-provision MSIX package updates on interactive Store launch (never during --startup or --settings).
-    if (!isStartupMode && !isExplicitSettings && !IsTipRegisteredAndUpToDate(localDll, localDll32)) {
+    // Auto-provision MSIX package updates on interactive Store launch (never during --settings).
+    if (!isExplicitSettings && !IsTipRegisteredAndUpToDate(localDll, localDll32)) {
         if (vielotus_win_installer::IsProcessElevated()) {
             PerformElevatedMsixTipProvisioning();
         } else {
             RunElevatedSelfCommand(L"--install-msix-ime", 30000);
         }
-    } else if (!isStartupMode && WakeExistingSettingsWindow()) {
+    } else if (WakeExistingSettingsWindow()) {
         return 0;
     }
 
     if (ResolveExistingTipDllPath().empty()) {
-        if (!isStartupMode) {
-            MessageBoxW(
-                nullptr,
-                L"Kh\u00F4ng t\u00ECm th\u1EA5y t\u1EC7p nh\u00E2n b\u1ED9 g\u00F5 VieLotusTIP.dll.",
-                L"Sen Vi\u1EC7t (VieLotusIM)",
-                MB_ICONERROR | MB_OK
-            );
-        }
-        return isStartupMode ? 0 : 1;
+        MessageBoxW(
+            nullptr,
+            L"Kh\u00F4ng t\u00ECm th\u1EA5y t\u1EC7p nh\u00E2n b\u1ED9 g\u00F5 VieLotusTIP.dll.",
+            L"Sen Vi\u1EC7t (VieLotusIM)",
+            MB_ICONERROR | MB_OK
+        );
+        return 1;
     }
 
     HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    ShowVieLotusSettingsDialog(hInstance, nullptr, isStartupMode, &InvokeTipActivateUserProfiles);
+    ShowVieLotusSettingsDialog(hInstance, nullptr, false, &InvokeTipActivateUserProfiles);
     if (SUCCEEDED(hrCo)) {
         CoUninitialize();
     }

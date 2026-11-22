@@ -1199,7 +1199,7 @@ int main(int argc, char **argv) {
         }
     };
 
-    int tsfTotal = 29, tsfPass = 0;
+    int tsfTotal = 31, tsfPass = 0;
     auto checkTsf = [&](int id, bool cond, const char *desc, const std::string &actual) {
         if (cond) {
             tsfPass++;
@@ -1757,6 +1757,43 @@ int main(int argc, char **argv) {
         ok = ok && !ShouldIncludeContactInFeedbackChannel(true);
         ok = ok && ShouldIncludeContactInFeedbackChannel(false);
         checkTsf(29, ok, "SettingsRevision override sync & public feedback contact strip", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 30: Language Bar icon selection (Vietnamese -> SV lotus logo, English -> Slate [E] badge)
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        ok = ok && (ResolveLangBarIconKind(true) == LangBarIconKind::VietnameseSvLogo);
+        ok = ok && (ResolveLangBarIconKind(false) == LangBarIconKind::EnglishSlateBadge);
+        checkTsf(30, ok, "Language Bar SV logo (VN) / Slate [E] (EN) icon policy", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 31: Sync-first EndActiveComposition fallback & ref-release policy (issue #173 Chromium Enter race)
+    {
+        using namespace vielotus_tsf_guard;
+        constexpr int32_t kSOk = 0;
+        constexpr int32_t kEFail = static_cast<int32_t>(0x80004005u);
+        bool ok = true;
+        // 1. Sync succeeded immediately -> no async fallback, refs already cleared in DoEditSession
+        ok = ok && !ShouldFallbackEndCompositionAsync(kSOk, kSOk, true);
+        ok = ok && !ShouldReleaseCompositionAfterEndAttempt(kSOk, kSOk, true);
+        // 2. Sync executed but returned session error -> no retry, release stale refs
+        ok = ok && !ShouldFallbackEndCompositionAsync(kSOk, kEFail, true);
+        ok = ok && ShouldReleaseCompositionAfterEndAttempt(kSOk, kEFail, true);
+        // 3. Document locked -> TS_E_SYNCHRONOUS / TF_E_SYNCHRONOUS / TF_E_LOCKED -> fallback to TF_ES_ASYNCDONTCARE
+        ok = ok && ShouldFallbackEndCompositionAsync(kSOk, kTsESynchronous, false);
+        ok = ok && ShouldFallbackEndCompositionAsync(kSOk, kTfESynchronous, false);
+        ok = ok && ShouldFallbackEndCompositionAsync(kTfESynchronous, kSOk, false);
+        ok = ok && ShouldFallbackEndCompositionAsync(kSOk, kTfELocked, false);
+        ok = ok && ShouldFallbackEndCompositionAsync(kSOk, kSOk, false);
+        // 4. Queued async (TF_S_ASYNC) -> do NOT retry again and do NOT prematurely release refs
+        ok = ok && !ShouldFallbackEndCompositionAsync(kSOk, kTfSAsync, false);
+        ok = ok && !ShouldReleaseCompositionAfterEndAttempt(kSOk, kTfSAsync, false);
+        // 5. Final fallback failed without executing -> must release stale composition refs
+        ok = ok && ShouldReleaseCompositionAfterEndAttempt(kEFail, kSOk, false);
+        ok = ok && ShouldReleaseCompositionAfterEndAttempt(kSOk, kTfELocked, false);
+        ok = ok && ShouldReleaseCompositionAfterEndAttempt(kSOk, kSOk, false);
+        checkTsf(31, ok, "Sync-first EndActiveComposition fallback & ref-release policy", ok ? "OK" : "MISMATCH");
     }
 
     // =========================================================================

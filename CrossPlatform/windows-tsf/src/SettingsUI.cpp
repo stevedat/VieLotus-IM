@@ -34,48 +34,10 @@ static HINSTANCE g_settingsInst{nullptr};
 static const WCHAR c_szRunSubKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 static const WCHAR c_szRunValueName[] = L"VieLotusIM";
 
-enum {
-    IDM_TRAY_TELEX          = 2901,
-    IDM_TRAY_VNI            = 2902,
-    IDM_TRAY_SENFLEX        = 2903,
-    IDM_TRAY_MACRO          = 2904,
-    IDM_TRAY_START_WITH_WIN = 2905,
-    IDM_TRAY_OPEN_SETTINGS  = 2906,
-    IDM_TRAY_FEEDBACK       = 2907,
-    IDM_TRAY_CHECK_UPDATE   = 2908,
-    IDM_TRAY_EXIT           = 2909
-};
-
 static HINSTANCE ResolveSettingsInstance(HINSTANCE hInst) {
     if (hInst) return hInst;
     if (g_settingsInst) return g_settingsInst;
     return GetModuleHandleW(nullptr);
-}
-
-static std::wstring ResolveInstalledSettingsExePath() {
-    WCHAR pf[MAX_PATH] = {};
-    if (ExpandEnvironmentStringsW(L"%ProgramW6432%\\VieLotusIM\\VieLotusSettings.exe", pf, MAX_PATH) > 0 && pf[0] != L'%') {
-        if (GetFileAttributesW(pf) != INVALID_FILE_ATTRIBUTES) {
-            return std::wstring(pf);
-        }
-    }
-    const WCHAR *fallbackPf = L"C:\\Program Files\\VieLotusIM\\VieLotusSettings.exe";
-    if (GetFileAttributesW(fallbackPf) != INVALID_FILE_ATTRIBUTES) {
-        return std::wstring(fallbackPf);
-    }
-    WCHAR selfPath[MAX_PATH] = {};
-    if (GetModuleFileNameW(ResolveSettingsInstance(nullptr), selfPath, MAX_PATH) > 0) {
-        std::wstring s(selfPath);
-        size_t pos = s.find_last_of(L"\\/");
-        if (pos != std::wstring::npos) {
-            std::wstring candidate = s.substr(0, pos + 1) + L"VieLotusSettings.exe";
-            if (GetFileAttributesW(candidate.c_str()) != INVALID_FILE_ATTRIBUTES) {
-                return candidate;
-            }
-        }
-        return s;
-    }
-    return L"C:\\Program Files\\VieLotusIM\\VieLotusSettings.exe";
 }
 
 // ============================================================================
@@ -249,7 +211,6 @@ enum class HitRegion : int {
     TileDevMode,
     ChipQuickTelex,
     ChipRelaxedCoda,
-    TileStartWithWin,
     BtnWinTypingSettings,
     BtnClearTestEdit,
     BtnNidoOfficeExplore,
@@ -266,7 +227,6 @@ enum class HitRegion : int {
 };
 
 struct SettingsDialogInitParams {
-    bool canHideToTrayOnClose{true};
     VieLotusActivateProfilesFn onActivateProfiles{nullptr};
 };
 
@@ -276,10 +236,6 @@ struct BentoSettingsState {
     HitRegion hoveredRegion{HitRegion::None};
     float dpiScale{1.0f};
     bool isDark{false};
-    bool trayRegistered{false};
-    bool canHideToTrayOnClose{true};
-    UINT wmTaskbarCreated{0};
-    NOTIFYICONDATAW nid{};
     Image *pAppIcon{nullptr};
     HICON hWndIconBig{nullptr};
     HICON hWndIconSmall{nullptr};
@@ -483,8 +439,7 @@ static HitRegion HitTestBentoUI(const BentoSettingsState *st, float xDip, float 
         if (PtInDipRect(xDip, yDip, 20.0f, 256.0f, 157.0f, 66.0f)) return HitRegion::ChipQuickTelex;
         if (PtInDipRect(xDip, yDip, 177.0f, 256.0f, 157.0f, 66.0f)) return HitRegion::ChipRelaxedCoda;
 
-        if (PtInDipRect(xDip, yDip, 522.0f, 264.0f, 68.0f, 24.0f)) return HitRegion::BtnWinTypingSettings;
-        if (PtInDipRect(xDip, yDip, 346.0f, 256.0f, 314.0f, 66.0f)) return HitRegion::TileStartWithWin;
+        if (PtInDipRect(xDip, yDip, 346.0f, 256.0f, 314.0f, 66.0f)) return HitRegion::BtnWinTypingSettings;
 
         if (PtInDipRect(xDip, yDip, 594.0f, 338.0f, 58.0f, 28.0f)) return HitRegion::BtnClearTestEdit;
     } else {
@@ -949,16 +904,14 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
             DrawBentoFeatureTile(
                 g, s, isDark, 346.0f, 256.0f, 314.0f, 66.0f,
-                st->prefs.startWithWindows,
-                st->hoveredRegion == HitRegion::TileStartWithWin || st->hoveredRegion == HitRegion::BtnWinTypingSettings,
-                blueCol,
-                L"WN",
-                L"Kh\u1EDFi \u0111\u1ED9ng c\u00F9ng Windows",
-                st->prefs.startWithWindows
-                    ? L"T\u1EF1 ch\u1EA1y ng\u1EA7m & gi\u1EEF ki\u1EC3u g\u00F5 khi m\u1EDF m\u00E1y"
-                    : L"Kh\u00F4ng t\u1EF1 ch\u1EA1y khi kh\u1EDFi \u0111\u1ED9ng Windows",
-                L"Ph\u00EDm t\u1EAFt \u2197",
                 true,
+                st->hoveredRegion == HitRegion::BtnWinTypingSettings,
+                blueCol,
+                L"SV",
+                L"Thanh ng\u00F4n ng\u1EEF Windows",
+                L"N\u00FAt SV/E c\u1EA1nh VIE \u2022 Ctrl+Space \u0111\u1ED5i VI/EN",
+                L"Ph\u00EDm t\u1EAFt \u2197",
+                false,
                 fTileTitle, fSub, fPill, sfLeft, sfCenter
             );
 
@@ -1131,148 +1084,6 @@ static void OpenMicrosoftStorePage(HWND hwnd) {
             nullptr,
             SW_SHOWNORMAL
         );
-    }
-}
-
-static void UpdateTrayIconState(HWND hwnd, BentoSettingsState *st) {
-    if (!hwnd || !st) return;
-    st->nid.cbSize = sizeof(NOTIFYICONDATAW);
-    st->nid.hWnd = hwnd;
-    st->nid.uID = 1;
-    st->nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
-    st->nid.uCallbackMessage = kWmVieLotusTrayCallback;
-    st->nid.hIcon = st->hWndIconSmall ? st->hWndIconSmall
-                                      : (st->hWndIconBig ? st->hWndIconBig : LoadEmbeddedAppIcon(16, 16));
-    StringCchPrintfW(
-        st->nid.szTip,
-        ARRAYSIZE(st->nid.szTip),
-        L"Sen Vi\u1EC7t (VieLotusIM) \u2014 %s%s",
-        st->prefs.isVni ? L"Chu\u1EA9n VNI" : L"Chu\u1EA9n Telex",
-        st->prefs.senFlex ? L" \u2022 D\u1EA5u tr\u01B0\u1EDBc \u00E2m" : L""
-    );
-    if (st->trayRegistered) {
-        Shell_NotifyIconW(NIM_MODIFY, &st->nid);
-    } else {
-        st->trayRegistered = (Shell_NotifyIconW(NIM_ADD, &st->nid) != FALSE);
-    }
-}
-
-static void RemoveTrayIconState(BentoSettingsState *st) {
-    if (st && st->trayRegistered) {
-        Shell_NotifyIconW(NIM_DELETE, &st->nid);
-        st->trayRegistered = false;
-    }
-}
-
-static void ShowTrayContextMenu(HWND hwnd, BentoSettingsState *st) {
-    if (!hwnd || !st) return;
-    LoadVieLotusPrefs(st->prefs);
-
-    HMENU hMenu = CreatePopupMenu();
-    if (!hMenu) return;
-
-    AppendMenuW(
-        hMenu,
-        MF_STRING | (!st->prefs.isVni ? MF_CHECKED : MF_UNCHECKED),
-        IDM_TRAY_TELEX,
-        L"Chu\u1EA9n Telex (M\u1EB7c \u0111\u1ECBnh)"
-    );
-    AppendMenuW(
-        hMenu,
-        MF_STRING | (st->prefs.isVni ? MF_CHECKED : MF_UNCHECKED),
-        IDM_TRAY_VNI,
-        L"Chu\u1EA9n VNI (Ph\u00EDm s\u1ED1 1\u20139)"
-    );
-    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(
-        hMenu,
-        MF_STRING | (st->prefs.senFlex ? MF_CHECKED : MF_UNCHECKED),
-        IDM_TRAY_SENFLEX,
-        L"Cho ph\u00E9p g\u00F5 d\u1EA5u tr\u01B0\u1EDBc \u00E2m (dducj \u2192 \u0111\u1EE5c)"
-    );
-    AppendMenuW(
-        hMenu,
-        MF_STRING | (st->prefs.macroEnabled ? MF_CHECKED : MF_UNCHECKED),
-        IDM_TRAY_MACRO,
-        L"B\u1EA3ng g\u00F5 t\u1EAFt (Macro)"
-    );
-    AppendMenuW(
-        hMenu,
-        MF_STRING | (st->prefs.startWithWindows ? MF_CHECKED : MF_UNCHECKED),
-        IDM_TRAY_START_WITH_WIN,
-        L"Kh\u1EDFi \u0111\u1ED9ng c\u00F9ng Windows"
-    );
-    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(hMenu, MF_STRING, IDM_TRAY_OPEN_SETTINGS, L"M\u1EDF B\u1EA3ng \u0110i\u1EC1u Khi\u1EC3n Sen Vi\u1EC7t...");
-    AppendMenuW(hMenu, MF_STRING, IDM_TRAY_CHECK_UPDATE, L"C\u1EADp nh\u1EADt qua Microsoft Store...");
-    AppendMenuW(hMenu, MF_STRING, IDM_TRAY_FEEDBACK, L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i nhanh...");
-    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(hMenu, MF_STRING, IDM_TRAY_EXIT, L"Tho\u00E1t khay h\u1EC7 th\u1ED1ng");
-
-    SetMenuDefaultItem(hMenu, IDM_TRAY_OPEN_SETTINGS, FALSE);
-
-    POINT pt{};
-    GetCursorPos(&pt);
-    SetForegroundWindow(hwnd);
-    UINT cmd = TrackPopupMenu(
-        hMenu,
-        TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_BOTTOMALIGN,
-        pt.x, pt.y, 0, hwnd, nullptr
-    );
-    PostMessageW(hwnd, WM_NULL, 0, 0);
-    DestroyMenu(hMenu);
-
-    switch (cmd) {
-    case IDM_TRAY_TELEX:
-        st->prefs.isVni = false;
-        SaveVieLotusPrefs(st->prefs, true);
-        if (st->onActivateProfiles) st->onActivateProfiles(true);
-        UpdateTrayIconState(hwnd, st);
-        InvalidateRect(hwnd, nullptr, FALSE);
-        break;
-    case IDM_TRAY_VNI:
-        st->prefs.isVni = true;
-        SaveVieLotusPrefs(st->prefs, true);
-        if (st->onActivateProfiles) st->onActivateProfiles(true);
-        UpdateTrayIconState(hwnd, st);
-        InvalidateRect(hwnd, nullptr, FALSE);
-        break;
-    case IDM_TRAY_SENFLEX:
-        st->prefs.senFlex = !st->prefs.senFlex;
-        SaveVieLotusPrefs(st->prefs, true);
-        UpdateTrayIconState(hwnd, st);
-        InvalidateRect(hwnd, nullptr, FALSE);
-        break;
-    case IDM_TRAY_MACRO:
-        st->prefs.macroEnabled = !st->prefs.macroEnabled;
-        SaveVieLotusPrefs(st->prefs, true);
-        InvalidateRect(hwnd, nullptr, FALSE);
-        break;
-    case IDM_TRAY_START_WITH_WIN:
-        st->prefs.startWithWindows = !st->prefs.startWithWindows;
-        SaveVieLotusPrefs(st->prefs, true);
-        SyncStartWithWindowsRegistry(st->prefs.startWithWindows);
-        InvalidateRect(hwnd, nullptr, FALSE);
-        break;
-    case IDM_TRAY_OPEN_SETTINGS: {
-        BringSettingsWindowToFront(hwnd);
-        RefreshConflictSummaryThrottled(st, false);
-        InvalidateRect(hwnd, nullptr, FALSE);
-        if (st->hTestEdit && st->selectedTab == 0) SetFocus(st->hTestEdit);
-        break;
-    }
-    case IDM_TRAY_CHECK_UPDATE:
-        OpenMicrosoftStorePage(hwnd);
-        break;
-    case IDM_TRAY_FEEDBACK:
-        ShowVieLotusFeedbackDialog(ResolveSettingsInstance(nullptr), hwnd, st->prefs);
-        break;
-    case IDM_TRAY_EXIT:
-        RemoveTrayIconState(st);
-        DestroyWindow(hwnd);
-        break;
-    default:
-        break;
     }
 }
 
@@ -1939,19 +1750,12 @@ static LRESULT CALLBACK VieLotusFeedbackWndProc(HWND hwnd, UINT msg, WPARAM wPar
 static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     auto *st = reinterpret_cast<BentoSettingsState *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
 
-    if (st && st->wmTaskbarCreated != 0 && msg == st->wmTaskbarCreated) {
-        st->trayRegistered = false;
-        UpdateTrayIconState(hwnd, st);
-        return 0;
-    }
-
     switch (msg) {
     case WM_CREATE: {
         CREATESTRUCTW *cs = reinterpret_cast<CREATESTRUCTW *>(lParam);
         st = new BentoSettingsState();
         if (cs && cs->lpCreateParams) {
             const auto *init = reinterpret_cast<const SettingsDialogInitParams *>(cs->lpCreateParams);
-            st->canHideToTrayOnClose = init->canHideToTrayOnClose;
             st->onActivateProfiles = init->onActivateProfiles;
         }
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(st));
@@ -1961,7 +1765,6 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
         ReleaseDC(hwnd, hdc);
         st->dpiScale = (dpiY > 0) ? (static_cast<float>(dpiY) / 96.0f) : 1.0f;
         st->isDark = IsWindowsDarkMode();
-        st->wmTaskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
 
         // Allow desktop TIP hosts running at lower integrity or compatible UIPI contexts
         // to wake this Settings window via PostMessageW. (AppContainer hosts also use the Named Pipe server.)
@@ -1977,7 +1780,8 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
         }
 
         LoadVieLotusPrefs(st->prefs);
-        SyncStartWithWindowsRegistry(st->prefs.startWithWindows);
+        // Zero-background-process UX: always clean up any legacy HKCU\...\Run\VieLotusIM autostart value.
+        SyncStartWithWindowsRegistry(false);
 
         st->pAppIcon = LoadEmbeddedPngImage(102);
         st->hWndIconBig = LoadEmbeddedAppIcon(32, 32);
@@ -2005,8 +1809,6 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
         }
         if (st->hWndIconBig) SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(st->hWndIconBig));
         if (st->hWndIconSmall) SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(st->hWndIconSmall));
-
-        UpdateTrayIconState(hwnd, st);
 
         DWORD cornerPref = 2; // DWMWCP_ROUND
         DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
@@ -2065,7 +1867,6 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
             if (IsWindowVisible(hwnd)) {
                 RefreshConflictSummaryThrottled(st, false);
             }
-            UpdateTrayIconState(hwnd, st);
             InvalidateRect(hwnd, nullptr, FALSE);
             if (st->onActivateProfiles) st->onActivateProfiles(false);
             if (st->hTestEdit && st->selectedTab == 0 && IsWindowVisible(hwnd)) {
@@ -2080,7 +1881,6 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
         if (st) {
             LoadVieLotusPrefs(st->prefs);
             RefreshConflictSummaryThrottled(st, false);
-            UpdateTrayIconState(hwnd, st);
             InvalidateRect(hwnd, nullptr, FALSE);
             if (st->hTestEdit && st->selectedTab == 0) {
                 SetFocus(st->hTestEdit);
@@ -2090,25 +1890,7 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
     }
 
     case kWmVieLotusQuitTray: {
-        RemoveTrayIconState(st);
         DestroyWindow(hwnd);
-        return 0;
-    }
-
-    case kWmVieLotusTrayCallback: {
-        UINT mouseMsg = LOWORD(lParam);
-        if (mouseMsg == WM_LBUTTONUP || mouseMsg == WM_LBUTTONDBLCLK) {
-            BringSettingsWindowToFront(hwnd);
-            if (st) {
-                LoadVieLotusPrefs(st->prefs);
-                RefreshConflictSummaryThrottled(st, false);
-                UpdateTrayIconState(hwnd, st);
-                InvalidateRect(hwnd, nullptr, FALSE);
-                if (st->hTestEdit && st->selectedTab == 0) SetFocus(st->hTestEdit);
-            }
-        } else if (mouseMsg == WM_RBUTTONUP || mouseMsg == WM_CONTEXTMENU) {
-            ShowTrayContextMenu(hwnd, st);
-        }
         return 0;
     }
 
@@ -2130,7 +1912,6 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
                 BOOL darkTitle = st->isDark ? TRUE : FALSE;
                 DwmSetWindowAttribute(hwnd, 20, &darkTitle, sizeof(darkTitle));
             }
-            UpdateTrayIconState(hwnd, st);
             if (st->prefs.isVni != oldVni || st->isDark != oldDark || st->conflictImeSummary != oldConflicts) {
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
@@ -2221,7 +2002,6 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
             st->prefs.isVni = false;
             SaveVieLotusPrefs(st->prefs, true);
             if (st->onActivateProfiles) st->onActivateProfiles(true);
-            UpdateTrayIconState(hwnd, st);
             InvalidateRect(hwnd, nullptr, FALSE);
             if (st->hTestEdit) SetFocus(st->hTestEdit);
             break;
@@ -2229,14 +2009,12 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
             st->prefs.isVni = true;
             SaveVieLotusPrefs(st->prefs, true);
             if (st->onActivateProfiles) st->onActivateProfiles(true);
-            UpdateTrayIconState(hwnd, st);
             InvalidateRect(hwnd, nullptr, FALSE);
             if (st->hTestEdit) SetFocus(st->hTestEdit);
             break;
         case HitRegion::BarSenFlex:
             st->prefs.senFlex = !st->prefs.senFlex;
             SaveVieLotusPrefs(st->prefs, true);
-            UpdateTrayIconState(hwnd, st);
             InvalidateRect(hwnd, nullptr, FALSE);
             break;
         case HitRegion::TileMacroToggle:
@@ -2260,12 +2038,6 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
         case HitRegion::ChipRelaxedCoda:
             st->prefs.relaxedCoda = !st->prefs.relaxedCoda;
             SaveVieLotusPrefs(st->prefs, true);
-            InvalidateRect(hwnd, nullptr, FALSE);
-            break;
-        case HitRegion::TileStartWithWin:
-            st->prefs.startWithWindows = !st->prefs.startWithWindows;
-            SaveVieLotusPrefs(st->prefs, true);
-            SyncStartWithWindowsRegistry(st->prefs.startWithWindows);
             InvalidateRect(hwnd, nullptr, FALSE);
             break;
         case HitRegion::BtnWinTypingSettings:
@@ -2308,27 +2080,18 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
 
     case WM_KEYDOWN:
         if (wParam == VK_ESCAPE) {
-            if (st && st->canHideToTrayOnClose && st->trayRegistered) {
-                ShowWindow(hwnd, SW_HIDE);
-            } else {
-                DestroyWindow(hwnd);
-            }
+            DestroyWindow(hwnd);
             return 0;
         }
         break;
 
     case WM_CLOSE:
-        if (st && st->canHideToTrayOnClose && st->trayRegistered) {
-            ShowWindow(hwnd, SW_HIDE);
-        } else {
-            DestroyWindow(hwnd);
-        }
+        DestroyWindow(hwnd);
         return 0;
 
     case WM_DESTROY:
         if (st) {
             StopSettingsWakePipeServer(st);
-            RemoveTrayIconState(st);
             delete st->pAppIcon;
             if (st->hWndIconBig) DestroyIcon(st->hWndIconBig);
             if (st->hWndIconSmall) DestroyIcon(st->hWndIconSmall);
@@ -2347,40 +2110,19 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
 } // namespace
 
 void SyncStartWithWindowsRegistry(bool enable) {
+    (void)enable;
     HKEY hRun = nullptr;
-    if (RegCreateKeyExW(
+    if (RegOpenKeyExW(
             HKEY_CURRENT_USER,
             c_szRunSubKey,
             0,
-            nullptr,
-            REG_OPTION_NON_VOLATILE,
-            KEY_READ | KEY_WRITE,
-            nullptr,
-            &hRun,
-            nullptr
+            KEY_SET_VALUE,
+            &hRun
         ) != ERROR_SUCCESS || !hRun) {
         return;
     }
-
-    if (enable) {
-        std::wstring exePath = ResolveInstalledSettingsExePath();
-        if (GetFileAttributesW(exePath.c_str()) != INVALID_FILE_ATTRIBUTES) {
-            std::wstring cmd = L"\"" + exePath + L"\" --startup";
-            RegSetValueExW(
-                hRun,
-                c_szRunValueName,
-                0,
-                REG_SZ,
-                reinterpret_cast<const BYTE *>(cmd.c_str()),
-                static_cast<DWORD>((cmd.size() + 1) * sizeof(WCHAR))
-            );
-        } else {
-            RegDeleteValueW(hRun, c_szRunValueName);
-        }
-    } else {
-        RegDeleteValueW(hRun, c_szRunValueName);
-    }
-
+    // Zero-background-process UX: always remove any legacy HKCU\...\Run\VieLotusIM startup entry.
+    RegDeleteValueW(hRun, c_szRunValueName);
     RegCloseKey(hRun);
 }
 
@@ -2495,15 +2237,16 @@ void ShowVieLotusSettingsDialog(
     if (hInstance) {
         g_settingsInst = hInstance;
     }
+    if (startHiddenInTray) {
+        // Zero-background-process UX: never spawn a hidden tray window.
+        SyncStartWithWindowsRegistry(false);
+        return;
+    }
     HINSTANCE appInst = ResolveSettingsInstance(hInstance);
 
     HWND hExisting = FindWindowW(kSettingsWndClassName, nullptr);
     if (hExisting && IsWindow(hExisting)) {
-        if (!startHiddenInTray) {
-            WakeExistingSettingsWindow();
-        } else {
-            PostMessageW(hExisting, kWmVieLotusActivateProfiles, 0, 0);
-        }
+        WakeExistingSettingsWindow();
         return;
     }
 
@@ -2535,10 +2278,7 @@ void ShowVieLotusSettingsDialog(
     int clientW = MulDiv(680, dpiY, 96);
     int clientH = MulDiv(424, dpiY, 96);
 
-    DWORD dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN;
-    if (!startHiddenInTray) {
-        dwStyle |= WS_VISIBLE;
-    }
+    DWORD dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN | WS_VISIBLE;
     DWORD dwExStyle = WS_EX_APPWINDOW;
     RECT rcWnd = { 0, 0, clientW, clientH };
     AdjustWindowRectEx(&rcWnd, dwStyle, FALSE, dwExStyle);
@@ -2549,7 +2289,6 @@ void ShowVieLotusSettingsDialog(
     int posY = (screenH > wndH) ? ((screenH - wndH) / 2) : 100;
 
     SettingsDialogInitParams initParams{};
-    initParams.canHideToTrayOnClose = (hwndParent == nullptr);
     initParams.onActivateProfiles = onActivateProfiles;
 
     HWND hwnd = CreateWindowExW(
@@ -2561,10 +2300,8 @@ void ShowVieLotusSettingsDialog(
         hwndParent, nullptr, appInst, &initParams
     );
     if (hwnd) {
-        if (!startHiddenInTray) {
-            BringSettingsWindowToFront(hwnd);
-            UpdateWindow(hwnd);
-        }
+        BringSettingsWindowToFront(hwnd);
+        UpdateWindow(hwnd);
 
         MSG msg{};
         while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
