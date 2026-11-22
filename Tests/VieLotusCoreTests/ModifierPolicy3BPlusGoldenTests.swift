@@ -575,8 +575,8 @@ final class ModifierPolicy3BPlusGoldenTests: XCTestCase {
 
     func testSyllableDictionaryParityAndCount() {
         let dict = VietnameseSyllableDictionary.shared
-        XCTAssertEqual(dict.syllables.count, 7132)
-        for expected in ["pía", "được", "nghiêng", "khuya", "hươu", "kỷ"] {
+        XCTAssertEqual(dict.syllables.count, 7136)
+        for expected in ["pía", "được", "nghiêng", "khuya", "hươu", "kỷ", "đắk", "lắk", "krông", "pắc"] {
             XCTAssertTrue(dict.isValidSyllable(expected), "Missing expected syllable '\(expected)'")
         }
     }

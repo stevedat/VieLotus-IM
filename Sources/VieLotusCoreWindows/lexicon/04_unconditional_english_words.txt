@@ -46,7 +46,6 @@ away
 bare
 bark
 base
-beef
 before
 bias
 bird
@@ -316,14 +315,12 @@ lord
 lost
 lure
 lust
-lux
 macbook
 macos
 major
 malware
 maps
 mark
-mas
 mast
 matrix
 mature

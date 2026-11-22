@@ -373,7 +373,8 @@ final class SmartBilingualDetectorTests: XCTestCase {
         XCTAssertFalse(SmartBilingualDetector.isInlineEnglishWord(raw: "orr", rendered: "or"))
         XCTAssertFalse(SmartBilingualDetector.isInlineEnglishWord(raw: "iff", rendered: "if"))
         XCTAssertFalse(SmartBilingualDetector.isInlineEnglishWord(raw: "ass", rendered: "as"))
-        XCTAssertFalse(SmartBilingualDetector.isInlineEnglishWord(raw: "err", rendered: "er"))
+        // Policy exception: "err" resolves to English "err" consistently across Swift & C++20
+        XCTAssertTrue(SmartBilingualDetector.isInlineEnglishWord(raw: "err", rendered: "er"))
 
         // Genuine inline English words must continue to be restored inline
         XCTAssertTrue(SmartBilingualDetector.isInlineEnglishWord(raw: "post", rendered: "pót"))
@@ -1090,6 +1091,63 @@ final class SmartBilingualDetectorTests: XCTestCase {
         }
         XCTAssertEqual(session.currentOutput(), "fujitsu")
     }
+
+    #if canImport(NaturalLanguage)
+    func testAppleLanguageRecognizerConstrainedBilingualContextAndCache() {
+        let provider = AppleLanguageRecognizerProvider()
+
+        // Short English & developer contexts must pass the constrained binary threshold (>= 0.95)
+        for enContext in [
+            "please check the",
+            "the car is",
+            "pull request",
+            "git commit",
+            "code review",
+            "unit test",
+            "check code",
+            "fix bug",
+            "deploy server"
+        ] {
+            XCTAssertTrue(
+                provider.isConfidentEnglishContext(enContext),
+                "Expected confident English context for '\(enContext)'"
+            )
+            // Second call exercises the bounded cache
+            XCTAssertTrue(
+                provider.isConfidentEnglishContext(enContext),
+                "Cached lookup mismatch for '\(enContext)'"
+            )
+        }
+
+        // Unaccented Vietnamese, mixed Vietnamese sentences, single loanwords, and 3rd-language phrases
+        // must NOT trigger confident English context.
+        for nonEnglishContext in [
+            "tôi đang",
+            "deploy server nó",
+            "merge PR này",
+            "khong sao",
+            "an com",
+            "cam on",
+            "ban be",
+            "ban an com chua",
+            "hom nay",
+            "di choi",
+            "server",
+            "error",
+            "bonjour monsieur",
+            "hola amigo"
+        ] {
+            XCTAssertFalse(
+                provider.isConfidentEnglishContext(nonEnglishContext),
+                "Must NOT classify '\(nonEnglishContext)' as confident English context"
+            )
+            XCTAssertFalse(
+                provider.isConfidentEnglishContext(nonEnglishContext),
+                "Cached lookup mismatch for '\(nonEnglishContext)'"
+            )
+        }
+    }
+    #endif
 }
 
 

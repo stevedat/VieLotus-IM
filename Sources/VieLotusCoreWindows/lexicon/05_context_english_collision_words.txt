@@ -28,6 +28,7 @@ barn
 bars
 be
 bee
+beef
 been
 beer
 bees
@@ -191,11 +192,13 @@ lots
 low
 luis
 lus
+lux
 mais
 mans
 mar
 mars
 mary
+mas
 mats
 max
 mays

@@ -2539,12 +2539,36 @@ internal final class VietnameseEngine: @unchecked Sendable {
                                 i += 1
                                 postCodaHandled = true
                             }
-                        } else if lower == "o" && getRemainingAllowCancel() && result.count >= 3 {
-                            let prevResLower = Character(result[result.count - 3].lowercased())
-                            if (lastResLower == "i" || lastResLower == "u") && (midResLower == "ơ" || midResLower == "o") && prevResLower == "ư" {
-                                let isPrevUpper = result[result.count - 3].isUppercase
-                                result[result.count - 3] = isPrevUpper ? "U" : "u"
-                                result[midIdx] = isMidUpper ? "Ô" : "ô"
+                        } else if lower == "o" && getRemainingAllowCancel() && result.count >= 3 &&
+                                  (lastResLower == "i" || lastResLower == "u") &&
+                                  (midResLower == "ơ" || midResLower == "o") &&
+                                  Character(result[result.count - 3].lowercased()) == "ư" {
+                            let isPrevUpper = result[result.count - 3].isUppercase
+                            result[result.count - 3] = isPrevUpper ? "U" : "u"
+                            result[midIdx] = isMidUpper ? "Ô" : "ô"
+                            hornCancelled = false
+                            circumflexCancelled = false
+                            circumflexCancelledKey = nil
+                            i += 1
+                            postCodaHandled = true
+                        } else if lower == "o" && lastResLower == "i" && midResLower == "ơ" && getRemainingAllowCancel() {
+                            // Mutual-exclusion vowel reshape across offglide: ơi + o -> ôi (e.g. towio -> tôi, ddowifo -> đồi, mowio -> môi)
+                            var candidateResult = result
+                            candidateResult[midIdx] = isMidUpper ? "Ô" : "ô"
+                            if VietnameseSyllableDictionary.shared.isValidUntonedSyllable(String(candidateResult), genZMode: genZMode) {
+                                result[midIdx] = candidateResult[midIdx]
+                                hornCancelled = false
+                                circumflexCancelled = false
+                                circumflexCancelledKey = nil
+                                i += 1
+                                postCodaHandled = true
+                            }
+                        } else if lower == "a" && (lastResLower == "u" || lastResLower == "y") && midResLower == "ă" && getRemainingAllowCancel() {
+                            // Mutual-exclusion vowel reshape across offglide: ău/ăy + a -> âu/ây (e.g. cawya -> cây, dawua -> dâu)
+                            var candidateResult = result
+                            candidateResult[midIdx] = isMidUpper ? "Â" : "â"
+                            if VietnameseSyllableDictionary.shared.isValidUntonedSyllable(String(candidateResult), genZMode: genZMode) {
+                                result[midIdx] = candidateResult[midIdx]
                                 hornCancelled = false
                                 circumflexCancelled = false
                                 circumflexCancelledKey = nil

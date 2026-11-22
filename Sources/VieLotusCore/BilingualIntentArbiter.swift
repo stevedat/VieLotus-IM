@@ -954,7 +954,11 @@ public struct BilingualIntentArbiter: Sendable {
         "or": ["thẻ", "bỏ", "kêu", "ít"],
         "of": ["kêu", "gáy", "tiếng", "bò", "con"],
         "if": ["ầm", "nặng", "chậm", "lì", "kêu"],
-        "as": ["châu", "đông", "nam", "bắc", "tây", "hạng", "giải", "kêu", "la"],
+        "as": [
+            "châu", "đông", "nam", "bắc", "tây", "hạng", "giải", "kêu", "la",
+            "chi", "gì", "vậy", "thế", "thật", "quá", "đó", "nữa", "luôn",
+            "đâu", "sao", "hả", "nha", "nhé", "đấy", "lắm", "chứ", "rồi", "nè"
+        ],
         "us": ["béo", "mập", "tròn", "no", "kêu"],
         "his": ["cười", "mắt", "ngựa", "bé", "hí"],
         "her": ["hơn", "vui", "cười"]

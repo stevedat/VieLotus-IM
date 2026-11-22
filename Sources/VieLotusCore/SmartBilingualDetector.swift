@@ -76,7 +76,7 @@ public struct SmartBilingualDetector {
         "ios", "ipados", "macos", "watchos", "tvos", "visionos", "xcode", "swiftui",
         "appstore", "chatgpt", "openai", "gemini", "claude", "copilot", "zalo",
         "tiktok", "shopee", "lazada", "vnpay", "spotify", "netflix", "youtube",
-        "github", "ubuntu", "android", "chrome"
+        "github", "ubuntu", "android", "chrome", "err"
     ]
 
     private static var supplementaryLexiconTokens: Set<String> = []
@@ -1617,6 +1617,9 @@ public struct SmartBilingualDetector {
     }
 
     private static func isBlockedTelexToneEscapeTarget(_ lower: String) -> Bool {
+        if lower == "err" {
+            return false
+        }
         guard let escaped = collapsedTelexToneEscapes(lower) else {
             return false
         }

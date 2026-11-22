@@ -369,8 +369,15 @@ public struct VietnameseSyllableDictionary: Sendable {
             "dỳ", "dỷ", "dỹ", "dỵ",
             "ỹ", "ỵ"
         ]
+        // Official Vietnamese Central Highlands / ethnic-minority geographical proper-noun syllables
+        // (e.g., Đắk Lắk, Đắk Nông, Krông Pắc, Krông Ana, Krông Năng, Krông Nô, Pắc Bó).
+        // Included in baseSyllables (not supplementalTonedSyllables) so capitalized forms stay Vietnamese.
+        let ethnicPlaceNameSyllables: Set<String> = [
+            "đắk", "lắk", "krông", "pắc"
+        ]
         let baseSyllables = Set(Self.baseSyllableList.split(whereSeparator: \.isWhitespace).map { String($0) })
             .union(standardYOrthographySyllables)
+            .union(ethnicPlaceNameSyllables)
         let supplementalTonedSyllables: Set<String> = [
             "dỉ", "hẻ", "pả", "pát", "pẻ", "pía", "rím", "roá", "síc", "soà", "sủ", "tơn", "tý",
             "bín", "chảm", "dít", "lía", "loán", "pét", "píc", "quến",

@@ -233,7 +233,17 @@ public enum InputSourceDoctor {
 
     /// Read-only inspection of macOS Text Input Sources (`Carbon.HIToolbox`).
     /// Never mutates system preferences or triggers TCC / TIS authorization prompts.
+    /// Guarantees HIToolbox `TIS*` APIs execute on the main thread (macOS 26.5+/27 enforces `dispatch_assert_queue(main)`).
     public static func inspect(bundleID: String = InputSourceStatus.defaultBundleID) -> InputSourceStatus {
+        if Thread.isMainThread {
+            return inspectOnMainThread(bundleID: bundleID)
+        }
+        return DispatchQueue.main.sync {
+            inspectOnMainThread(bundleID: bundleID)
+        }
+    }
+
+    private static func inspectOnMainThread(bundleID: String) -> InputSourceStatus {
         let targetLower = bundleID.lowercased()
 
         let candidatePaths = [

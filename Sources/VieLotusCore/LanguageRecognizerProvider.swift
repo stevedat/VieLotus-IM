@@ -13,12 +13,28 @@ internal protocol LanguageRecognizerProvider: Sendable {
 /// Apple-native implementation using `NLLanguageRecognizer` on macOS/iOS.
 internal final class AppleLanguageRecognizerProvider: LanguageRecognizerProvider, @unchecked Sendable {
     private let lock = NSLock()
+    /// Unconstrained recognizer for single-token / open-vocabulary `isDominantLanguageEnglish`.
     private let recognizer = NLLanguageRecognizer()
+    /// Dedicated binary-constrained recognizer (`[.vietnamese, .english]`) for sentence-context
+    /// arbitration so probability mass is never diluted across 50+ unrelated languages.
+    private let contextRecognizer = NLLanguageRecognizer()
 
-    /// 512-entry LRU-style cache for `isDominantLanguageEnglish` with 25% FIFO batch eviction.
+    /// 512-entry bounded caches with 25% FIFO batch eviction.
     private static let dominantLangCacheCapacity = 512
+    private static let confidentContextCacheCapacity = 512
+    /// Binary-constrained (`vi` vs `en`) English confidence floor.
+    /// Empirically calibrated so short English/dev phrases (`pull request`, `git commit`,
+    /// `code review`, `fix bug`, `check code`) score >= 0.98 while unaccented Vietnamese
+    /// (`an com` 0.943, `ban be` 0.923, `cam on` 0.921, `ban an com chua` 0.794),
+    /// loanword nouns (`server` 0.944), and non-EN/VI phrases (`bonjour monsieur` 0.735)
+    /// stay strictly below threshold.
+    private static let constrainedEnglishConfidenceThreshold: Double = 0.95
+    private static let bilingualConstraints: [NLLanguage] = [.vietnamese, .english]
+
     private var dominantLangCache: [String: Bool] = [:]
     private var dominantLangCacheKeys: [String] = []
+    private var confidentContextCache: [String: Bool] = [:]
+    private var confidentContextCacheKeys: [String] = []
 
     internal init() {}
 
@@ -53,12 +69,33 @@ internal final class AppleLanguageRecognizerProvider: LanguageRecognizerProvider
     internal func isConfidentEnglishContext(_ context: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        recognizer.reset()
-        recognizer.processString(context)
-        let hypotheses = recognizer.languageHypotheses(withMaximum: 2)
+
+        if let cached = confidentContextCache[context] {
+            return cached
+        }
+
+        contextRecognizer.reset()
+        // Re-apply constraints after every reset(): Apple's NLLanguageRecognizer clears
+        // internal constraint state on reset() even though the getter still reports them.
+        contextRecognizer.languageConstraints = Self.bilingualConstraints
+        contextRecognizer.processString(context)
+        let hypotheses = contextRecognizer.languageHypotheses(withMaximum: 2)
         let englishScore = hypotheses[.english, default: 0]
         let vietnameseScore = hypotheses[.vietnamese, default: 0]
-        return englishScore >= 0.75 && englishScore >= vietnameseScore * 2
+        let result = englishScore >= Self.constrainedEnglishConfidenceThreshold && englishScore >= vietnameseScore * 2
+
+        if confidentContextCacheKeys.count >= Self.confidentContextCacheCapacity {
+            let evictCount = Self.confidentContextCacheCapacity / 4
+            let evictedKeys = Array(confidentContextCacheKeys.prefix(evictCount))
+            for key in evictedKeys {
+                confidentContextCache.removeValue(forKey: key)
+            }
+            confidentContextCacheKeys.removeFirst(evictCount)
+        }
+
+        confidentContextCache[context] = result
+        confidentContextCacheKeys.append(context)
+        return result
     }
 }
 #endif

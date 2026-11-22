@@ -231,10 +231,18 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             tisStatus = InputSourceDoctor.inspect()
         }
-        .onReceive(DistributedNotificationCenter.default().publisher(for: InputSourceDoctor.selectedInputSourceChangedNotification)) { _ in
+        .onReceive(
+            DistributedNotificationCenter.default()
+                .publisher(for: InputSourceDoctor.selectedInputSourceChangedNotification)
+                .receive(on: DispatchQueue.main)
+        ) { _ in
             tisStatus = InputSourceDoctor.inspect()
         }
-        .onReceive(DistributedNotificationCenter.default().publisher(for: InputSourceDoctor.enabledInputSourcesChangedNotification)) { _ in
+        .onReceive(
+            DistributedNotificationCenter.default()
+                .publisher(for: InputSourceDoctor.enabledInputSourcesChangedNotification)
+                .receive(on: DispatchQueue.main)
+        ) { _ in
             tisStatus = InputSourceDoctor.inspect()
         }
     }

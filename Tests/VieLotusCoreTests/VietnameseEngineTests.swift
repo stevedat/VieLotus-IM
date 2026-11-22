@@ -1194,4 +1194,75 @@ final class VietnameseEngineTests: XCTestCase {
             XCTFail("Expected commit on second ref + Space")
         }
     }
+
+    func testCrossPlatformParityAuditCases() {
+        func drivePhrase(_ phrase: String, profile: GrammarProfile = .senFlex) -> String {
+            let session = InputSessionManager()
+            session.setInputMethod(.telex)
+            session.setGrammarProfile(profile)
+            session.setSmartBilingualEnabled(true)
+            var out = ""
+            for ch in phrase {
+                if session.isWordBoundary(ch) {
+                    let action = session.commitWord(smartBilingualEnabled: true, boundaryChar: ch)
+                    if case let .commit(bs, txt, isOverride) = action, isOverride {
+                        out.removeLast(min(bs, out.count))
+                        out += txt
+                    }
+                    out.append(ch)
+                } else {
+                    let action = session.handleCharacter(ch)
+                    if case let .replace(bs, txt) = action {
+                        out.removeLast(min(bs, out.count))
+                        out += txt
+                    } else if case .passThrough = action {
+                        out.append(ch)
+                    }
+                }
+            }
+            return out.trimmingCharacters(in: .whitespaces)
+        }
+
+        // VietTelex #149: 4-way circumflex <-> horn/breve switch preserving tone & semi-vowel coda
+        XCTAssertEqual(drivePhrase("caamsw "), "cắm")
+        XCTAssertEqual(drivePhrase("tooiw "), "tơi")
+        XCTAssertEqual(drivePhrase("cawmsa "), "cấm")
+        XCTAssertEqual(drivePhrase("towio "), "tôi")
+        XCTAssertEqual(drivePhrase("dowifo "), "dồi")
+        XCTAssertEqual(drivePhrase("ddowifo "), "đồi")
+        XCTAssertEqual(drivePhrase("mowio "), "môi")
+        // Semi-vowel coda guard must never mangle English -io words
+        XCTAssertEqual(drivePhrase("radio folio patio studio "), "radio folio patio studio")
+
+        // Vikey #113: Vietnamese sentence-final particle 'á' after Vietnamese heads vs English 'as'
+        XCTAssertEqual(drivePhrase("chi as "), "chi á")
+        XCTAssertEqual(drivePhrase("gif as "), "gì á")
+        XCTAssertEqual(drivePhrase("vaayj as "), "vậy á")
+        XCTAssertEqual(drivePhrase("chaau as "), "châu á")
+        XCTAssertEqual(drivePhrase("same as "), "same as")
+        XCTAssertEqual(drivePhrase("as "), "as")
+
+        // Vikey #140: 'err' resolves to English 'err' while keeping Rule B for 'arr'/'orr'/'ass'/'iff'
+        XCTAssertEqual(drivePhrase("err "), "err")
+        XCTAssertEqual(drivePhrase("Err "), "Err")
+        XCTAssertEqual(drivePhrase("ERR "), "ERR")
+        XCTAssertEqual(drivePhrase("arr "), "ar")
+        XCTAssertEqual(drivePhrase("orr "), "or")
+
+        // Vikey #112 & VietTelex #166 & #168
+        XCTAssertEqual(drivePhrase("dongdof "), "đồng")
+        XCTAssertEqual(drivePhrase("download dashboard depend diamond "), "download dashboard depend diamond")
+        XCTAssertEqual(drivePhrase("benhj lechj luanj "), "benhj lechj luanj")
+        XCTAssertEqual(drivePhrase("quanr "), "quản")
+        XCTAssertEqual(drivePhrase(":w :wq :wwq "), ":w :wq :wq")
+
+        // Central Highlands / ethnic-minority Vietnamese geographical proper nouns (Đắk Lắk, Krông Pắc)
+        XCTAssertEqual(drivePhrase("DDawsk Lawsk "), "Đắk Lắk")
+        XCTAssertEqual(drivePhrase("DDawks Lawks "), "Đắk Lắk")
+        XCTAssertEqual(drivePhrase("lawsk lawks "), "lắk lắk")
+        XCTAssertEqual(drivePhrase("Kroong Pawcs "), "Krông Pắc")
+        XCTAssertEqual(drivePhrase("Krongo kroong KROONG "), "Krông krông KRÔNG")
+        // Non-krông English kr- words stay strictly untouched
+        XCTAssertEqual(drivePhrase("kruger krisflyer krill krypton "), "kruger krisflyer krill krypton")
+    }
 }
