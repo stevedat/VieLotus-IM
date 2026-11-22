@@ -39,7 +39,8 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void **ppvObj) {
             HMODULE hNew = LoadLibraryW(canonicalPath);
             if (hNew && hNew != g_hInst) {
                 using PFN_DllGetClassObject = HRESULT(STDAPICALLTYPE *)(REFCLSID, REFIID, void **);
-                auto pfnGet = reinterpret_cast<PFN_DllGetClassObject>(GetProcAddress(hNew, "DllGetClassObject"));
+                FARPROC rawGet = GetProcAddress(hNew, "DllGetClassObject");
+                auto pfnGet = reinterpret_cast<PFN_DllGetClassObject>(reinterpret_cast<void *>(rawGet));
                 if (pfnGet) {
                     return pfnGet(rclsid, riid, ppvObj);
                 }
@@ -94,17 +95,23 @@ extern "C" void CALLBACK DeactivateUserProfilesW(HWND hwnd, HINSTANCE hinst, LPW
 }
 
 extern "C" void CALLBACK ShowSettingsDialogW(HWND hwnd, HINSTANCE hinst, LPWSTR lpszCmdLine, int nCmdShow) {
+    (void)hwnd;
     (void)hinst;
-    bool startHidden = (nCmdShow == SW_HIDE) ||
-                       (lpszCmdLine && (wcsstr(lpszCmdLine, L"--startup") != nullptr ||
-                                        wcsstr(lpszCmdLine, L"/startup") != nullptr ||
-                                        wcsstr(lpszCmdLine, L"--tray") != nullptr));
-    HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    if (startHidden) {
-        ActivateUserProfiles(false);
+    if (nCmdShow == SW_HIDE ||
+        (lpszCmdLine && (wcsstr(lpszCmdLine, L"--startup") != nullptr ||
+                         wcsstr(lpszCmdLine, L"/startup") != nullptr ||
+                         wcsstr(lpszCmdLine, L"--tray") != nullptr))) {
+        return;
     }
-    ShowVieLotusSettingsDialog(hwnd, startHidden);
-    if (SUCCEEDED(hrCo)) {
-        CoUninitialize();
+    HWND hExisting = FindWindowW(kSettingsWndClassName, nullptr);
+    if (hExisting && IsWindow(hExisting)) {
+        DWORD targetPid = 0;
+        if (GetWindowThreadProcessId(hExisting, &targetPid) != 0 && targetPid != 0) {
+            AllowSetForegroundWindow(targetPid);
+        }
+        if (PostMessageW(hExisting, kWmVieLotusShowSettings, 0, 0)) {
+            return;
+        }
     }
+    TryWakeSettingsViaNamedPipe(50);
 }

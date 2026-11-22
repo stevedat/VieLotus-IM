@@ -48,6 +48,7 @@ fi
     -I"${ROOT_DIR}/Sources/VieLotusCoreWindows" \
     -I"${ROOT_DIR}/Sources/VieLotusCAPI/include" \
     -I"${ROOT_DIR}/CrossPlatform/common" \
+    -I"${ROOT_DIR}/CrossPlatform/windows-tsf/src" \
     "${ROOT_DIR}/Tests/WindowsEngineLab/main.cpp" \
     "${ROOT_DIR}/Sources/VieLotusCoreWindows/WindowsNativeEngine.cpp" \
     -o "${BIN}"

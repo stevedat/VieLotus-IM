@@ -1,10 +1,13 @@
 #pragma once
 
 #include "Globals.h"
+#include "TsfGameGuardLogic.h"
 #if defined(VIELOTUS_EMBEDDED_ENGINE)
 #include "WindowsNativeEngine.h"
 #endif
 #include <string>
+
+class CLangBarItemButton;
 
 class CVieLotusTIP : public ITfTextInputProcessorEx,
                      public ITfKeyEventSink,
@@ -48,12 +51,22 @@ public:
     // ITfCompositionSink
     STDMETHODIMP OnCompositionTerminated(TfEditCookie ecWrite, ITfComposition *pComposition) override;
 
+    // Language Bar (GUID_LBI_INPUTMODE) UI callbacks
+    bool IsVietnameseMode() const { return m_isVietnameseMode; }
+    bool IsVniMode() const { return m_isVniMode; }
+    HWND GetFocusedContextWindow() const;
+    void ToggleVietnameseModeFromUi(ITfContext *pic = nullptr);
+    void SetVietnameseModeFromUi(bool enable, ITfContext *pic = nullptr);
+    void OpenSettingsWindowFromTip();
+    void HandleLangBarMenuSelect(UINT wID);
+
 private:
     std::atomic<LONG> m_cRef{1};
     ITfThreadMgr *m_pThreadMgr{nullptr};
     TfClientId m_tfClientId{TF_CLIENTID_NULL};
     DWORD m_dwThreadMgrEventSinkCookie{TF_INVALID_COOKIE};
     DWORD m_dwProfileNotifySinkCookie{TF_INVALID_COOKIE};
+    CLangBarItemButton *m_pLangBarButton{nullptr};
 
     vielotus_session_t m_session{nullptr};
 #if defined(VIELOTUS_EMBEDDED_ENGINE)
@@ -70,6 +83,8 @@ private:
     bool m_hasManualProcessOverride{false};
     bool m_manualProcessVietnameseMode{true};
     uint32_t m_lastPrefsRevision{0};
+    uint32_t m_lastSettingsRevision{0};
+    bool m_hasInitializedSettingsRevision{false};
     LONG m_lastEditShifted{0};
     HRESULT m_lastEditSetTextHr{S_OK};
     HWND m_lastWin32EditHwnd{nullptr};
@@ -78,6 +93,9 @@ private:
 
     void InitSession();
     void CleanSession();
+    void InitLanguageBar();
+    void UninitLanguageBar();
+    void UpdateLanguageBar(bool forceNotify = false);
     void ReleaseCompositionRefs();
     void EndActiveComposition(ITfContext *pic);
     void SyncWin32EditCaretBeforeKey();
@@ -97,5 +115,11 @@ private:
     const char *GetLastTextSession() const;
     int32_t GetLastCommitDiffBackspacesSession() const;
     const char *GetLastCommitDiffTextSession() const;
-    void ExecuteEditSession(ITfContext *pic, int32_t backspaces, const std::wstring &text, bool bCommit);
+    vielotus_tsf_guard::TsfEditOutcome ExecuteEditSession(
+        ITfContext *pic,
+        int32_t backspaces,
+        const std::wstring &text,
+        bool bCommit
+    );
+    void ApplyEditOutcome(vielotus_tsf_guard::TsfEditOutcome outcome, BOOL *pfEaten);
 };

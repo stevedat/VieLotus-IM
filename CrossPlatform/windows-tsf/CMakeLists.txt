@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(VieLotusTIP VERSION 2.0.7 LANGUAGES CXX)
+project(VieLotusTIP VERSION 2.0.8 LANGUAGES CXX)
 
 # Use static MSVC runtime (/MT) so VieLotusTIP.dll has zero external VC++ Redistributable dependencies
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -16,8 +16,10 @@ include_directories(
 
 set(SOURCES
     src/Globals.cpp
+    src/PrefsStore.cpp
     src/ClassFactory.cpp
     src/EditSession.cpp
+    src/LangBarButton.cpp
     src/VieLotusTIP.cpp
     src/Register.cpp
     src/dllmain.cpp
@@ -83,14 +85,12 @@ target_link_libraries(VieLotusTIP PRIVATE
     advapi32
     user32
     gdi32
-    gdiplus
-    dwmapi
     shell32
 )
 
 option(VIELOTUS_BUILD_SETTINGS "Build VieLotusSettings.exe" ON)
 set(VIELOTUS_ARM64X_PASS "" CACHE STRING "Two-pass ARM64X build phase: ARM64 or ARM64EC")
-set(VIELOTUS_ARM64X_REPRO_DIR "" CACHE PATH "Directory holding native ARM64 /LINKREPRO artifacts for ARM64X linking")
+set(VIELOTUS_ARM64X_REPRO_DIR "" CACHE PATH "Directory holding native ARM64 /LINKREPROFULLPATHRSP artifacts for ARM64X linking")
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 4)
     set(VIELOTUS_TIP_OUTPUT_NAME "VieLotusTIP32")
@@ -120,6 +120,8 @@ endif()
 if(VIELOTUS_BUILD_SETTINGS AND NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
     add_executable(VieLotusSettings WIN32
         src/SettingsMain.cpp
+        src/SettingsUI.cpp
+        src/PrefsStore.cpp
         VieLotusSettings.rc
         VieLotusSettings.manifest
     )
@@ -127,9 +129,12 @@ if(VIELOTUS_BUILD_SETTINGS AND NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
     target_link_libraries(VieLotusSettings PRIVATE
         user32
         gdi32
+        gdiplus
+        dwmapi
         shell32
         advapi32
         ole32
+        oleaut32
         uuid
     )
 

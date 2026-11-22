@@ -216,6 +216,38 @@ final class ClientAdapterTests: XCTestCase {
             .passthrough
         )
 
+        // When passthroughRemoteApps is true, Remote Desktop apps stay in .passthrough even if
+        // the user switches global preference to .directReplacement or .markedText (prevents double-IME).
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(
+                for: .remoteOrVirtualMachine,
+                bundleIdentifier: "com.carriez.rustdesk",
+                passthroughRemoteApps: true,
+                preference: .directReplacement
+            ),
+            .passthrough
+        )
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(
+                for: .remoteOrVirtualMachine,
+                bundleIdentifier: "com.carriez.rustdesk",
+                passthroughRemoteApps: true,
+                preference: .markedText
+            ),
+            .passthrough
+        )
+        // Explicit per-app override still wins over passthroughRemoteApps.
+        XCTAssertEqual(
+            ClientAdapter.presentationMode(
+                for: .remoteOrVirtualMachine,
+                bundleIdentifier: "com.carriez.rustdesk",
+                passthroughRemoteApps: true,
+                preference: .directReplacement,
+                appOverrides: ["com.carriez.rustdesk": .markedText]
+            ),
+            .markedText
+        )
+
         // When global preference is .passthrough, it applies globally
         XCTAssertEqual(
             ClientAdapter.presentationMode(

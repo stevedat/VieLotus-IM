@@ -9,7 +9,7 @@
 
 #define MyAppName "Sen Việt (VieLotusIM)"
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.7"
+  #define MyAppVersion "2.0.8"
 #endif
 #ifndef MyAppArch
   #define MyAppArch "x64"
@@ -37,8 +37,8 @@ DisableProgramGroupPage=yes
 OutputDir=..\..\dist\windows
 OutputBaseFilename=VieLotus-Setup-{#MyAppArch}
 SetupIconFile=assets\VieLotusIM.ico
-Compression=lzma2/ultra64
-SolidCompression=yes
+Compression=lzma2/fast
+SolidCompression=no
 WizardStyle=modern
 #if MyAppArch == "arm64"
 ArchitecturesAllowed=arm64
@@ -50,11 +50,16 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 CloseApplications=no
 RestartApplications=no
-; VieLotusSettings.exe registers the canonical HKLM\...\Uninstall\VieLotusIM entry + shortcuts
-Uninstallable=no
+Uninstallable=yes
+UninstallDisplayIcon={app}\VieLotusIM.ico
+UninstallDisplayName=Sen Việt (VieLotusIM) — Bộ gõ Tiếng Việt
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Icons]
+Name: "{group}\Cài đặt Sen Việt (VieLotusIM)"; Filename: "{app}\VieLotusSettings.exe"; Parameters: "--settings"; WorkingDir: "{app}"; IconFilename: "{app}\VieLotusIM.ico"
+Name: "{group}\Gỡ cài đặt Sen Việt (VieLotusIM)"; Filename: "{uninstallexe}"; IconFilename: "{app}\VieLotusIM.ico"
 
 [Files]
 ; 64-bit Native TSF COM TIP DLL (x64 on x64, ARM64X [ARM64 + ARM64EC] on ARM64)
@@ -74,13 +79,16 @@ Source: "assets\VieLotusIM.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "assets\*.png"; DestDir: "{app}\assets"; Flags: ignoreversion
 
 [Run]
-; Native Win32 provisioning: grants AppContainer RX ACLs via SetNamedSecurityInfoW, registers both
-; 64-bit (KEY_WOW64_64KEY) and 32-bit WOW6432Node (KEY_WOW64_32KEY) COM/TSF entries, and creates shortcuts.
-Filename: "{app}\VieLotusSettings.exe"; Parameters: "--install-msix-ime"; Flags: runhidden waituntilterminated
+; Native Win32 provisioning: grants AppContainer RX ACLs via SetNamedSecurityInfoW and registers
+; 64-bit (KEY_WOW64_64KEY) + 32-bit WOW6432Node (KEY_WOW64_32KEY) COM/TSF entries cleanly.
+Filename: "{app}\VieLotusSettings.exe"; Parameters: "--register-tsf"; Flags: waituntilterminated
 ; Activate Sen Việt Telex/VNI profiles in the logged-in user's Windows Language Bar (Win + Space)
-Filename: "{app}\VieLotusSettings.exe"; Parameters: "--activate"; Flags: runasoriginaluser runhidden waituntilterminated
+Filename: "{app}\VieLotusSettings.exe"; Parameters: "--activate"; Flags: runasoriginaluser waituntilterminated
 ; Open Settings UI after interactive install (skipped during silent /VERYSILENT install)
-Filename: "{app}\VieLotusSettings.exe"; Description: "Mở bảng Cài đặt Sen Việt (VieLotusIM)"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\VieLotusSettings.exe"; Parameters: "--settings"; Description: "Mở bảng Cài đặt Sen Việt (VieLotusIM)"; Flags: postinstall nowait skipifsilent runasoriginaluser
+
+[UninstallRun]
+Filename: "{app}\VieLotusSettings.exe"; Parameters: "--unregister-tsf"; RunOnceId: "VieLotusUnregisterTsf"; Flags: waituntilterminated
 
 [Code]
 procedure PrepareDllForHotUpgrade(BaseName: String);

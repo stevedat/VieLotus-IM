@@ -6,7 +6,7 @@
 
 param (
     [string]$Configuration = "Release",
-    [string]$Version = "2.0.7",
+    [string]$Version = "2.0.8",
     [string]$MsixVersion = "",
     [ValidateSet("x64", "arm64", "all")]
     [string]$Arch = "all",
@@ -253,38 +253,37 @@ function Invoke-BuildTsfArch {
         Copy-Item $arm64xOutDll -Destination "$binStagingDir\VieLotusTIP.dll" -Force
         Copy-Item $arm64xOutDll -Destination "$distWindowsDir\VieLotusTIP-arm64.dll" -Force
         Write-Host "   ✅ Đã liên kết ARM64X: $arm64xOutDll -> $binStagingDir\arm64\VieLotusTIP.dll"
-        return
-    }
-
-    Write-Host "🔨 Bước 3 ($TargetArch): Biên dịch VieLotusTIP.dll ($TargetArch, C++20 Static /MT COM In-Process)..." -ForegroundColor Green
-    $tsfBuildDir = "$rootDir\build-tsf-$TargetArch"
-    cmake -B $tsfBuildDir -S $tsfSourceDir -A x64 -DCMAKE_BUILD_TYPE=$Configuration
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "❌ Lỗi: cmake configure VieLotusTIP ($TargetArch) thất bại (exit code $LASTEXITCODE)."
-        exit $LASTEXITCODE
-    }
-    cmake --build $tsfBuildDir --config $Configuration
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "❌ Lỗi: cmake build VieLotusTIP ($TargetArch) thất bại (exit code $LASTEXITCODE)."
-        exit $LASTEXITCODE
-    }
-
-    $builtTipDll = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusTIP.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($builtTipDll) {
-        Copy-Item $builtTipDll.FullName -Destination "$binStagingDir\$TargetArch\VieLotusTIP.dll" -Force
-        Copy-Item $builtTipDll.FullName -Destination "$binStagingDir\VieLotusTIP.dll" -Force
-        Copy-Item $builtTipDll.FullName -Destination "$distWindowsDir\VieLotusTIP-$TargetArch.dll" -Force
-        Write-Host "   ✅ Đã copy: $($builtTipDll.FullName) -> $binStagingDir\$TargetArch\VieLotusTIP.dll"
     } else {
-        Write-Error "❌ Lỗi: Không tìm thấy VieLotusTIP.dll ($TargetArch) sau khi build."
-        exit 1
-    }
+        Write-Host "🔨 Bước 3 ($TargetArch): Biên dịch VieLotusTIP.dll ($TargetArch, C++20 Static /MT COM In-Process)..." -ForegroundColor Green
+        $tsfBuildDir = "$rootDir\build-tsf-$TargetArch"
+        cmake -B $tsfBuildDir -S $tsfSourceDir -A x64 -DCMAKE_BUILD_TYPE=$Configuration
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ Lỗi: cmake configure VieLotusTIP ($TargetArch) thất bại (exit code $LASTEXITCODE)."
+            exit $LASTEXITCODE
+        }
+        cmake --build $tsfBuildDir --config $Configuration
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "❌ Lỗi: cmake build VieLotusTIP ($TargetArch) thất bại (exit code $LASTEXITCODE)."
+            exit $LASTEXITCODE
+        }
 
-    $builtSettingsExe = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusSettings.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($builtSettingsExe) {
-        Copy-Item $builtSettingsExe.FullName -Destination "$binStagingDir\$TargetArch\VieLotusSettings.exe" -Force
-        Copy-Item $builtSettingsExe.FullName -Destination "$binStagingDir\VieLotusSettings.exe" -Force
-        Write-Host "   ✅ Đã copy: $($builtSettingsExe.FullName) -> $binStagingDir\$TargetArch\VieLotusSettings.exe"
+        $builtTipDll = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusTIP.dll" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($builtTipDll) {
+            Copy-Item $builtTipDll.FullName -Destination "$binStagingDir\$TargetArch\VieLotusTIP.dll" -Force
+            Copy-Item $builtTipDll.FullName -Destination "$binStagingDir\VieLotusTIP.dll" -Force
+            Copy-Item $builtTipDll.FullName -Destination "$distWindowsDir\VieLotusTIP-$TargetArch.dll" -Force
+            Write-Host "   ✅ Đã copy: $($builtTipDll.FullName) -> $binStagingDir\$TargetArch\VieLotusTIP.dll"
+        } else {
+            Write-Error "❌ Lỗi: Không tìm thấy VieLotusTIP.dll ($TargetArch) sau khi build."
+            exit 1
+        }
+
+        $builtSettingsExe = Get-ChildItem -Path $tsfBuildDir -Filter "VieLotusSettings.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($builtSettingsExe) {
+            Copy-Item $builtSettingsExe.FullName -Destination "$binStagingDir\$TargetArch\VieLotusSettings.exe" -Force
+            Copy-Item $builtSettingsExe.FullName -Destination "$binStagingDir\VieLotusSettings.exe" -Force
+            Write-Host "   ✅ Đã copy: $($builtSettingsExe.FullName) -> $binStagingDir\$TargetArch\VieLotusSettings.exe"
+        }
     }
 }
 
@@ -368,6 +367,14 @@ foreach ($spec in $expectedBinaries) {
         if ($asciiText.Contains($needle) -or $utf16Text.Contains($needle)) {
             Write-Error "❌ Phát hiện chuỗi bị cấm '$needle' bên trong $binPath!"
             exit 1
+        }
+    }
+    if ($spec.RelPath -like "*VieLotusTIP*.dll") {
+        foreach ($tipNeedle in @("CurrentVersion\Run", "CreateToolhelp32Snapshot", "gdiplus.dll", "dwmapi.dll")) {
+            if ($asciiText.Contains($tipNeedle) -or $utf16Text.Contains($tipNeedle)) {
+                Write-Error "❌ Phát hiện phụ thuộc/chuỗi không được phép '$tipNeedle' bên trong Thin TIP DLL $binPath!"
+                exit 1
+            }
         }
     }
 

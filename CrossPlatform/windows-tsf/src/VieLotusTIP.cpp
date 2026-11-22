@@ -1,5 +1,6 @@
 #include "VieLotusTIP.h"
 #include "EditSession.h"
+#include "LangBarButton.h"
 #include "Register.h"
 #include <shellapi.h>
 #include <vector>
@@ -274,6 +275,7 @@ CVieLotusTIP::CVieLotusTIP() {
 }
 
 CVieLotusTIP::~CVieLotusTIP() {
+    UninitLanguageBar();
     CleanSession();
     DllRelease();
 }
@@ -339,10 +341,21 @@ void CVieLotusTIP::ApplyVniMode(bool isVni, bool persistToRegistry) {
             }
         }
     }
+    UpdateLanguageBar(false);
 }
 
 void CVieLotusTIP::ReloadUserPreferences() {
     m_lastPrefsRevision = GetLocalPrefsRevision();
+    const uint32_t currentSettingsRev = LoadSettingsRevision();
+    if (!m_hasInitializedSettingsRevision) {
+        m_hasInitializedSettingsRevision = true;
+        m_lastSettingsRevision = currentSettingsRev;
+    } else if (vielotus_tsf_guard::ShouldClearManualOverrideOnSettingsRevision(
+                   m_lastSettingsRevision,
+                   currentSettingsRev)) {
+        m_lastSettingsRevision = currentSettingsRev;
+        m_hasManualProcessOverride = false;
+    }
     VieLotusWindowsPrefs prefs{};
     LoadVieLotusPrefs(prefs);
     m_isVniMode = prefs.isVni;
@@ -376,6 +389,7 @@ void CVieLotusTIP::ReloadUserPreferences() {
         api.set_smart_bilingual(m_session, prefs.smartBilingual);
         api.set_modern_orthography(m_session, prefs.modernOrthography);
     }
+    UpdateLanguageBar(false);
 }
 
 void CVieLotusTIP::InitSession() {
@@ -661,6 +675,26 @@ bool IsClassicWin32EditControl(HWND hwnd) {
     return _wcsicmp(clsName, L"edit") == 0;
 }
 
+bool IsTargetContextReadOnly(ITfContext *pic) {
+    TF_STATUS status{};
+    const bool hasContext = (pic != nullptr);
+    const bool gotStatus = hasContext && SUCCEEDED(pic->GetStatus(&status));
+    if (vielotus_tsf_guard::ShouldBypassContextForTyping(
+            hasContext,
+            gotStatus,
+            static_cast<uint32_t>(status.dwDynamicFlags),
+            static_cast<uint32_t>(TF_SD_READONLY)
+        )) {
+        return true;
+    }
+    HWND hFocus = GetFocus();
+    if (IsClassicWin32EditControl(hFocus) &&
+        ((GetWindowLongW(hFocus, GWL_STYLE) & ES_READONLY) != 0)) {
+        return true;
+    }
+    return false;
+}
+
 } // namespace
 
 void CVieLotusTIP::SyncWin32EditCaretBeforeKey() {
@@ -786,44 +820,66 @@ void CVieLotusTIP::EndActiveComposition(ITfContext *pic) {
     targetCtx->Release();
 }
 
-void CVieLotusTIP::ExecuteEditSession(ITfContext *pic, int32_t backspaces, const std::wstring &text, bool bCommit) {
+vielotus_tsf_guard::TsfEditOutcome CVieLotusTIP::ExecuteEditSession(
+    ITfContext *pic,
+    int32_t backspaces,
+    const std::wstring &text,
+    bool bCommit
+) {
+    using vielotus_tsf_guard::TsfEditOutcome;
+
     m_lastEditShifted = 0;
     m_lastEditSetTextHr = S_OK;
-    if (!pic) return;
+    if (!pic) {
+        m_lastEditSetTextHr = E_INVALIDARG;
+        return TsfEditOutcome::Failed;
+    }
 
     HWND hFocus = GetFocus();
     if (IsClassicWin32EditControl(hFocus)) {
         if (m_pComposition) {
             EndActiveComposition(pic);
         }
+        if ((GetWindowLongW(hFocus, GWL_STYLE) & ES_READONLY) != 0) {
+            m_lastEditSetTextHr = TS_E_READONLY;
+            return TsfEditOutcome::Failed;
+        }
         DWORD dwStart = 0, dwEnd = 0;
         SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+        if (!vielotus_tsf_guard::CanClassicWin32EditDelete(
+                backspaces,
+                static_cast<uint32_t>(dwStart),
+                static_cast<uint32_t>(dwEnd)
+            )) {
+            m_lastEditShifted = 0;
+            m_lastEditSetTextHr = S_FALSE;
+            return TsfEditOutcome::DeleteRefused;
+        }
         if (dwStart < dwEnd) {
             SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(text.c_str()));
             m_lastEditShifted = 0;
             m_lastEditSetTextHr = S_OK;
         } else {
             const DWORD reqBs = (backspaces > 0) ? static_cast<DWORD>(backspaces) : 0;
-            const DWORD bsToApply = (dwStart >= reqBs) ? reqBs : dwStart;
-            if (bsToApply > 0) {
+            if (reqBs > 0) {
                 SendMessageW(
                     hFocus,
                     EM_SETSEL,
-                    static_cast<WPARAM>(dwStart - bsToApply),
+                    static_cast<WPARAM>(dwStart - reqBs),
                     static_cast<LPARAM>(dwEnd)
                 );
             }
-            if (bsToApply > 0 || !text.empty()) {
+            if (reqBs > 0 || !text.empty()) {
                 SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(text.c_str()));
             }
-            m_lastEditShifted = -static_cast<LONG>(bsToApply);
+            m_lastEditShifted = -static_cast<LONG>(reqBs);
             m_lastEditSetTextHr = S_OK;
         }
         DWORD afterStart = 0, afterEnd = 0;
         SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&afterStart), reinterpret_cast<LPARAM>(&afterEnd));
         m_lastWin32EditHwnd = hFocus;
         m_lastWin32EditCaret = (afterStart == afterEnd) ? afterStart : 0xFFFFFFFFu;
-        return;
+        return TsfEditOutcome::Succeeded;
     }
 
     const bool keepComposition = !bCommit && HasActiveWordSession();
@@ -837,18 +893,289 @@ void CVieLotusTIP::ExecuteEditSession(ITfContext *pic, int32_t backspaces, const
         &m_pCompositionContext,
         static_cast<ITfCompositionSink *>(this)
     );
-    if (!pEdit) return;
+    if (!pEdit) {
+        m_lastEditSetTextHr = E_OUTOFMEMORY;
+        return TsfEditOutcome::Failed;
+    }
+
     HRESULT hrSession = S_OK;
     HRESULT hrReq = pic->RequestEditSession(m_tfClientId, pEdit, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE, &hrSession);
-    if (SUCCEEDED(hrReq) && pEdit->WasExecuted()) {
-        m_lastEditShifted = pEdit->GetActualShifted();
-        m_lastEditSetTextHr = pEdit->GetSetTextHr();
+    const bool wasExecuted = pEdit->WasExecuted();
+    const bool deleteRefused = pEdit->WasDeleteRefused();
+    const HRESULT hrSetText = pEdit->GetSetTextHr();
+    const LONG actualShifted = pEdit->GetActualShifted();
+    pEdit->Release();
+
+    const TsfEditOutcome outcome = vielotus_tsf_guard::ClassifyRequestEditSessionResult(
+        true,
+        static_cast<int32_t>(hrReq),
+        static_cast<int32_t>(hrSession),
+        wasExecuted,
+        deleteRefused,
+        static_cast<int32_t>(hrSetText)
+    );
+
+    if (wasExecuted) {
+        m_lastEditShifted = actualShifted;
+        m_lastEditSetTextHr = FAILED(hrSession) ? hrSession : hrSetText;
     } else if (FAILED(hrReq)) {
         m_lastEditSetTextHr = hrReq;
     } else {
         m_lastEditSetTextHr = hrSession;
     }
-    pEdit->Release();
+    return outcome;
+}
+
+void CVieLotusTIP::ApplyEditOutcome(vielotus_tsf_guard::TsfEditOutcome outcome, BOOL *pfEaten) {
+    if (vielotus_tsf_guard::ShouldEatKeyAfterEdit(outcome)) {
+        *pfEaten = TRUE;
+    } else {
+        ResetComposingSession();
+        ReleaseCompositionRefs();
+        *pfEaten = FALSE;
+    }
+}
+
+namespace {
+
+bool IsRunningInAppContainer() {
+    HANDLE hToken = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken) || !hToken) {
+        return false;
+    }
+    DWORD isAppContainer = 0;
+    DWORD retLen = 0;
+    const BOOL ok = GetTokenInformation(
+        hToken,
+        static_cast<TOKEN_INFORMATION_CLASS>(29), // TokenIsAppContainer (Windows 8+)
+        &isAppContainer,
+        sizeof(isAppContainer),
+        &retLen
+    );
+    CloseHandle(hToken);
+    return (ok != FALSE) && (isAppContainer != 0);
+}
+
+bool FindSettingsExecutablePath(std::wstring &outPath) {
+    outPath.clear();
+    WCHAR pf[MAX_PATH] = {};
+    if (ExpandEnvironmentStringsW(L"%ProgramW6432%\\VieLotusIM\\VieLotusSettings.exe", pf, MAX_PATH) > 0 &&
+        pf[0] != L'%' &&
+        GetFileAttributesW(pf) != INVALID_FILE_ATTRIBUTES) {
+        outPath = pf;
+        return true;
+    }
+    const WCHAR *fallbackPf = L"C:\\Program Files\\VieLotusIM\\VieLotusSettings.exe";
+    if (GetFileAttributesW(fallbackPf) != INVALID_FILE_ATTRIBUTES) {
+        outPath = fallbackPf;
+        return true;
+    }
+    WCHAR dllPath[MAX_PATH] = {};
+    if (g_hInst && GetModuleFileNameW(g_hInst, dllPath, MAX_PATH) > 0) {
+        std::wstring dir(dllPath);
+        size_t pos = dir.find_last_of(L"\\/");
+        if (pos != std::wstring::npos) {
+            std::wstring candidate = dir.substr(0, pos + 1) + L"VieLotusSettings.exe";
+            if (GetFileAttributesW(candidate.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                outPath = candidate;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+} // namespace
+
+void CVieLotusTIP::InitLanguageBar() {
+    if (!m_pThreadMgr || m_pLangBarButton) {
+        return;
+    }
+    ITfLangBarItemMgr *pLangBarMgr = nullptr;
+    if (FAILED(m_pThreadMgr->QueryInterface(IID_ITfLangBarItemMgr_Compat, reinterpret_cast<void **>(&pLangBarMgr))) || !pLangBarMgr) {
+        return;
+    }
+    CLangBarItemButton *pButton = new (std::nothrow) CLangBarItemButton(this, m_isVietnameseMode, m_isVniMode);
+    if (pButton) {
+        if (SUCCEEDED(pLangBarMgr->AddItem(static_cast<ITfLangBarItem *>(pButton)))) {
+            m_pLangBarButton = pButton;
+            m_pLangBarButton->Show(TRUE);
+        } else {
+            pButton->DetachOwner();
+            pButton->Release();
+        }
+    }
+    pLangBarMgr->Release();
+}
+
+void CVieLotusTIP::UninitLanguageBar() {
+    if (!m_pLangBarButton) {
+        return;
+    }
+    m_pLangBarButton->DetachOwner();
+    if (m_pThreadMgr) {
+        ITfLangBarItemMgr *pLangBarMgr = nullptr;
+        if (SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfLangBarItemMgr_Compat, reinterpret_cast<void **>(&pLangBarMgr))) && pLangBarMgr) {
+            pLangBarMgr->RemoveItem(static_cast<ITfLangBarItem *>(m_pLangBarButton));
+            pLangBarMgr->Release();
+        }
+    }
+    m_pLangBarButton->Release();
+    m_pLangBarButton = nullptr;
+}
+
+void CVieLotusTIP::UpdateLanguageBar(bool forceNotify) {
+    if (m_pLangBarButton) {
+        m_pLangBarButton->UpdateState(m_isVietnameseMode, m_isVniMode, forceNotify);
+    }
+}
+
+HWND CVieLotusTIP::GetFocusedContextWindow() const {
+    HWND hwnd = nullptr;
+    if (m_pThreadMgr) {
+        ITfDocumentMgr *pDocMgr = nullptr;
+        if (SUCCEEDED(m_pThreadMgr->GetFocus(&pDocMgr)) && pDocMgr) {
+            ITfContext *pContext = nullptr;
+            if (SUCCEEDED(pDocMgr->GetTop(&pContext)) && pContext) {
+                ITfContextView *pView = nullptr;
+                if (SUCCEEDED(pContext->GetActiveView(&pView)) && pView) {
+                    pView->GetWnd(&hwnd);
+                    pView->Release();
+                }
+                pContext->Release();
+            }
+            pDocMgr->Release();
+        }
+    }
+    if (!hwnd) {
+        HWND hFg = GetForegroundWindow();
+        if (hFg && GetWindowThreadProcessId(hFg, nullptr) == GetCurrentThreadId()) {
+            hwnd = hFg;
+        }
+    }
+    return hwnd;
+}
+
+void CVieLotusTIP::SetVietnameseModeFromUi(bool enable, ITfContext *pic) {
+    m_isVietnameseMode = enable;
+    m_hasManualProcessOverride = true;
+    m_manualProcessVietnameseMode = m_isVietnameseMode;
+
+    VieLotusWindowsPrefs prefs{};
+    LoadVieLotusPrefs(prefs);
+    bool existingPerAppBypass = false;
+    if (m_isRemoteProcess || LoadPerAppBypassPreference(m_currentExeName.c_str(), existingPerAppBypass)) {
+        SavePerAppBypassPreference(m_currentExeName.c_str(), !m_isVietnameseMode);
+    } else {
+        prefs.vietnameseEnabled = m_isVietnameseMode;
+        SaveVieLotusPrefs(prefs);
+    }
+
+    ResetComposingSession();
+    if (pic) {
+        EndActiveComposition(pic);
+    } else if (m_pComposition) {
+        EndActiveComposition(nullptr);
+    } else {
+        ReleaseCompositionRefs();
+    }
+    UpdateLanguageBar(true);
+}
+
+void CVieLotusTIP::ToggleVietnameseModeFromUi(ITfContext *pic) {
+    SetVietnameseModeFromUi(!m_isVietnameseMode, pic);
+}
+
+void CVieLotusTIP::OpenSettingsWindowFromTip() {
+    ResetComposingSession();
+    if (m_pComposition) {
+        EndActiveComposition(nullptr);
+    } else {
+        ReleaseCompositionRefs();
+    }
+
+    HWND hExisting = FindWindowW(kSettingsWndClassName, nullptr);
+    const bool hasExistingWindow = (hExisting != nullptr && IsWindow(hExisting) != FALSE);
+    bool pipeWakeSucceeded = false;
+    if (!hasExistingWindow) {
+        pipeWakeSucceeded = TryWakeSettingsViaNamedPipe(50);
+    }
+    const bool isAppContainer = IsRunningInAppContainer();
+    std::wstring settingsExe;
+    const bool hasSettingsExe =
+        (!hasExistingWindow && !pipeWakeSucceeded && !isAppContainer && FindSettingsExecutablePath(settingsExe));
+
+    const auto plan = vielotus_tsf_guard::PlanSettingsLaunch(
+        hasExistingWindow,
+        pipeWakeSucceeded,
+        isAppContainer,
+        hasSettingsExe
+    );
+
+    switch (plan) {
+    case vielotus_tsf_guard::SettingsLaunchPlan::PostToExistingWindow: {
+        DWORD targetPid = 0;
+        if (GetWindowThreadProcessId(hExisting, &targetPid) != 0 && targetPid != 0) {
+            AllowSetForegroundWindow(targetPid);
+        }
+        // VieLotusSettings.exe allows kWmVieLotusShowSettings across compatible UIPI and brings itself to front.
+        if (!PostMessageW(hExisting, kWmVieLotusShowSettings, 0, 0)) {
+            TryWakeSettingsViaNamedPipe(50);
+        }
+        break;
+    }
+    case vielotus_tsf_guard::SettingsLaunchPlan::WakeViaNamedPipe:
+        break;
+    case vielotus_tsf_guard::SettingsLaunchPlan::LaunchSettingsExe:
+        ShellExecuteW(
+            nullptr,
+            L"open",
+            settingsExe.c_str(),
+            L"--settings",
+            nullptr,
+            SW_SHOWNORMAL
+        );
+        break;
+    case vielotus_tsf_guard::SettingsLaunchPlan::SkipUnavailable:
+        break;
+    }
+}
+
+void CVieLotusTIP::HandleLangBarMenuSelect(UINT wID) {
+    using vielotus_tsf_guard::LangBarMenuAction;
+    switch (vielotus_tsf_guard::ResolveLangBarMenuAction(static_cast<uint32_t>(wID))) {
+    case LangBarMenuAction::SetVietnamese:
+        SetVietnameseModeFromUi(true, nullptr);
+        break;
+    case LangBarMenuAction::SetEnglish:
+        SetVietnameseModeFromUi(false, nullptr);
+        break;
+    case LangBarMenuAction::SetTelex: {
+        VieLotusWindowsPrefs prefs{};
+        LoadVieLotusPrefs(prefs);
+        prefs.isVni = false;
+        SaveVieLotusPrefs(prefs);
+        ApplyVniMode(false, true);
+        SyncActiveLanguageProfile();
+        UpdateLanguageBar(true);
+        break;
+    }
+    case LangBarMenuAction::SetVni: {
+        VieLotusWindowsPrefs prefs{};
+        LoadVieLotusPrefs(prefs);
+        prefs.isVni = true;
+        SaveVieLotusPrefs(prefs);
+        ApplyVniMode(true, true);
+        SyncActiveLanguageProfile();
+        UpdateLanguageBar(true);
+        break;
+    }
+    case LangBarMenuAction::OpenSettings:
+        OpenSettingsWindowFromTip();
+        break;
+    case LangBarMenuAction::None:
+        break;
+    }
 }
 
 void CVieLotusTIP::CleanSession() {
@@ -894,11 +1221,17 @@ STDMETHODIMP CVieLotusTIP::ActivateEx(ITfThreadMgr *ptim, TfClientId tid, DWORD 
         pSource->Release();
     }
 
+    // 3. Register Taskbar Input Indicator button (GUID_LBI_INPUTMODE — fail-safe)
+    InitLanguageBar();
+
     return S_OK;
 }
 
 STDMETHODIMP CVieLotusTIP::Deactivate() {
     if (!m_pThreadMgr) return S_OK;
+
+    // Remove Language Bar button before releasing m_pThreadMgr so no COM ref keeps VieLotusTIP.dll pinned
+    UninitLanguageBar();
 
     // 1. Unadvise KeyEventSink
     ITfKeystrokeMgr *pKeystrokeMgr = nullptr;
@@ -934,6 +1267,7 @@ STDMETHODIMP CVieLotusTIP::OnSetFocus(BOOL fForeground) {
     if (fForeground) {
         ReloadUserPreferences();
         SyncActiveLanguageProfile();
+        UpdateLanguageBar(true);
     }
     ReleaseCompositionRefs();
     ResetComposingSession();
@@ -948,20 +1282,31 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
     const bool hasShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
     const bool hasAlt = (GetKeyState(VK_MENU) & 0x8000) != 0;
     const bool hasWin = ((GetKeyState(VK_LWIN) & 0x8000) != 0) || ((GetKeyState(VK_RWIN) & 0x8000) != 0);
+    const bool contextReadOnly = IsTargetContextReadOnly(pic);
 
-    // Hotkey: Ctrl + Shift + S -> Open Sen Viet Settings Window
-    if (wParam == 'S' && hasCtrl && hasShift && !hasAlt && !hasWin) {
-        *pfEaten = TRUE;
-        return S_OK;
-    }
-
-    // Hotkey toggle: Ctrl + Space / Shift + Space (handled even when m_isVietnameseMode is false)
-    if (wParam == VK_SPACE && (hasCtrl || hasShift) && !hasAlt && !hasWin) {
+    const auto hotkey = vielotus_tsf_guard::ClassifyHotkey(
+        static_cast<uint32_t>(wParam),
+        hasCtrl,
+        hasShift,
+        hasAlt,
+        hasWin,
+        m_isVietnameseMode,
+        contextReadOnly
+    );
+    if (hotkey != vielotus_tsf_guard::HotkeyKind::None) {
         *pfEaten = TRUE;
         return S_OK;
     }
 
     if (!m_isVietnameseMode) return S_OK;
+
+    if (contextReadOnly) {
+        if (IsComposingSession() || HasActiveWordSession()) {
+            ResetComposingSession();
+            ReleaseCompositionRefs();
+        }
+        return S_OK;
+    }
 
     // Bare modifier / lock keys (Shift, Ctrl, Alt, Win, CapsLock, NumLock, ScrollLock) -> touch nothing
     if (IsBareModifierOrToggleKey(wParam)) {
@@ -1070,66 +1415,58 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
     if (!pfEaten) return E_POINTER;
     *pfEaten = FALSE;
 
-    if (!pic) return S_OK;
 
+    if (GetLocalPrefsRevision() != m_lastPrefsRevision) {
+        ReloadUserPreferences();
+    }
 
     const bool hasCtrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
     const bool hasShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
     const bool hasAlt = (GetKeyState(VK_MENU) & 0x8000) != 0;
     const bool hasWin = ((GetKeyState(VK_LWIN) & 0x8000) != 0) || ((GetKeyState(VK_RWIN) & 0x8000) != 0);
+    const bool contextReadOnly = IsTargetContextReadOnly(pic);
 
-    // Hotkey: Ctrl + Shift + S -> Open Sen Viet Settings Window
-    if (wParam == 'S' && hasCtrl && hasShift && !hasAlt && !hasWin) {
-        ResetComposingSession();
-        EndActiveComposition(pic);
-        HWND hExisting = FindWindowW(L"VieLotusBentoSettingsWndClass", nullptr);
-        if (hExisting && IsWindow(hExisting)) {
-            ShowWindow(hExisting, SW_SHOW);
-            ShowWindow(hExisting, SW_RESTORE);
-            SetForegroundWindow(hExisting);
-            PostMessageW(hExisting, WM_USER + 101, 0, 0);
-        } else {
-            WCHAR settingsExe[MAX_PATH] = {};
-            if (ExpandEnvironmentStringsW(L"%ProgramW6432%\\VieLotusIM\\VieLotusSettings.exe", settingsExe, MAX_PATH) > 0 &&
-                GetFileAttributesW(settingsExe) != INVALID_FILE_ATTRIBUTES) {
-                ShellExecuteW(nullptr, L"open", settingsExe, L"--settings", nullptr, SW_SHOWNORMAL);
+    const auto hotkey = vielotus_tsf_guard::ClassifyHotkey(
+        static_cast<uint32_t>(wParam),
+        hasCtrl,
+        hasShift,
+        hasAlt,
+        hasWin,
+        m_isVietnameseMode,
+        contextReadOnly
+    );
+
+    // Hotkey toggle: Ctrl + Space (or Ctrl + Shift + Space); bare Shift + Space is never intercepted
+    if (hotkey == vielotus_tsf_guard::HotkeyKind::ToggleVietnamese) {
+        ToggleVietnameseModeFromUi(pic);
+        *pfEaten = TRUE;
+        return S_OK;
+    }
+
+    // Hotkey: Ctrl + Shift + S -> Open Sen Viet Settings Window (only when VN mode is ON & context writable)
+    if (hotkey == vielotus_tsf_guard::HotkeyKind::OpenSettings) {
+        OpenSettingsWindowFromTip();
+        *pfEaten = TRUE;
+        return S_OK;
+    }
+
+    if (!m_isVietnameseMode) {
+        if (m_pComposition) {
+            if (pic) {
+                EndActiveComposition(pic);
             } else {
-                ShowVieLotusSettingsDialog(GetForegroundWindow(), false);
+                ReleaseCompositionRefs();
             }
         }
-        ReloadUserPreferences();
-        *pfEaten = TRUE;
         return S_OK;
     }
 
-    // Hotkey toggle: Ctrl + Space / Shift + Space
-    if (wParam == VK_SPACE && (hasCtrl || hasShift) && !hasAlt && !hasWin) {
-        m_isVietnameseMode = !m_isVietnameseMode;
-        m_hasManualProcessOverride = true;
-        m_manualProcessVietnameseMode = m_isVietnameseMode;
-        VieLotusWindowsPrefs prefs{};
-        LoadVieLotusPrefs(prefs);
-        bool existingPerAppBypass = false;
-        if (m_isRemoteProcess || LoadPerAppBypassPreference(m_currentExeName.c_str(), existingPerAppBypass)) {
-            SavePerAppBypassPreference(m_currentExeName.c_str(), !m_isVietnameseMode);
-        } else {
-            prefs.vietnameseEnabled = m_isVietnameseMode;
-            SaveVieLotusPrefs(prefs);
+    if (contextReadOnly || !pic) {
+        if (IsComposingSession() || HasActiveWordSession()) {
+            ResetComposingSession();
+            ReleaseCompositionRefs();
         }
-        ResetComposingSession();
-        EndActiveComposition(pic);
-        *pfEaten = TRUE;
         return S_OK;
-    }
-
-    if (!m_isVietnameseMode) return S_OK;
-
-    if (GetLocalPrefsRevision() != m_lastPrefsRevision) {
-        ReloadUserPreferences();
-        if (!m_isVietnameseMode) {
-            EndActiveComposition(pic);
-            return S_OK;
-        }
     }
 
     if (IsBareModifierOrToggleKey(wParam)) {
@@ -1159,19 +1496,14 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
             int32_t action = FeedBackspaceSession();
             if (action == VIELOTUS_ACTION_RESET) {
                 ClearWordStateSession();
-                ExecuteEditSession(pic, 1, L"", false);
-                *pfEaten = TRUE;
+                const auto outcome = ExecuteEditSession(pic, 1, L"", false);
+                ApplyEditOutcome(outcome, pfEaten);
             } else {
                 int32_t bs = GetLastBackspacesSession();
                 const char *replacement = GetLastTextSession();
                 std::wstring wText = Utf8ToWide(replacement);
-                ExecuteEditSession(pic, bs, wText, false);
-                if (bs > 0 && wText.empty() && m_lastEditShifted == 0) {
-                    ClearWordStateSession();
-                    *pfEaten = FALSE;
-                } else {
-                    *pfEaten = TRUE;
-                }
+                const auto outcome = ExecuteEditSession(pic, bs, wText, false);
+                ApplyEditOutcome(outcome, pfEaten);
             }
             return S_OK;
         }
@@ -1205,21 +1537,21 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
             int32_t bs = GetLastCommitDiffBackspacesSession();
             std::wstring wCommitted = Utf8ToWide(committed);
             wCommitted += chBuf[0]; // Append boundary key
-            ExecuteEditSession(pic, bs, wCommitted, true);
-            *pfEaten = TRUE;
+            const auto outcome = ExecuteEditSession(pic, bs, wCommitted, true);
+            ApplyEditOutcome(outcome, pfEaten);
             return S_OK;
         } else if (action == VIELOTUS_ACTION_REPLACE) {
             int32_t bs = GetLastBackspacesSession();
             const char *replacement = GetLastTextSession();
             std::wstring wText = Utf8ToWide(replacement);
-            ExecuteEditSession(pic, bs, wText, false);
-            *pfEaten = TRUE;
+            const auto outcome = ExecuteEditSession(pic, bs, wText, false);
+            ApplyEditOutcome(outcome, pfEaten);
             return S_OK;
         } else {
             // CONSUMED or PASS_THROUGH after OnTestKeyDown ate the key: insert character directly
             std::wstring wText(1, chBuf[0]);
-            ExecuteEditSession(pic, 0, wText, !IsComposingSession());
-            *pfEaten = TRUE;
+            const auto outcome = ExecuteEditSession(pic, 0, wText, !IsComposingSession());
+            ApplyEditOutcome(outcome, pfEaten);
             return S_OK;
         }
     } else if (toAsciiRes > 0) {
@@ -1227,8 +1559,8 @@ STDMETHODIMP CVieLotusTIP::OnKeyDown(ITfContext *pic, WPARAM wParam, LPARAM lPar
         // clear Vietnamese word state and insert the translated UTF-16 sequence so the character is never swallowed.
         ClearWordStateSession();
         std::wstring wText(chBuf, static_cast<size_t>(toAsciiRes));
-        ExecuteEditSession(pic, 0, wText, true);
-        *pfEaten = TRUE;
+        const auto outcome = ExecuteEditSession(pic, 0, wText, true);
+        ApplyEditOutcome(outcome, pfEaten);
         return S_OK;
     }
 
@@ -1275,6 +1607,9 @@ STDMETHODIMP CVieLotusTIP::OnSetFocus(ITfDocumentMgr *pdimFocus, ITfDocumentMgr 
     if (pdimFocus != nullptr && GetLocalPrefsRevision() != m_lastPrefsRevision) {
         ReloadUserPreferences();
         SyncActiveLanguageProfile();
+    }
+    if (pdimFocus != nullptr) {
+        UpdateLanguageBar(false);
     }
     ReleaseCompositionRefs();
     ResetComposingSession();

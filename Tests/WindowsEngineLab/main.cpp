@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "WindowsNativeEngine.h"
+#include "TsfGameGuardLogic.h"
 #include "vielotus.h"
 #if !defined(_WIN32)
 #include "vielotus_linux_common.h"
@@ -1198,7 +1199,7 @@ int main(int argc, char **argv) {
         }
     };
 
-    int tsfTotal = 18, tsfPass = 0;
+    int tsfTotal = 29, tsfPass = 0;
     auto checkTsf = [&](int id, bool cond, const char *desc, const std::string &actual) {
         if (cond) {
             tsfPass++;
@@ -1434,6 +1435,328 @@ int main(int argc, char **argv) {
         }
 
         checkTsf(18, ok, "Mouse highlight partial-word replacements", diag.empty() ? "OK" : diag);
+    }
+
+    // TSF 19: Hotkey guard (no bare Shift+Space hijack; Ctrl+Shift+S guarded by VN mode + writable context)
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        // Bare Shift+Space is NEVER intercepted (games sprint+jump, fast Shift+Space typing)
+        ok = ok && (ClassifyHotkey(kVkSpace, false, true, false, false, true, false) == HotkeyKind::None);
+        ok = ok && (ClassifyHotkey(kVkSpace, false, true, false, false, false, false) == HotkeyKind::None);
+        ok = ok && (ClassifyHotkey(kVkSpace, false, true, false, false, true, true) == HotkeyKind::None);
+        // Ctrl+Space and Ctrl+Shift+Space toggle VI/EN even when VN is OFF or context is read-only
+        ok = ok && (ClassifyHotkey(kVkSpace, true, false, false, false, true, false) == HotkeyKind::ToggleVietnamese);
+        ok = ok && (ClassifyHotkey(kVkSpace, true, false, false, false, false, false) == HotkeyKind::ToggleVietnamese);
+        ok = ok && (ClassifyHotkey(kVkSpace, true, false, false, false, false, true) == HotkeyKind::ToggleVietnamese);
+        ok = ok && (ClassifyHotkey(kVkSpace, true, true, false, false, true, false) == HotkeyKind::ToggleVietnamese);
+        // Win+Space / Alt+Ctrl+Space never eaten
+        ok = ok && (ClassifyHotkey(kVkSpace, false, false, false, true, true, false) == HotkeyKind::None);
+        ok = ok && (ClassifyHotkey(kVkSpace, true, false, true, false, true, false) == HotkeyKind::None);
+        // Ctrl+Shift+S only opens Settings when VN mode is ON AND context is writable
+        ok = ok && (ClassifyHotkey(kVkKeyS, true, true, false, false, true, false) == HotkeyKind::OpenSettings);
+        ok = ok && (ClassifyHotkey(kVkKeyS, true, true, false, false, false, false) == HotkeyKind::None);
+        ok = ok && (ClassifyHotkey(kVkKeyS, true, true, false, false, true, true) == HotkeyKind::None);
+        ok = ok && (ClassifyHotkey(kVkKeyS, true, true, true, false, true, false) == HotkeyKind::None);
+        checkTsf(19, ok, "Hotkey classification (no Shift+Space; Ctrl+Shift+S gated)", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 20: Read-only ITfContext guard (TF_SD_READONLY / null context)
+    {
+        using namespace vielotus_tsf_guard;
+        constexpr uint32_t kReadOnlyBit = 0x1u;
+        bool ok = true;
+        ok = ok && ShouldBypassContextForTyping(false, false, 0u, kReadOnlyBit);
+        ok = ok && ShouldBypassContextForTyping(true, true, kReadOnlyBit, kReadOnlyBit);
+        ok = ok && ShouldBypassContextForTyping(true, true, kReadOnlyBit | 0x2u, kReadOnlyBit);
+        ok = ok && !ShouldBypassContextForTyping(true, true, 0u, kReadOnlyBit);
+        ok = ok && !ShouldBypassContextForTyping(true, true, 0x8u, kReadOnlyBit);
+        // If host GetStatus() returns E_NOTIMPL, do not blindly block typing
+        ok = ok && !ShouldBypassContextForTyping(true, false, kReadOnlyBit, kReadOnlyBit);
+        checkTsf(20, ok, "Read-only ITfContext bypass guard", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 21: RequestEditSession outcome classification (sync OK vs TF_S_ASYNC vs DeleteRefused vs Failed)
+    {
+        using namespace vielotus_tsf_guard;
+        constexpr int32_t kSOk = 0;
+        constexpr int32_t kSFalse = 1;
+        constexpr int32_t kEFail = static_cast<int32_t>(0x80004005u);
+        constexpr int32_t kTsEReadOnly = static_cast<int32_t>(0x80040209u);
+        constexpr int32_t kTsESync = static_cast<int32_t>(0x80040208u);
+        constexpr int32_t kTfELocked = static_cast<int32_t>(0x80040500u);
+
+        bool ok = true;
+        // Sync success -> Succeeded -> eat key
+        auto oSync = ClassifyRequestEditSessionResult(true, kSOk, kSOk, true, false, kSOk);
+        ok = ok && (oSync == TsfEditOutcome::Succeeded) && ShouldEatKeyAfterEdit(oSync);
+        // Queued async (TF_S_ASYNC, !wasExecuted) -> QueuedAsync -> MUST keep key eaten (no double insert)
+        auto oAsync = ClassifyRequestEditSessionResult(true, kSOk, kTfSAsync, false, false, kSOk);
+        ok = ok && (oAsync == TsfEditOutcome::QueuedAsync) && ShouldEatKeyAfterEdit(oAsync);
+        // RequestEditSession returned failure -> Failed -> do NOT eat key
+        auto oReqFail = ClassifyRequestEditSessionResult(true, kEFail, kSOk, false, false, kSOk);
+        ok = ok && (oReqFail == TsfEditOutcome::Failed) && !ShouldEatKeyAfterEdit(oReqFail);
+        // Rejected via hrSession without running (TS_E_READONLY / TS_E_SYNCHRONOUS / TF_E_LOCKED / dropped S_OK)
+        auto oRejRo = ClassifyRequestEditSessionResult(true, kSOk, kTsEReadOnly, false, false, kSOk);
+        auto oRejSync = ClassifyRequestEditSessionResult(true, kSOk, kTsESync, false, false, kSOk);
+        auto oRejLock = ClassifyRequestEditSessionResult(true, kSOk, kTfELocked, false, false, kSOk);
+        auto oDropped = ClassifyRequestEditSessionResult(true, kSOk, kSOk, false, false, kSOk);
+        ok = ok && (oRejRo == TsfEditOutcome::Failed) && !ShouldEatKeyAfterEdit(oRejRo);
+        ok = ok && (oRejSync == TsfEditOutcome::Failed) && !ShouldEatKeyAfterEdit(oRejSync);
+        ok = ok && (oRejLock == TsfEditOutcome::Failed) && !ShouldEatKeyAfterEdit(oRejLock);
+        ok = ok && (oDropped == TsfEditOutcome::Failed) && !ShouldEatKeyAfterEdit(oDropped);
+        // Executed synchronously but GetSelection or SetText failed -> Failed -> do NOT eat key
+        auto oGetSelFail = ClassifyRequestEditSessionResult(true, kSOk, kEFail, true, false, kEFail);
+        auto oSetTextFail = ClassifyRequestEditSessionResult(true, kSOk, kTsEReadOnly, true, false, kTsEReadOnly);
+        ok = ok && (oGetSelFail == TsfEditOutcome::Failed) && !ShouldEatKeyAfterEdit(oGetSelFail);
+        ok = ok && (oSetTextFail == TsfEditOutcome::Failed) && !ShouldEatKeyAfterEdit(oSetTextFail);
+        // Executed synchronously and refused zero/partial delete -> DeleteRefused -> do NOT eat key
+        auto oRefused = ClassifyRequestEditSessionResult(true, kSOk, kSFalse, true, true, kSFalse);
+        ok = ok && (oRefused == TsfEditOutcome::DeleteRefused) && !ShouldEatKeyAfterEdit(oRefused);
+        // Allocation failure -> Failed -> do NOT eat key
+        auto oOom = ClassifyRequestEditSessionResult(false, kSOk, kSOk, false, false, kSOk);
+        ok = ok && (oOom == TsfEditOutcome::Failed) && !ShouldEatKeyAfterEdit(oOom);
+        checkTsf(21, ok, "RequestEditSession sync/async/refused/failed classification", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 22: PlanRangeShiftEdit (zero-shift, partial-shift, over-shift, RichEdit fallback) & Classic Edit guard
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        // Full shift, zero requested backspaces, or active selection -> ApplyFullRange
+        ok = ok && (PlanRangeShiftEdit(0, 0, true, false, false, 0) == ShiftEditPlan::ApplyFullRange);
+        ok = ok && (PlanRangeShiftEdit(3, 0, false, false, false, 0) == ShiftEditPlan::ApplyFullRange);
+        ok = ok && (PlanRangeShiftEdit(3, 3, true, false, false, 0) == ShiftEditPlan::ApplyFullRange);
+        // Non-Win32: zero-shift, partial-shift, and over-shift ALL refuse with zero mutation
+        ok = ok && (PlanRangeShiftEdit(3, 0, true, false, false, 0) == ShiftEditPlan::RefuseNoMutation);
+        ok = ok && (PlanRangeShiftEdit(3, 1, true, false, false, 0) == ShiftEditPlan::RefuseNoMutation);
+        ok = ok && (PlanRangeShiftEdit(3, 2, true, false, false, 0) == ShiftEditPlan::RefuseNoMutation);
+        ok = ok && (PlanRangeShiftEdit(3, 5, true, false, false, 0) == ShiftEditPlan::RefuseNoMutation);
+        // Win32 Edit/RichEdit: partial/zero shift only falls back when caret >= requestedBackspaces
+        ok = ok && (PlanRangeShiftEdit(3, 1, true, true, true, 3) == ShiftEditPlan::FallbackWin32Edit);
+        ok = ok && (PlanRangeShiftEdit(3, 0, true, true, true, 5) == ShiftEditPlan::FallbackWin32Edit);
+        ok = ok && (PlanRangeShiftEdit(3, 1, true, true, true, 2) == ShiftEditPlan::RefuseNoMutation);
+        ok = ok && (PlanRangeShiftEdit(3, 0, true, true, true, 0) == ShiftEditPlan::RefuseNoMutation);
+        ok = ok && (PlanRangeShiftEdit(3, 1, true, true, false, 5) == ShiftEditPlan::RefuseNoMutation);
+        // Classic Win32 Edit delete guard
+        ok = ok && CanClassicWin32EditDelete(0, 0, 0);
+        ok = ok && CanClassicWin32EditDelete(3, 3, 3);
+        ok = ok && CanClassicWin32EditDelete(3, 1, 4); // active selection
+        ok = ok && !CanClassicWin32EditDelete(3, 0, 0); // zero chars before caret
+        ok = ok && !CanClassicWin32EditDelete(3, 2, 2); // partial chars before caret
+        // RichEdit single-operation atomic fallback re-validation (must refuse with zero prior mutation)
+        ok = ok && CanWin32AtomicFallbackReplace(3, 3, 3);
+        ok = ok && CanWin32AtomicFallbackReplace(3, 5, 5);
+        ok = ok && !CanWin32AtomicFallbackReplace(3, 2, 2); // caret shorter than full requestedBackspaces
+        ok = ok && !CanWin32AtomicFallbackReplace(3, 0, 0);
+        ok = ok && !CanWin32AtomicFallbackReplace(3, 3, 5); // non-empty selection mismatch
+        ok = ok && !CanWin32AtomicFallbackReplace(0, 5, 5);
+        checkTsf(22, ok, "Range shift, Classic Edit & RichEdit atomic fallback guards", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 23–25: Hostile game-chat TSF host simulation (zero-shift, partial-shift, GetSelection fail, TF_S_ASYNC)
+    {
+        using namespace vielotus_tsf_guard;
+        struct HostileGameTsfSim {
+            enum class HostMode { ZeroShift, MaxOneShift, MaxTwoShift, GetSelectionFail, QueuedAsync };
+            WindowsNativeEngine engine;
+            HostMode mode;
+            std::string doc;
+            struct QueuedOp { int32_t bs; std::string text; };
+            std::vector<QueuedOp> asyncQueue;
+            int32_t lastRequestedBs{0};
+            ShiftEditPlan lastPlan{ShiftEditPlan::ApplyFullRange};
+
+            explicit HostileGameTsfSim(HostMode m) : mode(m) {
+                engine.setSmartBilingual(true);
+            }
+
+            TsfEditOutcome runEditSession(int32_t bs, const std::string &text) {
+                lastRequestedBs = bs;
+                if (mode == HostMode::GetSelectionFail) {
+                    // Synchronous DoEditSession entered, GetSelection returned E_FAIL
+                    return ClassifyRequestEditSessionResult(
+                        true, 0, static_cast<int32_t>(0x80004005u), true, false,
+                        static_cast<int32_t>(0x80004005u)
+                    );
+                }
+                if (mode == HostMode::QueuedAsync) {
+                    asyncQueue.push_back({bs, text});
+                    return ClassifyRequestEditSessionResult(true, 0, kTfSAsync, false, false, 0);
+                }
+                int32_t actualShifted = bs;
+                if (bs > 0) {
+                    if (mode == HostMode::ZeroShift) actualShifted = 0;
+                    else if (mode == HostMode::MaxOneShift) actualShifted = std::min<int32_t>(bs, 1);
+                    else if (mode == HostMode::MaxTwoShift) actualShifted = std::min<int32_t>(bs, 2);
+                }
+                const auto plan = PlanRangeShiftEdit(bs, actualShifted, true, false, false, 0);
+                lastPlan = plan;
+                if (plan == ShiftEditPlan::RefuseNoMutation) {
+                    return ClassifyRequestEditSessionResult(true, 0, 1, true, true, 1);
+                }
+                removeLastUtf16Units(doc, bs);
+                doc += text;
+                return ClassifyRequestEditSessionResult(true, 0, 0, true, false, 0);
+            }
+
+            void flushAsyncQueue() {
+                for (const auto &op : asyncQueue) {
+                    removeLastUtf16Units(doc, op.bs);
+                    doc += op.text;
+                }
+                asyncQueue.clear();
+            }
+
+            bool pressKey(char ch) {
+                if (ch == '\b') {
+                    if (!engine.isComposing()) {
+                        if (!doc.empty()) removeLastUtf16Units(doc, 1);
+                        return false;
+                    }
+                    int32_t act = engine.feedBackspace();
+                    TsfEditOutcome out = (act == static_cast<int32_t>(Action::Reset))
+                        ? runEditSession(1, "")
+                        : runEditSession(engine.getLastBackspaces(), engine.getLastTextUtf8());
+                    if (ShouldEatKeyAfterEdit(out)) return true;
+                    engine.reset();
+                    if (!doc.empty()) removeLastUtf16Units(doc, 1); // native host VK_BACK
+                    return false;
+                }
+                int32_t act = engine.feedChar(static_cast<uint32_t>(static_cast<unsigned char>(ch)));
+                TsfEditOutcome out = TsfEditOutcome::Succeeded;
+                if (act == static_cast<int32_t>(Action::Commit)) {
+                    std::string committed = engine.getLastCommitDiffTextUtf8();
+                    committed.push_back(ch);
+                    out = runEditSession(engine.getLastCommitDiffBackspaces(), committed);
+                } else if (act == static_cast<int32_t>(Action::Replace)) {
+                    out = runEditSession(engine.getLastBackspaces(), engine.getLastTextUtf8());
+                } else {
+                    out = runEditSession(0, std::string(1, ch));
+                }
+                if (ShouldEatKeyAfterEdit(out)) return true;
+                engine.reset();
+                doc.push_back(ch); // native host key delivery
+                return false;
+            }
+        };
+
+        // TSF 23: Zero-shift host refuses backward delete -> zero duplication + native Backspace passes
+        {
+            HostileGameTsfSim sim(HostileGameTsfSim::HostMode::ZeroShift);
+            bool e1 = sim.pressKey('t');
+            bool e2 = sim.pressKey('i');
+            bool e3 = sim.pressKey('e');
+            bool e4 = sim.pressKey('e'); // bs=1, actualShifted=0 -> DeleteRefused -> raw 'e' passes
+            bool bsAfter = sim.pressKey('\b'); // engine already reset -> native backspace
+            bool ok = e1 && e2 && e3 && !e4 && !bsAfter && (sim.doc == "tie");
+            checkTsf(23, ok, "Zero-shift game host avoids duplication and passes raw key", sim.doc);
+        }
+
+        // TSF 24: Partial-shift host (mid-word & retroactive 2-word commit) -> zero duplication/corrupt splice
+        {
+            // Mid-word: "truo" + 'w' requests bs=2 ("uo" -> "ươ"), host only shifts 1 -> RefuseNoMutation -> "truow"
+            HostileGameTsfSim simMid(HostileGameTsfSim::HostMode::MaxOneShift);
+            simMid.pressKey('t');
+            simMid.pressKey('r');
+            simMid.pressKey('u');
+            simMid.pressKey('o');
+            bool wEaten = simMid.pressKey('w');
+            bool okMid = !wEaten && (simMid.lastRequestedBs == 2) &&
+                         (simMid.lastPlan == ShiftEditPlan::RefuseNoMutation) &&
+                         (simMid.doc == "truow");
+
+            // Retroactive 2-word commit: "sex " ("sẽ ") + "toy" + ' ' requests retro bs=6 ("sex toy "),
+            // host only allows shifting up to 2 chars -> RefuseNoMutation -> Space passes -> "sẽ toy "
+            HostileGameTsfSim simRetro(HostileGameTsfSim::HostMode::MaxTwoShift);
+            for (char c : std::string("sex toy")) simRetro.pressKey(c);
+            bool spEaten = simRetro.pressKey(' ');
+            bool okRetro = !spEaten && (simRetro.lastRequestedBs == 6) &&
+                           (simRetro.lastPlan == ShiftEditPlan::RefuseNoMutation) &&
+                           (simRetro.doc == "sẽ toy ");
+
+            checkTsf(24, okMid && okRetro, "Partial-shift game host refuses splice without corruption",
+                     "mid='" + simMid.doc + "'(bs=" + std::to_string(simMid.lastRequestedBs) +
+                     ") retro='" + simRetro.doc + "'(bs=" + std::to_string(simRetro.lastRequestedBs) + ")");
+        }
+
+        // TSF 25: GetSelection E_FAIL passes key through; TF_S_ASYNC keeps key eaten with no double insert
+        {
+            HostileGameTsfSim simFail(HostileGameTsfSim::HostMode::GetSelectionFail);
+            bool wEaten = simFail.pressKey('w');
+            bool aEaten = simFail.pressKey('a');
+            bool okFail = !wEaten && !aEaten && (simFail.doc == "wa");
+
+            HostileGameTsfSim simAsync(HostileGameTsfSim::HostMode::QueuedAsync);
+            bool allEaten = true;
+            for (char c : std::string("tiees")) {
+                allEaten = allEaten && simAsync.pressKey(c);
+            }
+            simAsync.flushAsyncQueue();
+            bool okAsync = allEaten && (simAsync.doc == "tiế");
+
+            checkTsf(25, okFail && okAsync, "GetSelection E_FAIL passthrough vs TF_S_ASYNC queued eat",
+                     "fail='" + simFail.doc + "' async='" + simAsync.doc + "'");
+        }
+    }
+
+    // TSF 26: Out-of-process Settings launch policy (HWND -> Named Pipe -> Desktop EXE -> Skip)
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        // Existing Settings window always gets PostMessage first in both desktop & AppContainer
+        ok = ok && (PlanSettingsLaunch(true, false, false, true) == SettingsLaunchPlan::PostToExistingWindow);
+        ok = ok && (PlanSettingsLaunch(true, false, true, true) == SettingsLaunchPlan::PostToExistingWindow);
+        ok = ok && (PlanSettingsLaunch(true, true, true, false) == SettingsLaunchPlan::PostToExistingWindow);
+        // No HWND (e.g. AppContainer isolation), Named Pipe wake succeeded -> WakeViaNamedPipe
+        ok = ok && (PlanSettingsLaunch(false, true, true, false) == SettingsLaunchPlan::WakeViaNamedPipe);
+        ok = ok && (PlanSettingsLaunch(false, true, true, true) == SettingsLaunchPlan::WakeViaNamedPipe);
+        ok = ok && (PlanSettingsLaunch(false, true, false, true) == SettingsLaunchPlan::WakeViaNamedPipe);
+        // No HWND, pipe unavailable: only desktop hosts with VieLotusSettings.exe launch it;
+        // AppContainer and hosts without VieLotusSettings.exe skip cleanly (zero in-process dialog UI)
+        ok = ok && (PlanSettingsLaunch(false, false, false, true) == SettingsLaunchPlan::LaunchSettingsExe);
+        ok = ok && (PlanSettingsLaunch(false, false, true, true) == SettingsLaunchPlan::SkipUnavailable);
+        ok = ok && (PlanSettingsLaunch(false, false, false, false) == SettingsLaunchPlan::SkipUnavailable);
+        ok = ok && (PlanSettingsLaunch(false, false, true, false) == SettingsLaunchPlan::SkipUnavailable);
+        checkTsf(26, ok, "Out-of-process Settings launch policy (HWND / NamedPipe / Desktop)", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 27: Language Bar (GUID_LBI_INPUTMODE) menu command resolution
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        ok = ok && (ResolveLangBarMenuAction(kLangBarCmdVietnamese) == LangBarMenuAction::SetVietnamese);
+        ok = ok && (ResolveLangBarMenuAction(kLangBarCmdEnglish) == LangBarMenuAction::SetEnglish);
+        ok = ok && (ResolveLangBarMenuAction(kLangBarCmdTelex) == LangBarMenuAction::SetTelex);
+        ok = ok && (ResolveLangBarMenuAction(kLangBarCmdVni) == LangBarMenuAction::SetVni);
+        ok = ok && (ResolveLangBarMenuAction(kLangBarCmdOpenSettings) == LangBarMenuAction::OpenSettings);
+        ok = ok && (ResolveLangBarMenuAction(0u) == LangBarMenuAction::None);
+        ok = ok && (ResolveLangBarMenuAction(9999u) == LangBarMenuAction::None);
+        checkTsf(27, ok, "Language Bar menu command routing", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 28: Language Bar OnUpdate notification throttling (zero redundant RPC on unchanged state)
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        ok = ok && !ShouldNotifyLangBarUpdate(true, false, true, false, false);
+        ok = ok && ShouldNotifyLangBarUpdate(true, false, false, false, false);
+        ok = ok && ShouldNotifyLangBarUpdate(true, false, true, true, false);
+        ok = ok && ShouldNotifyLangBarUpdate(true, false, true, false, true);
+        checkTsf(28, ok, "Language Bar update notification policy", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 29: Settings revision clears stale per-process manual override & GitHub issue strips private contact
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        ok = ok && !ShouldClearManualOverrideOnSettingsRevision(0u, 0u);
+        ok = ok && !ShouldClearManualOverrideOnSettingsRevision(3u, 3u);
+        ok = ok && ShouldClearManualOverrideOnSettingsRevision(0u, 1u);
+        ok = ok && ShouldClearManualOverrideOnSettingsRevision(3u, 4u);
+        ok = ok && !ShouldIncludeContactInFeedbackChannel(true);
+        ok = ok && ShouldIncludeContactInFeedbackChannel(false);
+        checkTsf(29, ok, "SettingsRevision override sync & public feedback contact strip", ok ? "OK" : "MISMATCH");
     }
 
     // =========================================================================

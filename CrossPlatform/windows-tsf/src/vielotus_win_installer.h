@@ -192,6 +192,8 @@ inline bool GrantAppContainerReadExecuteAcl(const std::wstring &targetPath) {
 
 static constexpr const wchar_t *kUninstallRegSubKey =
     L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\VieLotusIM";
+static constexpr const wchar_t *kInnoUninstallRegSubKey =
+    L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{C7B08E9D-4762-4C97-8B1F-522197A598DE}_is1";
 static constexpr const wchar_t *kLegacyInnoUninstallRegSubKey =
     L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{8E2A7B44-5A1F-4B82-9B7C-123456789ABC}_is1";
 static constexpr const wchar_t *kTipClsidInprocSubKey =
@@ -238,11 +240,11 @@ inline bool IsProcessElevated() {
     return isMember != FALSE;
 }
 
-inline bool IsUninstallEntryRegistered() {
+inline bool HasValidUninstallStringInKey(HKEY hRoot, const wchar_t *subKey) {
     HKEY hKey = nullptr;
     if (RegOpenKeyExW(
-            HKEY_LOCAL_MACHINE,
-            kUninstallRegSubKey,
+            hRoot,
+            subKey,
             0,
             KEY_READ | KEY_WOW64_64KEY,
             &hKey
@@ -252,11 +254,19 @@ inline bool IsUninstallEntryRegistered() {
     WCHAR uninstallCmd[MAX_PATH * 2] = {};
     DWORD cb = sizeof(uninstallCmd);
     DWORD type = 0;
-    bool ok = (RegQueryValueExW(hKey, L"UninstallString", nullptr, &type, reinterpret_cast<LPBYTE>(uninstallCmd), &cb) == ERROR_SUCCESS &&
-               uninstallCmd[0] != L'\0');
+    const bool ok = (RegQueryValueExW(hKey, L"UninstallString", nullptr, &type, reinterpret_cast<LPBYTE>(uninstallCmd), &cb) == ERROR_SUCCESS &&
+                     uninstallCmd[0] != L'\0');
     RegCloseKey(hKey);
-    if (!ok) return false;
+    return ok;
+}
 
+inline bool IsUninstallEntryRegistered() {
+    if (HasValidUninstallStringInKey(HKEY_LOCAL_MACHINE, kInnoUninstallRegSubKey)) {
+        return true;
+    }
+    if (!HasValidUninstallStringInKey(HKEY_LOCAL_MACHINE, kUninstallRegSubKey)) {
+        return false;
+    }
     std::wstring uninstExe = GetInstallDir() + L"\\Uninstall-VieLotusIM.exe";
     DWORD attrs = GetFileAttributesW(uninstExe.c_str());
     return (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY));
@@ -350,7 +360,7 @@ inline void RegisterWindowsInstalledAppAndShortcuts(const std::wstring &installD
             nullptr
         ) == ERROR_SUCCESS && hKey) {
         static const WCHAR kDisplayName[] = L"Sen Vi\u1EC7t (VieLotusIM) \u2014 B\u1ED9 g\u00F5 Ti\u1EBFng Vi\u1EC7t";
-        static const WCHAR kDisplayVersion[] = L"2.0.7";
+        static const WCHAR kDisplayVersion[] = L"2.0.8";
         static const WCHAR kPublisher[] = L"Sen Vi\u1EC7t (VieLotusIM)";
         static const WCHAR kUrlInfo[] = L"https://github.com/stevedat/VieLotus-IM";
 
@@ -405,39 +415,7 @@ inline void RegisterWindowsInstalledAppAndShortcuts(const std::wstring &installD
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
 }
 
-inline int RunFullUninstallFlow(bool quiet) {
-    if (!IsProcessElevated()) {
-        WCHAR selfPath[MAX_PATH] = {};
-        if (GetModuleFileNameW(nullptr, selfPath, MAX_PATH) == 0) return 1;
-        SHELLEXECUTEINFOW sei{};
-        sei.cbSize = sizeof(sei);
-        sei.fMask = SEE_MASK_NOCLOSEPROCESS;
-        sei.lpVerb = L"runas";
-        sei.lpFile = selfPath;
-        sei.lpParameters = quiet ? L"--uninstall --quiet" : L"--uninstall";
-        sei.nShow = SW_SHOWNORMAL;
-        if (ShellExecuteExW(&sei) && sei.hProcess) {
-            WaitForSingleObject(sei.hProcess, 60000);
-            DWORD exitCode = 0;
-            GetExitCodeProcess(sei.hProcess, &exitCode);
-            CloseHandle(sei.hProcess);
-            return static_cast<int>(exitCode);
-        }
-        return 1;
-    }
-
-    if (!quiet) {
-        int ans = MessageBoxW(
-            nullptr,
-            L"B\u1EA1n c\u00F3 ch\u1EAFc ch\u1EAFn mu\u1ED1n g\u1EE1 c\u00E0i \u0111\u1EB7t b\u1ED9 g\u00F5 Ti\u1EBFng Vi\u1EC7t Sen Vi\u1EC7t (VieLotusIM) kh\u1ECFi m\u00E1y t\u00EDnh kh\u00F4ng?",
-            L"G\u1EE1 c\u00E0i \u0111\u1EB7t Sen Vi\u1EC7t (VieLotusIM)",
-            MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2 | MB_SETFOREGROUND
-        );
-        if (ans != IDYES) {
-            return 0;
-        }
-    }
-
+inline void UnregisterTsfAndCleanUserProfileState(const std::wstring &installDir) {
     CloseRunningSettingsAndTrayWindow();
 
     HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -449,17 +427,18 @@ inline int RunFullUninstallFlow(bool quiet) {
     }
 
     // 2. Unregister TSF profiles and COM server
-    std::wstring installDir = GetInstallDir();
     std::wstring tipDll = installDir + L"\\VieLotusTIP.dll";
     HMODULE hDll = LoadLibraryW(tipDll.c_str());
     if (hDll) {
         using PFN_RundllEntryW = void(CALLBACK *)(HWND, HINSTANCE, LPWSTR, int);
         using PFN_DllUnregisterServer = HRESULT(STDAPICALLTYPE *)(void);
-        auto pfnDeact = reinterpret_cast<PFN_RundllEntryW>(GetProcAddress(hDll, "DeactivateUserProfilesW"));
+        FARPROC rawDeact = GetProcAddress(hDll, "DeactivateUserProfilesW");
+        auto pfnDeact = reinterpret_cast<PFN_RundllEntryW>(reinterpret_cast<void *>(rawDeact));
         if (pfnDeact) {
             pfnDeact(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
         }
-        auto pfnUnreg = reinterpret_cast<PFN_DllUnregisterServer>(GetProcAddress(hDll, "DllUnregisterServer"));
+        FARPROC rawUnreg = GetProcAddress(hDll, "DllUnregisterServer");
+        auto pfnUnreg = reinterpret_cast<PFN_DllUnregisterServer>(reinterpret_cast<void *>(rawUnreg));
         if (pfnUnreg) {
             pfnUnreg();
         }
@@ -493,6 +472,65 @@ inline int RunFullUninstallFlow(bool quiet) {
     }
     RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\VieLotusIM\\AppBypass");
     RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\VieLotusIM");
+
+    if (SUCCEEDED(hrCo)) {
+        CoUninitialize();
+    }
+}
+
+inline int RunInnoTsfUnregisterOnly() {
+    std::wstring installDir = GetInstallDir();
+    WCHAR exePath[MAX_PATH] = {};
+    if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) > 0) {
+        std::wstring s(exePath);
+        size_t pos = s.find_last_of(L"\\/");
+        if (pos != std::wstring::npos) {
+            std::wstring siblingDir = s.substr(0, pos);
+            if (GetFileAttributesW((siblingDir + L"\\VieLotusTIP.dll").c_str()) != INVALID_FILE_ATTRIBUTES) {
+                installDir = siblingDir;
+            }
+        }
+    }
+    UnregisterTsfAndCleanUserProfileState(installDir);
+    DeleteFileW((installDir + L"\\Uninstall-VieLotusIM.exe").c_str());
+    return 0;
+}
+
+inline int RunFullUninstallFlow(bool quiet) {
+    if (!IsProcessElevated()) {
+        WCHAR selfPath[MAX_PATH] = {};
+        if (GetModuleFileNameW(nullptr, selfPath, MAX_PATH) == 0) return 1;
+        SHELLEXECUTEINFOW sei{};
+        sei.cbSize = sizeof(sei);
+        sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+        sei.lpVerb = L"runas";
+        sei.lpFile = selfPath;
+        sei.lpParameters = quiet ? L"--uninstall --quiet" : L"--uninstall";
+        sei.nShow = SW_SHOWNORMAL;
+        if (ShellExecuteExW(&sei) && sei.hProcess) {
+            WaitForSingleObject(sei.hProcess, 60000);
+            DWORD exitCode = 0;
+            GetExitCodeProcess(sei.hProcess, &exitCode);
+            CloseHandle(sei.hProcess);
+            return static_cast<int>(exitCode);
+        }
+        return 1;
+    }
+
+    if (!quiet) {
+        int ans = MessageBoxW(
+            nullptr,
+            L"B\u1EA1n c\u00F3 ch\u1EAFc ch\u1EAFn mu\u1ED1n g\u1EE1 c\u00E0i \u0111\u1EB7t b\u1ED9 g\u00F5 Ti\u1EBFng Vi\u1EC7t Sen Vi\u1EC7t (VieLotusIM) kh\u1ECFi m\u00E1y t\u00EDnh kh\u00F4ng?",
+            L"G\u1EE1 c\u00E0i \u0111\u1EB7t Sen Vi\u1EC7t (VieLotusIM)",
+            MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2 | MB_SETFOREGROUND
+        );
+        if (ans != IDYES) {
+            return 0;
+        }
+    }
+
+    std::wstring installDir = GetInstallDir();
+    UnregisterTsfAndCleanUserProfileState(installDir);
 
     // 4. Remove Start Menu & Desktop shortcuts
     WCHAR commonProgs[MAX_PATH] = {};
@@ -543,10 +581,6 @@ inline int RunFullUninstallFlow(bool quiet) {
     }
     if (!RemoveDirectoryW(installDir.c_str())) {
         MoveFileExW(installDir.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
-    }
-
-    if (SUCCEEDED(hrCo)) {
-        CoUninitialize();
     }
 
     if (!quiet) {

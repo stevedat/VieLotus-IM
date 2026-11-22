@@ -29,6 +29,7 @@ public:
     bool WasSelectionEmpty() const { return m_wasEmpty; }
     HRESULT GetSetTextHr() const { return m_hrSetText; }
     bool WasExecuted() const { return m_executed; }
+    bool WasDeleteRefused() const { return m_deleteRefused; }
 
 private:
     std::atomic<LONG> m_cRef{1};
@@ -44,4 +45,5 @@ private:
     bool m_wasEmpty{true};
     HRESULT m_hrSetText{S_OK};
     bool m_executed{false};
+    bool m_deleteRefused{false};
 };

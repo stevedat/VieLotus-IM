@@ -571,11 +571,11 @@ struct SettingsView: View {
             }
             switch prefs.presentationModePreference {
             case .automatic:
-                return "Direct & Stealth tự động"
+                return "Mặc định (Direct & Native Marked Text)"
             case .directReplacement:
-                return "Ưu tiên Direct (Không gạch)"
+                return "Ưu tiên Direct (Thử nghiệm trên Web)"
             case .markedText:
-                return "Marked Text chuẩn Apple"
+                return "Native Marked Text"
             case .passthrough:
                 return "Tạm ngắt bộ gõ"
             }
@@ -1125,9 +1125,9 @@ private struct AdaptiveCompatibilitySheet: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Tương thích Ứng dụng (Adaptive Hybrid)")
+                    Text("Tương thích Ứng dụng")
                         .font(.system(size: 14, weight: .bold))
-                    Text("Tự động chọn chế độ gõ tối ưu (Direct / Stealth Marked Text) cho từng ứng dụng")
+                    Text("Mặc định dùng Direct cho app native và Native Marked Text (ổn định nhất đã kiểm thử) cho Chromium/Electron")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
@@ -1147,17 +1147,22 @@ private struct AdaptiveCompatibilitySheet: View {
                     Text("Chế độ toàn cục:")
                         .font(.system(size: 11.5, weight: .semibold))
                     Picker("", selection: $prefs.presentationModePreference) {
-                        Text("Tự động (Adaptive Hybrid)").tag(PresentationModePreference.automatic)
-                        Text("Ưu tiên Không gạch chân (Direct)").tag(PresentationModePreference.directReplacement)
-                        Text("Marked Text (Chuẩn Apple)").tag(PresentationModePreference.markedText)
+                        Text("Mặc định (Tự động theo ứng dụng)").tag(PresentationModePreference.automatic)
+                        Text("Ưu tiên Direct (Thử nghiệm trên Web)").tag(PresentationModePreference.directReplacement)
+                        Text("Native Marked Text").tag(PresentationModePreference.markedText)
                     }
                     .labelsHidden()
-                    .frame(width: 235)
+                    .frame(width: 265)
 
                     Spacer()
 
-                    if !prefs.appModeOverrides.isEmpty || !ClientAdapter.forcedMarkedTextBundles().isEmpty {
+                    if !prefs.appModeOverrides.isEmpty ||
+                        !ClientAdapter.forcedMarkedTextBundles().isEmpty ||
+                        prefs.presentationModePreference != .automatic ||
+                        prefs.experimentalVerifiedExplicitRange {
                         Button("Khôi phục mặc định") {
+                            prefs.presentationModePreference = .automatic
+                            prefs.experimentalVerifiedExplicitRange = false
                             prefs.appModeOverrides.removeAll()
                             ClientAdapter.resetDynamicMarkedText()
                             reloadRunningApps()
@@ -1180,7 +1185,7 @@ private struct AdaptiveCompatibilitySheet: View {
                 }
             }
         }
-        .frame(width: 560, height: 360)
+        .frame(width: 590, height: 370)
         .onAppear {
             reloadRunningApps()
         }
@@ -1240,14 +1245,14 @@ private struct AdaptiveCompatibilitySheet: View {
                     ClientAdapter.clearForcedMarkedText(for: app.id)
                 }
             )) {
-                Text("Tự động").tag(PresentationModePreference.automatic)
-                Text("Direct (Không gạch)").tag(PresentationModePreference.directReplacement)
-                Text("Marked Text").tag(PresentationModePreference.markedText)
+                Text("Mặc định").tag(PresentationModePreference.automatic)
+                Text(app.category == .chromium ? "Direct (Thử nghiệm)" : "Direct (Không gạch)").tag(PresentationModePreference.directReplacement)
+                Text("Native Marked Text").tag(PresentationModePreference.markedText)
                 Text("Passthrough").tag(PresentationModePreference.passthrough)
             }
             .labelsHidden()
             .controlSize(.small)
-            .frame(width: 140)
+            .frame(width: 155)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -1267,20 +1272,27 @@ private struct AdaptiveCompatibilitySheet: View {
             return ("Auto-Fallback • Marked Text", .orange)
         case .appOverride:
             switch mode {
-            case .directReplacement: return ("Ghim • Không gạch chân", .green)
-            case .markedText: return ("Ghim • Marked Text", .blue)
+            case .directReplacement:
+                if category == .chromium {
+                    return ("Ghim • Direct (Thử nghiệm)", .orange)
+                }
+                return ("Ghim • Không gạch chân", .green)
+            case .markedText: return ("Ghim • Native Marked Text", .blue)
             case .terminalDirect: return ("Ghim • Terminal Direct", .teal)
             case .passthrough: return ("Ghim • Tắt bộ gõ", .secondary)
             }
         default:
             switch mode {
             case .directReplacement:
+                if category == .chromium {
+                    return ("Direct • Thử nghiệm", .orange)
+                }
                 return ("Direct • Không gạch chân", .green)
             case .markedText:
                 if category == .chromium {
-                    return ("Stealth • Gạch chân ẩn", .indigo)
+                    return ("Native Marked Text • Mặc định", .indigo)
                 }
-                return ("Marked Text • An toàn", .blue)
+                return ("Native Marked Text • Ổn định", .blue)
             case .terminalDirect:
                 return ("Terminal Direct", .teal)
             case .passthrough:

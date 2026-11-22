@@ -33,6 +33,17 @@ final class VieLotusIMController: IMKInputController {
     private var lastCommittedWordStartLocation: Int = NSNotFound
     private var lastCommittedWordLength: Int = 0
     private var lastIdleBoundaryEndLocation: Int = NSNotFound
+    private var explicitRangeBurstAnchor: Int = NSNotFound
+    private var explicitRangeHighWaterHostSelection: Int = NSNotFound
+    private var explicitRangeCursor: Int = NSNotFound
+    private var explicitRangeLastInsertTimeNs: UInt64 = 0
+    private var explicitRangeFirstUnackedTimeNs: UInt64 = 0
+    private var explicitRangeDisabledForCurrentFocus: Bool = false
+    private var explicitRangeNeedsPostBoundaryProbe: Bool = false
+    private var explicitRangeAwaitingProbeVerification: Bool = false
+    private var explicitRangeExpectedPostProbeLoc: Int = NSNotFound
+    private var explicitRangeProbeChar: String = ""
+    private static let explicitRangeStaleSelectionTimeoutNs: UInt64 = 350_000_000
     private var didEditMarkedTextInComposition: Bool = false
     private var isEditingInTerminalOverlay: Bool = false
     private var lastNativeBackspaceReportedLocation: Int = NSNotFound
@@ -145,12 +156,72 @@ final class VieLotusIMController: IMKInputController {
         return ClientAdapter.isInlineURLAutocompleteTail(tail)
     }
 
+    private func resetExplicitRangeBurst() {
+        explicitRangeBurstAnchor = NSNotFound
+        explicitRangeHighWaterHostSelection = NSNotFound
+        explicitRangeCursor = NSNotFound
+        explicitRangeLastInsertTimeNs = 0
+        explicitRangeFirstUnackedTimeNs = 0
+    }
+
+    private func resetExplicitRangeProbe() {
+        explicitRangeNeedsPostBoundaryProbe = false
+        explicitRangeAwaitingProbeVerification = false
+        explicitRangeExpectedPostProbeLoc = NSNotFound
+        explicitRangeProbeChar = ""
+    }
+
+    /// Marks a risk boundary (Enter, Tab, Escape, focus/selection change, navigation,
+    /// idle Backspace, shortcuts) after which experimental `Verified Explicit Range`
+    /// must probe & verify host state via Path A before permitting Path B replacements.
+    private func armExplicitRangeRiskBoundary() {
+        resetExplicitRangeBurst()
+        explicitRangeNeedsPostBoundaryProbe = true
+        explicitRangeAwaitingProbeVerification = false
+        explicitRangeExpectedPostProbeLoc = NSNotFound
+        explicitRangeProbeChar = ""
+    }
+
+    private func recordExplicitRangeCommit(startLocation: Int, newEndLocation: Int, observedHostLocation: Int) {
+        explicitRangeNeedsPostBoundaryProbe = false
+        let now = monotonicClockNanoseconds()
+        let priorHighWater = explicitRangeHighWaterHostSelection
+        if explicitRangeBurstAnchor == NSNotFound {
+            explicitRangeBurstAnchor = observedHostLocation != NSNotFound
+                ? min(observedHostLocation, startLocation)
+                : startLocation
+        } else if newEndLocation < explicitRangeBurstAnchor {
+            explicitRangeBurstAnchor = newEndLocation
+        }
+        var hostAdvanced = false
+        if observedHostLocation != NSNotFound {
+            if explicitRangeHighWaterHostSelection == NSNotFound {
+                explicitRangeHighWaterHostSelection = observedHostLocation
+                hostAdvanced = true
+            } else if observedHostLocation > explicitRangeHighWaterHostSelection {
+                explicitRangeHighWaterHostSelection = observedHostLocation
+                hostAdvanced = true
+            }
+        }
+        if explicitRangeHighWaterHostSelection != NSNotFound && newEndLocation < explicitRangeHighWaterHostSelection {
+            explicitRangeHighWaterHostSelection = newEndLocation
+        }
+        explicitRangeCursor = newEndLocation
+        explicitRangeLastInsertTimeNs = now
+        if observedHostLocation == newEndLocation {
+            explicitRangeFirstUnackedTimeNs = 0
+        } else if explicitRangeFirstUnackedTimeNs == 0 || hostAdvanced || priorHighWater == NSNotFound {
+            explicitRangeFirstUnackedTimeNs = now
+        }
+    }
+
     private func resetSelectionDrift() {
         lastNativeBackspaceReportedLocation = NSNotFound
         accumulatedSelectionDrift = 0
         lastBackspaceDidNotMoveSelection = false
         lastDirectReplacementDelta = 0
         lastIdleBoundaryEndLocation = NSNotFound
+        armExplicitRangeRiskBoundary()
     }
 
     private func isActiveMarkedClauseSelection(
@@ -348,13 +419,19 @@ final class VieLotusIMController: IMKInputController {
 
     /// Returns the preferred visual attributes for marked (composing) text.
     /// IMKInputController calls this when it needs to render the composition region.
-    /// We return Apple-standard single underline + markedClauseSegment:0 — matching
-    /// Apple's own Japanese, Pinyin, and Korean IMEs exactly.
+    /// Delegates to `MarkedTextStyleResolver` so IMKit attribute queries stay identical to
+    /// `setCompositionMarkedText(_:client:replacementRange:resolvedBundleID:)`.
     override func compositionAttributes(at range: NSRange) -> NSMutableDictionary! {
-        let dict = NSMutableDictionary()
-        dict[NSAttributedString.Key.underlineStyle] = NSUnderlineStyle.single.rawValue
-        dict[NSAttributedString.Key.markedClauseSegment] = 0
-        return dict
+        let prefs = Preferences.shared
+        let activeBundleID = lastClientIdentifier?.split(separator: ":").first.map { String($0).lowercased() }
+        let userExplicitlyChoseMarkedText =
+            prefs.presentationModePreference == .markedText ||
+            (activeBundleID != nil && !activeBundleID!.isEmpty && prefs.appModeOverrides[activeBundleID!] == .markedText)
+        let attrs = MarkedTextStyleResolver.compositionAttributes(
+            userExplicitlyChoseMarkedText: userExplicitlyChoseMarkedText,
+            stealthStyle: prefs.stealthMarkedTextStyle
+        )
+        return NSMutableDictionary(dictionary: attrs)
     }
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
@@ -409,6 +486,7 @@ final class VieLotusIMController: IMKInputController {
             lastCommittedWordStartLocation = NSNotFound
             lastCommittedWordLength = 0
             didEditMarkedTextInComposition = false
+            explicitRangeDisabledForCurrentFocus = false
             resetSelectionDrift()
             backtickDepth = 0
             machineTypingDetector.reset()
@@ -440,7 +518,8 @@ final class VieLotusIMController: IMKInputController {
             preference: preferences.presentationModePreference,
             appOverrides: preferences.appModeOverrides
         )
-        if hasActiveMarkedText && presentationMode == .directReplacement {
+        if (hasActiveMarkedText || (explicitRangeDisabledForCurrentFocus && appCategory == .chromium && !Self.isBrowserOmniboxSession)) &&
+            presentationMode == .directReplacement {
             presentationMode = .markedText
         }
 
@@ -457,15 +536,232 @@ final class VieLotusIMController: IMKInputController {
             return false
         }
         let selection = effectiveSelection(for: rawSelection)
+        var useVerifiedExplicitRange =
+            preferences.experimentalVerifiedExplicitRange &&
+            !explicitRangeDisabledForCurrentFocus &&
+            appCategory == .chromium &&
+            presentationMode == .directReplacement &&
+            !Self.isBrowserOmniboxSession
+        if useVerifiedExplicitRange && lastBackspaceDidNotMoveSelection {
+            // Trigger A: Native Backspace did not move reported `selectedRange().location`
+            // (hidden-textarea editors such as CodeMirror 5 on w3schools Tryit reset or decouple
+            // their hidden `<textarea>` while Chromium's cached `_textSelectionRange` stays frozen).
+            // Latch Native Marked Text for the current focus session so Blink's `SetSelectionOffsets`
+            // never rejects out-of-bounds explicit ranges and locks out typing.
+            traceLab("explicitRangeCircuitBreaker", bundleID: bundleID,
+                     detail: "reason=frozenBackspace rawLoc=\(rawSelection.location) drift=\(accumulatedSelectionDrift)",
+                     selection: rawSelection)
+            explicitRangeDisabledForCurrentFocus = true
+            useVerifiedExplicitRange = false
+            presentationMode = .markedText
+            resetSelectionDrift()
+            resetExplicitRangeProbe()
+            if engine.isComposing {
+                engine.reset()
+                composingWord = ""
+                rawWord = ""
+                editCaretBack = Self.caretDisarmed
+                virtualCursorLocation = NSNotFound
+                compositionStartLocation = NSNotFound
+                lastCommittedWordStartLocation = NSNotFound
+                lastCommittedWordLength = 0
+                lastDirectReplacementDelta = 0
+            }
+        }
+        if useVerifiedExplicitRange && explicitRangeAwaitingProbeVerification {
+            // Predictive Safety Gate Step 2 (Preventive Pre-Edit Verification):
+            // Verify BOTH host caret progression AND returned context (`attributedSubstring`)
+            // for the character probed via Path A after a risk boundary BEFORE permitting any
+            // Path B explicit-range text replacement.
+            let probeStr = explicitRangeProbeChar
+            let probeLen = (probeStr as NSString).length
+            let expectedLoc = explicitRangeExpectedPostProbeLoc
+            resetExplicitRangeProbe()
+
+            let selectionMatches = selection.location != NSNotFound &&
+                selection.length == 0 &&
+                expectedLoc != NSNotFound &&
+                selection.location == expectedLoc &&
+                expectedLoc >= probeLen
+
+            let observedAtExpected: String? = (expectedLoc != NSNotFound && expectedLoc >= probeLen)
+                ? client.attributedSubstring(from: NSRange(location: expectedLoc - probeLen, length: probeLen))?.string
+                : nil
+            let expectedProbeConfirmedOnHost = observedAtExpected != nil &&
+                !observedAtExpected!.isEmpty &&
+                !observedAtExpected!.contains("\u{FFFC}") &&
+                observedAtExpected!.precomposedStringWithCanonicalMapping == probeStr.precomposedStringWithCanonicalMapping
+
+            if selectionMatches && expectedProbeConfirmedOnHost {
+                let verifiedStart = compositionStartLocation != NSNotFound
+                    ? min(compositionStartLocation, expectedLoc - probeLen)
+                    : (expectedLoc - probeLen)
+                explicitRangeBurstAnchor = verifiedStart
+                explicitRangeHighWaterHostSelection = expectedLoc
+                explicitRangeCursor = expectedLoc
+                explicitRangeLastInsertTimeNs = monotonicClockNanoseconds()
+                explicitRangeFirstUnackedTimeNs = 0
+                traceLab("explicitRangePredictiveGateOpen", bundleID: bundleID,
+                         detail: "anchor=\(verifiedStart) loc=\(expectedLoc) probe='\(probeStr)'",
+                         selection: selection)
+            } else if !selectionMatches && expectedProbeConfirmedOnHost {
+                // Host committed the probed character at `expectedLoc - probeLen`, meaning the user
+                // moved focus/caret externally (e.g. mouse click) before key #2 on a healthy host.
+                // Reset composition and re-arm the probe at the new caret without latching fallback.
+                traceLab("explicitRangeExternalJump", bundleID: bundleID,
+                         detail: "reason=postProbeCaretJump expected=\(expectedLoc) actual=\(selection.location) probe='\(probeStr)'",
+                         selection: selection)
+                armExplicitRangeRiskBoundary()
+                if engine.isComposing {
+                    engine.reset()
+                    composingWord = ""
+                    rawWord = ""
+                    editCaretBack = Self.caretDisarmed
+                    virtualCursorLocation = NSNotFound
+                    compositionStartLocation = NSNotFound
+                    lastCommittedWordStartLocation = NSNotFound
+                    lastCommittedWordLength = 0
+                    lastDirectReplacementDelta = 0
+                }
+            } else {
+                // Host selection diverged/froze (e.g. CodeMirror 5 drained hidden `<textarea>`
+                // after Enter) or host context failed to confirm the probed character (e.g.
+                // auto-formatting mutation or unverifiable context). Latch Native Marked Text
+                // preventively BEFORE issuing any out-of-bounds explicit-range replacement.
+                let reason: String
+                if !selectionMatches {
+                    reason = "selectionDiverged"
+                } else if observedAtExpected == nil || observedAtExpected!.isEmpty {
+                    reason = "unverifiedContext"
+                } else {
+                    reason = "contextMismatch"
+                }
+                traceLab("explicitRangePredictiveGateClosed", bundleID: bundleID,
+                         detail: "reason=\(reason) expectedLoc=\(expectedLoc) actualLoc=\(selection.location) expectedChar='\(probeStr)' actualChar='\(observedAtExpected ?? "nil")'",
+                         selection: selection)
+                explicitRangeDisabledForCurrentFocus = true
+                useVerifiedExplicitRange = false
+                presentationMode = .markedText
+                resetExplicitRangeBurst()
+
+                // Zero-word-loss rescue for drained hidden-textarea editors (CodeMirror 5):
+                // If Path A inserted `probeStr` at the drained textarea's true offset (e.g. stale
+                // `27` snapped to real `1` with `attributedSubstring(0, 1) == probeStr`), re-anchor
+                // composition to that verified offset so key #2 completes the word cleanly.
+                let observedAtActual: String? = (selection.location != NSNotFound && selection.length == 0 && selection.location >= probeLen)
+                    ? client.attributedSubstring(from: NSRange(location: selection.location - probeLen, length: probeLen))?.string
+                    : nil
+                let probeFoundAtActualOffset = !selectionMatches &&
+                    observedAtActual != nil &&
+                    !observedAtActual!.isEmpty &&
+                    !observedAtActual!.contains("\u{FFFC}") &&
+                    observedAtActual!.precomposedStringWithCanonicalMapping == probeStr.precomposedStringWithCanonicalMapping
+
+                if probeFoundAtActualOffset && engine.isComposing && composingWord == probeStr {
+                    compositionStartLocation = selection.location - probeLen
+                    virtualCursorLocation = selection.location
+                    lastDirectReplacementDelta = 0
+                } else if engine.isComposing {
+                    engine.reset()
+                    composingWord = ""
+                    rawWord = ""
+                    editCaretBack = Self.caretDisarmed
+                    virtualCursorLocation = NSNotFound
+                    compositionStartLocation = NSNotFound
+                    lastCommittedWordStartLocation = NSNotFound
+                    lastCommittedWordLength = 0
+                    lastDirectReplacementDelta = 0
+                }
+            }
+        }
+        if useVerifiedExplicitRange && explicitRangeCursor != NSNotFound {
+            // Chromium skips synchronous `_textSelectionRange` updates when `insertText` uses
+            // an explicit `replacementRange` (`render_widget_host_view_cocoa.mm:3078`). During
+            // a continuous forward typing burst, host `selectedRange().location` advances
+            // monotonically inside `[explicitRangeBurstAnchor, explicitRangeCursor]` as Blink's
+            // async `SelectionChanged` IPCs arrive. Any selection outside that window, backward
+            // move below the previously observed high-water mark, non-empty selection, or lag
+            // persisting past `explicitRangeStaleSelectionTimeoutNs` disarms the burst cleanly.
+            let now = monotonicClockNanoseconds()
+            let isBoundaryCommitKey = event.keyCode == 49 || event.keyCode == 36 || event.keyCode == 76 || event.keyCode == 48
+            let unackedOrigin = explicitRangeFirstUnackedTimeNs > 0 ? explicitRangeFirstUnackedTimeNs : explicitRangeLastInsertTimeNs
+            let isStaleTimeout = !(engine.isComposing && isBoundaryCommitKey) &&
+                unackedOrigin > 0 &&
+                now > unackedOrigin &&
+                (now - unackedOrigin) > Self.explicitRangeStaleSelectionTimeoutNs
+            if selection.location == NSNotFound || selection.length > 0 {
+                armExplicitRangeRiskBoundary()
+                if engine.isComposing {
+                    engine.reset()
+                    composingWord = ""
+                    rawWord = ""
+                    editCaretBack = Self.caretDisarmed
+                    virtualCursorLocation = NSNotFound
+                    compositionStartLocation = NSNotFound
+                    lastCommittedWordStartLocation = NSNotFound
+                    lastCommittedWordLength = 0
+                    lastDirectReplacementDelta = 0
+                }
+            } else if selection.location == explicitRangeCursor {
+                explicitRangeBurstAnchor = selection.location
+                explicitRangeHighWaterHostSelection = selection.location
+                explicitRangeFirstUnackedTimeNs = 0
+            } else {
+                let minAnchor = explicitRangeBurstAnchor != NSNotFound ? explicitRangeBurstAnchor : 0
+                let movedBackwardBelowHighWater = explicitRangeHighWaterHostSelection != NSNotFound &&
+                    selection.location < explicitRangeHighWaterHostSelection
+                let jumpedOutsideWindow = selection.location < minAnchor || selection.location > explicitRangeCursor
+                if jumpedOutsideWindow || movedBackwardBelowHighWater || isStaleTimeout {
+                    let reason = jumpedOutsideWindow
+                        ? "outsideWindow"
+                        : (movedBackwardBelowHighWater ? "backwardJump" : "staleTimeout")
+                    if !jumpedOutsideWindow && !movedBackwardBelowHighWater && isStaleTimeout {
+                        // Trigger B: Host `selectedRange()` remained frozen past 350ms despite explicit
+                        // `insertText` calls (e.g. Blink `SetSelectionOffsets` rejected out-of-bounds
+                        // ranges after CodeMirror 5 drained its hidden `<textarea>`). Switch this focus
+                        // session to Native Marked Text (`NSNotFound`) to restore typing immediately.
+                        traceLab("explicitRangeCircuitBreaker", bundleID: bundleID,
+                                 detail: "reason=staleTimeout anchor=\(minAnchor) highWater=\(explicitRangeHighWaterHostSelection) cursor=\(explicitRangeCursor) actual=\(selection.location) output=\(composingWord)",
+                                 selection: selection)
+                        explicitRangeDisabledForCurrentFocus = true
+                        useVerifiedExplicitRange = false
+                        presentationMode = .markedText
+                        resetExplicitRangeBurst()
+                        resetExplicitRangeProbe()
+                    } else {
+                        traceLab("explicitRangeExternalJump", bundleID: bundleID,
+                                 detail: "reason=\(reason) anchor=\(minAnchor) highWater=\(explicitRangeHighWaterHostSelection) cursor=\(explicitRangeCursor) actual=\(selection.location) output=\(composingWord)",
+                                 selection: selection)
+                        armExplicitRangeRiskBoundary()
+                    }
+                    if engine.isComposing {
+                        engine.reset()
+                        composingWord = ""
+                        rawWord = ""
+                        editCaretBack = Self.caretDisarmed
+                        virtualCursorLocation = NSNotFound
+                        compositionStartLocation = NSNotFound
+                        lastCommittedWordStartLocation = NSNotFound
+                        lastCommittedWordLength = 0
+                        lastDirectReplacementDelta = 0
+                    }
+                } else {
+                    if explicitRangeHighWaterHostSelection == NSNotFound || selection.location > explicitRangeHighWaterHostSelection {
+                        explicitRangeHighWaterHostSelection = selection.location
+                        explicitRangeFirstUnackedTimeNs = now
+                    }
+                }
+            }
+        }
         var detectedDirectReplacementDesync = false
         let hadMidCompositionValidCursor = engine.isComposing && virtualCursorLocation != NSNotFound
         if !Self.isBrowserOmniboxSession,
+           !useVerifiedExplicitRange,
            (presentationMode == .terminalDirect || presentationMode == .directReplacement),
            engine.isComposing,
            virtualCursorLocation != NSNotFound,
            selection.location != NSNotFound,
            selection.location != virtualCursorLocation {
-            
             let composingLen = (composingWord as NSString).length
             let cursorEval = DirectReplacementGuard.evaluateCursorState(
                 selection: selection,
@@ -922,6 +1218,7 @@ final class VieLotusIMController: IMKInputController {
 
         if isPUAOrFunctionKey {
             editCaretBack = Self.caretDisarmed
+            armExplicitRangeRiskBoundary()
             if engine.isComposing {
                 if presentationMode == .terminalDirect || (Self.isBrowserOmniboxSession && !hasActiveMarkedText) {
                     cancelComposition()
@@ -943,6 +1240,7 @@ final class VieLotusIMController: IMKInputController {
                 if engine.isComposing {
                     _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
                 }
+                armExplicitRangeRiskBoundary()
                 backtickDepth += 1
                 return false
             }
@@ -982,6 +1280,15 @@ final class VieLotusIMController: IMKInputController {
                 return false
             }
             let wasComposingBeforeSpace = engine.isComposing
+            let explicitSpaceLoc: Int = {
+                if wasComposingBeforeSpace && virtualCursorLocation != NSNotFound {
+                    return virtualCursorLocation
+                }
+                if explicitRangeCursor != NSNotFound {
+                    return explicitRangeCursor
+                }
+                return selection.location
+            }()
             DiagnosticLogger.shared.logEvent("SPACE", app: bundleID, detail: "wasComposing=\(wasComposingBeforeSpace) outUTF16=\(engine.currentOutput().utf16.count)")
             var restored = false
             if wasComposingBeforeSpace {
@@ -990,6 +1297,17 @@ final class VieLotusIMController: IMKInputController {
             precededByTechnicalDelimiter = false
             followsDot = false
             session.precededByLeadingSlash = false
+            if useVerifiedExplicitRange && !explicitRangeNeedsPostBoundaryProbe && !restored && explicitSpaceLoc != NSNotFound {
+                let spaceRange = NSRange(location: explicitSpaceLoc, length: 0)
+                client.insertText(" ", replacementRange: spaceRange)
+                recordExplicitRangeCommit(startLocation: explicitSpaceLoc, newEndLocation: explicitSpaceLoc + 1, observedHostLocation: selection.location)
+                lastIdleBoundaryEndLocation = explicitSpaceLoc + 1
+                editCaretBack = wasComposingBeforeSpace ? -1 : Self.caretDisarmed
+                traceLab("verifiedExplicitSpace", bundleID: bundleID, key: "Space",
+                         detail: "range=\(spaceRange.location),0 restored=false cursor=\(explicitRangeCursor)",
+                         selection: client.selectedRange())
+                return true
+            }
             traceLab("space", bundleID: bundleID, key: "Space", detail: "restored=\(restored)",
                      selection: client.selectedRange())
             editCaretBack = wasComposingBeforeSpace ? -1 : Self.caretDisarmed
@@ -1026,6 +1344,15 @@ final class VieLotusIMController: IMKInputController {
             clearBrowserOmniboxSession()
             editCaretBack = Self.caretDisarmed
             let wasComposingBeforePunct = engine.isComposing
+            let explicitPunctLoc: Int = {
+                if wasComposingBeforePunct && virtualCursorLocation != NSNotFound {
+                    return virtualCursorLocation
+                }
+                if explicitRangeCursor != NSNotFound {
+                    return explicitRangeCursor
+                }
+                return selection.location
+            }()
             let wasInLeadingSlash = session.precededByLeadingSlash
             var restored = false
             if wasComposingBeforePunct {
@@ -1034,6 +1361,17 @@ final class VieLotusIMController: IMKInputController {
             precededByTechnicalDelimiter = MacroEngine.isTechnicalDelimiter(firstChar)
             followsDot = firstChar == "."
             session.precededByLeadingSlash = wasComposingBeforePunct ? (firstChar == "/" && wasInLeadingSlash) : (firstChar == "/")
+            if useVerifiedExplicitRange && !explicitRangeNeedsPostBoundaryProbe && !restored && explicitPunctLoc != NSNotFound {
+                let punctStr = String(firstChar)
+                let punctLen = punctStr.utf16.count
+                client.insertText(punctStr, replacementRange: NSRange(location: explicitPunctLoc, length: 0))
+                recordExplicitRangeCommit(startLocation: explicitPunctLoc, newEndLocation: explicitPunctLoc + punctLen, observedHostLocation: selection.location)
+                lastIdleBoundaryEndLocation = explicitPunctLoc + punctLen
+                traceLab("verifiedExplicitPunct", bundleID: bundleID, key: punctStr,
+                         detail: "range=\(explicitPunctLoc),0 cursor=\(explicitRangeCursor)",
+                         selection: client.selectedRange())
+                return true
+            }
             recordPostBoundaryCaretLocation(
                 wasComposingBeforeBoundary: wasComposingBeforePunct,
                 selectionBeforeBoundary: selection,
@@ -1071,6 +1409,7 @@ final class VieLotusIMController: IMKInputController {
             }
             precededByTechnicalDelimiter = true
             followsDot = false
+            armExplicitRangeRiskBoundary()
             recordPostBoundaryCaretLocation(
                 wasComposingBeforeBoundary: wasComposingBeforeDigit,
                 selectionBeforeBoundary: selection,
@@ -1234,7 +1573,12 @@ final class VieLotusIMController: IMKInputController {
             let expectedPostBoundaryLoc: Int = (editCaretBack == -1 && lastCommittedWordStartLocation != NSNotFound && lastCommittedWordLength > 0)
                 ? (lastCommittedWordStartLocation + lastCommittedWordLength + 1)
                 : lastIdleBoundaryEndLocation
+            let isExplicitRangePostBoundaryLag = useVerifiedExplicitRange &&
+                explicitRangeCursor != NSNotFound &&
+                selection.location != NSNotFound &&
+                selection.location <= explicitRangeCursor
             if !Self.isBrowserOmniboxSession,
+               !isExplicitRangePostBoundaryLag,
                presentationMode != .terminalDirect,
                !isExcelApp,
                !precededByTechnicalDelimiter,
@@ -1305,6 +1649,11 @@ final class VieLotusIMController: IMKInputController {
         var isEditing = false
         var feedResult: (backspaces: Int, suffix: String)? = nil
 
+        if useVerifiedExplicitRange && explicitRangeNeedsPostBoundaryProbe && !engine.isComposing && editCaretBack >= 0 {
+            // Preventive Safety Rule: after a risk boundary (Left arrow, idle Backspace, focus/selection
+            // change), experimental Chromium Direct must not automatically reopen and rewrite old text.
+            editCaretBack = Self.caretDisarmed
+        }
         if !engine.isComposing && editCaretBack >= 0 {
             if let lastWord = engine.lastCommittedWord,
                !verifyHostCommittedWordMatches(expectedWord: lastWord, cursorLocation: selection.location, presentationMode: presentationMode, client: client) {
@@ -1367,9 +1716,14 @@ final class VieLotusIMController: IMKInputController {
                 isEditingInTerminalOverlay = false
                 lastCommittedWordStartLocation = NSNotFound
                 lastCommittedWordLength = 0
-                compositionStartLocation = selection.location != NSNotFound ? selection.location : virtualCursorLocation
-                if virtualCursorLocation == NSNotFound && selection.location != NSNotFound {
-                    virtualCursorLocation = selection.location
+                if useVerifiedExplicitRange && !isUserSelection && explicitRangeCursor != NSNotFound {
+                    compositionStartLocation = explicitRangeCursor
+                    virtualCursorLocation = explicitRangeCursor
+                } else {
+                    compositionStartLocation = selection.location != NSNotFound ? selection.location : virtualCursorLocation
+                    if virtualCursorLocation == NSNotFound && selection.location != NSNotFound {
+                        virtualCursorLocation = selection.location
+                    }
                 }
             } else {
                 rawWord = engine.rawString()
@@ -1542,8 +1896,8 @@ final class VieLotusIMController: IMKInputController {
                     }
                     return true
                 } else {
-                    // Stealth Composition Mode: delivers zero-underline composition session
-                    DiagnosticLogger.shared.logEvent("STEALTH_MARKED_TEXT", app: bundleID, detail: "lenUTF16=\(output.utf16.count) consumed=true")
+                    // Apple-standard W3C Marked Text composition session
+                    DiagnosticLogger.shared.logEvent("MARKED_TEXT_COMPOSITION", app: bundleID, detail: "lenUTF16=\(output.utf16.count) consumed=true")
                     let postMarkedSelection = setCompositionMarkedText(output, client: client, resolvedBundleID: bundleID)
                     composingWord = output
                     traceLab("setMarkedText", bundleID: bundleID, detail: "output=\(output)",
@@ -1603,13 +1957,21 @@ final class VieLotusIMController: IMKInputController {
                     if compositionStartLocation != NSNotFound {
                         startLoc = compositionStartLocation
                     } else {
-                        let currentLoc = selection.location != NSNotFound ? selection.location : virtualCursorLocation
+                        let currentLoc: Int
+                    if useVerifiedExplicitRange && wasComposing && virtualCursorLocation != NSNotFound {
+                        // In Chromium Verified Explicit Range mode, prefer monotonic virtualCursorLocation
+                        // during an active composition burst because `render_widget_host_view_cocoa.mm:3078`
+                        // does not synchronously advance `_textSelectionRange` for explicit replacementRanges.
+                        currentLoc = virtualCursorLocation
+                    } else {
+                        currentLoc = selection.location != NSNotFound ? selection.location : virtualCursorLocation
+                    }
                         startLoc = currentLoc != NSNotFound && currentLoc >= previousCount ? currentLoc - previousCount : NSNotFound
                     }
                     let range = startLoc != NSNotFound && previousCount > 0
                         ? NSRange(location: startLoc, length: previousCount + ((isBrowserInlineTailSelection || isUserSelection) ? selection.length : 0))
                         : NSRange(location: NSNotFound, length: 0)
-                    if !isEditing && !isBrowserInlineTailSelection && !isUserSelection && range.location != NSNotFound && range.length > 0,
+                    if !useVerifiedExplicitRange && !isEditing && !isBrowserInlineTailSelection && !isUserSelection && range.location != NSNotFound && range.length > 0,
                        let hostSub = client.attributedSubstring(from: range)?.string,
                        !hostSub.isEmpty,
                        !hostSub.contains("\u{FFFC}"),
@@ -1625,7 +1987,10 @@ final class VieLotusIMController: IMKInputController {
                         return false
                     }
                     if isPureAppendToOnScreenWord {
-                        client.insertText(String(firstChar), replacementRange: NSRange(location: NSNotFound, length: 0))
+                        let inlineAppendRange: NSRange = (useVerifiedExplicitRange && virtualCursorLocation != NSNotFound)
+                            ? NSRange(location: virtualCursorLocation, length: 0)
+                            : NSRange(location: NSNotFound, length: 0)
+                        client.insertText(String(firstChar), replacementRange: inlineAppendRange)
                     } else {
                         client.insertText(rawWord, replacementRange: range)
                     }
@@ -1634,6 +1999,9 @@ final class VieLotusIMController: IMKInputController {
                     if startLoc != NSNotFound {
                         compositionStartLocation = startLoc
                         virtualCursorLocation = startLoc + (rawWord as NSString).length
+                        if useVerifiedExplicitRange {
+                            recordExplicitRangeCommit(startLocation: startLoc, newEndLocation: virtualCursorLocation, observedHostLocation: selection.location)
+                        }
                     }
                     return true
                 }
@@ -1658,11 +2026,46 @@ final class VieLotusIMController: IMKInputController {
                         virtualCursorLocation = startLoc + diff.suffix.utf16.count
                         return true
                     }
+                    if useVerifiedExplicitRange && !isEditing && diff.backspaces == 0 && (explicitRangeNeedsPostBoundaryProbe || isUserSelection) {
+                        // Predictive Safety Gate Step 1 (transformed 1st key, e.g. Telex 'w' -> 'ư'):
+                        // Route through Path A (`NSNotFound`, Blink `InsertTextAndMoveCaret`) instead of
+                        // an explicit offset that could be silently rejected after a risk boundary.
+                        if selection.location == NSNotFound {
+                            explicitRangeDisabledForCurrentFocus = true
+                            resetExplicitRangeProbe()
+                            resetExplicitRangeBurst()
+                        } else {
+                            let suffixLen = diff.suffix.utf16.count
+                            explicitRangeNeedsPostBoundaryProbe = false
+                            explicitRangeAwaitingProbeVerification = true
+                            explicitRangeExpectedPostProbeLoc = selection.location + suffixLen
+                            explicitRangeProbeChar = diff.suffix
+                            if !wasComposing {
+                                compositionStartLocation = selection.location
+                            }
+                            virtualCursorLocation = selection.location + suffixLen
+                            traceLab("explicitRangePredictiveProbe", bundleID: bundleID, key: String(firstChar),
+                                     detail: "transformed='\(diff.suffix)' expectedLoc=\(explicitRangeExpectedPostProbeLoc)",
+                                     selection: selection)
+                        }
+                        lastDirectReplacementDelta = 0
+                        client.insertText(diff.suffix, replacementRange: NSRange(location: NSNotFound, length: 0))
+                        composingWord = output
+                        return true
+                    }
                     let hasSelection = selection.location != NSNotFound && selection.length > 0
                     let maxBackspaces = isEditing ? Int.max : composingWord.utf16.count
                     let safeBackspaces = isEditing ? diff.backspaces : min(diff.backspaces, maxBackspaces)
 
-                    let currentLoc = selection.location != NSNotFound ? selection.location : virtualCursorLocation
+                    let currentLoc: Int
+                    if useVerifiedExplicitRange && wasComposing && virtualCursorLocation != NSNotFound {
+                        // In Chromium Verified Explicit Range mode, prefer monotonic virtualCursorLocation
+                        // during an active composition burst because `render_widget_host_view_cocoa.mm:3078`
+                        // does not synchronously advance `_textSelectionRange` for explicit replacementRanges.
+                        currentLoc = virtualCursorLocation
+                    } else {
+                        currentLoc = selection.location != NSNotFound ? selection.location : virtualCursorLocation
+                    }
                     let range: NSRange
                     
                     if isEditing && compositionStartLocation != NSNotFound {
@@ -1687,9 +2090,28 @@ final class VieLotusIMController: IMKInputController {
 
                     DiagnosticLogger.shared.logEvent("DIRECT_REPLACE", app: bundleID, detail: "del=\(safeBackspaces) insUTF16=\(diff.suffix.utf16.count) range=\(range.location),\(range.length) consumed=true")
                     let previousComposingUTF16 = composingWord.utf16.count
-                    let hostSubstringForCheck: String? = (appCategory == .standardAppKit && !Self.isBrowserOmniboxSession && !isExcelApp && !isEditing && range.location != NSNotFound && range.length > 0)
+                    let shouldCheckHostSubstring = (!Self.isBrowserOmniboxSession && !isExcelApp && !isEditing && range.location != NSNotFound && range.length > 0) &&
+                        (appCategory == .standardAppKit || (useVerifiedExplicitRange && explicitRangeNeedsPostBoundaryProbe))
+                    let hostSubstringForCheck: String? = shouldCheckHostSubstring
                         ? client.attributedSubstring(from: range).flatMap { (!$0.string.isEmpty && !$0.string.contains("\u{FFFC}")) ? $0.string : nil }
                         : nil
+                    if useVerifiedExplicitRange && explicitRangeNeedsPostBoundaryProbe && range.location != NSNotFound && range.length > 0 && hostSubstringForCheck == nil {
+                        // Preventive Safety Gate: refuse to rewrite an old range after a risk boundary
+                        // when the host returns no verifiable context for that range.
+                        traceLab("explicitRangePredictiveGateClosed", bundleID: bundleID, key: String(firstChar),
+                                 detail: "reason=unverifiedPostBoundaryReplace range=\(range.location),\(range.length)",
+                                 selection: selection)
+                        explicitRangeDisabledForCurrentFocus = true
+                        resetExplicitRangeProbe()
+                        resetExplicitRangeBurst()
+                        engine.reset()
+                        composingWord = ""
+                        rawWord = ""
+                        compositionStartLocation = NSNotFound
+                        virtualCursorLocation = NSNotFound
+                        lastDirectReplacementDelta = 0
+                        return false
+                    }
                     let ownership = DirectReplacementGuard.verifyRangeOwnership(
                         replacementRange: range,
                         composingWord: composingWord,
@@ -1703,6 +2125,11 @@ final class VieLotusIMController: IMKInputController {
                         traceLab("hostComposingMismatch", bundleID: bundleID, key: String(firstChar),
                                  detail: "expected=\(composingWord) actual=\(hostSubstringForCheck ?? "")",
                                  selection: selection)
+                        if useVerifiedExplicitRange {
+                            explicitRangeDisabledForCurrentFocus = true
+                            resetExplicitRangeProbe()
+                            resetExplicitRangeBurst()
+                        }
                         engine.reset()
                         composingWord = ""
                         rawWord = ""
@@ -1721,9 +2148,6 @@ final class VieLotusIMController: IMKInputController {
                     }
                     lastDirectReplacementDelta = validatedRange.location != NSNotFound ? validatedRange.length : 0
                     client.insertText(diff.suffix, replacementRange: validatedRange)
-                    traceLab("directReplace", bundleID: bundleID,
-                             detail: "range=\(validatedRange.location),\(validatedRange.length) suffix=\(diff.suffix)",
-                             selection: client.selectedRange())
                     composingWord = output
                     
                     if validatedRange.location != NSNotFound {
@@ -1731,9 +2155,15 @@ final class VieLotusIMController: IMKInputController {
                             compositionStartLocation = validatedRange.location
                         }
                         virtualCursorLocation = validatedRange.location + diff.suffix.utf16.count
+                        if useVerifiedExplicitRange {
+                            recordExplicitRangeCommit(startLocation: validatedRange.location, newEndLocation: virtualCursorLocation, observedHostLocation: selection.location)
+                        }
                     } else if currentLoc != NSNotFound {
                         virtualCursorLocation = currentLoc - safeBackspaces + diff.suffix.utf16.count
                     }
+                    traceLab(useVerifiedExplicitRange ? "verifiedExplicitReplace" : "directReplace", bundleID: bundleID,
+                             detail: "range=\(validatedRange.location),\(validatedRange.length) suffix=\(diff.suffix) vcur=\(virtualCursorLocation)",
+                             selection: client.selectedRange())
                     return true
                 } else {
                     lastDirectReplacementDelta = 0
@@ -1765,6 +2195,72 @@ final class VieLotusIMController: IMKInputController {
                                  detail: "start=\(compositionStartLocation) cursor=\(virtualCursorLocation)",
                                  selection: postSel)
                         return true
+                    }
+                    if useVerifiedExplicitRange && !isUserSelection && !explicitRangeNeedsPostBoundaryProbe {
+                        // Experimental Verified Explicit Range (Chromium Path B only):
+                        // Route pure appends through `insertText(_:replacementRange:)` with an explicit
+                        // non-NSNotFound range so every keystroke in the word shares `_host->ImeCommitText`
+                        // instead of mixing `_textToBeInserted`/`kChar` (Path A) with explicit edits (Path B).
+                        //
+                        // IMPORTANT: When `isUserSelection == true` (`selection.length > 0`) OR after any
+                        // risk boundary (`explicitRangeNeedsPostBoundaryProbe == true`), we MUST fall through
+                        // to Path A (`return false` -> Blink `InsertTextAndMoveCaret`) on key #1 so:
+                        //   1. Blink atomically deletes highlighted text without `ReplaceTextAndKeepSelection`
+                        //      re-selecting `(loc, 1)` (`input_method_controller.cc:676-681`).
+                        //   2. Predictive Safety Gate can verify host caret progression and context on key #2
+                        //      before issuing any explicit-range replacement.
+                        let charStr = String(firstChar)
+                        let charLen = charStr.utf16.count
+                        let appendLoc: Int
+                        if wasComposing && virtualCursorLocation != NSNotFound {
+                            appendLoc = virtualCursorLocation
+                        } else if explicitRangeCursor != NSNotFound {
+                            appendLoc = explicitRangeCursor
+                        } else if selection.location != NSNotFound {
+                            appendLoc = selection.location
+                        } else if virtualCursorLocation != NSNotFound {
+                            appendLoc = virtualCursorLocation
+                        } else {
+                            appendLoc = NSNotFound
+                        }
+                        if appendLoc != NSNotFound {
+                            let appendRange = NSRange(location: appendLoc, length: 0)
+                            client.insertText(charStr, replacementRange: appendRange)
+                            if !wasComposing {
+                                compositionStartLocation = appendLoc
+                            }
+                            virtualCursorLocation = appendLoc + charLen
+                            recordExplicitRangeCommit(startLocation: appendLoc, newEndLocation: virtualCursorLocation, observedHostLocation: selection.location)
+                            traceLab("verifiedExplicitAppend", bundleID: bundleID, key: charStr,
+                                     detail: "range=\(appendRange.location),0 start=\(compositionStartLocation) vcur=\(virtualCursorLocation)",
+                                     selection: client.selectedRange())
+                            return true
+                        }
+                    }
+                    if useVerifiedExplicitRange {
+                        let charStr = String(firstChar)
+                        let charLen = charStr.utf16.count
+                        if selection.location == NSNotFound {
+                            traceLab("explicitRangePredictiveGateClosed", bundleID: bundleID, key: charStr,
+                                     detail: "reason=invalidSelectionBeforeProbe",
+                                     selection: selection)
+                            explicitRangeDisabledForCurrentFocus = true
+                            resetExplicitRangeProbe()
+                            resetExplicitRangeBurst()
+                        } else {
+                            explicitRangeNeedsPostBoundaryProbe = false
+                            explicitRangeAwaitingProbeVerification = true
+                            explicitRangeExpectedPostProbeLoc = selection.location + charLen
+                            explicitRangeProbeChar = charStr
+                            if !wasComposing {
+                                compositionStartLocation = selection.location
+                            }
+                            virtualCursorLocation = selection.location + charLen
+                            traceLab("explicitRangePredictiveProbe", bundleID: bundleID, key: charStr,
+                                     detail: "expectedLoc=\(explicitRangeExpectedPostProbeLoc) wasUserSel=\(isUserSelection)",
+                                     selection: selection)
+                        }
+                        return false
                     }
                     DiagnosticLogger.shared.logEvent("DIRECT_PASSTHROUGH", app: bundleID)
                     
@@ -1819,7 +2315,7 @@ final class VieLotusIMController: IMKInputController {
         if session.inputMethod != preferences.inputMethod {
             session.setInputMethod(preferences.inputMethod)
         }
-        let presentationMode = ClientAdapter.presentationMode(
+        var presentationMode = ClientAdapter.presentationMode(
             for: appCategory,
             bundleIdentifier: bundleID,
             terminalDirectEnabled: preferences.terminalDirectMode,
@@ -1827,6 +2323,10 @@ final class VieLotusIMController: IMKInputController {
             preference: preferences.presentationModePreference,
             appOverrides: preferences.appModeOverrides
         )
+        if (hasActiveMarkedText || (explicitRangeDisabledForCurrentFocus && appCategory == .chromium && !Self.isBrowserOmniboxSession)) &&
+            presentationMode == .directReplacement {
+            presentationMode = .markedText
+        }
 
         traceLab("didCommand", bundleID: bundleID, key: selectorName,
                  detail: "selector=\(selectorName) isComposing=\(engine.isComposing)",
@@ -1837,6 +2337,7 @@ final class VieLotusIMController: IMKInputController {
             return handleBackspace(client: client, selection: selection, rawSelection: rawSelection, bundleID: bundleID, presentationMode: presentationMode)
 
         case "deleteForward:":
+            armExplicitRangeRiskBoundary()
             if engine.isComposing {
                 if presentationMode == .terminalDirect || Self.isBrowserOmniboxSession {
                     cancelComposition()
@@ -1909,9 +2410,11 @@ final class VieLotusIMController: IMKInputController {
             if engine.isComposing {
                 _ = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection)
             }
+            armExplicitRangeRiskBoundary()
             return false
 
         case "cancelOperation:": // Escape
+            armExplicitRangeRiskBoundary()
             if Self.isBrowserOmniboxSession {
                 clearBrowserOmniboxSession()
                 cancelComposition()
@@ -2098,7 +2601,14 @@ final class VieLotusIMController: IMKInputController {
                 traceLab("backspace", bundleID: bundleID, key: "Backspace",
                          detail: "rawBefore=\(rawBefore) rawAfter=\(rawWord) diff=\(diff.backspaces),\(diff.suffix)",
                          selection: client.selectedRange(), composingOverride: effectiveOutput)
-                if (presentationMode == .directReplacement || (presentationMode == .markedText && !hasActiveMarkedText)),
+                let useVerifiedExplicitRangeBackspace =
+                    Preferences.shared.experimentalVerifiedExplicitRange &&
+                    !explicitRangeDisabledForCurrentFocus &&
+                    ClientAdapter.classify(bundleIdentifier: bundleID) == .chromium &&
+                    presentationMode == .directReplacement &&
+                    !Self.isBrowserOmniboxSession
+                if !useVerifiedExplicitRangeBackspace,
+                   (presentationMode == .directReplacement || (presentationMode == .markedText && !hasActiveMarkedText)),
                    diff.backspaces == 1, diff.suffix.isEmpty,
                    effectiveOutput == String(composingWord.dropLast()) {
                     composingWord = effectiveOutput
@@ -2273,6 +2783,9 @@ final class VieLotusIMController: IMKInputController {
                                      detail: "backspace finish-composition range=\(wordRange.location),\(wordRange.length)",
                                      selection: client.selectedRange())
                             virtualCursorLocation = wordRange.location
+                            if useVerifiedExplicitRangeBackspace {
+                                recordExplicitRangeCommit(startLocation: wordRange.location, newEndLocation: wordRange.location, observedHostLocation: selection.location)
+                            }
                         } else {
                             traceLab("backspaceNativeFallback", bundleID: bundleID,
                                      detail: "finish-composition range unavailable startLoc=\(startLoc) length=\(previousOutputLength)",
@@ -2289,7 +2802,13 @@ final class VieLotusIMController: IMKInputController {
 
                     if output != composingWord {
                         if wordRange.location != NSNotFound {
-                            resetSelectionDrift()
+                            if useVerifiedExplicitRangeBackspace {
+                                lastNativeBackspaceReportedLocation = NSNotFound
+                                accumulatedSelectionDrift = 0
+                                lastBackspaceDidNotMoveSelection = false
+                            } else {
+                                resetSelectionDrift()
+                            }
                             lastDirectReplacementDelta = wordRange.length
                             client.insertText(output, replacementRange: wordRange)
                             traceLab("insertText", bundleID: bundleID,
@@ -2297,6 +2816,9 @@ final class VieLotusIMController: IMKInputController {
                                      selection: client.selectedRange())
                             composingWord = output
                             virtualCursorLocation = wordRange.location + (output as NSString).length
+                            if useVerifiedExplicitRangeBackspace {
+                                recordExplicitRangeCommit(startLocation: wordRange.location, newEndLocation: virtualCursorLocation, observedHostLocation: selection.location)
+                            }
                             return true
                         } else {
                             engine.reset()
@@ -2326,6 +2848,7 @@ final class VieLotusIMController: IMKInputController {
             isEditingInTerminalOverlay = false
             return false
         } else {
+            armExplicitRangeRiskBoundary()
             precededByTechnicalDelimiter = false
             followsDot = false
             // Backspace while idle: deleting the space after committed word arms editing
@@ -2463,6 +2986,11 @@ final class VieLotusIMController: IMKInputController {
             precededByTechnicalDelimiter: hostPrecededByTechnicalDelimiter,
             boundaryChar: suffixChar
         )
+        let isVerifiedExplicitRangeCommit =
+            prefs.experimentalVerifiedExplicitRange &&
+            presentationMode == .directReplacement &&
+            !Self.isBrowserOmniboxSession &&
+            ClientAdapter.classify(bundleIdentifier: ClientAdapter.resolveBundleIdentifier(client.bundleIdentifier())) == .chromium
         let candidateMacroKey = rawWord.isEmpty ? output : rawWord
         if prefs.macroEnabled && !suppressMacro, let macroExpansion = MacroEngine.shared.lookup(word: candidateMacroKey) {
             let appendStr = suffixChar != nil ? String(suffixChar!) : ""
@@ -2488,6 +3016,9 @@ final class VieLotusIMController: IMKInputController {
                          selection: client.selectedRange())
                 if range.location != NSNotFound {
                     virtualCursorLocation = range.location + (macroExpansion + appendStr).utf16.count
+                    if isVerifiedExplicitRangeCommit {
+                        recordExplicitRangeCommit(startLocation: range.location, newEndLocation: virtualCursorLocation, observedHostLocation: selection.location)
+                    }
                 } else if virtualCursorLocation != NSNotFound {
                     virtualCursorLocation += (macroExpansion + appendStr).utf16.count
                 }
@@ -2581,6 +3112,9 @@ final class VieLotusIMController: IMKInputController {
                              selection: client.selectedRange(), composingOverride: restoredWord)
                     if range.location != NSNotFound {
                         virtualCursorLocation = range.location + (rawWord + appendStr).utf16.count
+                        if isVerifiedExplicitRangeCommit {
+                            recordExplicitRangeCommit(startLocation: range.location, newEndLocation: virtualCursorLocation, observedHostLocation: selection.location)
+                        }
                     } else if virtualCursorLocation != NSNotFound {
                         virtualCursorLocation += (rawWord + appendStr).utf16.count
                     }
@@ -2741,18 +3275,11 @@ final class VieLotusIMController: IMKInputController {
             prefs.presentationModePreference == .markedText ||
             (bundleID != nil && prefs.appModeOverrides[bundleID!] == .markedText)
 
-        var compositionAttributes: [NSAttributedString.Key: Any] = [
-            .underlineStyle: NSUnderlineStyle.single.rawValue,
-            .markedClauseSegment: 0
-        ]
-        if !userExplicitlyChoseMarkedText {
-            // In Stealth Marked Text mode (Chromium/Electron automatic mode or dynamic fallback),
-            // keep NSUnderlineStyle.single + markedClauseSegment:0 so the host honors the W3C
-            // composition segment boundary, but set alpha to 0.004 (1/255) so Chromium renders
-            // a near-invisible underline instead of falling back to a thick solid bar.
-            compositionAttributes[.underlineColor] = NSColor.labelColor.withAlphaComponent(0.004)
-        }
-        let attrString = NSAttributedString(string: text, attributes: compositionAttributes)
+        let attrString = MarkedTextStyleResolver.attributedMarkedText(
+            text,
+            userExplicitlyChoseMarkedText: userExplicitlyChoseMarkedText,
+            stealthStyle: prefs.stealthMarkedTextStyle
+        )
         let textLen = text.utf16.count
         client.setMarkedText(attrString,
                              selectionRange: NSRange(location: textLen, length: 0),
@@ -2790,7 +3317,8 @@ final class VieLotusIMController: IMKInputController {
                 preference: prefs.presentationModePreference,
                 appOverrides: prefs.appModeOverrides
             )
-            if hasActiveMarkedText && mode == .directReplacement {
+            if (hasActiveMarkedText || (explicitRangeDisabledForCurrentFocus && appCategory == .chromium && !Self.isBrowserOmniboxSession)) &&
+                mode == .directReplacement {
                 mode = .markedText
             }
             let selection = effectiveSelection(for: client.selectedRange())
@@ -2835,6 +3363,7 @@ final class VieLotusIMController: IMKInputController {
         lastCommittedWordStartLocation = NSNotFound
         didEditMarkedTextInComposition = false
         isEditingInTerminalOverlay = false
+        explicitRangeDisabledForCurrentFocus = false
         resetSelectionDrift()
         lastClientIdentifier = nil
         lastActiveClientObject = sender as AnyObject
@@ -2886,6 +3415,7 @@ final class VieLotusIMController: IMKInputController {
         lastCommittedWordStartLocation = NSNotFound
         didEditMarkedTextInComposition = false
         isEditingInTerminalOverlay = false
+        explicitRangeDisabledForCurrentFocus = false
         resetSelectionDrift()
         lastClientIdentifier = nil
         lastActiveClientObject = nil

@@ -1,8 +1,13 @@
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0A00
+#endif
+
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <strsafe.h>
 #include <string>
+#include "SettingsUI.h"
 #include "vielotus_win_installer.h"
 
 typedef HRESULT(STDAPICALLTYPE *PFN_DllRegisterServer)(void);
@@ -244,10 +249,12 @@ static int PerformElevatedMsixTipProvisioning() {
     HRESULT hr = E_FAIL;
     HMODULE hDll = LoadLibraryW(dstDll.c_str());
     if (hDll) {
-        auto pfnReg = reinterpret_cast<PFN_DllRegisterServer>(GetProcAddress(hDll, "DllRegisterServer"));
+        FARPROC rawReg = GetProcAddress(hDll, "DllRegisterServer");
+        auto pfnReg = reinterpret_cast<PFN_DllRegisterServer>(reinterpret_cast<void *>(rawReg));
         hr = pfnReg ? pfnReg() : E_FAIL;
 
-        auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(GetProcAddress(hDll, "ActivateUserProfilesW"));
+        FARPROC rawAct = GetProcAddress(hDll, "ActivateUserProfilesW");
+        auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(reinterpret_cast<void *>(rawAct));
         if (pfnAct) {
             pfnAct(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
         }
@@ -263,13 +270,91 @@ static int PerformElevatedMsixTipProvisioning() {
     return SUCCEEDED(hr) ? 0 : 3;
 }
 
+static std::wstring ResolveExistingTipDllPath() {
+    std::wstring exeDir = GetExecutableDir();
+    std::wstring localDll = exeDir.empty() ? L"" : (exeDir + L"\\VieLotusTIP.dll");
+    std::wstring pfDll = GetProgramFilesInstallDir() + L"\\VieLotusTIP.dll";
+    DWORD pfAttrs = GetFileAttributesW(pfDll.c_str());
+    if (pfAttrs != INVALID_FILE_ATTRIBUTES && !(pfAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        return pfDll;
+    }
+    DWORD localAttrs = localDll.empty() ? INVALID_FILE_ATTRIBUTES : GetFileAttributesW(localDll.c_str());
+    if (localAttrs != INVALID_FILE_ATTRIBUTES && !(localAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
+        return localDll;
+    }
+    return L"";
+}
+
+static void InvokeTipActivateUserProfiles(bool forceLangListSync) {
+    (void)forceLangListSync;
+    std::wstring dllPath = ResolveExistingTipDllPath();
+    if (dllPath.empty()) return;
+    HMODULE hDll = LoadLibraryW(dllPath.c_str());
+    if (!hDll) return;
+    FARPROC rawAct = GetProcAddress(hDll, "ActivateUserProfilesW");
+    auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(reinterpret_cast<void *>(rawAct));
+    if (pfnAct) {
+        pfnAct(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
+    }
+    FreeLibrary(hDll);
+}
+
+static void InvokeTipDeactivateUserProfiles() {
+    std::wstring dllPath = ResolveExistingTipDllPath();
+    if (dllPath.empty()) return;
+    HMODULE hDll = LoadLibraryW(dllPath.c_str());
+    if (!hDll) return;
+    FARPROC rawDeact = GetProcAddress(hDll, "DeactivateUserProfilesW");
+    auto pfnDeact = reinterpret_cast<PFN_RundllEntryW>(reinterpret_cast<void *>(rawDeact));
+    if (pfnDeact) {
+        pfnDeact(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
+    }
+    FreeLibrary(hDll);
+}
+
+static int PerformElevatedInnoTsfRegistration() {
+    vielotus_win_installer::CloseRunningSettingsAndTrayWindow();
+
+    std::wstring targetDir = GetExecutableDir();
+    if (targetDir.empty() ||
+        GetFileAttributesW((targetDir + L"\\VieLotusTIP.dll").c_str()) == INVALID_FILE_ATTRIBUTES) {
+        targetDir = GetProgramFilesInstallDir();
+    }
+    if (targetDir.empty()) {
+        return 1;
+    }
+
+    // Remove any obsolete VieLotusCAPI.dll or legacy standalone uninstaller so Installed Apps shows only Inno's entry
+    DeleteFileW((targetDir + L"\\VieLotusCAPI.dll").c_str());
+    DeleteFileW((targetDir + L"\\Uninstall-VieLotusIM.exe").c_str());
+    RegDeleteKeyExW(HKEY_LOCAL_MACHINE, vielotus_win_installer::kUninstallRegSubKey, KEY_WOW64_64KEY, 0);
+    RegDeleteKeyExW(HKEY_LOCAL_MACHINE, vielotus_win_installer::kLegacyInnoUninstallRegSubKey, KEY_WOW64_64KEY, 0);
+
+    std::wstring dstDll = targetDir + L"\\VieLotusTIP.dll";
+    std::wstring dstDll32 = targetDir + L"\\VieLotusTIP32.dll";
+    vielotus_win_installer::GrantAppContainerReadExecuteAcl(targetDir);
+    vielotus_win_installer::GrantAppContainerReadExecuteAcl(dstDll);
+    if (GetFileAttributesW(dstDll32.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        vielotus_win_installer::GrantAppContainerReadExecuteAcl(dstDll32);
+    }
+
+    HRESULT hr = E_FAIL;
+    HMODULE hDll = LoadLibraryW(dstDll.c_str());
+    if (hDll) {
+        FARPROC rawReg = GetProcAddress(hDll, "DllRegisterServer");
+        auto pfnReg = reinterpret_cast<PFN_DllRegisterServer>(reinterpret_cast<void *>(rawReg));
+        hr = pfnReg ? pfnReg() : E_FAIL;
+        FreeLibrary(hDll);
+    }
+    return SUCCEEDED(hr) ? 0 : 3;
+}
+
 static void EnablePerMonitorDpiAwareness() {
     HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
     if (hUser32) {
         typedef BOOL(WINAPI *PFN_SetProcessDpiAwarenessContext)(DPI_AWARENESS_CONTEXT);
-        auto pfn = reinterpret_cast<PFN_SetProcessDpiAwarenessContext>(
-            GetProcAddress(hUser32, "SetProcessDpiAwarenessContext")
-        );
+        FARPROC rawDpi = GetProcAddress(hUser32, "SetProcessDpiAwarenessContext");
+        auto pfn = reinterpret_cast<PFN_SetProcessDpiAwarenessContext>(reinterpret_cast<void *>(rawDpi));
         if (pfn) {
             pfn(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         }
@@ -424,7 +509,8 @@ static void ExecuteWizardInstallSteps(SetupWizardState *st) {
     std::wstring pfDll = GetProgramFilesInstallDir() + L"\\VieLotusTIP.dll";
     HMODULE hDll = LoadLibraryW(pfDll.c_str());
     if (hDll) {
-        auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(GetProcAddress(hDll, "ActivateUserProfilesW"));
+        FARPROC rawAct = GetProcAddress(hDll, "ActivateUserProfilesW");
+        auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(reinterpret_cast<void *>(rawAct));
         if (pfnAct) {
             pfnAct(st->hWnd, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
         }
@@ -461,7 +547,7 @@ static LRESULT CALLBACK SetupWizardWndProc(HWND hwnd, UINT msg, WPARAM wParam, L
 
         st->hTitle = CreateWindowExW(
             0, L"STATIC",
-            L"Tr\u00ECnh C\u00E0i \u0110\u1EB7t Sen Vi\u1EC7t (VieLotusIM) v2.0.7",
+            L"Tr\u00ECnh C\u00E0i \u0110\u1EB7t Sen Vi\u1EC7t (VieLotusIM) v2.0.8",
             WS_CHILD | WS_VISIBLE,
             pad, pad, w, static_cast<int>(28 * s),
             hwnd, nullptr, cs->hInstance, nullptr
@@ -596,7 +682,7 @@ static bool RunInteractiveSetupWizard(HINSTANCE hInstance, bool &outOpenSettings
     HWND hwnd = CreateWindowExW(
         WS_EX_APPWINDOW,
         L"VieLotusSetupWizardWndClass",
-        L"Tr\u00ECnh C\u00E0i \u0110\u1EB7t Sen Vi\u1EC7t (VieLotusIM) v2.0.7",
+        L"Tr\u00ECnh C\u00E0i \u0110\u1EB7t Sen Vi\u1EC7t (VieLotusIM) v2.0.8",
         dwStyle,
         posX, posY, winW, winH,
         nullptr, nullptr, hInstance, &st
@@ -623,6 +709,7 @@ static bool RunInteractiveSetupWizard(HINSTANCE hInstance, bool &outOpenSettings
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLine, int nCmdShow) {
     (void)hPrevInstance;
+    (void)nCmdShow;
     EnablePerMonitorDpiAwareness();
 
     std::wstring cmdLine = lpCmdLine ? lpCmdLine : L"";
@@ -631,6 +718,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
                       cmdLine.find(L"/quiet") != std::wstring::npos ||
                       cmdLine.find(L"/S") != std::wstring::npos);
         return vielotus_win_installer::RunFullUninstallFlow(quiet);
+    }
+    if (cmdLine.find(L"--unregister-tsf") != std::wstring::npos || cmdLine.find(L"/unregister-tsf") != std::wstring::npos) {
+        return vielotus_win_installer::RunInnoTsfUnregisterOnly();
+    }
+    if (cmdLine.find(L"--register-tsf") != std::wstring::npos || cmdLine.find(L"/register-tsf") != std::wstring::npos) {
+        return PerformElevatedInnoTsfRegistration();
     }
     if (cmdLine.find(L"--install-msix-ime") != std::wstring::npos) {
         return PerformElevatedMsixTipProvisioning();
@@ -651,15 +744,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         }
         if (rc == 0) {
             ResetWinLangListCleanStamp();
-            std::wstring pfDll = GetProgramFilesInstallDir() + L"\\VieLotusTIP.dll";
-            HMODULE hDll = LoadLibraryW(pfDll.c_str());
-            if (hDll) {
-                auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(GetProcAddress(hDll, "ActivateUserProfilesW"));
-                if (pfnAct) {
-                    pfnAct(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
-                }
-                FreeLibrary(hDll);
-            }
+            InvokeTipActivateUserProfiles(true);
         }
         return rc;
     }
@@ -668,14 +753,24 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
                                 cmdLine.find(L"/startup") != std::wstring::npos ||
                                 cmdLine.find(L"--tray") != std::wstring::npos ||
                                 cmdLine.find(L"/tray") != std::wstring::npos);
+    const bool isExplicitSettings = (cmdLine.find(L"--settings") != std::wstring::npos ||
+                                     cmdLine.find(L"/settings") != std::wstring::npos);
+    const bool isActivateCmd = (cmdLine.find(L"--activate") != std::wstring::npos ||
+                                cmdLine.find(L"/activate") != std::wstring::npos);
+    const bool isDeactivateCmd = (cmdLine.find(L"--deactivate") != std::wstring::npos ||
+                                  cmdLine.find(L"/deactivate") != std::wstring::npos);
+
+    if (isActivateCmd) {
+        InvokeTipActivateUserProfiles(true);
+        return 0;
+    }
+    if (isDeactivateCmd) {
+        InvokeTipDeactivateUserProfiles();
+        return 0;
+    }
 
     // If invoked as VieLotus-Setup-*.exe (or with --setup), run the interactive Setup Wizard UI
-    if (!isStartupMode &&
-        IsSetupExecutableInvocation(cmdLine) &&
-        cmdLine.find(L"--activate") == std::wstring::npos &&
-        cmdLine.find(L"/activate") == std::wstring::npos &&
-        cmdLine.find(L"--deactivate") == std::wstring::npos &&
-        cmdLine.find(L"/deactivate") == std::wstring::npos) {
+    if (!isStartupMode && IsSetupExecutableInvocation(cmdLine)) {
         bool openSettings = false;
         if (!RunInteractiveSetupWizard(hInstance, openSettings)) {
             return 0;
@@ -697,26 +792,27 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         }
     }
 
+    // Fast-path single-instance wake for explicit --settings launches (<5ms, zero UAC, zero DLL load).
+    if (!isStartupMode && isExplicitSettings && WakeExistingSettingsWindow()) {
+        return 0;
+    }
+
     std::wstring exeDir = GetExecutableDir();
     std::wstring localDll = exeDir + L"\\VieLotusTIP.dll";
     std::wstring localDll32 = exeDir + L"\\VieLotusTIP32.dll";
-    std::wstring pfDll = GetProgramFilesInstallDir() + L"\\VieLotusTIP.dll";
 
-    // If launched interactively (never during silent --startup at Windows login) before HKLM TSF registration
-    // or after an MSIX Store update, elevate once to provision %ProgramFiles%\VieLotusIM\VieLotusTIP.dll (+ VieLotusTIP32.dll).
-    if (!isStartupMode && !IsTipRegisteredAndUpToDate(localDll, localDll32)) {
+    // Auto-provision MSIX package updates on interactive Store launch (never during --startup or --settings).
+    if (!isStartupMode && !isExplicitSettings && !IsTipRegisteredAndUpToDate(localDll, localDll32)) {
         if (vielotus_win_installer::IsProcessElevated()) {
             PerformElevatedMsixTipProvisioning();
         } else {
             RunElevatedSelfCommand(L"--install-msix-ime", 30000);
         }
+    } else if (!isStartupMode && WakeExistingSettingsWindow()) {
+        return 0;
     }
 
-    HMODULE hDll = LoadLibraryW(pfDll.c_str());
-    if (!hDll) {
-        hDll = LoadLibraryW(localDll.c_str());
-    }
-    if (!hDll) {
+    if (ResolveExistingTipDllPath().empty()) {
         if (!isStartupMode) {
             MessageBoxW(
                 nullptr,
@@ -728,31 +824,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         return isStartupMode ? 0 : 1;
     }
 
-    if (cmdLine.find(L"--activate") != std::wstring::npos || cmdLine.find(L"/activate") != std::wstring::npos) {
-        auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(GetProcAddress(hDll, "ActivateUserProfilesW"));
-        if (pfnAct) pfnAct(nullptr, hDll, lpCmdLine, SW_HIDE);
-        FreeLibrary(hDll);
-        return 0;
+    HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    ShowVieLotusSettingsDialog(hInstance, nullptr, isStartupMode, &InvokeTipActivateUserProfiles);
+    if (SUCCEEDED(hrCo)) {
+        CoUninitialize();
     }
-
-    if (cmdLine.find(L"--deactivate") != std::wstring::npos || cmdLine.find(L"/deactivate") != std::wstring::npos) {
-        auto pfnDeact = reinterpret_cast<PFN_RundllEntryW>(GetProcAddress(hDll, "DeactivateUserProfilesW"));
-        if (pfnDeact) pfnDeact(nullptr, hDll, lpCmdLine, SW_HIDE);
-        FreeLibrary(hDll);
-        return 0;
-    }
-
-    // Ensure current user profile has saved Telex/VNI enabled in Windows Language Bar
-    auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(GetProcAddress(hDll, "ActivateUserProfilesW"));
-    if (pfnAct) {
-        pfnAct(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
-    }
-
-    auto pfnShow = reinterpret_cast<PFN_RundllEntryW>(GetProcAddress(hDll, "ShowSettingsDialogW"));
-    if (pfnShow) {
-        pfnShow(nullptr, hInstance, lpCmdLine, isStartupMode ? SW_HIDE : nCmdShow);
-    }
-
-    FreeLibrary(hDll);
     return 0;
 }

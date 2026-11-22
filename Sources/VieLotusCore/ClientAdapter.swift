@@ -372,6 +372,13 @@ public struct ClientAdapter {
             }
         }
 
+        if category == .remoteOrVirtualMachine && passthroughRemoteApps {
+            // Protect Remote Desktop / VM sessions (RustDesk, RDP, Parallels, UTM, etc.) from
+            // double-IME corruption even when the user switches the global presentation preference
+            // (per-app overrides above still take precedence if explicitly configured).
+            return (.passthrough, .categoryHeuristic(category))
+        }
+
         switch preference {
         case .directReplacement:
             return (.directReplacement, .globalPreference(preference))
@@ -399,9 +406,6 @@ public struct ClientAdapter {
             }
         }
 
-        if category == .remoteOrVirtualMachine && passthroughRemoteApps {
-            return (.passthrough, .categoryHeuristic(category))
-        }
         if category == .terminal {
             return (terminalDirectEnabled ? .terminalDirect : .markedText, .categoryHeuristic(category))
         }
@@ -410,9 +414,9 @@ public struct ClientAdapter {
         }
         if category == .chromium {
             // Chromium / Electron / CEF apps (Chrome, Slack, VSCode, Discord, Notion, Figma, etc.):
-            // Use Stealth Composition (Zero-Underline Marked Text) to synchronize with the W3C IME
-            // composition lifecycle. This completely eliminates duplicate characters ("t-ti-tiế-tiếng")
-            // and swallowed keystrokes caused by asynchronous React/DOM virtual diffing.
+            // Default to Native Marked Text (`setMarkedText`, ulStyle=1, clause=0) — the most
+            // stable verified method across Chromium/Blink/Electron editors — to synchronize with
+            // the browser's IME composition lifecycle and avoid asynchronous DOM diffing races.
             return (.markedText, .categoryHeuristic(category))
         }
         if let id {

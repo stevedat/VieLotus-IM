@@ -1,4 +1,5 @@
 #include "EditSession.h"
+#include "TsfGameGuardLogic.h"
 
 namespace {
 
@@ -110,7 +111,15 @@ STDMETHODIMP_(ULONG) CEditSession::Release() {
 }
 
 STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
-    if (!m_pContext) return E_FAIL;
+    m_executed = true;
+    m_deleteRefused = false;
+    m_actualShifted = 0;
+    m_hrSetText = S_OK;
+
+    if (!m_pContext) {
+        m_hrSetText = E_FAIL;
+        return E_FAIL;
+    }
 
     if (m_ppComposition && *m_ppComposition &&
         m_ppCompositionContext && *m_ppCompositionContext &&
@@ -121,7 +130,6 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
     // Pure composition-termination session (e.g. before non-eaten Enter/Tab/Arrow key)
     if (m_backspaces == 0 && m_insertText.empty() && !m_bKeepComposition) {
         SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
-        m_executed = true;
         return S_OK;
     }
 
@@ -132,8 +140,23 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
     HWND hFocusTop = GetFocus();
     if (IsClassicWin32EditHwnd(hFocusTop)) {
         SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+        if ((GetWindowLongW(hFocusTop, GWL_STYLE) & ES_READONLY) != 0) {
+            m_hrSetText = TS_E_READONLY;
+            return TS_E_READONLY;
+        }
         DWORD dwStart = 0, dwEnd = 0;
         SendMessageW(hFocusTop, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+        if (!vielotus_tsf_guard::CanClassicWin32EditDelete(
+                m_backspaces,
+                static_cast<uint32_t>(dwStart),
+                static_cast<uint32_t>(dwEnd)
+            )) {
+            m_wasEmpty = (dwStart == dwEnd);
+            m_actualShifted = 0;
+            m_deleteRefused = true;
+            m_hrSetText = S_FALSE;
+            return S_FALSE;
+        }
         if (dwStart < dwEnd) {
             m_wasEmpty = false;
             SendMessageW(hFocusTop, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(m_insertText.c_str()));
@@ -142,22 +165,20 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
         } else {
             m_wasEmpty = true;
             const DWORD reqBs = (m_backspaces > 0) ? static_cast<DWORD>(m_backspaces) : 0;
-            const DWORD bsToApply = (dwStart >= reqBs) ? reqBs : dwStart;
-            if (bsToApply > 0) {
+            if (reqBs > 0) {
                 SendMessageW(
                     hFocusTop,
                     EM_SETSEL,
-                    static_cast<WPARAM>(dwStart - bsToApply),
+                    static_cast<WPARAM>(dwStart - reqBs),
                     static_cast<LPARAM>(dwEnd)
                 );
             }
-            if (bsToApply > 0 || !m_insertText.empty()) {
+            if (reqBs > 0 || !m_insertText.empty()) {
                 SendMessageW(hFocusTop, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(m_insertText.c_str()));
             }
-            m_actualShifted = -static_cast<LONG>(bsToApply);
+            m_actualShifted = -static_cast<LONG>(reqBs);
             m_hrSetText = S_OK;
         }
-        m_executed = true;
         return S_OK;
     }
 
@@ -166,11 +187,17 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
 
     // Get current caret selection
     if (FAILED(m_pContext->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &sel, &cFetched)) || cFetched == 0) {
+        SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+        m_hrSetText = E_FAIL;
         return E_FAIL;
     }
 
     ITfRange *pRange = sel.range;
-    if (!pRange) return E_FAIL;
+    if (!pRange) {
+        SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+        m_hrSetText = E_FAIL;
+        return E_FAIL;
+    }
 
     BOOL fWasEmpty = TRUE;
     pRange->IsEmpty(ec, &fWasEmpty);
@@ -179,9 +206,74 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
     // If backspaces > 0 and there was no active selection, expand range backwards
     LONG cchShifted = 0;
     if (m_backspaces > 0 && fWasEmpty) {
-        pRange->ShiftStart(ec, -m_backspaces, &cchShifted, nullptr);
+        HRESULT hrShift = pRange->ShiftStart(ec, -m_backspaces, &cchShifted, nullptr);
+        if (FAILED(hrShift)) {
+            cchShifted = 0;
+        }
     }
     m_actualShifted = cchShifted;
+    const int32_t actualShifted = (cchShifted < 0) ? static_cast<int32_t>(-cchShifted) : 0;
+
+    HWND hFocus = GetFocus();
+    const bool isWin32Edit = IsWin32EditOrRichEditHwnd(hFocus);
+    const bool isWin32ReadOnly = isWin32Edit && ((GetWindowLongW(hFocus, GWL_STYLE) & ES_READONLY) != 0);
+    DWORD win32SelStart = 0, win32SelEnd = 0;
+    bool win32SelEmpty = false;
+    if (isWin32Edit && !isWin32ReadOnly) {
+        SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&win32SelStart), reinterpret_cast<LPARAM>(&win32SelEnd));
+        win32SelEmpty = (win32SelStart == win32SelEnd);
+    }
+
+    const auto shiftPlan = vielotus_tsf_guard::PlanRangeShiftEdit(
+        m_backspaces,
+        actualShifted,
+        fWasEmpty != FALSE,
+        isWin32Edit && !isWin32ReadOnly,
+        win32SelEmpty,
+        static_cast<uint32_t>(win32SelStart)
+    );
+
+    if (shiftPlan == vielotus_tsf_guard::ShiftEditPlan::RefuseNoMutation) {
+        // Host shifted 0 or only part of the requested backspaces (e.g. non-standard game chat
+        // control or externally cleared/truncated field). Abort with zero mutation so replacement
+        // text can never duplicate or overwrite unrelated characters.
+        SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+        pRange->Release();
+        m_deleteRefused = true;
+        m_hrSetText = S_FALSE;
+        return S_FALSE;
+    }
+
+    if (shiftPlan == vielotus_tsf_guard::ShiftEditPlan::FallbackWin32Edit) {
+        // End composition metadata without deleting any text first, then re-verify EM_GETSEL
+        // and execute ONE atomic EM_SETSEL + EM_REPLACESEL across the full m_backspaces span.
+        // If the caret no longer covers m_backspaces, refuse with zero characters deleted.
+        SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+        DWORD dwStart = 0, dwEnd = 0;
+        SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
+        if (!vielotus_tsf_guard::CanWin32AtomicFallbackReplace(
+                m_backspaces,
+                static_cast<uint32_t>(dwStart),
+                static_cast<uint32_t>(dwEnd)
+            )) {
+            pRange->Release();
+            m_deleteRefused = true;
+            m_hrSetText = S_FALSE;
+            return S_FALSE;
+        }
+        const DWORD reqBs = static_cast<DWORD>(m_backspaces);
+        SendMessageW(
+            hFocus,
+            EM_SETSEL,
+            static_cast<WPARAM>(dwStart - reqBs),
+            static_cast<LPARAM>(dwEnd)
+        );
+        SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(m_insertText.c_str()));
+        pRange->Release();
+        m_actualShifted = -static_cast<LONG>(m_backspaces);
+        m_hrSetText = S_OK;
+        return S_OK;
+    }
 
     // Anchor composition start with backward gravity before mutating text
     ITfRange *pCompStartAnchor = nullptr;
@@ -207,45 +299,12 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
         }
     }
 
-    const int32_t actualShifted = (cchShifted < 0) ? static_cast<int32_t>(-cchShifted) : 0;
-    const int32_t missingBs = (fWasEmpty && m_backspaces > actualShifted) ? (m_backspaces - actualShifted) : 0;
     bool handledByWin32Edit = false;
-    std::wstring effectiveInsertText = m_insertText;
 
-    if (missingBs > 0) {
-        HWND hFocus = GetFocus();
-        if (IsWin32EditOrRichEditHwnd(hFocus)) {
-            if (actualShifted > 0) {
-                pRange->SetText(ec, 0, L"", 0);
-            }
-            DWORD dwStart = 0, dwEnd = 0;
-            SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
-            if (dwStart >= static_cast<DWORD>(missingBs)) {
-                SendMessageW(
-                    hFocus,
-                    EM_SETSEL,
-                    static_cast<WPARAM>(dwStart - static_cast<DWORD>(missingBs)),
-                    static_cast<LPARAM>(dwEnd)
-                );
-                SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(effectiveInsertText.c_str()));
-                handledByWin32Edit = true;
-                m_actualShifted = -static_cast<LONG>(m_backspaces);
-                m_hrSetText = S_OK;
-            }
-        } else if (m_bCommit && actualShifted > 0 && effectiveInsertText.size() > static_cast<size_t>(missingBs)) {
-            effectiveInsertText.erase(0, static_cast<size_t>(missingBs));
-        }
-    } else if (fWasEmpty) {
-        HWND hFocus = GetFocus();
-        if (IsWin32EditOrRichEditHwnd(hFocus)) {
-            DWORD dwStart = 0, dwEnd = 0;
-            SendMessageW(hFocus, EM_GETSEL, reinterpret_cast<WPARAM>(&dwStart), reinterpret_cast<LPARAM>(&dwEnd));
-            if (dwStart < dwEnd) {
-                SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(effectiveInsertText.c_str()));
-                handledByWin32Edit = true;
-                m_hrSetText = S_OK;
-            }
-        }
+    if (fWasEmpty && isWin32Edit && !isWin32ReadOnly && win32SelStart < win32SelEnd) {
+        SendMessageW(hFocus, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(m_insertText.c_str()));
+        handledByWin32Edit = true;
+        m_hrSetText = S_OK;
     }
 
     if (!handledByWin32Edit) {
@@ -253,11 +312,20 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
         pRange->SetGravity(ec, TF_GRAVITY_BACKWARD, TF_GRAVITY_FORWARD);
 
         // Set new text (replaces the selected range)
-        if (!effectiveInsertText.empty()) {
-            m_hrSetText = pRange->SetText(ec, 0, effectiveInsertText.c_str(), static_cast<LONG>(effectiveInsertText.length()));
+        if (!m_insertText.empty()) {
+            m_hrSetText = pRange->SetText(ec, 0, m_insertText.c_str(), static_cast<LONG>(m_insertText.length()));
         } else if (m_backspaces > 0 || !fWasEmpty) {
             // Pure backspace delete or active selection delete
             m_hrSetText = pRange->SetText(ec, 0, L"", 0);
+        }
+
+        if (FAILED(m_hrSetText)) {
+            SafeEndAndClearComposition(ec, m_ppComposition, m_ppCompositionContext);
+            if (pCompStartAnchor) {
+                pCompStartAnchor->Release();
+            }
+            pRange->Release();
+            return m_hrSetText;
         }
 
         // Move caret to end of modified text
@@ -322,6 +390,5 @@ STDMETHODIMP CEditSession::DoEditSession(TfEditCookie ec) {
         pCompStartAnchor->Release();
     }
     pRange->Release();
-    m_executed = true;
     return S_OK;
 }

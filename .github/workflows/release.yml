@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 2.0.7)'
+        description: 'Release version (e.g. 2.0.8)'
         required: false
         default: ''
 
@@ -34,7 +34,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-            VERSION="${VERSION:-2.0.7}"
+            VERSION="${VERSION:-2.0.8}"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -88,7 +88,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-            VERSION="${VERSION:-2.0.7}"
+            VERSION="${VERSION:-2.0.8}"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -171,7 +171,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist)"
-            VERSION="${VERSION:-2.0.7}"
+            VERSION="${VERSION:-2.0.8}"
             TAG="v${VERSION}"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
@@ -339,10 +339,15 @@ jobs:
 
           ## What's New in {os.environ["TAG"]}
 
-          - **Full Windows Multi-Architecture TSF Support (fixes Zalo PC & 32-bit/x64 apps on Windows ARM64 & x64):**
-            - `VieLotusTIP.dll` on ARM64 is now a true **ARM64X** dual-ABI binary (`ARM64` + `ARM64EC` with `IMAGE_DYNAMIC_RELOCATION_ARM64X`), loading seamlessly in both native ARM64 apps (Notepad, Edge, Terminal, Search) and emulated x64 apps (Chrome x64, VS Code x64, Electron x64).
-            - Bundled 32-bit **`VieLotusTIP32.dll`** (`Win32 / x86`) registered under `HKLM\\SOFTWARE\\WOW6432Node\\Classes\\CLSID\\...\\InprocServer32` in both x64 and ARM64 packages so 32-bit apps (including **Zalo PC `Zalo.exe [x86]`**, Steam, and legacy Win32 apps) type Vietnamese cleanly.
-            - Clean AV-hygienic Windows installers: zero embedded PE payloads, zero `icacls` / `rundll32` / hidden PowerShell LOLBin calls.
+          - **Thin Windows `VieLotusTIP.dll` & Out-of-Process `VieLotusSettings.exe`:**
+            - Extracted Bento Settings, System Tray, and Feedback UI out of the in-process COM TIP DLL so `VieLotusTIP.dll` / `VieLotusTIP32.dll` carry zero GDI+, DWM, process-enumeration, clipboard, or startup-registry dependencies.
+            - Added Windows Taskbar `[V]/[E]` (`GUID_LBI_INPUTMODE`) indicator, hardened session-scoped Named Pipe wake (`SHOW`) for AppContainer hosts (Notepad, Edge, Windows Search), and privacy-safe public GitHub issue reporting.
+            - Updated Inno Setup offline installers (`VieLotus-Setup-x64.exe`, `VieLotus-Setup-arm64.exe`) with standard uninstall integration, `SolidCompression=no`, and zero `runhidden` flags alongside ARM64X (`ARM64 + ARM64EC`) + 32-bit WOW64 support.
+          - **Swift 6 ↔ C++20 Engine Parity & macOS Hybrid Pure Native:**
+            - Synchronized edge-case Telex transforms across Swift 6 and C++20 (semivowel modifier updates, Central Highlands place names like `Đắk Lắk` / `Krông Pắc` while keeping English `kr-` words, and refined context-sensitive lexicon rules; **149 / 149** cross-engine parity).
+            - Finalized macOS Hybrid Pure Native presentation policy (`MarkedTextStylePolicy`) and main-thread `TISCreateInputSourceList` safety.
+          - **Freestanding C++20 WebAssembly SDK (`@vielotus/core`):**
+            - Added zero-import `wasm32` build of the C++20 engine and interactive `/try/` playground.
 
           ## Swift CLI regression benchmark
 

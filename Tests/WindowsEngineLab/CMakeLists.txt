@@ -50,6 +50,7 @@ target_include_directories(VieLotusWinEngineLab PRIVATE
     "${CORE_WIN_DIR}"
     "${REPO_ROOT}/Sources/VieLotusCAPI/include"
     "${REPO_ROOT}/CrossPlatform/common"
+    "${REPO_ROOT}/CrossPlatform/windows-tsf/src"
 )
 
 target_compile_definitions(VieLotusWinEngineLab PRIVATE

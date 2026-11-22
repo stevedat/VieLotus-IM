@@ -20,6 +20,8 @@ final class Preferences: ObservableObject {
         static let smartBilingual = "VieLotusIM.smartBilingual"
         static let terminalDirectMode = "VieLotusIM.terminalDirectMode"
         static let presentationModePreference = "VieLotusIM.presentationModePreference"
+        static let stealthMarkedTextStyle = "VieLotusIM.stealthMarkedTextStyle"
+        static let experimentalVerifiedExplicitRange = "VieLotusIM.experimentalVerifiedExplicitRange"
         static let appModeOverrides = "VieLotusIM.appModeOverrides"
         static let developerMode = "VieLotusIM.developerMode"
         static let genZMode = "VieLotusIM.genZModeV2"
@@ -122,6 +124,37 @@ final class Preferences: ObservableObject {
         }
     }
 
+    @Published var stealthMarkedTextStyle: StealthMarkedTextStyle {
+        didSet {
+            guard !isReloading else { return }
+            defaults.set(stealthMarkedTextStyle.rawValue, forKey: Key.stealthMarkedTextStyle)
+            CFPreferencesSetAppValue(
+                Key.stealthMarkedTextStyle as CFString,
+                stealthMarkedTextStyle.rawValue as CFString,
+                kCFPreferencesCurrentApplication
+            )
+            flushDefaults()
+        }
+    }
+
+    /// Experimental opt-in R&D flag: keeps all Chromium Direct Replacement appends,
+    /// diacritic edits, and Space commits on Chromium's explicit-range `ImeCommitText` path
+    /// (`replacementRange.location != NSNotFound`) with monotonic `virtualCursorLocation`
+    /// tracking to account for Chromium's skipped synchronous `_textSelectionRange` update
+    /// (`render_widget_host_view_cocoa.mm:3078`). Disabled by default in production.
+    @Published var experimentalVerifiedExplicitRange: Bool {
+        didSet {
+            guard !isReloading else { return }
+            defaults.set(experimentalVerifiedExplicitRange, forKey: Key.experimentalVerifiedExplicitRange)
+            CFPreferencesSetAppValue(
+                Key.experimentalVerifiedExplicitRange as CFString,
+                (experimentalVerifiedExplicitRange as CFBoolean),
+                kCFPreferencesCurrentApplication
+            )
+            flushDefaults()
+        }
+    }
+
     @Published var appModeOverrides: [String: PresentationModePreference] {
         didSet {
             defaults.set(appModeOverrides.mapValues(\.rawValue), forKey: Key.appModeOverrides)
@@ -205,6 +238,13 @@ final class Preferences: ObservableObject {
         self.macroEnabled = defaults.object(forKey: Key.macroEnabled) as? Bool ?? false
         let rawPresentationMode = defaults.string(forKey: Key.presentationModePreference) ?? PresentationModePreference.automatic.rawValue
         self.presentationModePreference = PresentationModePreference(rawValue: rawPresentationMode) ?? .automatic
+        let rawStealthStyle = (CFPreferencesCopyAppValue(Key.stealthMarkedTextStyle as CFString, kCFPreferencesCurrentApplication) as? String)
+            ?? defaults.string(forKey: Key.stealthMarkedTextStyle)
+            ?? StealthMarkedTextStyle.appleStandardSingle.rawValue
+        self.stealthMarkedTextStyle = StealthMarkedTextStyle(rawValue: rawStealthStyle) ?? .appleStandardSingle
+        self.experimentalVerifiedExplicitRange = (CFPreferencesCopyAppValue(Key.experimentalVerifiedExplicitRange as CFString, kCFPreferencesCurrentApplication) as? Bool)
+            ?? (defaults.object(forKey: Key.experimentalVerifiedExplicitRange) as? Bool)
+            ?? false
         let storedOverrides = defaults.dictionary(forKey: Key.appModeOverrides) as? [String: String] ?? [:]
         self.appModeOverrides = storedOverrides.reduce(into: [:]) { result, entry in
             let bundleID = entry.key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -292,6 +332,13 @@ final class Preferences: ObservableObject {
         self.macroEnabled = defaults.object(forKey: Key.macroEnabled) as? Bool ?? false
         let rawPresentationMode = defaults.string(forKey: Key.presentationModePreference) ?? PresentationModePreference.automatic.rawValue
         self.presentationModePreference = PresentationModePreference(rawValue: rawPresentationMode) ?? .automatic
+        let rawStealthStyle = (CFPreferencesCopyAppValue(Key.stealthMarkedTextStyle as CFString, kCFPreferencesCurrentApplication) as? String)
+            ?? defaults.string(forKey: Key.stealthMarkedTextStyle)
+            ?? StealthMarkedTextStyle.appleStandardSingle.rawValue
+        self.stealthMarkedTextStyle = StealthMarkedTextStyle(rawValue: rawStealthStyle) ?? .appleStandardSingle
+        self.experimentalVerifiedExplicitRange = (CFPreferencesCopyAppValue(Key.experimentalVerifiedExplicitRange as CFString, kCFPreferencesCurrentApplication) as? Bool)
+            ?? (defaults.object(forKey: Key.experimentalVerifiedExplicitRange) as? Bool)
+            ?? false
         let storedOverrides = defaults.dictionary(forKey: Key.appModeOverrides) as? [String: String] ?? [:]
         self.appModeOverrides = storedOverrides.reduce(into: [:]) { result, entry in
             let bundleID = entry.key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
