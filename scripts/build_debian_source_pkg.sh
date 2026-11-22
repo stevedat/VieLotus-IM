@@ -22,13 +22,7 @@ DEB_REV="${2:-1}"
 OUT_DIR="${ROOT_DIR}/dist/debian-src"
 
 if [ -z "${PUBLIC_REPO_DIR:-}" ]; then
-    if [ -f "${ROOT_DIR}/Sources/VieLotusCore/Resources/English/scowl-en.txt" ] && [ -f "${ROOT_DIR}/CrossPlatform/packaging/debian/changelog" ]; then
-        PUBLIC_REPO_DIR="${ROOT_DIR}"
-    elif [ -d "${ROOT_DIR}" ]; then
-        PUBLIC_REPO_DIR="${ROOT_DIR}"
-    else
-        PUBLIC_REPO_DIR="${ROOT_DIR}"
-    fi
+    PUBLIC_REPO_DIR="${ROOT_DIR}"
 fi
 
 rm -rf "${OUT_DIR}"

@@ -101,11 +101,6 @@ if [ -z "$(find "$APP_DIR/Contents/Resources" -maxdepth 1 -name "*VieLotusCore.b
     find .build/scratch-arm64 -name "*VieLotusCore.bundle" -type d -maxdepth 5 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
     find .build/out/Products/Release -name "*VieLotusCore.bundle" -type d -maxdepth 2 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
 fi
-# Exclude mobile touch-keyboard suggestion dictionaries from the macOS InputMethodKit bundle
-rm -f "$APP_DIR/Contents/Resources/"*VieLotusCore.bundle/Contents/Resources/TuDienTuGhep.json \
-      "$APP_DIR/Contents/Resources/"*VieLotusCore.bundle/Contents/Resources/TuDienTuGhep.txt \
-      "$APP_DIR/Contents/Resources/"*VieLotusCore.bundle/TuDienTuGhep.json \
-      "$APP_DIR/Contents/Resources/"*VieLotusCore.bundle/TuDienTuGhep.txt
 
 CORE_BUNDLE="$(find "$APP_DIR/Contents/Resources" -maxdepth 1 -name "*VieLotusCore.bundle" -type d | head -n 1)"
 if [ -z "$CORE_BUNDLE" ]; then

@@ -95,18 +95,8 @@ private let engineVersionCString: [CChar] = Array(AppInfo.appVersion.utf8CString
 // Lifecycle Exports
 // ============================================================================
 
-#if os(Android) && !VIELOTUS_OPEN_CORE_MACOS && canImport(VieLotusMobileCore)
-private let capiAndroidSpellProviderInit: Void = {
-    SmartBilingualDetector.spellCheckerProvider = IOSSpellChecker()
-    SmartBilingualDetector.warmUpModelsAsync()
-}()
-#endif
-
 @_cdecl("vielotus_create_session")
 public func vielotus_create_session() -> UnsafeMutableRawPointer {
-    #if os(Android) && !VIELOTUS_OPEN_CORE_MACOS && canImport(VieLotusMobileCore)
-    _ = capiAndroidSpellProviderInit
-    #endif
     let wrapper = VieLotusSessionWrapper()
     return Unmanaged.passRetained(wrapper).toOpaque()
 }

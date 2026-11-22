@@ -3,7 +3,7 @@ set -eu
 
 # scripts/verify_release_assets.sh
 # Verifies Developer ID signatures, Apple Notarization tickets, SHA-256 manifest integrity,
-# and release completeness for VieLotusIM and VieLotusLab deliverables.
+# and release completeness for VieLotusIM deliverables.
 
 EXPECTED_TEAM_ID="${EXPECTED_TEAM_ID:-${APPLE_TEAM_ID:-}}"
 REQUIRED_FILES=(

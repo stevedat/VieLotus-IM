@@ -1,15 +1,13 @@
 // SharedPreferencesConstants.swift
 // VieLotusCore
 //
-// Shared constants used by both VieLotusCore (QuickPhraseStore) and
-// VieLotusMobileCore (KeyboardPreferences). Extracted to avoid a circular
-// dependency between the two modules.
+// Shared constants for keyboard preferences and quick phrases.
 
 import Foundation
 
-/// Shared constants for keyboard preferences, used across Core and Mobile modules.
+/// Shared constants for keyboard preferences.
 public enum SharedPreferencesConstants {
-    /// App Group suite name for UserDefaults shared between the host app and keyboard extension.
+    /// Suite name for UserDefaults shared across VieLotusIM components.
     public static let defaultSuiteName = "group.com.vietlotus.keyboard"
 
     /// Darwin notification name posted when preferences change.
