@@ -1,3 +1,14 @@
+vielotus (2.0.9-1) unstable; urgency=medium
+
+  * New upstream release 2.0.9:
+    - macOS installer (`VieLotusIM.pkg`): fix `preinstall` using exact
+      `pkill -9 -x VieLotusIM` and `postinstall` detached `open -g` so
+      CLI, MDM, and Homebrew Cask (`installer -pkg VieLotusIM.pkg -target /`)
+      installations never terminate the parent `installer` process.
+    - Add CI packaging verification guard for `VieLotusIM.pkg` scripts.
+
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Mon, 23 Nov 2026 05:50:00 +0700
+
 vielotus (2.0.8-1) unstable; urgency=medium
 
   * New upstream release 2.0.8:

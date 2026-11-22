@@ -1,5 +1,5 @@
 Name:           vielotus
-Version:        2.0.8
+Version:        2.0.9
 Release:        1%{?dist}
 Summary:        VieLotusIM (Sen Viet) — Next-Gen Vietnamese Input Method for IBus & Fcitx5
 License:        MIT AND FSFAP
@@ -125,6 +125,9 @@ install -Dm644 CrossPlatform/packaging/linux/org.vielotus.VieLotus.metainfo.xml 
 %{_datadir}/icons/hicolor/*/apps/fcitx-vielotus.png
 
 %changelog
+* Mon Nov 23 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com> - 2.0.9-1
+- Official Pure C++20 source-built release of Sen Việt (VieLotusIM) 2.0.9
+
 * Sun Nov 22 2026 Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com> - 2.0.8-1
 - Official Pure C++20 source-built release of Sen Việt (VieLotusIM) 2.0.8
 

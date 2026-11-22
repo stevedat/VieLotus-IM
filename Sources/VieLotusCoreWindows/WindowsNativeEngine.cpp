@@ -5046,9 +5046,9 @@ VIELOTUS_CAPI_EXPORT void vielotus_sync_armed_word(void *session, const char *be
 }
 
 VIELOTUS_CAPI_EXPORT const char *vielotus_get_version(void) {
-    return "2.0.8";
+    return "2.0.9";
 }
 
 VIELOTUS_CAPI_EXPORT const char *vielotus_get_build_stamp(void) {
-    return "2.0.8-r16 (PureTSF+OutOfProcSettings+Tray)";
+    return "2.0.9-r17 (PureTSF+OutOfProcSettings+Tray)";
 }

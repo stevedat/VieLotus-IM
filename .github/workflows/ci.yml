@@ -78,7 +78,7 @@ jobs:
         id: version
         run: |
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          echo "version=${VERSION:-2.0.8}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION:-2.0.9}" >> "$GITHUB_OUTPUT"
 
       - name: Install build tools, Fcitx5, and IBus dev dependencies
         run: |
@@ -188,7 +188,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          VERSION="${VERSION:-2.0.8}"
+          VERSION="${VERSION:-2.0.9}"
           rm -rf /tmp/deb-src
           mkdir -p /tmp/deb-src
           git archive --format=tar.gz --prefix="VieLotus-IM-${VERSION}/" HEAD > "/tmp/deb-src/vielotus_${VERSION}.orig.tar.gz"
@@ -197,10 +197,10 @@ jobs:
           (cd "/tmp/deb-src/VieLotus-IM-${VERSION}" && dpkg-buildpackage -us -uc)
           ls -lh /tmp/deb-src
 
-      - name: Verify Debian 2.0.8-1 update metadata (.dsc and .changes)
+      - name: Verify Debian 2.0.9-1 update metadata (.dsc and .changes)
         run: |
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          VERSION="${VERSION:-2.0.8}"
+          VERSION="${VERSION:-2.0.9}"
           DSC="/tmp/deb-src/vielotus_${VERSION}-1.dsc"
           CHANGES="$(ls /tmp/deb-src/vielotus_${VERSION}-1_*.changes | head -n 1)"
           grep -q '^Vcs-Git: https://github.com/stevedat/VieLotus-IM.git \[CrossPlatform/packaging\]$' "$DSC"
@@ -220,7 +220,7 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          VERSION="${VERSION:-2.0.8}"
+          VERSION="${VERSION:-2.0.9}"
           LIB_DEB="$(ls /tmp/deb-src/libvielotus0_${VERSION}-1_*.deb | head -n 1)"
           FCITX_DEB="$(ls /tmp/deb-src/fcitx5-vielotus_${VERSION}-1_*.deb | head -n 1)"
           IBUS_DEB="$(ls /tmp/deb-src/ibus-vielotus_${VERSION}-1_*.deb | head -n 1)"
@@ -523,7 +523,7 @@ jobs:
           if ($plist -match '<key>CFBundleShortVersionString</key>\s*<string>([^<]+)</string>') {
             $version = $Matches[1]
           } else {
-            $version = "2.0.8"
+            $version = "2.0.9"
           }
           ./scripts/build_windows.ps1 -Version $version -Arch all -SkipTests -FetchStoreStub
           $requiredArtifacts = @(

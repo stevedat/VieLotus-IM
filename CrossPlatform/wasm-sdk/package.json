@@ -1,6 +1,6 @@
 {
   "name": "@vielotus/core",
-  "version": "2.0.8",
+  "version": "2.0.9",
   "description": "Sen Việt (VieLotusIM) WebAssembly Vietnamese IME SDK — zero-dependency C++20 core compiled to freestanding wasm32 with Telex/VNI, Smart Bilingual, and OS IME auto-yield.",
   "type": "module",
   "license": "MIT",
