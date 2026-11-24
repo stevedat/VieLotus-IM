@@ -2575,6 +2575,48 @@ int main(int argc, char **argv) {
                          " gone=" + mHnGone + " bom=" + mBom + " back=" + mHnBack);
                 vielotus_set_macro_enabled(mSess, false);
 
+                // C-ABI '@' tech-delimiter parity (root@host / admin@test.com)
+                std::string atRootHost = driveCapiDoc("root@host ");
+                std::string atAdminTest = driveCapiDoc("admin@test.com ");
+                bool capiAtTechOk = (atRootHost == "root@host " && atAdminTest == "admin@test.com ");
+                checkP06("capi:at-tech-delimiter", capiAtTechOk,
+                         "root@host=" + atRootHost + " admin@test.com=" + atAdminTest);
+
+#if !defined(_WIN32)
+                // Shared Linux X11 keysym guards (Numpad normalization & standalone modifier filtering)
+                bool linuxKeysOk =
+                    vl_normalize_numpad_keysym(0xFFB0u) == '0' &&
+                    vl_normalize_numpad_keysym(0xFFB4u) == '4' &&
+                    vl_normalize_numpad_keysym(0xFFB9u) == '9' &&
+                    vl_normalize_numpad_keysym(0xFFAAu) == '*' &&
+                    vl_normalize_numpad_keysym(0xFFABu) == '+' &&
+                    vl_normalize_numpad_keysym(0xFFACu) == ',' &&
+                    vl_normalize_numpad_keysym(0xFFADu) == '-' &&
+                    vl_normalize_numpad_keysym(0xFFAEu) == '.' &&
+                    vl_normalize_numpad_keysym(0xFFAFu) == '/' &&
+                    vl_normalize_numpad_keysym(0xFFBDu) == '=' &&
+                    vl_normalize_numpad_keysym(0xFF80u) == ' ' &&
+                    vl_normalize_numpad_keysym(0xFF95u) == 0xFF95u && // KP_Home unchanged
+                    vl_normalize_numpad_keysym(0xFF9Fu) == 0xFF9Fu && // KP_Delete unchanged
+                    vl_normalize_numpad_keysym('a') == 'a' &&
+                    vl_is_modifier_or_lock_keysym(0xFFE1u) && // Shift_L
+                    vl_is_modifier_or_lock_keysym(0xFFE3u) && // Control_L
+                    vl_is_modifier_or_lock_keysym(0xFFE5u) && // Caps_Lock
+                    vl_is_modifier_or_lock_keysym(0xFFE7u) && // Meta_L
+                    vl_is_modifier_or_lock_keysym(0xFFE9u) && // Alt_L
+                    vl_is_modifier_or_lock_keysym(0xFFEBu) && // Super_L
+                    vl_is_modifier_or_lock_keysym(0xFFECu) && // Super_R
+                    vl_is_modifier_or_lock_keysym(0xFFEDu) && // Hyper_L
+                    vl_is_modifier_or_lock_keysym(0xFE03u) && // ISO_Level3_Shift
+                    vl_is_modifier_or_lock_keysym(0xFE11u) && // ISO_Level5_Shift
+                    vl_is_modifier_or_lock_keysym(0xFF7Fu) && // Num_Lock
+                    vl_is_modifier_or_lock_keysym(0xFF14u) && // Scroll_Lock
+                    !vl_is_modifier_or_lock_keysym('a') &&
+                    !vl_is_modifier_or_lock_keysym(0xFF0Du) && // Return
+                    !vl_is_modifier_or_lock_keysym(0xFFB4u);   // KP_4
+                checkP06("linux:numpad-and-modifier-keysyms", linuxKeysOk, linuxKeysOk ? "OK" : "MISMATCH");
+#endif
+
                 // Relaxed Coda C-ABI tests (Telex + VNI + English safety)
                 std::string rcOffBilingual = driveCapiDoc("khoog ");
                 vielotus_set_smart_bilingual(mSess, false);

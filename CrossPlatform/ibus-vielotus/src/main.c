@@ -312,6 +312,22 @@ static void ibus_vielotus_engine_reset_internal(IBusVieLotusEngine *vl_engine) {
     ibus_vielotus_clear_preedit((IBusEngine *)vl_engine);
 }
 
+/*
+ * Reset local engine session without emitting D-Bus commit/clear signals back to
+ * the client. Used in `reset`, `focus_out`, and `disable` because `ibus-daemon`
+ * (`bus/inputcontext.c`) has already cleared/committed preedit according to
+ * `IBUS_ENGINE_PREEDIT_COMMIT` before invoking those callbacks; emitting another
+ * `commit_text` or `update_preedit` here causes double-commits or LibreOffice/Qt
+ * reset desyncs.
+ */
+static void ibus_vielotus_reset_local_state_only(IBusVieLotusEngine *vl_engine) {
+    vl_engine->replayed_after_backspace = FALSE;
+    vl_engine->preedit_visible = FALSE;
+    if (vl_engine->session) {
+        vielotus_reset_session(vl_engine->session);
+    }
+}
+
 
 static gboolean ibus_vielotus_can_delete_surrounding_before_cursor(IBusEngine *engine, int32_t surr_del) {
     if (!engine || surr_del <= 0 || !(engine->client_capabilities & IBUS_CAP_SURROUNDING_TEXT)) {
@@ -380,9 +396,13 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
         }
     }
 
+    /* Always clear preedit (downgrading mode to IBUS_ENGINE_PREEDIT_CLEAR) BEFORE
+     * committing text, matching upstream ibus `bus/inputcontext.c` so Chromium/Wayland
+     * clients never duplicate the last word when Enter resets the input box. */
+    ibus_vielotus_clear_preedit(engine);
+
     if (buf[0] != '\0') {
         if (surr_del > 0 && can_delete_surr) {
-            ibus_vielotus_clear_preedit(engine);
             ibus_engine_delete_surrounding_text(engine, -surr_del, (guint)surr_del);
         }
         IBusText *commit_text = ibus_text_new_from_string(buf);
@@ -393,7 +413,6 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
         vielotus_reset_session(vl_engine->session);
     }
-    ibus_vielotus_clear_preedit(engine);
 }
 
 static void ibus_vielotus_update_preedit(IBusVieLotusEngine *vl_engine) {
@@ -542,7 +561,7 @@ static void ibus_vielotus_engine_finalize(GObject *object) {
 static void ibus_vielotus_engine_reset(IBusEngine *engine) {
     IBusVieLotusEngine *vl_engine = (IBusVieLotusEngine *)engine;
     vl_dev_code_reset(&vl_engine->dev_code_state);
-    ibus_vielotus_engine_reset_internal(vl_engine);
+    ibus_vielotus_reset_local_state_only(vl_engine);
     if (vl_engine->session) {
         vielotus_append_context(vl_engine->session, "");
     }
@@ -615,11 +634,7 @@ static void ibus_vielotus_engine_disable(IBusEngine *engine) {
     vl_engine->engine_enabled = FALSE;
     vl_engine->is_password_field = FALSE;
     vl_dev_code_reset(&vl_engine->dev_code_state);
-    if (vielotus_is_composing(vl_engine->session)) {
-        ibus_vielotus_commit_composing(vl_engine, NULL);
-    } else {
-        ibus_vielotus_engine_reset_internal(vl_engine);
-    }
+    ibus_vielotus_reset_local_state_only(vl_engine);
     if (vl_engine->session) {
         vielotus_append_context(vl_engine->session, "");
     }
@@ -695,11 +710,7 @@ static void ibus_vielotus_handle_focus_out_common(IBusEngine *engine) {
     vl_engine->is_password_field = FALSE;
     vl_engine->active_presentation_mode = VL_PRESENTATION_AUTOMATIC;
     vl_dev_code_reset(&vl_engine->dev_code_state);
-    if (vielotus_is_composing(vl_engine->session)) {
-        ibus_vielotus_commit_composing(vl_engine, NULL);
-    } else {
-        ibus_vielotus_engine_reset_internal(vl_engine);
-    }
+    ibus_vielotus_reset_local_state_only(vl_engine);
     if (vl_engine->session) {
         vielotus_append_context(vl_engine->session, "");
     }
@@ -998,13 +1009,12 @@ static gboolean ibus_vielotus_engine_process_key_event(
         return FALSE;
     }
 
-    if (keyval == IBUS_KEY_Shift_L || keyval == IBUS_KEY_Shift_R ||
-        keyval == IBUS_KEY_Caps_Lock || keyval == IBUS_KEY_Shift_Lock ||
-        keyval == IBUS_KEY_ISO_Level3_Shift) {
+    if (vl_is_modifier_or_lock_keysym((uint32_t)keyval)) {
         return FALSE;
     }
 
-    if (state & (IBUS_CONTROL_MASK | IBUS_MOD1_MASK | IBUS_SUPER_MASK)) {
+    if (state & (IBUS_CONTROL_MASK | IBUS_MOD1_MASK | IBUS_MOD4_MASK |
+                 IBUS_SUPER_MASK | IBUS_HYPER_MASK | IBUS_META_MASK)) {
         if (vielotus_is_composing(vl_engine->session)) {
             ibus_vielotus_commit_composing(vl_engine, NULL);
         }
@@ -1061,6 +1071,8 @@ static gboolean ibus_vielotus_engine_process_key_event(
         return FALSE;
     }
 
+    keyval = (guint)vl_normalize_numpad_keysym((uint32_t)keyval);
+
     if (keyval >= 32 && keyval < 127) {
         gboolean is_alpha = (keyval >= 'a' && keyval <= 'z') || (keyval >= 'A' && keyval <= 'Z');
         gboolean is_digit = (keyval >= '0' && keyval <= '9');
@@ -1073,9 +1085,13 @@ static gboolean ibus_vielotus_engine_process_key_event(
                     const char *committed = vielotus_get_last_text(vl_engine->session);
                     char buf[1024];
                     snprintf(buf, sizeof(buf), "%s%c", committed ? committed : "", (char)keyval);
+                    ibus_vielotus_clear_preedit(engine);
                     IBusText *commit_text = ibus_text_new_from_string(buf);
                     ibus_engine_commit_text(engine, commit_text);
-                    ibus_vielotus_engine_reset_internal(vl_engine);
+                    vl_engine->replayed_after_backspace = FALSE;
+                    if (vielotus_is_composing(vl_engine->session)) {
+                        vielotus_reset_session(vl_engine->session);
+                    }
                     return TRUE;
                 }
                 char trail[2] = { (char)keyval, '\0' };
@@ -1172,12 +1188,12 @@ static gboolean ibus_vielotus_engine_process_key_event(
             const char *committed = vielotus_get_last_text(vl_engine->session);
             char buf[1024];
             snprintf(buf, sizeof(buf), "%s", committed ? committed : "");
+            ibus_vielotus_clear_preedit(engine);
             if (buf[0] != '\0') {
                 IBusText *commit_text = ibus_text_new_from_string(buf);
                 ibus_engine_commit_text(engine, commit_text);
             }
             vl_engine->replayed_after_backspace = FALSE;
-            ibus_vielotus_clear_preedit(engine);
             return TRUE;
         } else if (vielotus_is_composing(vl_engine->session) ||
                    action == VIELOTUS_ACTION_REPLACE ||

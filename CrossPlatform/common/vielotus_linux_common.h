@@ -318,6 +318,46 @@ static inline VL_COMMON_UNUSED bool vl_keysym_to_raw_seq(
     return false;
 }
 
+/*
+ * Standard X11 modifier & lock keysyms shared verbatim by both IBus (`IBUS_KEY_*`)
+ * and Fcitx5 (`FcitxKey_*`). Standalone presses of these keys must never commit or
+ * reset an active preedit (fixes Super/Overview, Ctrl/Alt shortcut lag, NumLock).
+ */
+static inline VL_COMMON_UNUSED bool vl_is_modifier_or_lock_keysym(uint32_t keysym) {
+    if (keysym >= 0xFFE1u && keysym <= 0xFFEEu) {
+        /* Shift_L/R, Control_L/R, Caps_Lock, Shift_Lock, Meta_L/R, Alt_L/R, Super_L/R, Hyper_L/R */
+        return true;
+    }
+    return keysym == 0xFE03u || /* ISO_Level3_Shift */
+           keysym == 0xFE11u || /* ISO_Level5_Shift */
+           keysym == 0xFF7Fu || /* Num_Lock */
+           keysym == 0xFF14u;   /* Scroll_Lock */
+}
+
+/*
+ * Maps printable X11 Numpad keysyms (emitted when NumLock is active) to their
+ * ASCII equivalents so Numpad digits/operators are committed atomically with
+ * preedit (preventing `abc4` -> `4abc` Chrome/Wayland reordering) and support
+ * VNI tone digits on Numpad. Navigation keys (`KP_Home..KP_Delete`, `KP_Enter`,
+ * `KP_Tab`) are intentionally returned unchanged.
+ */
+static inline VL_COMMON_UNUSED uint32_t vl_normalize_numpad_keysym(uint32_t keysym) {
+    if (keysym >= 0xFFB0u && keysym <= 0xFFB9u) {
+        return (uint32_t)('0' + (keysym - 0xFFB0u));
+    }
+    switch (keysym) {
+        case 0xFFAAu: return (uint32_t)'*'; /* KP_Multiply */
+        case 0xFFABu: return (uint32_t)'+'; /* KP_Add */
+        case 0xFFACu: return (uint32_t)','; /* KP_Separator */
+        case 0xFFADu: return (uint32_t)'-'; /* KP_Subtract */
+        case 0xFFAEu: return (uint32_t)'.'; /* KP_Decimal */
+        case 0xFFAFu: return (uint32_t)'/'; /* KP_Divide */
+        case 0xFFBDu: return (uint32_t)'='; /* KP_Equal */
+        case 0xFF80u: return (uint32_t)' '; /* KP_Space */
+        default: return keysym;
+    }
+}
+
 /* ==========================================================================
  * 2. Non-Destructive `config.env` Reader & Atomic Merge-Writer
  * ========================================================================== */

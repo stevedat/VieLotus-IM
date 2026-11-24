@@ -233,14 +233,17 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
         out.append(trailingAscii);
     }
 
+    /* Always clear preedit BEFORE committing text so Wayland text-input-v3 / Chromium
+     * clients never keep a stale preedit when Enter or focus transitions run. */
+    if (preeditVisible_) {
+        preeditVisible_ = false;
+        ic_->inputPanel().reset();
+        ic_->updatePreedit();
+        ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+    }
+
     if (!out.empty()) {
         if (surrDel > 0 && canDeleteSurrounding) {
-            if (preeditVisible_) {
-                preeditVisible_ = false;
-                ic_->inputPanel().reset();
-                ic_->updatePreedit();
-                ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
-            }
             ic_->deleteSurroundingText(-surrDel, static_cast<unsigned int>(surrDel));
         }
         ic_->commitString(out);
@@ -249,12 +252,6 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
     replayedAfterBackspace_ = false;
     if (session_ && vielotus_is_composing(session_)) {
         vielotus_reset_session(session_);
-    }
-    if (preeditVisible_) {
-        preeditVisible_ = false;
-        ic_->inputPanel().reset();
-        ic_->updatePreedit();
-        ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
     }
 }
 
@@ -460,16 +457,16 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
     auto sym = keyEvent.key().sym();
     auto states = keyEvent.key().states();
 
-    // Ignore pure modifier presses (Shift, CapsLock, etc.) so uppercase typing works mid-word
-    if (sym == FcitxKey_Shift_L || sym == FcitxKey_Shift_R ||
-        sym == FcitxKey_Caps_Lock || sym == FcitxKey_Shift_Lock ||
-        sym == FcitxKey_ISO_Level3_Shift) {
+    // Ignore pure modifier/lock presses (Shift, Ctrl, Alt, Super, Meta, Hyper, CapsLock, NumLock)
+    if (vl_is_modifier_or_lock_keysym(static_cast<uint32_t>(sym))) {
         return;
     }
 
-    // Shortcuts with Ctrl / Alt / Super: commit current word first, then pass key through
+    // Shortcuts with Ctrl / Alt / Super / Hyper / Meta: commit current word first, then pass key through
     if (states.test(KeyState::Ctrl) || states.test(KeyState::Alt) ||
-        states.test(KeyState::Super)) {
+        states.test(KeyState::Super) || states.test(KeyState::Super2) ||
+        states.test(KeyState::Hyper) || states.test(KeyState::Hyper2) ||
+        states.test(KeyState::Meta)) {
         if (vielotus_is_composing(session_)) {
             commitComposing(nullptr);
         }
@@ -583,6 +580,9 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         return;
     }
 
+    // Normalize printable Numpad keysyms (KP_0..9, KP_Add/Decimal/...) into ASCII before printable handling
+    sym = static_cast<KeySym>(vl_normalize_numpad_keysym(static_cast<uint32_t>(sym)));
+
     // Handle printable ASCII characters (32..126)
     if (sym >= 32 && sym < 127) {
         uint64_t t0Us = 0;
@@ -600,6 +600,12 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
                     const char* committed = vielotus_get_last_text(session_);
                     std::string out = committed ? committed : "";
                     out.push_back(static_cast<char>(sym));
+                    if (preeditVisible_) {
+                        preeditVisible_ = false;
+                        ic_->inputPanel().reset();
+                        ic_->updatePreedit();
+                        ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+                    }
                     ic_->commitString(out);
                     resetWord();
                     keyEvent.filterAndAccept();
@@ -703,18 +709,18 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
         if (action == VIELOTUS_ACTION_COMMIT) {
             const char* committed = vielotus_get_last_text(session_);
             std::string out = committed ? committed : "";
+            if (preeditVisible_) {
+                preeditVisible_ = false;
+                ic_->inputPanel().reset();
+                ic_->updatePreedit();
+                ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
+            }
             if (!out.empty()) {
                 ic_->commitString(out);
             }
             replayedAfterBackspace_ = false;
             if (vielotus_is_composing(session_)) {
                 vielotus_reset_session(session_);
-            }
-            if (preeditVisible_) {
-                preeditVisible_ = false;
-                ic_->inputPanel().reset();
-                ic_->updatePreedit();
-                ic_->updateUserInterface(UserInterfaceComponent::InputPanel);
             }
             keyEvent.filterAndAccept();
             return;

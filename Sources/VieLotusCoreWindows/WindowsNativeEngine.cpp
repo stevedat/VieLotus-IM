@@ -4851,6 +4851,9 @@ VIELOTUS_CAPI_EXPORT int32_t vielotus_feed_char(void *session, uint32_t codepoin
         s->impl.m_pendingBoundaryCp = 0;
         s->impl.m_afterDigit = vielotus_win::isAsciiDigit(codepoint);
         s->impl.m_precededByMacroDelimiter = vielotus_win::isMacroTechnicalDelimiter(codepoint);
+        if (codepoint == '@') {
+            s->impl.m_precededByTechDelimiter = true;
+        }
         s->impl.m_precededByLeadingSlash = false;
         s->lastAction = act;
         s->syncStrings();
