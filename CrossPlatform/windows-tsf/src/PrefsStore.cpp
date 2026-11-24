@@ -252,6 +252,7 @@ void LoadVieLotusPrefs(VieLotusWindowsPrefs &outPrefs) {
 }
 
 void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs, bool fromSettingsApp) {
+    bool inputMethodChanged = false;
     HKEY hKey = nullptr;
     if (RegCreateKeyExW(
             HKEY_CURRENT_USER,
@@ -264,6 +265,10 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs, bool fromSettingsApp) 
             &hKey,
             nullptr
         ) == ERROR_SUCCESS && hKey) {
+        DWORD prevInputMethod = 0;
+        const bool hadPrevInputMethod = ReadRegDword(hKey, c_szPrefsInputMethodVal, prevInputMethod);
+        inputMethodChanged = !hadPrevInputMethod || ((prevInputMethod == 1u) != prefs.isVni);
+
         WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 12u);
         WriteRegDword(hKey, c_szPrefsInputMethodVal, prefs.isVni ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsVnEnabledVal, prefs.vietnameseEnabled ? 1u : 0u);
@@ -282,10 +287,16 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs, bool fromSettingsApp) 
             DWORD nextRev = (curRev == 0xFFFFFFFFu) ? 1u : (curRev + 1u);
             WriteRegDword(hKey, c_szPrefsSettingsRevisionVal, nextRev);
         }
-        WriteRegDword(hKey, c_szPrefsUpdatedBySettingsVal, 1u);
+        if (fromSettingsApp || inputMethodChanged) {
+            WriteRegDword(hKey, c_szPrefsUpdatedBySettingsVal, 1u);
+        }
         RegCloseKey(hKey);
     }
-    SavePersistedVniPreference(prefs.isVni);
+    if (fromSettingsApp || inputMethodChanged) {
+        SavePersistedVniPreference(prefs.isVni);
+    } else {
+        g_localPrefsRevision.fetch_add(1, std::memory_order_relaxed);
+    }
 }
 
 bool LoadPerAppBypassPreference(const wchar_t *exeName, bool &outBypass) {

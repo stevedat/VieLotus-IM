@@ -1199,7 +1199,7 @@ int main(int argc, char **argv) {
         }
     };
 
-    int tsfTotal = 31, tsfPass = 0;
+    int tsfTotal = 32, tsfPass = 0;
     auto checkTsf = [&](int id, bool cond, const char *desc, const std::string &actual) {
         if (cond) {
             tsfPass++;
@@ -1453,12 +1453,12 @@ int main(int argc, char **argv) {
         // Win+Space / Alt+Ctrl+Space never eaten
         ok = ok && (ClassifyHotkey(kVkSpace, false, false, false, true, true, false) == HotkeyKind::None);
         ok = ok && (ClassifyHotkey(kVkSpace, true, false, true, false, true, false) == HotkeyKind::None);
-        // Ctrl+Shift+S only opens Settings when VN mode is ON AND context is writable
-        ok = ok && (ClassifyHotkey(kVkKeyS, true, true, false, false, true, false) == HotkeyKind::OpenSettings);
+        // Ctrl+Shift+S is never intercepted so Save As works everywhere
+        ok = ok && (ClassifyHotkey(kVkKeyS, true, true, false, false, true, false) == HotkeyKind::None);
         ok = ok && (ClassifyHotkey(kVkKeyS, true, true, false, false, false, false) == HotkeyKind::None);
         ok = ok && (ClassifyHotkey(kVkKeyS, true, true, false, false, true, true) == HotkeyKind::None);
         ok = ok && (ClassifyHotkey(kVkKeyS, true, true, true, false, true, false) == HotkeyKind::None);
-        checkTsf(19, ok, "Hotkey classification (no Shift+Space; Ctrl+Shift+S gated)", ok ? "OK" : "MISMATCH");
+        checkTsf(19, ok, "Hotkey classification (no Shift+Space; no Ctrl+Shift+S Save As hijack)", ok ? "OK" : "MISMATCH");
     }
 
     // TSF 20: Read-only ITfContext guard (TF_SD_READONLY / null context)
@@ -1794,6 +1794,19 @@ int main(int argc, char **argv) {
         ok = ok && ShouldReleaseCompositionAfterEndAttempt(kSOk, kTfELocked, false);
         ok = ok && ShouldReleaseCompositionAfterEndAttempt(kSOk, kSOk, false);
         checkTsf(31, ok, "Sync-first EndActiveComposition fallback & ref-release policy", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 32: '@' sets tech-delimiter context without eating '@' (root@host / admin@test.com)
+    {
+        WinTsfSimulator sim;
+        sim.typeString("root");
+        bool at1 = sim.pressCharKey('@');
+        sim.typeString("host ");
+        sim.typeString("admin");
+        bool at2 = sim.pressCharKey('@');
+        sim.typeString("test.com ");
+        const bool ok = !at1 && !at2 && sim.doc == "root@host admin@test.com ";
+        checkTsf(32, ok, "'@' tech-delimiter restoration without eating '@'", ok ? "OK" : sim.doc);
     }
 
     // =========================================================================
@@ -2549,14 +2562,17 @@ int main(int argc, char **argv) {
                 std::string mIp = driveCapiDoc("ip ");
                 std::string mDdk = driveCapiDoc("ddk ");
                 std::string mHnGone = driveCapiDoc("hn ");
+                bool bomOk = vielotus_load_macros_json("\xEF\xBB\xBF{\"bom\":\"Thành công\"}");
+                std::string mBom = driveCapiDoc("bom ");
                 vielotus_reset_default_macros();
                 std::string mHnBack = driveCapiDoc("hn ");
                 bool macroJsonOk =
                     (loadOk && !badOk && mKs == "Khách sạn " && mKS == "KHÁCH SẠN " &&
-                     mIp == "iPhone " && mDdk == "Đăng ký " && mHnGone == "hn " && mHnBack == "Hà Nội ");
+                     mIp == "iPhone " && mDdk == "Đăng ký " && mHnGone == "hn " &&
+                     bomOk && mBom == "Thành công " && mHnBack == "Hà Nội ");
                 checkP06("capi:macro-json-load-and-reset", macroJsonOk,
                          "ks=" + mKs + " KS=" + mKS + " ip=" + mIp + " ddk=" + mDdk +
-                         " gone=" + mHnGone + " back=" + mHnBack);
+                         " gone=" + mHnGone + " bom=" + mBom + " back=" + mHnBack);
                 vielotus_set_macro_enabled(mSess, false);
 
                 // Relaxed Coda C-ABI tests (Telex + VNI + English safety)

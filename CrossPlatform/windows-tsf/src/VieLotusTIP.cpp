@@ -3,6 +3,7 @@
 #include "LangBarButton.h"
 #include "Register.h"
 #include <shellapi.h>
+#include <mutex>
 #include <vector>
 
 #define VI_LANGID 0x042A
@@ -164,7 +165,13 @@ static bool IsKnownRemoteDesktopExecutable(const std::wstring &lowerExe) {
         L"vmware-remotemks.exe",
         L"vmware-view.exe",
         L"parsec.exe",
-        L"wfica32.exe"
+        L"wfica32.exe",
+        L"moonlight.exe",
+        L"vncviewer.exe",
+        L"tvnviewer.exe",
+        L"nxplayer.exe",
+        L"todesk.exe",
+        L"virtualboxvm.exe"
     };
     for (LPCWSTR item : kRemoteExes) {
         if (lowerExe == item) {
@@ -356,6 +363,98 @@ void CVieLotusTIP::ApplyVniMode(bool isVni, bool persistToRegistry) {
     UpdateLanguageBar(false);
 }
 
+#if defined(VIELOTUS_EMBEDDED_ENGINE)
+static void ReloadCustomMacrosIfChanged() {
+    static std::mutex s_macroMutex;
+    static bool s_hasLoadedCustomFile = false;
+    static bool s_hasCachedMeta = false;
+    static FILETIME s_lastWriteTime{};
+    static DWORD s_lastFileSize = 0;
+
+    WCHAR macroPath[MAX_PATH] = {0};
+    const DWORD expanded = ExpandEnvironmentStringsW(
+        L"%APPDATA%\\VieLotusIM\\macros.json",
+        macroPath,
+        MAX_PATH
+    );
+    if (expanded == 0 || expanded >= MAX_PATH || macroPath[0] == L'%') {
+        return;
+    }
+
+    WIN32_FILE_ATTRIBUTE_DATA fad{};
+    if (!GetFileAttributesExW(macroPath, GetFileExInfoStandard, &fad)) {
+        const DWORD err = GetLastError();
+        if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND) {
+            std::lock_guard<std::mutex> lock(s_macroMutex);
+            if (s_hasLoadedCustomFile) {
+                vielotus_win::WindowsNativeEngine::resetDefaultMacros();
+                s_hasLoadedCustomFile = false;
+            }
+            s_hasCachedMeta = false;
+        }
+        return;
+    }
+    if ((fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        return;
+    }
+    constexpr DWORD kMaxMacroFileBytes = 256u * 1024u;
+    if (fad.nFileSizeHigh != 0 || fad.nFileSizeLow == 0 || fad.nFileSizeLow > kMaxMacroFileBytes) {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(s_macroMutex);
+        if (s_hasCachedMeta &&
+            CompareFileTime(&fad.ftLastWriteTime, &s_lastWriteTime) == 0 &&
+            fad.nFileSizeLow == s_lastFileSize) {
+            return;
+        }
+    }
+
+    HANDLE hFile = CreateFileW(
+        macroPath,
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr
+    );
+    if (hFile == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    std::string buf(static_cast<size_t>(fad.nFileSizeLow), '\0');
+    DWORD totalRead = 0;
+    bool readOk = true;
+    while (totalRead < fad.nFileSizeLow) {
+        DWORD chunk = 0;
+        if (!ReadFile(hFile, &buf[totalRead], fad.nFileSizeLow - totalRead, &chunk, nullptr)) {
+            readOk = false;
+            break;
+        }
+        if (chunk == 0) {
+            break;
+        }
+        totalRead += chunk;
+    }
+    CloseHandle(hFile);
+    if (!readOk || totalRead == 0) {
+        return;
+    }
+    buf.resize(static_cast<size_t>(totalRead));
+
+    const bool parsedOk = vielotus_win::WindowsNativeEngine::loadMacrosJson(buf.c_str());
+    std::lock_guard<std::mutex> lock(s_macroMutex);
+    s_lastWriteTime = fad.ftLastWriteTime;
+    s_lastFileSize = fad.nFileSizeLow;
+    s_hasCachedMeta = true;
+    if (parsedOk) {
+        s_hasLoadedCustomFile = true;
+    }
+}
+#endif
+
 void CVieLotusTIP::ReloadUserPreferences() {
     m_lastPrefsRevision = GetLocalPrefsRevision();
     const uint32_t currentSettingsRev = LoadSettingsRevision();
@@ -392,6 +491,9 @@ void CVieLotusTIP::ReloadUserPreferences() {
     m_nativeEngine.setQuickTelex(prefs.quickTelex);
     m_nativeEngine.setRelaxedCoda(prefs.relaxedCoda);
     m_nativeEngine.setMacroEnabled(prefs.macroEnabled);
+    if (prefs.macroEnabled) {
+        ReloadCustomMacrosIfChanged();
+    }
 #endif
 
     const auto &api = GetCApi();

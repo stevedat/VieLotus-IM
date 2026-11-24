@@ -492,6 +492,12 @@ public:
         std::unordered_map<std::string, std::string> parsed;
         size_t pos = 0;
         const size_t len = std::strlen(jsonUtf8);
+        if (len >= 3 &&
+            static_cast<unsigned char>(jsonUtf8[0]) == 0xEF &&
+            static_cast<unsigned char>(jsonUtf8[1]) == 0xBB &&
+            static_cast<unsigned char>(jsonUtf8[2]) == 0xBF) {
+            pos = 3;
+        }
         auto skipWs = [&]() {
             while (pos < len) {
                 char c = jsonUtf8[pos];
@@ -3138,6 +3144,9 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
         }
         m_afterDigit = isAsciiDigit(codepoint);
         m_precededByMacroDelimiter = isMacroTechnicalDelimiter(codepoint);
+        if (codepoint == '@') {
+            m_precededByTechDelimiter = true;
+        }
         m_precededByLeadingSlash = false;
         m_lastBackspaces = 0;
         m_lastTextUtf8[0] = '\0';

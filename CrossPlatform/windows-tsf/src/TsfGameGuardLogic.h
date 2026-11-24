@@ -48,13 +48,12 @@ inline HotkeyKind ClassifyHotkey(
         return HotkeyKind::ToggleVietnamese;
     }
 
-    // Settings hotkey: Ctrl+Shift+S.
-    // Guarded behind active Vietnamese mode + writable context so bypassed games and read-only canvases
-    // never lose Ctrl+Shift+S or get interrupted by the Settings window.
-    if (isVietnameseMode && !contextReadOnly &&
-        vk == kVkKeyS && hasCtrl && hasShift && !hasAlt && !hasWin) {
-        return HotkeyKind::OpenSettings;
-    }
+    // Ctrl+Shift+S is intentionally NEVER intercepted because it collides with global "Save As"
+    // in VS Code, Windows 11 Notepad, Office, and creative apps. Settings opens cleanly via
+    // the Taskbar [SV] menu or Start Menu.
+    (void)hasShift;
+    (void)isVietnameseMode;
+    (void)contextReadOnly;
 
     return HotkeyKind::None;
 }

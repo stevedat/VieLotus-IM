@@ -1091,6 +1091,7 @@ static void OpenMacroJsonInNotepad(HWND hwnd) {
     WCHAR appData[MAX_PATH] = {};
     if (ExpandEnvironmentStringsW(L"%APPDATA%\\VieLotusIM", appData, MAX_PATH) > 0) {
         CreateDirectoryW(appData, nullptr);
+        vielotus_win_installer::GrantAppContainerReadExecuteAcl(appData);
         std::wstring macroPath = std::wstring(appData) + L"\\macros.json";
         if (GetFileAttributesW(macroPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
             HANDLE hFile = CreateFileW(macroPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -1101,6 +1102,7 @@ static void OpenMacroJsonInNotepad(HWND hwnd) {
                 CloseHandle(hFile);
             }
         }
+        vielotus_win_installer::GrantAppContainerReadExecuteAcl(macroPath);
         ShellExecuteW(hwnd, L"open", L"notepad.exe", macroPath.c_str(), nullptr, SW_SHOWNORMAL);
     }
 }
