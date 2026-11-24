@@ -961,15 +961,16 @@ final class VieLotusIMController: IMKInputController {
                 return false
             }
             if engine.isComposing {
+                let hadActiveMarkedText = hasActiveMarkedText
                 cancelComposition()
                 rawWord = ""
                 if presentationMode == .markedText {
                     client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
                 }
-                if presentationMode == .terminalDirect {
-                    return false
+                if presentationMode == .markedText && hadActiveMarkedText && appCategory != .overlay {
+                    return true
                 }
-                return true
+                return false
             }
             return false
         }

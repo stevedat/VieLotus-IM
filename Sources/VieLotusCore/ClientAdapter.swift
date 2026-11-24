@@ -88,6 +88,7 @@ public struct ClientAdapter {
            id.contains("qemu") ||
            id.contains("android.emulator") ||
            id.contains("iphonesimulator") ||
+           id.contains("screencontinuity") ||
            id.contains("vnc") ||
            id.contains("citrix") ||
            id.contains("rustdesk") ||
@@ -140,6 +141,7 @@ public struct ClientAdapter {
            id.contains("thebrowser") ||
            id.contains("opera") ||
            id.contains("vivaldi") ||
+           id.contains("helium") ||
            id.contains("vscode") ||
            id.contains("cursor") ||
            id.contains("windsurf") ||
