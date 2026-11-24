@@ -1199,7 +1199,7 @@ int main(int argc, char **argv) {
         }
     };
 
-    int tsfTotal = 32, tsfPass = 0;
+    int tsfTotal = 33, tsfPass = 0;
     auto checkTsf = [&](int id, bool cond, const char *desc, const std::string &actual) {
         if (cond) {
             tsfPass++;
@@ -1807,6 +1807,17 @@ int main(int argc, char **argv) {
         sim.typeString("test.com ");
         const bool ok = !at1 && !at2 && sim.doc == "root@host admin@test.com ";
         checkTsf(32, ok, "'@' tech-delimiter restoration without eating '@'", ok ? "OK" : sim.doc);
+    }
+
+    // TSF 33: MSIX vs Classic Win32 Start Menu shortcut & Installed Apps dedup policy
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        ok = ok && !ShouldRegisterClassicStartMenuAndUninstall(true);
+        ok = ok && ShouldRegisterClassicStartMenuAndUninstall(false);
+        ok = ok && !ShouldRequireWin32UninstallEntryForTipCheck(true);
+        ok = ok && ShouldRequireWin32UninstallEntryForTipCheck(false);
+        checkTsf(33, ok, "MSIX vs Win32 Start Menu & Installed Apps dedup policy", ok ? "OK" : "MISMATCH");
     }
 
     // =========================================================================

@@ -319,12 +319,68 @@ inline void CreateShortcutLink(
     }
 }
 
-inline void RegisterWindowsInstalledAppAndShortcuts(const std::wstring &installDir) {
+inline bool IsRunningFromMsixPackage() {
+    if (HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll")) {
+        using PFN_GetCurrentPackageFullName = LONG(WINAPI *)(UINT32 *, PWSTR);
+        FARPROC rawFn = GetProcAddress(hKernel32, "GetCurrentPackageFullName");
+        auto pfnGetPkg = reinterpret_cast<PFN_GetCurrentPackageFullName>(reinterpret_cast<void *>(rawFn));
+        if (pfnGetPkg) {
+            UINT32 len = 0;
+            const LONG rc = pfnGetPkg(&len, nullptr);
+            if (rc == ERROR_INSUFFICIENT_BUFFER || (rc == ERROR_SUCCESS && len > 0)) {
+                return true;
+            }
+        }
+    }
+    WCHAR selfPath[MAX_PATH] = {};
+    if (GetModuleFileNameW(nullptr, selfPath, MAX_PATH) > 0) {
+        std::wstring lower(selfPath);
+        for (WCHAR &ch : lower) {
+            if (ch >= L'A' && ch <= L'Z') {
+                ch = static_cast<WCHAR>(ch + (L'a' - L'A'));
+            }
+        }
+        if (lower.find(L"\\windowsapps\\") != std::wstring::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline void RemoveClassicStartMenuAndDesktopShortcuts() {
+    WCHAR commonProgs[MAX_PATH] = {};
+    if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_COMMON_PROGRAMS, nullptr, 0, commonProgs)) && commonProgs[0] != L'\0') {
+        std::wstring groupDir = std::wstring(commonProgs) + L"\\Sen Vi\u1EC7t (VieLotusIM)";
+        DeleteFileW((groupDir + L"\\C\u00E0i \u0111\u1EB7t Sen Vi\u1EC7t (VieLotusIM).lnk").c_str());
+        DeleteFileW((groupDir + L"\\G\u1EE1 c\u00E0i \u0111\u1EB7t Sen Vi\u1EC7t (VieLotusIM).lnk").c_str());
+        RemoveDirectoryW(groupDir.c_str());
+        DeleteFileW((std::wstring(commonProgs) + L"\\Sen Vi\u1EC7t (VieLotusIM).lnk").c_str());
+    }
+    WCHAR commonDesktop[MAX_PATH] = {};
+    if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_COMMON_DESKTOPDIRECTORY, nullptr, 0, commonDesktop)) && commonDesktop[0] != L'\0') {
+        DeleteFileW((std::wstring(commonDesktop) + L"\\Sen Vi\u1EC7t (VieLotusIM).lnk").c_str());
+    }
+}
+
+inline void RegisterWindowsInstalledAppAndShortcuts(const std::wstring &installDir, bool isMsixPackage = false) {
     std::wstring uninstallerExe = installDir + L"\\Uninstall-VieLotusIM.exe";
     std::wstring settingsExe = installDir + L"\\VieLotusSettings.exe";
     std::wstring icoFile = installDir + L"\\VieLotusIM.ico";
     std::wstring assetsDir = installDir + L"\\assets";
     CreateDirectoryW(assetsDir.c_str(), nullptr);
+
+    if (isMsixPackage) {
+        // Microsoft Store (MSIX) already registers its own Start Menu app tile and Settings > Installed apps
+        // entry via AppxManifest.xml. Clean up any legacy classic Win32 shortcuts/uninstall keys to prevent
+        // duplicate Sen Viet icons in Start Menu, Windows Search, and Installed Apps.
+        DeleteFileW(uninstallerExe.c_str());
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kUninstallRegSubKey, KEY_WOW64_64KEY, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kInnoUninstallRegSubKey, KEY_WOW64_64KEY, 0);
+        RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacyInnoUninstallRegSubKey, KEY_WOW64_64KEY, 0);
+        RemoveClassicStartMenuAndDesktopShortcuts();
+        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+        return;
+    }
 
     WCHAR selfPath[MAX_PATH] = {};
     if (GetModuleFileNameW(nullptr, selfPath, MAX_PATH) > 0) {
@@ -344,7 +400,8 @@ inline void RegisterWindowsInstalledAppAndShortcuts(const std::wstring &installD
     std::wstring quietUninstallCmd = L"\"" + uninstallerExe + L"\" --uninstall --quiet";
     std::wstring modifyCmd = L"\"" + iconExe + L"\" --settings";
 
-    // Remove legacy Inno Setup key if present to avoid duplicate entries in Installed Apps
+    // Remove any Inno Setup uninstall keys if present to avoid duplicate entries in Installed Apps
+    RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kInnoUninstallRegSubKey, KEY_WOW64_64KEY, 0);
     RegDeleteKeyExW(HKEY_LOCAL_MACHINE, kLegacyInnoUninstallRegSubKey, KEY_WOW64_64KEY, 0);
 
     HKEY hKey = nullptr;
@@ -533,18 +590,7 @@ inline int RunFullUninstallFlow(bool quiet) {
     UnregisterTsfAndCleanUserProfileState(installDir);
 
     // 4. Remove Start Menu & Desktop shortcuts
-    WCHAR commonProgs[MAX_PATH] = {};
-    if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_COMMON_PROGRAMS, nullptr, 0, commonProgs)) && commonProgs[0] != L'\0') {
-        std::wstring groupDir = std::wstring(commonProgs) + L"\\Sen Vi\u1EC7t (VieLotusIM)";
-        DeleteFileW((groupDir + L"\\C\u00E0i \u0111\u1EB7t Sen Vi\u1EC7t (VieLotusIM).lnk").c_str());
-        DeleteFileW((groupDir + L"\\G\u1EE1 c\u00E0i \u0111\u1EB7t Sen Vi\u1EC7t (VieLotusIM).lnk").c_str());
-        RemoveDirectoryW(groupDir.c_str());
-        DeleteFileW((std::wstring(commonProgs) + L"\\Sen Vi\u1EC7t (VieLotusIM).lnk").c_str());
-    }
-    WCHAR commonDesktop[MAX_PATH] = {};
-    if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_COMMON_DESKTOPDIRECTORY, nullptr, 0, commonDesktop)) && commonDesktop[0] != L'\0') {
-        DeleteFileW((std::wstring(commonDesktop) + L"\\Sen Vi\u1EC7t (VieLotusIM).lnk").c_str());
-    }
+    RemoveClassicStartMenuAndDesktopShortcuts();
 
     // 5. Delete files in C:\Program Files\VieLotusIM (or schedule reboot removal for any locked DLL)
     std::wstring pattern = installDir + L"\\*";

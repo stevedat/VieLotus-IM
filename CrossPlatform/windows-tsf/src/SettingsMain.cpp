@@ -8,6 +8,7 @@
 #include <strsafe.h>
 #include <string>
 #include "SettingsUI.h"
+#include "TsfGameGuardLogic.h"
 #include "vielotus_win_installer.h"
 
 typedef HRESULT(STDAPICALLTYPE *PFN_DllRegisterServer)(void);
@@ -136,7 +137,9 @@ static bool IsTipViewRegisteredAndUpToDate(const std::wstring &localDll, REGSAM 
 }
 
 static bool IsTipRegisteredAndUpToDate(const std::wstring &localDll, const std::wstring &localDll32) {
-    if (!vielotus_win_installer::IsUninstallEntryRegistered()) {
+    const bool isMsix = vielotus_win_installer::IsRunningFromMsixPackage();
+    if (vielotus_tsf_guard::ShouldRequireWin32UninstallEntryForTipCheck(isMsix) &&
+        !vielotus_win_installer::IsUninstallEntryRegistered()) {
         return false;
     }
     if (!IsTipViewRegisteredAndUpToDate(localDll, KEY_WOW64_64KEY)) {
@@ -261,8 +264,12 @@ static int PerformElevatedMsixTipProvisioning() {
         FreeLibrary(hDll);
     }
 
+    const bool isMsix = vielotus_win_installer::IsRunningFromMsixPackage();
     HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    vielotus_win_installer::RegisterWindowsInstalledAppAndShortcuts(dstDir);
+    vielotus_win_installer::RegisterWindowsInstalledAppAndShortcuts(
+        dstDir,
+        !vielotus_tsf_guard::ShouldRegisterClassicStartMenuAndUninstall(isMsix)
+    );
     if (SUCCEEDED(hrCo)) {
         CoUninitialize();
     }

@@ -289,4 +289,16 @@ inline LangBarIconKind ResolveLangBarIconKind(bool isVietnamese) {
     return isVietnamese ? LangBarIconKind::VietnameseSvLogo : LangBarIconKind::EnglishSlateBadge;
 }
 
+// Windows MSIX (Microsoft Store) vs Classic Win32 installer shortcut & Installed Apps policy:
+// MSIX packages already register their own Start Menu app tile and Settings > Installed apps entry
+// via AppxManifest.xml; skipping duplicate Win32 Start Menu .lnk & Uninstall entries prevents
+// duplicate Sen Viet icons in Start Menu, Windows Search, and Installed Apps.
+inline bool ShouldRegisterClassicStartMenuAndUninstall(bool isMsixPackage) {
+    return !isMsixPackage;
+}
+
+inline bool ShouldRequireWin32UninstallEntryForTipCheck(bool isMsixPackage) {
+    return !isMsixPackage;
+}
+
 } // namespace vielotus_tsf_guard
