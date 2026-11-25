@@ -1536,15 +1536,27 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
                 *pfEaten = TRUE;
                 return S_OK;
             }
+            const bool isNumpadDigit = vielotus_tsf_guard::IsNumpadDigitVk(static_cast<uint32_t>(wParam));
             // If the current thread's HKL still uses legacy KBDVNTC.DLL (0x042A042A),
             // eat all non-space printable ASCII keys so Windows TranslateMessage never maps
             // '1'..'0' or '['/']'/'=' to 'ă','â','ê','ô','̀','̉','̃','́','̣','đ','ư','ơ','₫'.
-            if (wParam != VK_SPACE && IsCurrentThreadLegacyVntcHkl()) {
+            if (wParam != VK_SPACE && !isNumpadDigit && IsCurrentThreadLegacyVntcHkl()) {
                 *pfEaten = TRUE;
                 return S_OK;
             }
             if (hasActiveWord) {
-                const bool isVniDigit = m_isVniMode && (ch >= L'0' && ch <= L'9');
+                if (m_isVniMode && isNumpadDigit) {
+                    // Numpad 0-9 in VNI always commits active word and passes through as a literal digit
+                    ClearWordStateSession();
+                    EndActiveComposition(pic);
+                    FeedCharSession(static_cast<uint32_t>(ch));
+                    return S_OK;
+                }
+                const bool isVniDigit = vielotus_tsf_guard::IsVniDigitModifierKey(
+                    m_isVniMode,
+                    static_cast<uint32_t>(wParam),
+                    static_cast<uint32_t>(ch)
+                );
                 const bool isBoundary = IsEngineBoundaryPunctuation(ch);
                 if (isVniDigit || isBoundary || m_session != nullptr) {
                     *pfEaten = TRUE;
@@ -1556,9 +1568,13 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
                 EndActiveComposition(pic);
                 return S_OK;
             }
-            // Idle (!hasActiveWord): if in VNI mode on a classic Win32 Edit control, eat VNI digits '0'..'9'
+            // Idle (!hasActiveWord): if in VNI mode on a classic Win32 Edit control, eat top-row VNI digits '0'..'9'
             // so OnKeyDown can attempt post-navigation word rehydration (or insert the literal digit).
-            if (m_isVniMode && (ch >= L'0' && ch <= L'9') && IsClassicWin32EditControl(GetFocus())) {
+            if (vielotus_tsf_guard::IsVniDigitModifierKey(
+                    m_isVniMode,
+                    static_cast<uint32_t>(wParam),
+                    static_cast<uint32_t>(ch)
+                ) && IsClassicWin32EditControl(GetFocus())) {
                 *pfEaten = TRUE;
                 return S_OK;
             }

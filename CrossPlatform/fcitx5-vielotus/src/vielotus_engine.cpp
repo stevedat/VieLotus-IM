@@ -194,7 +194,9 @@ void VieLotusState::commitComposing(const char* trailingAscii) {
     std::string out;
     bool canDeleteSurrounding = false;
     if (session_ && vielotus_is_composing(session_)) {
-        if (trailingAscii && trailingAscii[0] != '\0' && trailingAscii[1] == '\0') {
+        const bool trailingIsVniDigit = (inputMethod_ == VIELOTUS_INPUT_VNI) && trailingAscii &&
+            trailingAscii[0] >= '0' && trailingAscii[0] <= '9' && trailingAscii[1] == '\0';
+        if (trailingAscii && trailingAscii[0] != '\0' && trailingAscii[1] == '\0' && !trailingIsVniDigit) {
             uint32_t cp = static_cast<uint32_t>(static_cast<unsigned char>(trailingAscii[0]));
             vielotus_feed_char(session_, cp);
         } else {
@@ -581,6 +583,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
     }
 
     // Normalize printable Numpad keysyms (KP_0..9, KP_Add/Decimal/...) into ASCII before printable handling
+    const bool isNumpadDigit = vl_is_numpad_digit_keysym(static_cast<uint32_t>(sym));
     sym = static_cast<KeySym>(vl_normalize_numpad_keysym(static_cast<uint32_t>(sym)));
 
     // Handle printable ASCII characters (32..126)
@@ -590,7 +593,7 @@ void VieLotusState::keyEvent(KeyEvent& keyEvent) {
             (sym >= 'a' && sym <= 'z') || (sym >= 'A' && sym <= 'Z');
         const bool isDigit = (sym >= '0' && sym <= '9');
         const bool isWordChar =
-            isAlpha || (inputMethod_ == VIELOTUS_INPUT_VNI && isDigit &&
+            isAlpha || (inputMethod_ == VIELOTUS_INPUT_VNI && isDigit && !isNumpadDigit &&
                         vielotus_is_composing(session_));
 
         if (!isWordChar) {

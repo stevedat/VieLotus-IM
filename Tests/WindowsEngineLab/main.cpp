@@ -1199,7 +1199,7 @@ int main(int argc, char **argv) {
         }
     };
 
-    int tsfTotal = 34, tsfPass = 0;
+    int tsfTotal = 35, tsfPass = 0;
     auto checkTsf = [&](int id, bool cond, const char *desc, const std::string &actual) {
         if (cond) {
             tsfPass++;
@@ -1875,6 +1875,33 @@ int main(int argc, char **argv) {
         checkTsf(34, ok, "Cross-process Telex/VNI profile sync & ActivateProfile flags", ok ? "OK" : "MISMATCH");
     }
 
+    // TSF 35: Desktop Numpad 0-9 always emits literal digits in VNI (never acts as VNI diacritic)
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        ok = ok && IsNumpadDigitVk(kVkNumpad0);
+        ok = ok && IsNumpadDigitVk(kVkNumpad9);
+        ok = ok && !IsNumpadDigitVk('0');
+        ok = ok && !IsNumpadDigitVk('9');
+        // Top-row digits are VNI modifiers when VNI mode is active
+        ok = ok && IsVniDigitModifierKey(true, '1', '1');
+        ok = ok && IsVniDigitModifierKey(true, '9', '9');
+        ok = ok && !IsVniDigitModifierKey(false, '1', '1');
+        // Numpad digits are NEVER VNI modifiers even when VNI mode is active
+        ok = ok && !IsVniDigitModifierKey(true, kVkNumpad0, '0');
+        ok = ok && !IsVniDigitModifierKey(true, kVkNumpad0 + 1u, '1');
+        ok = ok && !IsVniDigitModifierKey(true, kVkNumpad9, '9');
+#if !defined(_WIN32)
+        // Linux X11 Numpad digit keysym classification (KP_0..KP_9 = 0xFFB0..0xFFB9)
+        ok = ok && vl_is_numpad_digit_keysym(0xFFB0u);
+        ok = ok && vl_is_numpad_digit_keysym(0xFFB1u);
+        ok = ok && vl_is_numpad_digit_keysym(0xFFB9u);
+        ok = ok && !vl_is_numpad_digit_keysym('1');
+        ok = ok && !vl_is_numpad_digit_keysym(0xFFABu); // KP_Add
+#endif
+        checkTsf(35, ok, "Desktop Numpad 0-9 literal-digit policy in VNI", ok ? "OK" : "MISMATCH");
+    }
+
     // =========================================================================
     // P0.6 Explicit Telex & VNI Escape Preservation Suite
     // Verifies both Windows TSF (WindowsNativeEngine / WinTsfSimulator) and
@@ -2090,12 +2117,31 @@ int main(int argc, char **argv) {
         checkWordBoth(kv.first, kv.second, false);
     }
 
-    // 3. VNI repeated-digit escapes
+    // 3. VNI repeated-digit escapes, alphanumeric phonotactics, leading-digit currency & Tone-Replace Rollback
     const std::pair<const char *, const char *> kVniEscapes[] = {
         {"tu33us", "tu3us"}, {"tu33u1", "tu3u1"}, {"ca11us", "ca1us"},
         {"to66u1", "to6u1"}, {"tu77u1", "tu7u1"}, {"tuo77u1", "tuo7u1"},
         {"ta88u1", "ta8u1"}, {"d99u1", "d9u1"},
-        {"duoc975", "được"}, {"duoc9759", "dược9"}
+        {"duoc975", "được"}, {"duoc9759", "dược9"}, {"duoc975123", "được123"},
+        {"truo7ng27", "truòng7"},
+        {"123D9atTP", "123ĐatTP"}, {"123D9a5tTP", "123ĐạtTP"}, {"123D9at5TP", "123ĐạtTP"},
+        {"123d9o6ng2", "123đồng"}, {"100d9", "100đ"}, {"100D9", "100Đ"},
+        {"D9atTP123", "ĐatTP123"}, {"D9a5tTP123", "ĐạtTP123"},
+        {"D9atTP9", "ĐatTP9"}, {"D9a5tTP5", "ĐạtTP5"},
+        {"D9a5t123", "Đạt123"}, {"D9at5123", "Đạt123"},
+        {"D9a5t11", "Đạt11"}, {"D9a5t10", "Đạt10"},
+        {"D9a5t125", "Đạt125"}, {"D9a5t129", "Đạt129"},
+        {"D9a5t2026", "Đạt2026"}, {"D9a5t789", "Đạt789"},
+        {"Dat5123", "Dạt123"}, {"Dat52026", "Dạt2026"},
+        {"viet65123", "việt123"}, {"viet652026", "việt2026"}, {"viet65126", "việt126"},
+        {"viet123", "viet123"},
+        {"co2123", "cò123"}, {"co210", "cò10"},
+        {"d9at51", "đát"}, {"co21", "có"}, {"to6i10", "tôi"},
+        {"Win11", "Win11"}, {"Win7", "Win7"},
+        {"iPhone16", "iPhone16"}, {"iPhone6", "iPhone6"}, {"iPad9", "iPad9"},
+        {"Java8", "Java8"}, {"Chrome6", "Chrome6"},
+        {"Pass123", "Pass123"}, {"Hello123", "Hello123"}, {"user123", "user123"},
+        {"TP123", "TP123"}, {"Q1", "Q1"}
     };
     for (const auto &kv : kVniEscapes) {
         checkWordBoth(kv.first, kv.second, true);

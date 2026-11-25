@@ -335,11 +335,19 @@ static inline VL_COMMON_UNUSED bool vl_is_modifier_or_lock_keysym(uint32_t keysy
 }
 
 /*
+ * Returns true if an X11 keysym is a Numpad digit (KP_0..KP_9, 0xFFB0..0xFFB9).
+ * In VNI mode, Numpad digits commit the active word and emit literal digits rather
+ * than acting as VNI tone/vowel modifiers (top-row '0'..'9' remain VNI diacritics).
+ */
+static inline VL_COMMON_UNUSED bool vl_is_numpad_digit_keysym(uint32_t keysym) {
+    return keysym >= 0xFFB0u && keysym <= 0xFFB9u;
+}
+
+/*
  * Maps printable X11 Numpad keysyms (emitted when NumLock is active) to their
  * ASCII equivalents so Numpad digits/operators are committed atomically with
- * preedit (preventing `abc4` -> `4abc` Chrome/Wayland reordering) and support
- * VNI tone digits on Numpad. Navigation keys (`KP_Home..KP_Delete`, `KP_Enter`,
- * `KP_Tab`) are intentionally returned unchanged.
+ * preedit (preventing `abc4` -> `4abc` Chrome/Wayland reordering). Navigation
+ * keys (`KP_Home..KP_Delete`, `KP_Enter`, `KP_Tab`) are returned unchanged.
  */
 static inline VL_COMMON_UNUSED uint32_t vl_normalize_numpad_keysym(uint32_t keysym) {
     if (keysym >= 0xFFB0u && keysym <= 0xFFB9u) {

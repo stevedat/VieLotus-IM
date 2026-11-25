@@ -724,13 +724,14 @@ internal final class VietnameseEngine: @unchecked Sendable {
             if !ch.isLetter && !ch.isNumber {
                 hasConfirmedSemanticEscapeInComposition = false
             }
+            let isRejectedVNIDigit = (inputMethod == .vni && ch.isNumber)
             lastToneSemanticEvent = nil
             compositionHistory.append(
                 CompositionSnapshot(
                     rawChars: rawChars,
                     renderedOutput: newOutput,
-                    isLiteralOrCancellationStep: false,
-                    isExplicitLiteralLock: false,
+                    isLiteralOrCancellationStep: isRejectedVNIDigit,
+                    isExplicitLiteralLock: isRejectedVNIDigit,
                     supersededModifiers: supersededModifiers,
                     toneSemanticEvent: nil,
                     hasConfirmedSemanticEscape: hasConfirmedSemanticEscapeInComposition
@@ -887,6 +888,14 @@ internal final class VietnameseEngine: @unchecked Sendable {
                   !newOutput.hasSuffix(String(ch)) else {
                 return false
             }
+            // Preserve the replaced tone in rawChars on 1-step VNI tone replacement (e.g. D9a5t + 1 -> D9a5t1)
+            // so a subsequent digit (e.g. '2' in D9a5t123) can roll back cleanly to Đạt123.
+            if ["1", "2", "3", "4", "5"].contains(lowerCh),
+               prevToneMod != nil,
+               newToneMod != nil,
+               prevToneMod != newToneMod {
+                return false
+            }
             if ch == "0" && VietnameseSyllableDictionary.hasToneMark(previousOutput) && !VietnameseSyllableDictionary.hasToneMark(newOutput) {
                 return true
             }
@@ -992,19 +1001,25 @@ internal final class VietnameseEngine: @unchecked Sendable {
               !VietnameseSyllableDictionary.shared.isPhonotacticallyValidSyllable(newOutput) &&
               !VietnameseSyllableDictionary.shared.hasUntonedPrefix(newOutput, preserveVowelShape: true, relaxedCoda: relaxedCoda, genZMode: genZMode)))
         let newIsASCII = newOutput.utf8.allSatisfy({ $0 < 128 })
+        let isRejectedVNIDigitAppend =
+            inputMethod == .vni &&
+            ch.isNumber &&
+            !previousOutput.isEmpty &&
+            newOutput == previousOutput + String(ch)
         let isLiteralOrCancel = (!previousOutput.isEmpty &&
             !newIsASCII &&
             !VietnameseSyllableDictionary.shared.isPlausibleInProgressVietnamese(newOutput, relaxedCoda: relaxedCoda, genZMode: genZMode)) ||
             isLiteralModifierFallbackOnComposed ||
             isSemanticToneEscapeCancel ||
             isVNICancellationAndLiteralEmit ||
+            isRejectedVNIDigitAppend ||
             isPostToneEscapeLiteralFollowup
         compositionHistory.append(
             CompositionSnapshot(
                 rawChars: rawChars,
                 renderedOutput: newOutput,
                 isLiteralOrCancellationStep: isLiteralOrCancel || ((isToneClearZ || isVNIToneClearOrReshape || isMutualExclusionVowelReshape || isReversibleLateVowelStep || isStrokeCancellation) && !wasEditingCommitted),
-                isExplicitLiteralLock: isVNICancellationAndLiteralEmit,
+                isExplicitLiteralLock: isVNICancellationAndLiteralEmit || isRejectedVNIDigitAppend,
                 supersededModifiers: supersededModifiers,
                 toneSemanticEvent: toneEvent,
                 hasConfirmedSemanticEscape: hasConfirmedSemanticEscapeInComposition
@@ -3239,6 +3254,83 @@ internal final class VietnameseEngine: @unchecked Sendable {
         }
     }
     
+    private static let validVNIOnsets: Set<String> = [
+        "", "b", "c", "ch", "d", "đ", "g", "gh", "gi", "h", "k", "kh",
+        "l", "m", "n", "ng", "ngh", "nh", "p", "ph", "q", "qu", "r",
+        "s", "t", "th", "tr", "v", "x", "kr"
+    ]
+    private static let validVNIGenZOnsets: Set<String> = ["f", "j", "w", "z", "dz"]
+    private static let validVNICodas: Set<String> = ["", "c", "ch", "m", "n", "ng", "nh", "p", "t"]
+    private static let stopVNICodas: Set<String> = ["c", "ch", "p", "t", "k"]
+
+    private struct VNISyllableShape {
+        let hasVowels: Bool
+        let hasSingleVowelCluster: Bool
+        let onsetValid: Bool
+        let codaValid: Bool
+        let isStopCoda: Bool
+    }
+
+    private static func analyzeVNISyllableShape(
+        _ chars: [Character],
+        relaxedCoda: Bool,
+        genZMode: Bool
+    ) -> VNISyllableShape {
+        guard !chars.isEmpty else {
+            return VNISyllableShape(hasVowels: false, hasSingleVowelCluster: false, onsetValid: false, codaValid: false, isStopCoda: false)
+        }
+        var vStart = -1
+        for idx in 0..<chars.count {
+            if Self.isVietnameseVowel(chars[idx]) {
+                vStart = idx
+                break
+            }
+        }
+        guard vStart >= 0 else {
+            return VNISyllableShape(hasVowels: false, hasSingleVowelCluster: false, onsetValid: false, codaValid: false, isStopCoda: false)
+        }
+        // Treat 'qu' + vowel and 'gi' + vowel (except 'gii') as initial onset
+        if vStart == 1 && chars[0].lowercased() == "q" && chars[1].lowercased() == "u" {
+            if vStart + 1 < chars.count && Self.isVietnameseVowel(chars[vStart + 1]) {
+                vStart += 1
+            }
+        } else if vStart == 1 && chars[0].lowercased() == "g" && chars[1].lowercased() == "i" {
+            if vStart + 1 < chars.count && Self.isVietnameseVowel(chars[vStart + 1]) && chars[vStart + 1].lowercased() != "i" {
+                vStart += 1
+            }
+        }
+        var vEnd = vStart
+        while vEnd + 1 < chars.count && Self.isVietnameseVowel(chars[vEnd + 1]) {
+            vEnd += 1
+        }
+        for idx in (vEnd + 1)..<chars.count {
+            if Self.isVietnameseVowel(chars[idx]) {
+                return VNISyllableShape(hasVowels: true, hasSingleVowelCluster: false, onsetValid: false, codaValid: false, isStopCoda: false)
+            }
+        }
+        let onset = String(chars[0..<vStart]).lowercased()
+        let onsetValid = validVNIOnsets.contains(onset) || (genZMode && validVNIGenZOnsets.contains(onset))
+        let coda = String(chars[(vEnd + 1)..<chars.count]).lowercased()
+        var codaValid = validVNICodas.contains(coda)
+        if !codaValid && coda == "k" {
+            let isEthnicK = (vStart == 1 && vEnd == 1 && (onset == "đ" || onset == "d" || onset == "l") &&
+                             (chars[vStart].lowercased() == "ă" || chars[vStart].lowercased() == "a"))
+            if isEthnicK || relaxedCoda {
+                codaValid = true
+            }
+        } else if !codaValid && relaxedCoda && (coda == "g" || coda == "h") {
+            codaValid = true
+        }
+        let isStop = stopVNICodas.contains(coda)
+        return VNISyllableShape(
+            hasVowels: true,
+            hasSingleVowelCluster: true,
+            onsetValid: onsetValid,
+            codaValid: codaValid,
+            isStopCoda: isStop
+        )
+    }
+
     private func transformVNI(_ chars: [Character]) -> String {
         if !chars.contains(where: \.isNumber) {
             return String(chars)
@@ -3247,6 +3339,21 @@ internal final class VietnameseEngine: @unchecked Sendable {
         var tone: VietnameseTone = .none
         var escapeActive = false
         var hornCancelled = false
+        var hasPendingToneReplace = false
+        var preReplaceTone: VietnameseTone = .none
+        var pendingToneReplaceDigit: Character = "0"
+
+        func lockDigitLiterally(_ digit: Character) {
+            if !hornCancelled {
+                Self.harmonizeVNIHornCluster(&result)
+            }
+            if tone != .none {
+                Self.applyTone(&result, tone: tone, modern: modernOrthography)
+                tone = .none
+            }
+            result.append(digit)
+            escapeActive = true
+        }
         
         for ch in chars {
             if escapeActive {
@@ -3254,12 +3361,30 @@ internal final class VietnameseEngine: @unchecked Sendable {
                 continue
             }
             if ch.isNumber {
-                let hasVowels = result.contains { Self.isVietnameseVowel($0) }
+                // Layer 2: 1-step Tone-Replace Rollback for consecutive numeric suffixes (e.g. D9a5t123 -> Đạt123, viet65123 -> việt123, co2123 -> cò123)
+                if hasPendingToneReplace {
+                    tone = preReplaceTone
+                    hasPendingToneReplace = false
+                    if !hornCancelled {
+                        Self.harmonizeVNIHornCluster(&result)
+                    }
+                    if tone != .none {
+                        Self.applyTone(&result, tone: tone, modern: modernOrthography)
+                        tone = .none
+                    }
+                    result.append(pendingToneReplaceDigit)
+                    result.append(ch)
+                    escapeActive = true
+                    continue
+                }
+
+                let shape = Self.analyzeVNISyllableShape(result, relaxedCoda: relaxedCoda, genZMode: genZMode)
+                let canModifyVowelOrTone = shape.hasVowels && shape.hasSingleVowelCluster && shape.onsetValid && shape.codaValid
+
                 switch ch {
                 case "1", "2", "3", "4", "5":
-                    guard hasVowels else {
-                        result.append(ch)
-                        escapeActive = true
+                    guard canModifyVowelOrTone else {
+                        lockDigitLiterally(ch)
                         continue
                     }
                     let targetTone: VietnameseTone
@@ -3270,6 +3395,10 @@ internal final class VietnameseEngine: @unchecked Sendable {
                     case "4": targetTone = .tilde
                     default: targetTone = .dot
                     }
+                    if shape.isStopCoda && targetTone != .acute && targetTone != .dot {
+                        lockDigitLiterally(ch)
+                        continue
+                    }
                     if tone == targetTone {
                         // Repeated active tone key cancels the tone, emits the digit literally, and locks literal mode
                         tone = .none
@@ -3278,21 +3407,26 @@ internal final class VietnameseEngine: @unchecked Sendable {
                         }
                         result.append(ch)
                         escapeActive = true
+                    } else if tone != .none {
+                        preReplaceTone = tone
+                        pendingToneReplaceDigit = ch
+                        hasPendingToneReplace = true
+                        tone = targetTone
                     } else {
                         tone = targetTone
                     }
                 case "0":
-                    if hasVowels && tone != .none {
+                    if shape.hasVowels && tone != .none {
                         tone = .none
                     } else {
-                        if !hornCancelled {
-                            Self.harmonizeVNIHornCluster(&result)
-                        }
-                        result.append(ch)
-                        escapeActive = true
+                        lockDigitLiterally(ch)
                     }
                 case "6":
                     // â, ê, ô
+                    guard canModifyVowelOrTone else {
+                        lockDigitLiterally(ch)
+                        continue
+                    }
                     let hasExistingCircumflex = result.contains { "âêôÂÊÔ".contains($0) }
                     if hasExistingCircumflex {
                         // Repeated '6' cancels circumflex back to base vowel, preserves active tone, appends '6', and locks
@@ -3340,18 +3474,14 @@ internal final class VietnameseEngine: @unchecked Sendable {
                         }
                     }
                     if !transformed {
-                        if !hornCancelled {
-                            Self.harmonizeVNIHornCluster(&result)
-                        }
-                        if tone != .none {
-                            Self.applyTone(&result, tone: tone, modern: modernOrthography)
-                            tone = .none
-                        }
-                        result.append(ch)
-                        escapeActive = true
+                        lockDigitLiterally(ch)
                     }
                 case "7":
                     // ơ, ư
+                    guard canModifyVowelOrTone else {
+                        lockDigitLiterally(ch)
+                        continue
+                    }
                     // 1. Constructive 'u7o7' sequence where '7' is typed immediately after 'ưo'
                     if result.count >= 2,
                        let lastChar = result.last,
@@ -3443,15 +3573,14 @@ internal final class VietnameseEngine: @unchecked Sendable {
                         }
                     }
                     if !transformed {
-                        if tone != .none {
-                            Self.applyTone(&result, tone: tone, modern: modernOrthography)
-                            tone = .none
-                        }
-                        result.append(ch)
-                        escapeActive = true
+                        lockDigitLiterally(ch)
                     }
                 case "8":
                     // ă
+                    guard canModifyVowelOrTone else {
+                        lockDigitLiterally(ch)
+                        continue
+                    }
                     let hasExistingBreve = result.contains { "ăĂ".contains($0) }
                     if hasExistingBreve {
                         for idx in 0..<result.count {
@@ -3480,18 +3609,16 @@ internal final class VietnameseEngine: @unchecked Sendable {
                         }
                     }
                     if !transformed {
-                        if !hornCancelled {
-                            Self.harmonizeVNIHornCluster(&result)
-                        }
-                        if tone != .none {
-                            Self.applyTone(&result, tone: tone, modern: modernOrthography)
-                            tone = .none
-                        }
-                        result.append(ch)
-                        escapeActive = true
+                        lockDigitLiterally(ch)
                     }
                 case "9":
-                    // đ
+                    // đ — only modify initial 'd'/'D' on a valid syllable stem (or consonant-only abbreviation like 'sd9t' -> 'sđt'),
+                    // never trailing 'd' in words like 'iPad9', 'Android9', 'Word9', or overflowed stems like 'ĐatTP9'.
+                    let canModifyStrokeD = !shape.hasVowels || canModifyVowelOrTone
+                    guard canModifyStrokeD else {
+                        lockDigitLiterally(ch)
+                        continue
+                    }
                     let hasExistingStroke = result.contains { "đĐ".contains($0) }
                     if hasExistingStroke {
                         for idx in 0..<result.count {
@@ -3510,26 +3637,24 @@ internal final class VietnameseEngine: @unchecked Sendable {
                         continue
                     }
                     var transformed = false
-                    for idx in stride(from: result.count - 1, through: 0, by: -1) {
-                        let lower = Character(result[idx].lowercased())
-                        let upper = result[idx].isUppercase
-                        if lower == "d" { result[idx] = upper ? "Đ" : "đ" ; transformed = true; break }
+                    if !shape.hasVowels {
+                        for idx in stride(from: result.count - 1, through: 0, by: -1) {
+                            let lower = Character(result[idx].lowercased())
+                            let upper = result[idx].isUppercase
+                            if lower == "d" { result[idx] = upper ? "Đ" : "đ"; transformed = true; break }
+                        }
+                    } else if let first = result.first, first.lowercased() == "d" {
+                        result[0] = first.isUppercase ? "Đ" : "đ"
+                        transformed = true
                     }
                     if !transformed {
-                        if !hornCancelled {
-                            Self.harmonizeVNIHornCluster(&result)
-                        }
-                        if tone != .none {
-                            Self.applyTone(&result, tone: tone, modern: modernOrthography)
-                            tone = .none
-                        }
-                        result.append(ch)
-                        escapeActive = true
+                        lockDigitLiterally(ch)
                     }
                 default:
                     result.append(ch)
                 }
             } else {
+                hasPendingToneReplace = false
                 result.append(ch)
             }
         }

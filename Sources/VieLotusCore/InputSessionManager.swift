@@ -1449,6 +1449,17 @@ public class InputSessionManager {
             return false
         }
         if engine.inputMethod == .vni && rawWord.contains(where: \.isNumber) {
+            // If an invalid Vietnamese vowel/tone stem got followed by trailing digits (e.g. `viet123` -> `viét23`),
+            // restore the original ASCII alphanumeric token instead of keeping a mangled non-syllable.
+            let renderedStem = String(rendered.prefix(while: { !$0.isNumber }))
+            if !engine.hasConfirmedSemanticEscapeInComposition &&
+               rendered.count > renderedStem.count &&
+               !renderedStem.isEmpty &&
+               !renderedStem.unicodeScalars.allSatisfy(\.isASCII) &&
+               !renderedStem.lowercased().contains("đ") &&
+               !VietnameseSyllableDictionary.shared.isValidSyllable(renderedStem.lowercased()) {
+                return true
+            }
             return false
         }
         if SmartBilingualDetector.isVNIDigitTransformationOrEscape(raw: rawWord, rendered: rendered) {

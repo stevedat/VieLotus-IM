@@ -792,6 +792,10 @@ struct NativeEngineState {
     bool m_afterDigit{false};
     bool m_precededByLeadingSlash{false};
     bool m_inSubwordEval{false};
+    bool m_vniPendingToneReplace{false};
+    int m_vniPreReplaceTone{0};
+    wchar_t m_vniPendingToneReplaceDigit{0};
+    bool m_vniNumericTailLocked{false};
     uint32_t m_pendingBoundaryCp{0};
     wchar_t m_prevCollisionDisplayed[16]{};
     int m_prevCollisionDisplayedLen{0};
@@ -829,6 +833,10 @@ struct NativeEngineState {
         m_lastCommitDiffBackspaces = 0;
         m_lastCommitDiffTextUtf8[0] = '\0';
         m_afterDigit = false;
+        m_vniPendingToneReplace = false;
+        m_vniPreReplaceTone = 0;
+        m_vniPendingToneReplaceDigit = 0;
+        m_vniNumericTailLocked = false;
     }
 
     bool isComposing() const {
@@ -1822,7 +1830,9 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
             }
         }
         const bool isCurrencyStrokeD =
-            (m_rawLen == 2 && rawLower[0] == L'd' && rawLower[1] == L'd');
+            (m_rawLen == 2 && rawLower[0] == L'd' &&
+             ((m_inputMethod == InputMethod::Telex && rawLower[1] == L'd') ||
+              (m_inputMethod == InputMethod::VNI && rawLower[1] == L'9')));
         if ((!rawHasAsciiVowel && !isCurrencyStrokeD) ||
             isPostDigitTechnicalUnitSuffix(rawLower, m_rawLen)) {
             return true;
@@ -2756,6 +2766,35 @@ bool NativeEngineState::applyVniCharacter(wchar_t ch) {
     if (m_literalLock) return false;
     if (ch < L'0' || ch > L'9') return false;
 
+    if (m_vniNumericTailLocked) {
+        if (m_literalTailLen < kMaxWordTokens - 1) {
+            m_literalTail[m_literalTailLen++] = ch;
+            m_literalTail[m_literalTailLen] = 0;
+        }
+        return true;
+    }
+
+    // Layer 2: 1-step Tone-Replace Rollback for consecutive numeric suffixes (e.g. D9a5t123 -> Đạt123, viet65123 -> việt123, co2123 -> cò123)
+    if (m_vniPendingToneReplace) {
+        m_tone = m_vniPreReplaceTone;
+        m_lastToneKey = (m_tone > 0) ? static_cast<wchar_t>(L'0' + m_tone) : 0;
+        const wchar_t prevDigit = m_vniPendingToneReplaceDigit;
+        m_vniPendingToneReplace = false;
+        m_vniPreReplaceTone = 0;
+        m_vniPendingToneReplaceDigit = 0;
+        m_hasUndoSnapshot = false;
+        m_classicOrVniEscape = true;
+        m_vniNumericTailLocked = true;
+        if (m_literalTailLen < kMaxWordTokens - 1) {
+            m_literalTail[m_literalTailLen++] = prevDigit;
+        }
+        if (m_literalTailLen < kMaxWordTokens - 1) {
+            m_literalTail[m_literalTailLen++] = ch;
+        }
+        m_literalTail[m_literalTailLen] = 0;
+        return true;
+    }
+
     int vStart = -1, vEnd = -1;
     bool hasCoda = false;
     findVowelCluster(vStart, vEnd, hasCoda);
@@ -2840,6 +2879,20 @@ bool NativeEngineState::applyVniCharacter(wchar_t ch) {
 
     if (ch == L'9') {
         if (m_tokenLen > 0 && m_tokens[0].baseLower == L'd') {
+            if (vStart != -1) {
+                wchar_t coda9[16]{};
+                int coda9Len = 0;
+                for (int i = vEnd + 1; i < m_tokenLen; ++i) {
+                    if (isAsciiBaseVowel(m_tokens[i].baseLower)) return false;
+                    if (coda9Len < 15) coda9[coda9Len++] = m_tokens[i].baseLower;
+                }
+                if (!isValidFinalCoda(coda9, coda9Len)) {
+                    const bool isEthnicK = (coda9Len == 1 && coda9[0] == L'k' && vEnd == vStart && m_tokens[vStart].baseLower == L'a');
+                    if (!isEthnicK && !(m_relaxedCoda && coda9Len == 1 && (coda9[0] == L'g' || coda9[0] == L'h' || coda9[0] == L'k'))) {
+                        return false;
+                    }
+                }
+            }
             if (m_tokens[0].shape == 0) {
                 m_tokens[0].shape = 4;
                 m_lastShapeKey = L'9';
@@ -2863,6 +2916,42 @@ bool NativeEngineState::applyVniCharacter(wchar_t ch) {
     }
 
     if (vStart == -1) return false;
+
+    // Validate Vietnamese initial onset, single contiguous vowel cluster, and coda before consuming
+    // VNI vowel/tone digits so mixed alphanumeric identifiers (Win11, iPhone6, Java8, Chrome6, Pass123, ĐatTP123)
+    // keep their digits intact.
+    {
+        wchar_t initStr[16]{};
+        int initLen = 0;
+        const bool hasStrokeD = (m_tokenLen > 0 && m_tokens[0].baseLower == L'd' && m_tokens[0].shape == 4);
+        for (int i = 0; i < vStart && initLen < 15; ++i) {
+            initStr[initLen++] = m_tokens[i].baseLower;
+        }
+        const bool isEthnicKr = (initLen == 2 && initStr[0] == L'k' && initStr[1] == L'r');
+        const bool isQBeforeU = (initLen == 1 && initStr[0] == L'q' && vStart == 1 && m_tokens[1].baseLower == L'u');
+        if (!isValidInitialOnset(initStr, initLen, hasStrokeD) && !isEthnicKr && !isQBeforeU) {
+            return false;
+        }
+        wchar_t codaCheck[16]{};
+        int codaCheckLen = 0;
+        for (int i = vEnd + 1; i < m_tokenLen; ++i) {
+            if (isAsciiBaseVowel(m_tokens[i].baseLower)) return false;
+            if (codaCheckLen < 15) codaCheck[codaCheckLen++] = m_tokens[i].baseLower;
+        }
+        bool codaOk = isValidFinalCoda(codaCheck, codaCheckLen);
+        if (!codaOk && codaCheckLen == 1) {
+            const bool isEthnicK =
+                codaCheck[0] == L'k' && (vEnd == vStart) &&
+                m_tokens[vStart].baseLower == L'a' &&
+                ((vStart == 1 && m_tokens[0].baseLower == L'd') || (vStart == 1 && m_tokens[0].baseLower == L'l'));
+            if (isEthnicK || (m_relaxedCoda && (codaCheck[0] == L'g' || codaCheck[0] == L'h' || codaCheck[0] == L'k'))) {
+                codaOk = true;
+            }
+        }
+        if (!codaOk) {
+            return false;
+        }
+    }
 
     if (m_shapeCancelledOnce && m_lastShapeKey == ch) {
         if (!stemWasValidVn) return false;
@@ -3067,6 +3156,15 @@ bool NativeEngineState::applyVniCharacter(wchar_t ch) {
             }
             return true;
         }
+        if (m_tone != 0 && m_tone != targetTone) {
+            m_vniPendingToneReplace = true;
+            m_vniPreReplaceTone = m_tone;
+            m_vniPendingToneReplaceDigit = ch;
+        } else {
+            m_vniPendingToneReplace = false;
+            m_vniPreReplaceTone = 0;
+            m_vniPendingToneReplaceDigit = 0;
+        }
         m_tone = targetTone;
         m_lastToneKey = ch;
         return true;
@@ -3178,14 +3276,22 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
     if (m_inputMethod == InputMethod::VNI && isAsciiDigit(codepoint)) {
         consumedAsModifier = applyVniCharacter(ch);
     } else if (!m_literalLock && m_literalTailLen > 0 && m_inputMethod == InputMethod::VNI) {
+        m_vniPendingToneReplace = false;
+        m_vniPreReplaceTone = 0;
+        m_vniPendingToneReplaceDigit = 0;
         m_classicOrVniEscape = true;
         if (m_literalTailLen < kMaxWordTokens - 1) {
             m_literalTail[m_literalTailLen++] = ch;
             m_literalTail[m_literalTailLen] = 0;
         }
         consumedAsModifier = true;
-    } else if (m_inputMethod == InputMethod::Telex && isAsciiAlpha(codepoint)) {
-        consumedAsModifier = applyTelexCharacter(ch, lowerCh, isUpper);
+    } else {
+        m_vniPendingToneReplace = false;
+        m_vniPreReplaceTone = 0;
+        m_vniPendingToneReplaceDigit = 0;
+        if (m_inputMethod == InputMethod::Telex && isAsciiAlpha(codepoint)) {
+            consumedAsModifier = applyTelexCharacter(ch, lowerCh, isUpper);
+        }
     }
 
     if (!consumedAsModifier) {
@@ -3324,7 +3430,8 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
             bool hasCodaNow = false;
             findVowelCluster(vStartNow, vEndNow, hasCodaNow);
 
-            bool hasVnSpecific = m_shapeCancelledOnce || m_hasUndoSnapshot || isSingleModifiedVowelStem || m_relaxedCodaExpanded;
+            bool hasVnSpecific = m_shapeCancelledOnce || m_hasUndoSnapshot || isSingleModifiedVowelStem || m_relaxedCodaExpanded ||
+                                 (m_inputMethod == InputMethod::VNI && isAsciiDigit(codepoint) && m_tone != 0);
             for (int i = 0; i < m_tokenLen; ++i) {
                 if (m_tokens[i].shape == 2 || m_tokens[i].shape == 3 || m_tokens[i].shape == 4 ||
                     (m_tokens[i].shape == 1 && m_tone != 0)) {
@@ -3400,6 +3507,9 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
         if (lockOverflowToTail) {
             if (m_inputMethod == InputMethod::VNI) {
                 m_classicOrVniEscape = true;
+                if (isAsciiDigit(codepoint) || isUpper) {
+                    m_vniNumericTailLocked = true;
+                }
             }
             if (hasStrongVietnameseSyllableAnchor() || lockHornedDiphthongRepeat || m_relaxedCodaExpanded) {
                 m_overflowLocked = true;
@@ -3409,6 +3519,9 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
                 m_literalTail[m_literalTailLen] = 0;
             }
         } else {
+            if (m_inputMethod == InputMethod::VNI && isAsciiDigit(codepoint)) {
+                m_vniNumericTailLocked = true;
+            }
             if (m_tokenLen < kMaxWordTokens) {
                 m_tokens[m_tokenLen++] = SyllableToken{ lowerCh, isUpper, 0 };
             }
@@ -3495,6 +3608,9 @@ int32_t NativeEngineState::feedBackspace() {
     wchar_t priorDisplayed[kMaxWordTokens]{};
     const int priorLen = m_displayedLen;
     for (int i = 0; i < priorLen; ++i) priorDisplayed[i] = m_displayed[i];
+    m_vniPendingToneReplace = false;
+    m_vniPreReplaceTone = 0;
+    m_vniPendingToneReplaceDigit = 0;
 
     wchar_t mixedCompoundBuf[kMaxWordTokens]{};
     if (tryComposeMixedCaseCompound(mixedCompoundBuf, kMaxWordTokens)) {
@@ -3614,6 +3730,7 @@ int32_t NativeEngineState::feedBackspace() {
         if (m_literalTailLen == 0) {
             m_telexToneEscape = false;
             m_overflowLocked = false;
+            m_vniNumericTailLocked = false;
             if (m_inputMethod == InputMethod::VNI) {
                 m_classicOrVniEscape = false;
             }

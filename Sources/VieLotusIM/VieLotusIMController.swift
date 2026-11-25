@@ -1384,10 +1384,16 @@ final class VieLotusIMController: IMKInputController {
             return false
         }
 
-        // Numbers (0-9): In Telex mode, digits are not tone marks or Vietnamese keys.
-        // Commit current composing word so the digit does not corrupt the word into raw English or cause caret jumps.
-        let isDigitInTelex = firstChar.isNumber && Preferences.shared.inputMethod != .vni
-        if isDigitInTelex {
+        // Numbers (0-9):
+        // - In Telex mode, digits are never diacritic keys.
+        // - In VNI mode:
+        //   (a) Leading digits when not composing (`123ĐatTP`, `123đồng`, `100đ`) must be word boundaries so they never start a literal-locked composition.
+        //   (b) Numpad digits (`event.modifierFlags.contains(.numericPad)`) always commit and insert literal digits (`Đạt` + Numpad `1` -> `Đạt1`).
+        let isVniMode = Preferences.shared.inputMethod == .vni
+        let isNumpadDigit = firstChar.isNumber && event.modifierFlags.contains(.numericPad)
+        let isIdleVniLeadingDigit = firstChar.isNumber && isVniMode && !engine.isComposing && (editCaretBack < 0 || engine.lastCommittedWord == nil)
+        let isDigitBoundary = firstChar.isNumber && (!isVniMode || isNumpadDigit || isIdleVniLeadingDigit)
+        if isDigitBoundary {
             DiagnosticLogger.shared.logEvent("DIGIT", app: bundleID, detail: "wasComposing=\(engine.isComposing)")
             if Self.isBrowserOmniboxSession {
                 engine.reset()
@@ -1398,7 +1404,7 @@ final class VieLotusIMController: IMKInputController {
                 compositionStartLocation = NSNotFound
                 lastCommittedWordStartLocation = NSNotFound
                 hasActiveMarkedText = false
-                precededByTechnicalDelimiter = true
+                precededByTechnicalDelimiter = !isVniMode
                 followsDot = false
                 return false
             }
@@ -1408,7 +1414,7 @@ final class VieLotusIMController: IMKInputController {
             if wasComposingBeforeDigit {
                 restored = commitWordWithBilingualCheck(client: client, presentationMode: presentationMode, selection: selection, suffixChar: firstChar)
             }
-            precededByTechnicalDelimiter = true
+            precededByTechnicalDelimiter = !isVniMode
             followsDot = false
             armExplicitRangeRiskBoundary()
             recordPostBoundaryCaretLocation(

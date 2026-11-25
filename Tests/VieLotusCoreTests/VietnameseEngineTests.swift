@@ -1265,4 +1265,92 @@ final class VietnameseEngineTests: XCTestCase {
         // Non-krông English kr- words stay strictly untouched
         XCTAssertEqual(drivePhrase("kruger krisflyer krill krypton "), "kruger krisflyer krill krypton")
     }
+
+    func testVNIAlphanumericPhonotacticsAndToneReplaceRollback() {
+        let driveVNI: (String) -> String = { raw in
+            let session = InputSessionManager()
+            session.setInputMethod(.vni)
+            session.setSmartBilingualEnabled(true)
+            var out = ""
+            for ch in raw {
+                if session.isWordBoundary(ch) {
+                    let action = session.commitWord(smartBilingualEnabled: true, boundaryChar: ch)
+                    if case let .commit(bs, text, isOverride) = action, isOverride {
+                        if bs > 0 { out.removeLast(min(bs, out.count)) }
+                        out += text
+                    }
+                    out.append(ch)
+                } else {
+                    let action = session.handleCharacter(ch)
+                    if case let .replace(bs, text) = action {
+                        if bs > 0 { out.removeLast(min(bs, out.count)) }
+                        out += text
+                    } else if case .passThrough = action {
+                        out.append(ch)
+                    }
+                }
+            }
+            if session.isComposing {
+                let action = session.commitWord(smartBilingualEnabled: true)
+                if case let .commit(bs, text, isOverride) = action, isOverride {
+                    if bs > 0 { out.removeLast(min(bs, out.count)) }
+                    out += text
+                }
+            }
+            return out.trimmingCharacters(in: .whitespaces)
+        }
+
+        // Layer 1: Leading digits & currency + Vietnamese phonotactics (onset, coda, stop-coda, overflow)
+        XCTAssertEqual(driveVNI("123D9atTP "), "123ĐatTP")
+        XCTAssertEqual(driveVNI("123D9a5tTP "), "123ĐạtTP")
+        XCTAssertEqual(driveVNI("123D9at5TP "), "123ĐạtTP")
+        XCTAssertEqual(driveVNI("123d9o6ng2 "), "123đồng")
+        XCTAssertEqual(driveVNI("100d9 "), "100đ")
+        XCTAssertEqual(driveVNI("100D9 "), "100Đ")
+        XCTAssertEqual(driveVNI("D9atTP123 "), "ĐatTP123")
+        XCTAssertEqual(driveVNI("D9a5tTP123 "), "ĐạtTP123")
+        XCTAssertEqual(driveVNI("D9atTP9 "), "ĐatTP9")
+        XCTAssertEqual(driveVNI("D9a5tTP5 "), "ĐạtTP5")
+        XCTAssertEqual(driveVNI("D9a5t2026 "), "Đạt2026")
+        XCTAssertEqual(driveVNI("D9a5t789 "), "Đạt789")
+        XCTAssertEqual(driveVNI("viet652026 "), "việt2026")
+        XCTAssertEqual(driveVNI("viet123 "), "viet123")
+        XCTAssertEqual(driveVNI("Win11 "), "Win11")
+        XCTAssertEqual(driveVNI("Win7 "), "Win7")
+        XCTAssertEqual(driveVNI("iPhone16 "), "iPhone16")
+        XCTAssertEqual(driveVNI("iPhone6 "), "iPhone6")
+        XCTAssertEqual(driveVNI("iPad9 "), "iPad9")
+        XCTAssertEqual(driveVNI("Java8 "), "Java8")
+        XCTAssertEqual(driveVNI("Chrome6 "), "Chrome6")
+        XCTAssertEqual(driveVNI("Pass123 "), "Pass123")
+        XCTAssertEqual(driveVNI("Hello123 "), "Hello123")
+        XCTAssertEqual(driveVNI("user123 "), "user123")
+        XCTAssertEqual(driveVNI("TP123 "), "TP123")
+        XCTAssertEqual(driveVNI("Q1 "), "Q1")
+
+        // Layer 2: 1-step Tone-Replace Rollback for consecutive numeric suffixes after toned Vietnamese syllables
+        XCTAssertEqual(driveVNI("D9a5t123 "), "Đạt123")
+        XCTAssertEqual(driveVNI("D9at5123 "), "Đạt123")
+        XCTAssertEqual(driveVNI("D9a5t11 "), "Đạt11")
+        XCTAssertEqual(driveVNI("D9a5t10 "), "Đạt10")
+        XCTAssertEqual(driveVNI("D9a5t125 "), "Đạt125")
+        XCTAssertEqual(driveVNI("D9a5t129 "), "Đạt129")
+        XCTAssertEqual(driveVNI("Dat5123 "), "Dạt123")
+        XCTAssertEqual(driveVNI("Dat52026 "), "Dạt2026")
+        XCTAssertEqual(driveVNI("viet65123 "), "việt123")
+        XCTAssertEqual(driveVNI("viet65126 "), "việt126")
+        XCTAssertEqual(driveVNI("co2123 "), "cò123")
+        XCTAssertEqual(driveVNI("co210 "), "cò10")
+        XCTAssertEqual(driveVNI("duoc975123 "), "được123")
+
+        // Preserved standard VNI 1-step tone replacement, clear ('0'), and repeated-digit escapes
+        XCTAssertEqual(driveVNI("d9at51 "), "đát")
+        XCTAssertEqual(driveVNI("co21 "), "có")
+        XCTAssertEqual(driveVNI("to6i10 "), "tôi")
+        XCTAssertEqual(driveVNI("canh22 "), "canh2")
+        XCTAssertEqual(driveVNI("tu33us "), "tu3us")
+        XCTAssertEqual(driveVNI("duoc975 "), "được")
+        XCTAssertEqual(driveVNI("duoc9759 "), "dược9")
+        XCTAssertEqual(driveVNI("truo7ng27 "), "truòng7")
+    }
 }

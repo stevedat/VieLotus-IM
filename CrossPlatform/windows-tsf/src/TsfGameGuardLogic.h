@@ -382,4 +382,17 @@ inline bool ShouldPersistOnProfileActivated(
     return !inProfileSync && (!hasPersistedVni || persistedVni != activatedProfileIsVni);
 }
 
+// Desktop Numpad digits (VK_NUMPAD0..VK_NUMPAD9 = 0x60..0x69) always emit literal digits in VNI mode
+// instead of acting as VNI tone/vowel modifiers (top-row '0'..'9' remain standard VNI diacritic keys).
+inline constexpr uint32_t kVkNumpad0 = 0x60u;
+inline constexpr uint32_t kVkNumpad9 = 0x69u;
+
+inline bool IsNumpadDigitVk(uint32_t vkCode) {
+    return vkCode >= kVkNumpad0 && vkCode <= kVkNumpad9;
+}
+
+inline bool IsVniDigitModifierKey(bool isVniMode, uint32_t vkCode, uint32_t ch) {
+    return isVniMode && !IsNumpadDigitVk(vkCode) && ch >= static_cast<uint32_t>('0') && ch <= static_cast<uint32_t>('9');
+}
+
 } // namespace vielotus_tsf_guard

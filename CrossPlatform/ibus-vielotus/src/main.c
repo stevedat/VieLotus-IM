@@ -369,7 +369,9 @@ static void ibus_vielotus_commit_composing(IBusVieLotusEngine *vl_engine, const 
 
 
     if (vl_engine->session && vielotus_is_composing(vl_engine->session)) {
-        if (trailing_ascii && trailing_ascii[0] != '\0' && trailing_ascii[1] == '\0') {
+        gboolean trailing_is_vni_digit = vl_engine->is_vni && trailing_ascii &&
+            trailing_ascii[0] >= '0' && trailing_ascii[0] <= '9' && trailing_ascii[1] == '\0';
+        if (trailing_ascii && trailing_ascii[0] != '\0' && trailing_ascii[1] == '\0' && !trailing_is_vni_digit) {
             uint32_t cp = (uint32_t)(unsigned char)trailing_ascii[0];
             vielotus_feed_char(vl_engine->session, cp);
         } else {
@@ -1071,12 +1073,13 @@ static gboolean ibus_vielotus_engine_process_key_event(
         return FALSE;
     }
 
+    gboolean is_numpad_digit = vl_is_numpad_digit_keysym((uint32_t)keyval) ? TRUE : FALSE;
     keyval = (guint)vl_normalize_numpad_keysym((uint32_t)keyval);
 
     if (keyval >= 32 && keyval < 127) {
         gboolean is_alpha = (keyval >= 'a' && keyval <= 'z') || (keyval >= 'A' && keyval <= 'Z');
         gboolean is_digit = (keyval >= '0' && keyval <= '9');
-        gboolean is_word_char = is_alpha || (vl_engine->is_vni && is_digit && vielotus_is_composing(vl_engine->session));
+        gboolean is_word_char = is_alpha || (vl_engine->is_vni && is_digit && !is_numpad_digit && vielotus_is_composing(vl_engine->session));
 
         if (!is_word_char) {
             if (vielotus_is_composing(vl_engine->session)) {
