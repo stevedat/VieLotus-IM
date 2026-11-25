@@ -1759,13 +1759,14 @@ int main(int argc, char **argv) {
         checkTsf(29, ok, "SettingsRevision override sync & public feedback contact strip", ok ? "OK" : "MISMATCH");
     }
 
-    // TSF 30: Language Bar icon selection (Vietnamese -> SV lotus logo, English -> Slate [E] badge)
+    // TSF 30: Language Bar icon selection (Vietnamese -> Indigo [V] badge, English -> Slate [E] badge;
+    // avoids duplicating the adjacent Windows profile SV lotus icon)
     {
         using namespace vielotus_tsf_guard;
         bool ok = true;
-        ok = ok && (ResolveLangBarIconKind(true) == LangBarIconKind::VietnameseSvLogo);
+        ok = ok && (ResolveLangBarIconKind(true) == LangBarIconKind::VietnameseIndigoBadge);
         ok = ok && (ResolveLangBarIconKind(false) == LangBarIconKind::EnglishSlateBadge);
-        checkTsf(30, ok, "Language Bar SV logo (VN) / Slate [E] (EN) icon policy", ok ? "OK" : "MISMATCH");
+        checkTsf(30, ok, "Language Bar Indigo [V] (VN) / Slate [E] (EN) icon policy", ok ? "OK" : "MISMATCH");
     }
 
     // TSF 31: Sync-first EndActiveComposition fallback & ref-release policy (issue #173 Chromium Enter race)

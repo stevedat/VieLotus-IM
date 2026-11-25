@@ -909,7 +909,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 blueCol,
                 L"SV",
                 L"Thanh ng\u00F4n ng\u1EEF Windows",
-                L"N\u00FAt SV/E c\u1EA1nh VIE \u2022 Ctrl+Space \u0111\u1ED5i VI/EN",
+                L"N\u00FAt V/E c\u1EA1nh SV \u2022 Ctrl+Space \u0111\u1ED5i VI/EN",
                 L"Ph\u00EDm t\u1EAFt \u2197",
                 false,
                 fTileTitle, fSub, fPill, sfLeft, sfCenter

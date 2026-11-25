@@ -277,16 +277,16 @@ inline bool ShouldNotifyLangBarUpdate(
     return forceRefresh || (prevVietnamese != nextVietnamese) || (prevVni != nextVni);
 }
 
-// Language Bar icon policy:
-//  - Vietnamese ON  -> crisp tight-cropped Sen Viet lotus 'SV' icon (resource 102 in VieLotusTIP.dll)
+// Language Bar icon policy (GUID_LBI_INPUTMODE — sits beside Windows' profile SV lotus icon):
+//  - Vietnamese ON  -> Indigo '[V]' rounded-square badge (avoids duplicating the adjacent SV profile logo)
 //  - English OFF    -> neutral Slate '[E]' rounded-square badge for instant visual contrast
 enum class LangBarIconKind {
-    VietnameseSvLogo = 0,
+    VietnameseIndigoBadge = 0,
     EnglishSlateBadge = 1
 };
 
 inline LangBarIconKind ResolveLangBarIconKind(bool isVietnamese) {
-    return isVietnamese ? LangBarIconKind::VietnameseSvLogo : LangBarIconKind::EnglishSlateBadge;
+    return isVietnamese ? LangBarIconKind::VietnameseIndigoBadge : LangBarIconKind::EnglishSlateBadge;
 }
 
 // Windows MSIX (Microsoft Store) vs Classic Win32 installer shortcut & Installed Apps policy:
