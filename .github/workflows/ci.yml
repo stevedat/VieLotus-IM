@@ -309,9 +309,9 @@ jobs:
           IBUS_DEB="$(ls /tmp/deb-src/ibus-vielotus_${VERSION}-1_*.deb | head -n 1)"
           META_DEB="$(ls /tmp/deb-src/vielotus_${VERSION}-1_all.deb | head -n 1)"
           DSC="/tmp/deb-src/vielotus_${VERSION}-1.dsc"
-          autopkgtest \
+          autopkgtest --no-built-binaries \
             "$LIB_DEB" "$FCITX_DEB" "$IBUS_DEB" "$META_DEB" \
-            -B "$DSC" \
+            "$DSC" \
             -- null
 
   arch-build:
