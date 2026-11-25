@@ -301,4 +301,85 @@ inline bool ShouldRequireWin32UninstallEntryForTipCheck(bool isMsixPackage) {
     return !isMsixPackage;
 }
 
+// ITfInputProcessorProfileMgr::ActivateProfile scope flags are mutually exclusive on Windows
+// (TF_IPPMF_FORPROCESS = 0x10000000, TF_IPPMF_FORSESSION = 0x20000000); combining both in one
+// call returns E_INVALIDARG and leaves the desktop profile unchanged.
+inline constexpr uint32_t kTfIppmfForProcess                   = 0x10000000u;
+inline constexpr uint32_t kTfIppmfForSession                   = 0x20000000u;
+inline constexpr uint32_t kTfIppmfEnableProfile                = 0x00000002u;
+inline constexpr uint32_t kTfIppmfDontCareCurrentInputLanguage = 0x00000004u;
+
+inline constexpr uint32_t kActivateProfileProcessFlags =
+    kTfIppmfForProcess | kTfIppmfEnableProfile | kTfIppmfDontCareCurrentInputLanguage;
+inline constexpr uint32_t kActivateProfileSessionFlags =
+    kTfIppmfForSession | kTfIppmfEnableProfile | kTfIppmfDontCareCurrentInputLanguage;
+
+inline bool AreActivateProfileFlagsValid(uint32_t flags) {
+    return !((flags & kTfIppmfForProcess) != 0u && (flags & kTfIppmfForSession) != 0u);
+}
+
+// Cross-process Telex <-> VNI profile synchronization policy using a monotonic InputMethodRevision
+// counter instead of a single-consumer flag (which previously let the first focused process consume
+// the override and allowed a second already-open process with a stale TSF profile to revert Registry).
+enum class ProfileSyncAction {
+    NoChange = 0,
+    AdoptActiveProfileLocally = 1,
+    PushRegistryToActiveProfile = 2
+};
+
+inline bool HasUnseenInputMethodRevision(
+    bool hasInitializedImRevision,
+    uint32_t lastSeenImRevision,
+    uint32_t currentRegistryImRevision
+) {
+    return hasInitializedImRevision &&
+           currentRegistryImRevision != 0u &&
+           currentRegistryImRevision != lastSeenImRevision;
+}
+
+inline ProfileSyncAction PlanProfileSync(
+    bool hasInitializedImRevision,
+    uint32_t lastSeenImRevision,
+    uint32_t currentRegistryImRevision,
+    bool forcePushToProfile,
+    bool selfTipActive,
+    bool hasKnownActiveProfileVni,
+    bool activeProfileIsVni,
+    bool registryIsVni,
+    bool inActivateEx,
+    bool activeProfileIsNullOrMissing
+) {
+    if (forcePushToProfile ||
+        HasUnseenInputMethodRevision(hasInitializedImRevision, lastSeenImRevision, currentRegistryImRevision)) {
+        if (selfTipActive || inActivateEx) {
+            return ProfileSyncAction::PushRegistryToActiveProfile;
+        }
+        return ProfileSyncAction::NoChange;
+    }
+
+    if (selfTipActive) {
+        if (hasKnownActiveProfileVni) {
+            return ProfileSyncAction::AdoptActiveProfileLocally;
+        }
+        return ProfileSyncAction::NoChange;
+    }
+
+    if (inActivateEx && activeProfileIsNullOrMissing) {
+        return ProfileSyncAction::PushRegistryToActiveProfile;
+    }
+
+    (void)activeProfileIsVni;
+    (void)registryIsVni;
+    return ProfileSyncAction::NoChange;
+}
+
+inline bool ShouldPersistOnProfileActivated(
+    bool inProfileSync,
+    bool hasPersistedVni,
+    bool persistedVni,
+    bool activatedProfileIsVni
+) {
+    return !inProfileSync && (!hasPersistedVni || persistedVni != activatedProfileIsVni);
+}
+
 } // namespace vielotus_tsf_guard

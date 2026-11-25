@@ -85,6 +85,8 @@ private:
     uint32_t m_lastPrefsRevision{0};
     uint32_t m_lastSettingsRevision{0};
     bool m_hasInitializedSettingsRevision{false};
+    uint32_t m_lastInputMethodRevision{0};
+    bool m_hasInitializedImRevision{false};
     LONG m_lastEditShifted{0};
     HRESULT m_lastEditSetTextHr{S_OK};
     HWND m_lastWin32EditHwnd{nullptr};
@@ -102,7 +104,7 @@ private:
     bool TryRehydrateWin32EditBeforeFeed(uint32_t codePoint);
     void ApplyVniMode(bool isVni, bool persistToRegistry);
     void ReloadUserPreferences();
-    void SyncActiveLanguageProfile();
+    void SyncActiveLanguageProfile(bool forcePushToProfile = false);
     void ResetComposingSession();
     void ClearWordStateSession();
     void SyncSurroundingContextSession(const std::wstring &precedingText);

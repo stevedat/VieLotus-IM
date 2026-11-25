@@ -18,6 +18,7 @@ const WCHAR c_szPrefsStartWithWindowsVal[] = L"StartWithWindows";
 const WCHAR c_szPrefsDefaultMigrationVal[] = L"DefaultPrefsMigrationVer";
 const WCHAR c_szPrefsUpdatedBySettingsVal[] = L"PrefsUpdatedBySettings";
 const WCHAR c_szPrefsSettingsRevisionVal[] = L"SettingsRevision";
+const WCHAR c_szPrefsInputMethodRevisionVal[] = L"InputMethodRevision";
 
 std::atomic<uint32_t> g_localPrefsRevision{1};
 
@@ -114,6 +115,17 @@ uint32_t LoadSettingsRevision() {
     return ok ? static_cast<uint32_t>(dwVal) : 0u;
 }
 
+uint32_t LoadInputMethodRevision() {
+    HKEY hKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kVieLotusPrefsSubKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS || !hKey) {
+        return 0u;
+    }
+    DWORD dwVal = 0;
+    const bool ok = ReadRegDword(hKey, c_szPrefsInputMethodRevisionVal, dwVal);
+    RegCloseKey(hKey);
+    return ok ? static_cast<uint32_t>(dwVal) : 0u;
+}
+
 bool LoadPersistedVniPreference(bool &outIsVni) {
     EnsureDefaultPrefsInitializedOnce();
     HKEY hKey = nullptr;
@@ -137,13 +149,18 @@ void SavePersistedVniPreference(bool isVni) {
             0,
             nullptr,
             REG_OPTION_NON_VOLATILE,
-            KEY_WRITE,
+            KEY_READ | KEY_WRITE,
             nullptr,
             &hKey,
             nullptr
         ) == ERROR_SUCCESS && hKey) {
         WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 12u);
         WriteRegDword(hKey, c_szPrefsInputMethodVal, isVni ? 1u : 0u);
+        DWORD curImRev = 0;
+        ReadRegDword(hKey, c_szPrefsInputMethodRevisionVal, curImRev);
+        DWORD nextImRev = (curImRev == 0xFFFFFFFFu) ? 1u : (curImRev + 1u);
+        WriteRegDword(hKey, c_szPrefsInputMethodRevisionVal, nextImRev);
+        WriteRegDword(hKey, c_szPrefsUpdatedBySettingsVal, 0u);
         RegCloseKey(hKey);
     }
 
@@ -198,6 +215,10 @@ bool ConsumeSettingsVniOverride(bool &outIsVni) {
     bool hasOverride = ReadRegDword(hKey, c_szPrefsUpdatedBySettingsVal, updated) && (updated != 0);
     if (hasOverride) {
         WriteRegDword(hKey, c_szPrefsUpdatedBySettingsVal, 0u);
+        DWORD curImRev = 0;
+        ReadRegDword(hKey, c_szPrefsInputMethodRevisionVal, curImRev);
+        DWORD nextImRev = (curImRev == 0xFFFFFFFFu) ? 1u : (curImRev + 1u);
+        WriteRegDword(hKey, c_szPrefsInputMethodRevisionVal, nextImRev);
         DWORD dwVal = 0;
         if (ReadRegDword(hKey, c_szPrefsInputMethodVal, dwVal)) {
             outIsVni = (dwVal == 1);
@@ -286,9 +307,6 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs, bool fromSettingsApp) 
             ReadRegDword(hKey, c_szPrefsSettingsRevisionVal, curRev);
             DWORD nextRev = (curRev == 0xFFFFFFFFu) ? 1u : (curRev + 1u);
             WriteRegDword(hKey, c_szPrefsSettingsRevisionVal, nextRev);
-        }
-        if (fromSettingsApp || inputMethodChanged) {
-            WriteRegDword(hKey, c_szPrefsUpdatedBySettingsVal, 1u);
         }
         RegCloseKey(hKey);
     }

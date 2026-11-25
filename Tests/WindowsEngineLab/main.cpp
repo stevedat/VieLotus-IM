@@ -1199,7 +1199,7 @@ int main(int argc, char **argv) {
         }
     };
 
-    int tsfTotal = 33, tsfPass = 0;
+    int tsfTotal = 34, tsfPass = 0;
     auto checkTsf = [&](int id, bool cond, const char *desc, const std::string &actual) {
         if (cond) {
             tsfPass++;
@@ -1819,6 +1819,60 @@ int main(int argc, char **argv) {
         ok = ok && !ShouldRequireWin32UninstallEntryForTipCheck(true);
         ok = ok && ShouldRequireWin32UninstallEntryForTipCheck(false);
         checkTsf(33, ok, "MSIX vs Win32 Start Menu & Installed Apps dedup policy", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 34: Cross-process Telex <-> VNI profile switch & ActivateProfile flag separation policy
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        // 1. ActivateProfile scope flags: FORPROCESS and FORSESSION must never be OR'd in one call
+        ok = ok && AreActivateProfileFlagsValid(kActivateProfileProcessFlags);
+        ok = ok && AreActivateProfileFlagsValid(kActivateProfileSessionFlags);
+        ok = ok && !AreActivateProfileFlagsValid(
+            kTfIppmfForProcess | kTfIppmfForSession | kTfIppmfEnableProfile | kTfIppmfDontCareCurrentInputLanguage
+        );
+
+        // 2. Monotonic InputMethodRevision detection
+        ok = ok && !HasUnseenInputMethodRevision(false, 0u, 1u);
+        ok = ok && !HasUnseenInputMethodRevision(true, 0u, 0u);
+        ok = ok && !HasUnseenInputMethodRevision(true, 5u, 5u);
+        ok = ok && HasUnseenInputMethodRevision(true, 0u, 1u);
+        ok = ok && HasUnseenInputMethodRevision(true, 5u, 6u);
+
+        // 3. Explicit LangBar menu selection (forcePushToProfile=true) pushes to Windows profile
+        ok = ok && (PlanProfileSync(true, 5u, 5u, true, true, true, true, false, false, false) ==
+                    ProfileSyncAction::PushRegistryToActiveProfile);
+
+        // 4. Already-open process (e.g. Chrome) with stale VNI profile sees unseen revision (5 -> 6, Telex)
+        //    and pushes Registry Telex to its active TSF profile instead of reverting Registry back to VNI
+        ok = ok && (PlanProfileSync(true, 5u, 6u, false, true, true, true, false, false, false) ==
+                    ProfileSyncAction::PushRegistryToActiveProfile);
+
+        // 5. Same revision (no external switch): adopt active Windows profile locally without mutating Registry
+        ok = ok && (PlanProfileSync(true, 6u, 6u, false, true, true, true, false, false, false) ==
+                    ProfileSyncAction::AdoptActiveProfileLocally);
+
+        // 6. Fresh ActivateEx with Sen Viet active (e.g. Win+Space -> VNI): adopt locally, do not fight Win+Space
+        ok = ok && (PlanProfileSync(false, 0u, 6u, false, true, true, true, false, true, false) ==
+                    ProfileSyncAction::AdoptActiveProfileLocally);
+
+        // 7. Fresh ActivateEx with GUID_NULL active profile: initialize from Registry preference
+        ok = ok && (PlanProfileSync(false, 0u, 6u, false, false, false, false, true, true, true) ==
+                    ProfileSyncAction::PushRegistryToActiveProfile);
+
+        // 8. Another TIP active (e.g. ENG US) while not in ActivateEx: never steal focus even on unseen rev
+        ok = ok && (PlanProfileSync(true, 5u, 6u, false, false, false, false, true, false, false) ==
+                    ProfileSyncAction::NoChange);
+        ok = ok && (PlanProfileSync(true, 5u, 5u, true, false, false, false, true, false, false) ==
+                    ProfileSyncAction::NoChange);
+
+        // 9. OnActivated persistence guard: avoid redundant writes / revision ping-pong on FORSESSION echoes
+        ok = ok && !ShouldPersistOnProfileActivated(true, true, false, true);
+        ok = ok && !ShouldPersistOnProfileActivated(false, true, true, true);
+        ok = ok && ShouldPersistOnProfileActivated(false, true, false, true);
+        ok = ok && ShouldPersistOnProfileActivated(false, false, false, true);
+
+        checkTsf(34, ok, "Cross-process Telex/VNI profile sync & ActivateProfile flags", ok ? "OK" : "MISMATCH");
     }
 
     // =========================================================================

@@ -48,6 +48,7 @@ bool LoadPerAppBypassPreference(const wchar_t *exeName, bool &outBypass);
 void SavePerAppBypassPreference(const wchar_t *exeName, bool bypass);
 uint32_t GetLocalPrefsRevision();
 uint32_t LoadSettingsRevision();
+uint32_t LoadInputMethodRevision();
 
 std::wstring GetSettingsWakePipeName();
 bool TryWakeSettingsViaNamedPipe(DWORD waitMs = 50);
