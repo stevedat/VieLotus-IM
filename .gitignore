@@ -59,3 +59,6 @@ key.properties
 # Diagnostic & Temp Files
 *.log
 *.tmp
+
+__pycache__/
+*.pyc
