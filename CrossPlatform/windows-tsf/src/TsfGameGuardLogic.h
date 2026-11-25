@@ -531,4 +531,11 @@ inline SettingsImSyncResult ResolveSettingsInputMethodSync(const SettingsImSyncI
     return out;
 }
 
+inline bool ShouldAutoActivateOnSettingsCreate(
+    bool syncRecommendedAutoActivate,
+    bool startWithWindowsEnabled
+) {
+    return syncRecommendedAutoActivate && startWithWindowsEnabled;
+}
+
 } // namespace vielotus_tsf_guard

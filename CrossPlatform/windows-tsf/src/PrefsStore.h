@@ -19,7 +19,7 @@ struct VieLotusWindowsPrefs {
     bool quickTelex{false};
     bool relaxedCoda{false};
     bool autoBypassRemoteApps{false};
-    bool startWithWindows{false};
+    bool startWithWindows{true};
 };
 
 inline constexpr UINT kWmVieLotusActivateProfiles = WM_USER + 100;

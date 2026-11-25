@@ -1,6 +1,9 @@
 import VieLotusCore
 import Foundation
 import Combine
+#if os(macOS)
+import ServiceManagement
+#endif
 
 public enum EngineBackend: String, CaseIterable, Sendable {
     case pureSwift = "pureSwift" // LotusEngine (Pure Swift 6)
@@ -30,6 +33,7 @@ final class Preferences: ObservableObject {
         static let enforceABCBaseLayout = "VieLotusIM.enforceABCBaseLayout"
         static let macroEnabled = "VieLotusIM.macroEnabledV2"
         static let grammarProfile = "VieLotusIM.grammarProfile"
+        static let launchAtLogin = "VieLotusIM.launchAtLogin"
     }
     
     private func flushDefaults() {
@@ -209,6 +213,38 @@ final class Preferences: ObservableObject {
             flushDefaults()
         }
     }
+
+    @Published var launchAtLogin: Bool {
+        didSet {
+            guard !isReloading else { return }
+            defaults.set(launchAtLogin, forKey: Key.launchAtLogin)
+            CFPreferencesSetAppValue(
+                Key.launchAtLogin as CFString,
+                (launchAtLogin as CFBoolean),
+                kCFPreferencesCurrentApplication
+            )
+            flushDefaults()
+            applyLaunchAtLoginRegistration(enabled: launchAtLogin)
+        }
+    }
+
+    public func applyLaunchAtLoginRegistration(enabled: Bool) {
+        #if os(macOS)
+        guard Bundle.main.bundleURL.pathExtension.lowercased() == "app" else { return }
+        if #available(macOS 13.0, *) {
+            let service = SMAppService.mainApp
+            if enabled {
+                if service.status != .enabled {
+                    try? service.register()
+                }
+            } else {
+                if service.status == .enabled {
+                    try? service.unregister()
+                }
+            }
+        }
+        #endif
+    }
     
     @Published var engineBackend: EngineBackend {
         didSet {
@@ -258,6 +294,9 @@ final class Preferences: ObservableObject {
             ?? (defaults.object(forKey: Key.genZMode) as? Bool)
             ?? false
         self.developerMode = defaults.object(forKey: Key.developerMode) as? Bool ?? false
+        self.launchAtLogin = (CFPreferencesCopyAppValue(Key.launchAtLogin as CFString, kCFPreferencesCurrentApplication) as? Bool)
+            ?? (defaults.object(forKey: Key.launchAtLogin) as? Bool)
+            ?? true
         
         let rawGrammarProfile: String
         if let cfStr = CFPreferencesCopyAppValue(Key.grammarProfile as CFString, kCFPreferencesCurrentApplication) as? String {
@@ -352,6 +391,9 @@ final class Preferences: ObservableObject {
             ?? (defaults.object(forKey: Key.genZMode) as? Bool)
             ?? false
         self.developerMode = defaults.object(forKey: Key.developerMode) as? Bool ?? false
+        self.launchAtLogin = (CFPreferencesCopyAppValue(Key.launchAtLogin as CFString, kCFPreferencesCurrentApplication) as? Bool)
+            ?? (defaults.object(forKey: Key.launchAtLogin) as? Bool)
+            ?? true
 
         let rawBackend = defaults.string(forKey: Key.engineBackend) ?? EngineBackend.pureSwift.rawValue
         self.engineBackend = EngineBackend(rawValue: rawBackend) ?? .pureSwift

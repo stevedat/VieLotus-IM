@@ -262,17 +262,11 @@ enum class HitRegion : int {
     TileDevMode,
     ChipQuickTelex,
     ChipRelaxedCoda,
-    BtnWinTypingSettings,
+    TileStartWithWindows,
     BtnClearTestEdit,
-    BtnNidoOfficeExplore,
-    BtnYouPersonaExplore,
     RowFeedback,
     RowZalo,
-    RowLinkedIn,
     RowGitHub,
-    FooterNidoOffice,
-    FooterYouPersona,
-    FooterZalo,
     FooterGitHub,
     FooterFeedback
 };
@@ -421,6 +415,96 @@ static void ActivateSettingsProcessProfile(bool isVni) {
         pProfileMgr->Release();
     }
     pProfiles->Release();
+}
+
+static void DisableStartWithWindowsTsfAutostart() {
+    SyncStartWithWindowsRegistry(false);
+
+    ITfInputProcessorProfiles *pProfiles = nullptr;
+    if (SUCCEEDED(CoCreateInstance(
+            CLSID_TF_InputProcessorProfiles,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_ITfInputProcessorProfiles,
+            reinterpret_cast<void **>(&pProfiles)
+        )) && pProfiles) {
+        // Keep both profiles enabled for manual Win+Spacebar switching,
+        // while disabling automatic sign-in default activation.
+        pProfiles->EnableLanguageProfileByDefault(kClsidVieLotusTip, kViLangId, kGuidVieLotusProfileTelex, FALSE);
+        pProfiles->EnableLanguageProfileByDefault(kClsidVieLotusTip, kViLangId, kGuidVieLotusProfileVni, FALSE);
+        pProfiles->Release();
+    }
+
+    HKEY hUserProfile = nullptr;
+    if (RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            L"Control Panel\\International\\User Profile",
+            0,
+            KEY_READ | KEY_SET_VALUE,
+            &hUserProfile
+        ) == ERROR_SUCCESS && hUserProfile) {
+        RegDeleteValueW(hUserProfile, L"InputMethodOverride");
+
+        DWORD dwType = 0;
+        DWORD cbData = 0;
+        if (RegQueryValueExW(hUserProfile, L"Languages", nullptr, &dwType, nullptr, &cbData) == ERROR_SUCCESS &&
+            dwType == REG_MULTI_SZ && cbData > sizeof(WCHAR) * 2) {
+            std::vector<WCHAR> buf(cbData / sizeof(WCHAR) + 2, L'\0');
+            if (RegQueryValueExW(
+                    hUserProfile,
+                    L"Languages",
+                    nullptr,
+                    &dwType,
+                    reinterpret_cast<LPBYTE>(buf.data()),
+                    &cbData
+                ) == ERROR_SUCCESS) {
+                std::vector<std::wstring> otherLangs;
+                std::vector<std::wstring> viLangs;
+                const WCHAR *p = buf.data();
+                while (*p) {
+                    std::wstring lang(p);
+                    if (_wcsicmp(lang.c_str(), L"vi-VN") == 0 || _wcsicmp(lang.c_str(), L"vi") == 0) {
+                        viLangs.push_back(lang);
+                    } else {
+                        otherLangs.push_back(lang);
+                    }
+                    p += lang.size() + 1;
+                }
+                if (!otherLangs.empty() && !viLangs.empty()) {
+                    std::vector<WCHAR> multiSz;
+                    for (const auto &s : otherLangs) {
+                        multiSz.insert(multiSz.end(), s.begin(), s.end());
+                        multiSz.push_back(L'\0');
+                    }
+                    for (const auto &s : viLangs) {
+                        multiSz.insert(multiSz.end(), s.begin(), s.end());
+                        multiSz.push_back(L'\0');
+                    }
+                    multiSz.push_back(L'\0');
+                    RegSetValueExW(
+                        hUserProfile,
+                        L"Languages",
+                        0,
+                        REG_MULTI_SZ,
+                        reinterpret_cast<const BYTE *>(multiSz.data()),
+                        static_cast<DWORD>(multiSz.size() * sizeof(WCHAR))
+                    );
+                }
+            }
+        }
+        RegCloseKey(hUserProfile);
+    }
+
+    DWORD_PTR dwRes = 0;
+    SendMessageTimeoutW(
+        HWND_BROADCAST,
+        WM_SETTINGCHANGE,
+        0,
+        reinterpret_cast<LPARAM>(L"intl"),
+        SMTO_ABORTIFHUNG | SMTO_NOTIMEOUTIFNOTHUNG,
+        150,
+        &dwRes
+    );
 }
 
 static void StartSettingsProfileNotifySink(BentoSettingsState *st, HWND hwnd) {
@@ -737,10 +821,8 @@ static HitRegion HitTestBentoUI(const BentoSettingsState *st, float xDip, float 
     if (PtInDipRect(xDip, yDip, 456.0f, 11.0f, 102.0f, 32.0f)) return HitRegion::TabSettings;
     if (PtInDipRect(xDip, yDip, 558.0f, 11.0f, 102.0f, 32.0f)) return HitRegion::TabAbout;
 
-    if (PtInDipRect(xDip, yDip, 336.0f, 388.0f, 118.0f, 32.0f)) return HitRegion::FooterFeedback;
-    if (PtInDipRect(xDip, yDip, 462.0f, 388.0f, 68.0f, 32.0f)) return HitRegion::FooterNidoOffice;
-    if (PtInDipRect(xDip, yDip, 538.0f, 388.0f, 88.0f, 32.0f)) return HitRegion::FooterYouPersona;
-    if (PtInDipRect(xDip, yDip, 632.0f, 388.0f, 36.0f, 32.0f)) return HitRegion::FooterGitHub;
+    if (PtInDipRect(xDip, yDip, 476.0f, 388.0f, 122.0f, 32.0f)) return HitRegion::FooterFeedback;
+    if (PtInDipRect(xDip, yDip, 608.0f, 388.0f, 54.0f, 32.0f)) return HitRegion::FooterGitHub;
 
     if (st->selectedTab == 0) {
         if (!st->conflictImeSummary.empty() && PtInDipRect(xDip, yDip, 340.0f, 59.0f, 320.0f, 20.0f)) {
@@ -759,16 +841,13 @@ static HitRegion HitTestBentoUI(const BentoSettingsState *st, float xDip, float 
         if (PtInDipRect(xDip, yDip, 20.0f, 256.0f, 157.0f, 66.0f)) return HitRegion::ChipQuickTelex;
         if (PtInDipRect(xDip, yDip, 177.0f, 256.0f, 157.0f, 66.0f)) return HitRegion::ChipRelaxedCoda;
 
-        if (PtInDipRect(xDip, yDip, 346.0f, 256.0f, 314.0f, 66.0f)) return HitRegion::BtnWinTypingSettings;
+        if (PtInDipRect(xDip, yDip, 346.0f, 256.0f, 314.0f, 66.0f)) return HitRegion::TileStartWithWindows;
 
         if (PtInDipRect(xDip, yDip, 594.0f, 338.0f, 58.0f, 28.0f)) return HitRegion::BtnClearTestEdit;
     } else {
-        if (PtInDipRect(xDip, yDip, 20.0f, 168.0f, 314.0f, 104.0f)) return HitRegion::BtnNidoOfficeExplore;
-        if (PtInDipRect(xDip, yDip, 346.0f, 168.0f, 314.0f, 104.0f)) return HitRegion::BtnYouPersonaExplore;
-        if (PtInDipRect(xDip, yDip, 32.0f, 298.0f, 146.0f, 36.0f)) return HitRegion::RowFeedback;
-        if (PtInDipRect(xDip, yDip, 188.0f, 298.0f, 146.0f, 36.0f)) return HitRegion::RowZalo;
-        if (PtInDipRect(xDip, yDip, 344.0f, 298.0f, 146.0f, 36.0f)) return HitRegion::RowLinkedIn;
-        if (PtInDipRect(xDip, yDip, 500.0f, 298.0f, 148.0f, 36.0f)) return HitRegion::RowGitHub;
+        if (PtInDipRect(xDip, yDip, 32.0f, 298.0f, 197.0f, 36.0f)) return HitRegion::RowFeedback;
+        if (PtInDipRect(xDip, yDip, 241.0f, 298.0f, 197.0f, 36.0f)) return HitRegion::RowZalo;
+        if (PtInDipRect(xDip, yDip, 450.0f, 298.0f, 198.0f, 36.0f)) return HitRegion::RowGitHub;
     }
 
     return HitRegion::None;
@@ -883,13 +962,13 @@ static void DrawBentoFeatureTile(
     SolidBrush iconBrush(isActive ? accent : (isDark ? Color(255, 165, 165, 178) : Color(255, 120, 120, 128)));
     g.DrawString(iconGlyph, -1, &fPill, iconBox, &sfCenter, &iconBrush);
 
-    float rightControlsW = showToggleSwitch ? (actionPillText ? 126.0f : 56.0f) : 78.0f;
+    const float pillW = (actionPillText && wcslen(actionPillText) <= 4) ? 44.0f : 68.0f;
+    float rightControlsW = showToggleSwitch ? (actionPillText ? (pillW + 58.0f) : 56.0f) : (pillW + 10.0f);
     SolidBrush primaryBrush(isDark ? Color(255, 245, 245, 247) : Color(255, 28, 28, 30));
     RectF titleRect((x + 42.0f) * s, (y + 10.0f) * s, (w - 48.0f - rightControlsW) * s, 22.0f * s);
     g.DrawString(title, -1, &fTitle, titleRect, &sfLeft, &primaryBrush);
 
     if (actionPillText && actionPillText[0] != L'\0') {
-        float pillW = 68.0f;
         float pillX = showToggleSwitch ? (x + w - pillW - 56.0f) : (x + w - pillW - 12.0f);
         RectF pillRect(pillX * s, (y + 11.0f) * s, pillW * s, 21.0f * s);
         Color pillBg = isDark ? Color(255, 48, 48, 62) : Color(255, 238, 238, 244);
@@ -1222,16 +1301,19 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 drawConsonantChip(182.0f, L"Cu\u1ED1i (-g/-h/-k)", st->prefs.relaxedCoda, st->hoveredRegion == HitRegion::ChipRelaxedCoda);
             }
 
+            Color greenAcc = isDark ? Color(255, 74, 222, 128) : Color(255, 22, 163, 74);
             DrawBentoFeatureTile(
                 g, s, isDark, 346.0f, 256.0f, 314.0f, 66.0f,
-                true,
-                st->hoveredRegion == HitRegion::BtnWinTypingSettings,
-                blueCol,
+                st->prefs.startWithWindows,
+                st->hoveredRegion == HitRegion::TileStartWithWindows,
+                greenAcc,
                 L"SV",
-                L"Thanh ng\u00F4n ng\u1EEF Windows",
-                L"N\u00FAt V/E c\u1EA1nh SV \u2022 Ctrl+Space \u0111\u1ED5i VI/EN",
-                L"Ph\u00EDm t\u1EAFt \u2197",
-                false,
+                L"Kh\u1EDFi \u0111\u1ED9ng c\u00F9ng h\u1EC7 th\u1ED1ng",
+                st->prefs.startWithWindows
+                    ? L"T\u1EF1 \u0111\u1ED9ng b\u1EADt khi m\u1EDF m\u00E1y (Auto) \u2022 Thu\u1EA7n TSF"
+                    : L"\u0110ang t\u1EAFt \u2022 B\u1EA5m c\u00F4ng t\u1EAFc \u0111\u1EC3 b\u1EADt t\u1EF1 \u0111\u1ED9ng",
+                st->prefs.startWithWindows ? L"AUTO" : L"T\u1EAE" L"T",
+                true,
                 fTileTitle, fSub, fPill, sfLeft, sfCenter
             );
 
@@ -1268,7 +1350,8 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             g.DrawString(L"Xo\u00E1 th\u1EED", -1, &fPill, clearBtn, &sfCenter, &secondaryBrush);
         } else {
             SolidBrush indigoBrush(indigoCol);
-            SolidBrush tealBrush(tealCol);
+            Color greenCol = isDark ? Color(255, 74, 222, 128) : Color(255, 22, 163, 74);
+            SolidBrush greenBrush(greenCol);
             SolidBrush whiteTextBrush(Color(255, 255, 255, 255));
 
             DrawCard(g, RectF(20.0f * s, 68.0f * s, 640.0f * s, 88.0f * s), 10.0f * s, cardCol, cardBorderCol);
@@ -1287,47 +1370,37 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
             DrawCard(
                 g, RectF(20.0f * s, 168.0f * s, 314.0f * s, 104.0f * s), 10.0f * s,
-                st->hoveredRegion == HitRegion::BtnNidoOfficeExplore
-                    ? (isDark ? Color(255, 44, 46, 66) : Color(255, 246, 247, 255))
-                    : cardCol,
-                Color(120, indigoCol.GetR(), indigoCol.GetG(), indigoCol.GetB()), 1.1f * s
+                cardCol,
+                Color(120, greenCol.GetR(), greenCol.GetG(), greenCol.GetB()), 1.1f * s
             );
             g.DrawString(
-                L"NidoOffice",
-                -1, &fTileTitle, RectF(34.0f * s, 180.0f * s, 90.0f * s, 20.0f * s), &sfLeft, &primaryBrush
+                L"Quy\u1EC1n ri\u00EAng t\u01B0 & An to\u00E0n",
+                -1, &fTileTitle, RectF(34.0f * s, 180.0f * s, 180.0f * s, 20.0f * s), &sfLeft, &primaryBrush
             );
-            RectF nidoBadge(124.0f * s, 181.0f * s, 114.0f * s, 18.0f * s);
-            FillRoundRect(g, nidoBadge, 9.0f * s, Color(isDark ? 55 : 36, indigoCol.GetR(), indigoCol.GetG(), indigoCol.GetB()));
-            g.DrawString(L"EDUCENTER.APP", -1, &fPill, nidoBadge, &sfCenter, &indigoBrush);
+            RectF privacyBadge(220.0f * s, 181.0f * s, 100.0f * s, 18.0f * s);
+            FillRoundRect(g, privacyBadge, 9.0f * s, Color(isDark ? 55 : 36, greenCol.GetR(), greenCol.GetG(), greenCol.GetB()));
+            g.DrawString(L"100% OFFLINE", -1, &fPill, privacyBadge, &sfCenter, &greenBrush);
             g.DrawString(
-                L"So\u1EA1n th\u1EA3o T\u00E0i li\u1EC7u, Trang tr\u00ECnh b\u00E0y & B\u1EA3ng t\u00EDnh t\u00EDch h\u1EE3p AI",
-                -1, &fSub, RectF(34.0f * s, 210.0f * s, 286.0f * s, 46.0f * s), &sfWrap, &secondaryBrush
+                L"Thu\u1EA7n chu\u1EA9n Windows TSF, kh\u00F4ng ch\u1EA1y ti\u1EBFn tr\u00ECnh n\u1EC1n, kh\u00F4ng thu th\u1EADp ph\u00EDm b\u1EA5m hay g\u1EEDi d\u1EEF li\u1EC7u ra m\u1EA1ng.",
+                -1, &fSub, RectF(34.0f * s, 209.0f * s, 286.0f * s, 54.0f * s), &sfWrap, &secondaryBrush
             );
-            RectF nidoCta(260.0f * s, 179.0f * s, 60.0f * s, 22.0f * s);
-            FillRoundRect(g, nidoCta, 11.0f * s, Color(255, 88, 86, 214));
-            g.DrawString(L"M\u1EDF \u2197", -1, &fPill, nidoCta, &sfCenter, &whiteTextBrush);
 
             DrawCard(
                 g, RectF(346.0f * s, 168.0f * s, 314.0f * s, 104.0f * s), 10.0f * s,
-                st->hoveredRegion == HitRegion::BtnYouPersonaExplore
-                    ? (isDark ? Color(255, 36, 52, 54) : Color(255, 243, 252, 251))
-                    : cardCol,
-                Color(120, tealCol.GetR(), tealCol.GetG(), tealCol.GetB()), 1.1f * s
+                cardCol,
+                Color(120, blueCol.GetR(), blueCol.GetG(), blueCol.GetB()), 1.1f * s
             );
             g.DrawString(
-                L"YouPersona.com",
-                -1, &fTileTitle, RectF(360.0f * s, 180.0f * s, 122.0f * s, 20.0f * s), &sfLeft, &primaryBrush
+                L"M\u00E3 ngu\u1ED3n m\u1EDF",
+                -1, &fTileTitle, RectF(360.0f * s, 180.0f * s, 178.0f * s, 20.0f * s), &sfLeft, &primaryBrush
             );
-            RectF ypBadge(484.0f * s, 181.0f * s, 86.0f * s, 18.0f * s);
-            FillRoundRect(g, ypBadge, 9.0f * s, Color(isDark ? 55 : 36, tealCol.GetR(), tealCol.GetG(), tealCol.GetB()));
-            g.DrawString(L"THU CHI AI", -1, &fPill, ypBadge, &sfCenter, &tealBrush);
+            RectF ossBadge(548.0f * s, 181.0f * s, 98.0f * s, 18.0f * s);
+            FillRoundRect(g, ossBadge, 9.0f * s, Color(isDark ? 55 : 36, blueCol.GetR(), blueCol.GetG(), blueCol.GetB()));
+            g.DrawString(L"MIT LICENSE", -1, &fPill, ossBadge, &sfCenter, &blueBrush);
             g.DrawString(
-                L"Qu\u1EA3n l\u00FD T\u00E0i ch\u00EDnh c\u00E1 nh\u00E2n & Ng\u00E2n s\u00E1ch 6 chi\u1EBFc l\u1ECD b\u1EB1ng AI",
-                -1, &fSub, RectF(360.0f * s, 210.0f * s, 286.0f * s, 46.0f * s), &sfWrap, &secondaryBrush
+                L"Ph\u00E1t tri\u1EC3n minh b\u1EA1ch b\u1EB1ng C++20, m\u1ECDi ng\u01B0\u1EDDi c\u00F3 th\u1EC3 ki\u1EC3m tra m\u00E3 ngu\u1ED3n v\u00E0 \u0111\u00F3ng g\u00F3p tr\u00EAn GitHub.",
+                -1, &fSub, RectF(360.0f * s, 209.0f * s, 286.0f * s, 54.0f * s), &sfWrap, &secondaryBrush
             );
-            RectF ypCta(586.0f * s, 179.0f * s, 60.0f * s, 22.0f * s);
-            FillRoundRect(g, ypCta, 11.0f * s, Color(255, 13, 148, 136));
-            g.DrawString(L"M\u1EDF \u2197", -1, &fPill, ypCta, &sfCenter, &whiteTextBrush);
 
             DrawCard(g, RectF(20.0f * s, 284.0f * s, 640.0f * s, 64.0f * s), 10.0f * s, cardCol, cardBorderCol);
 
@@ -1348,24 +1421,22 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 }
             };
 
-            drawLinkBtn(32.0f, 146.0f, L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i", st->hoveredRegion == HitRegion::RowFeedback, true);
-            drawLinkBtn(188.0f, 146.0f, L"C\u1ED9ng \u0111\u1ED3ng Zalo \u2197", st->hoveredRegion == HitRegion::RowZalo, false);
-            drawLinkBtn(344.0f, 146.0f, L"Tr\u1EA7n Ph\u00E1t \u0110\u1EA1t \u2197", st->hoveredRegion == HitRegion::RowLinkedIn, false);
-            drawLinkBtn(500.0f, 148.0f, L"M\u00E3 ngu\u1ED3n GitHub \u2197", st->hoveredRegion == HitRegion::RowGitHub, false);
+            drawLinkBtn(32.0f, 197.0f, L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i", st->hoveredRegion == HitRegion::RowFeedback, true);
+            drawLinkBtn(241.0f, 197.0f, L"C\u1ED9ng \u0111\u1ED3ng Zalo \u2197", st->hoveredRegion == HitRegion::RowZalo, false);
+            drawLinkBtn(450.0f, 198.0f, L"M\u00E3 ngu\u1ED3n GitHub \u2197", st->hoveredRegion == HitRegion::RowGitHub, false);
         }
 
         g.FillRectangle(&barBrush, 0.0f, 384.0f * s, static_cast<float>(width), 40.0f * s);
         g.DrawLine(&divPen, 0.0f, 384.0f * s, static_cast<float>(width), 384.0f * s);
 
         SolidBrush greenDotBrush(Color(255, 34, 197, 94));
-        SolidBrush indigoFooterBrush(indigoCol);
         g.FillEllipse(&greenDotBrush, RectF(20.0f * s, 401.0f * s, 6.5f * s, 6.5f * s));
         g.DrawString(
             L"Song ng\u1EEF Anh\u2013Vi\u1EC7t \u2022 Ch\u00EDnh t\u1EA3 chu\u1EA9n m\u1EDBi t\u1EF1 \u0111\u1ED9ng",
-            -1, &fFooter, RectF(32.0f * s, 384.0f * s, 296.0f * s, 40.0f * s), &sfLeft, &secondaryBrush
+            -1, &fFooter, RectF(32.0f * s, 384.0f * s, 436.0f * s, 40.0f * s), &sfLeft, &secondaryBrush
         );
 
-        RectF fbPill(336.0f * s, 391.0f * s, 118.0f * s, 26.0f * s);
+        RectF fbPill(478.0f * s, 391.0f * s, 118.0f * s, 26.0f * s);
         FillRoundRect(
             g, fbPill, 13.0f * s,
             st->hoveredRegion == HitRegion::FooterFeedback
@@ -1375,11 +1446,8 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         DrawRoundRect(g, fbPill, 13.0f * s, Color(140, blueCol.GetR(), blueCol.GetG(), blueCol.GetB()), 1.0f * s);
         g.DrawString(L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i", -1, &fFooterBold, fbPill, &sfCenter, &blueBrush);
 
-        g.DrawString(L"NidoOffice", -1, &fFooterBold, RectF(462.0f * s, 384.0f * s, 68.0f * s, 40.0f * s), &sfCenter, &indigoFooterBrush);
-        g.DrawString(L"\u2022", -1, &fFooter, RectF(530.0f * s, 384.0f * s, 8.0f * s, 40.0f * s), &sfCenter, &secondaryBrush);
-        g.DrawString(L"YouPersona.com", -1, &fFooterBold, RectF(538.0f * s, 384.0f * s, 88.0f * s, 40.0f * s), &sfCenter, &blueBrush);
-        g.DrawString(L"\u2022", -1, &fFooter, RectF(626.0f * s, 384.0f * s, 6.0f * s, 40.0f * s), &sfCenter, &secondaryBrush);
-        g.DrawString(L"GitHub", -1, &fFooter, RectF(632.0f * s, 384.0f * s, 38.0f * s, 40.0f * s), &sfCenter, &secondaryBrush);
+        g.DrawString(L"\u2022", -1, &fFooter, RectF(598.0f * s, 384.0f * s, 12.0f * s, 40.0f * s), &sfCenter, &secondaryBrush);
+        g.DrawString(L"GitHub", -1, &fFooter, RectF(610.0f * s, 384.0f * s, 50.0f * s, 40.0f * s), &sfCenter, &secondaryBrush);
     }
 
     BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
@@ -2169,7 +2237,10 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
         UpdateTestEditCueBanner(st);
         RefreshConflictSummaryThrottled(st, true);
         StartSettingsProfileNotifySink(st, hwnd);
-        if (initSync.shouldAutoActivateOnCreate && st->onActivateProfiles) {
+        if (vielotus_tsf_guard::ShouldAutoActivateOnSettingsCreate(
+                initSync.shouldAutoActivateOnCreate,
+                st->prefs.startWithWindows
+            ) && st->onActivateProfiles) {
             st->onActivateProfiles(false);
             bool postActVni = st->prefs.isVni;
             st->hasLastObservedTsf = QueryActiveSenVietTsfProfile(postActVni);
@@ -2439,8 +2510,16 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
             SaveVieLotusPrefs(st->prefs, true);
             InvalidateRect(hwnd, nullptr, FALSE);
             break;
-        case HitRegion::BtnWinTypingSettings:
-            ShellExecuteW(hwnd, L"open", L"ms-settings:typing", nullptr, nullptr, SW_SHOWNORMAL);
+        case HitRegion::TileStartWithWindows:
+            st->prefs.startWithWindows = !st->prefs.startWithWindows;
+            SaveVieLotusPrefs(st->prefs, true);
+            if (st->prefs.startWithWindows) {
+                SyncStartWithWindowsRegistry(false);
+                if (st->onActivateProfiles) st->onActivateProfiles(true);
+            } else {
+                DisableStartWithWindowsTsfAutostart();
+            }
+            InvalidateRect(hwnd, nullptr, FALSE);
             break;
         case HitRegion::BtnClearTestEdit:
             if (st->hTestEdit) {
@@ -2448,20 +2527,8 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
                 SetFocus(st->hTestEdit);
             }
             break;
-        case HitRegion::BtnNidoOfficeExplore:
-        case HitRegion::FooterNidoOffice:
-            ShellExecuteW(hwnd, L"open", L"https://educenter.app", nullptr, nullptr, SW_SHOWNORMAL);
-            break;
-        case HitRegion::BtnYouPersonaExplore:
-        case HitRegion::FooterYouPersona:
-            ShellExecuteW(hwnd, L"open", L"https://youpersona.com", nullptr, nullptr, SW_SHOWNORMAL);
-            break;
         case HitRegion::RowZalo:
-        case HitRegion::FooterZalo:
             ShellExecuteW(hwnd, L"open", L"https://zalo.me/g/6wwyvywyvhsb0n6rwkze", nullptr, nullptr, SW_SHOWNORMAL);
-            break;
-        case HitRegion::RowLinkedIn:
-            ShellExecuteW(hwnd, L"open", L"https://www.linkedin.com/in/stevedat/?isSelfProfile=true", nullptr, nullptr, SW_SHOWNORMAL);
             break;
         case HitRegion::RowGitHub:
         case HitRegion::FooterGitHub:

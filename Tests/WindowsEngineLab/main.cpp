@@ -2084,6 +2084,12 @@ int main(int argc, char **argv) {
             ok = ok && !r.nextUiIsVni && r.uiChanged && r.shouldPersistToRegistry;
         }
 
+        // 11. StartWithWindows (Auto) gates initial auto-activation when Settings opens
+        ok = ok &&
+             ShouldAutoActivateOnSettingsCreate(true, true) &&
+             !ShouldAutoActivateOnSettingsCreate(true, false) &&
+             !ShouldAutoActivateOnSettingsCreate(false, true);
+
         checkTsf(37, ok, "Bidirectional TSF <-> Control Panel input method sync state machine", ok ? "OK" : "MISMATCH");
     }
 

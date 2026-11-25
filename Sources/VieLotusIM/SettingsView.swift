@@ -164,22 +164,6 @@ struct SettingsView: View {
 
                 Spacer(minLength: 12)
 
-                if let url = URL(string: "https://educenter.app") {
-                    Link("NidoOffice", destination: url)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.indigo)
-                }
-
-                Text("•").font(.system(size: 10)).foregroundColor(.secondary)
-
-                if let url = URL(string: "https://youpersona.com") {
-                    Link("YouPersona.com", destination: url)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.accentColor)
-                }
-
-                Text("•").font(.system(size: 10)).foregroundColor(.secondary)
-
                 Button {
                     showingFeedbackSheet = true
                 } label: {
@@ -198,7 +182,7 @@ struct SettingsView: View {
             .background(barSurfaceColor)
         }
         .background(windowCanvasColor)
-        .frame(width: 640, height: 420)
+        .frame(width: 640, height: 468)
         .sheet(isPresented: $showingMacroEditor) {
             MacroEditorView()
         }
@@ -221,6 +205,9 @@ struct SettingsView: View {
             if !prefs.enforceABCBaseLayout { prefs.enforceABCBaseLayout = true }
             macroCount = MacroEngine.shared.getMacroEntries().count
             tisStatus = InputSourceDoctor.inspect()
+            if prefs.launchAtLogin {
+                prefs.applyLaunchAtLoginRegistration(enabled: true)
+            }
             Task {
                 await updater.checkIfNeededOnSettingsOpen()
             }
@@ -330,8 +317,14 @@ struct SettingsView: View {
                 }
             }
 
-            // Hàng 3: Trạng thái Bộ gõ Hệ thống (Full-Width 1 dòng ngang, không bao giờ cắt chữ)
-            systemStatusFullWidthCard
+            // Hàng 3: Trạng thái Bộ gõ Hệ thống & Khởi động cùng hệ thống (2 cột cân đối)
+            HStack(spacing: 10) {
+                systemStatusCompactCard
+                launchAtLoginCard
+            }
+
+            // Hàng 4: Thanh Thử gõ nhanh
+            quickTestBar
 
             Spacer(minLength: 0)
         }
@@ -652,7 +645,7 @@ struct SettingsView: View {
         }
     }
 
-    private var systemStatusFullWidthCard: some View {
+    private var systemStatusCompactCard: some View {
         let borderColor: Color = {
             if tisStatus.hasAnyInputConflict {
                 return Color.orange.opacity(0.55)
@@ -669,58 +662,36 @@ struct SettingsView: View {
             }
         }()
 
-        return HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(tisStatusColor.opacity(0.16))
-                    .frame(width: 26, height: 26)
-                Image(systemName: tisStatusIcon)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundColor(tisStatusColor)
-            }
-
-            VStack(alignment: .leading, spacing: 1.5) {
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(tisStatusColor.opacity(0.16))
+                        .frame(width: 22, height: 22)
+                    Image(systemName: tisStatusIcon)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(tisStatusColor)
+                }
                 Text(tisStatus.summaryTitle)
-                    .font(.system(size: 11.5, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                Text(tisStatus.summarySubtitle)
-                    .font(.system(size: 10))
-                    .foregroundColor(tisStatus.hasAnyInputConflict ? .orange : .secondary)
-                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Button("Bàn phím ↗") {
+                    openSystemKeyboardSettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
             }
 
-            Spacer(minLength: 6)
-
-            HStack(spacing: 5) {
-                Text("✦ Thử gõ:")
-                    .font(.system(size: 10.5, weight: .bold))
-                    .foregroundColor(.indigo)
-                TextField("Gõ thử: thuongw / viet65...", text: $quickTestText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 11.5))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .frame(width: 156)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(windowCanvasColor)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(Color.indigo.opacity(isDark ? 0.45 : 0.28), lineWidth: 0.9)
-                    )
-            }
-
-            Button("Cài đặt Bàn phím ↗") {
-                openSystemKeyboardSettings()
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            Text(tisStatus.summarySubtitle)
+                .font(.system(size: 10.5))
+                .foregroundColor(tisStatus.hasAnyInputConflict ? .orange : .secondary)
+                .lineLimit(1)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 11)
         .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(cardSurfaceColor)
@@ -728,6 +699,87 @@ struct SettingsView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(borderColor, lineWidth: 1.0)
+        )
+    }
+
+    private var launchAtLoginCard: some View {
+        let isAuto = prefs.launchAtLogin
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isAuto ? Color.green.opacity(0.16) : Color.secondary.opacity(0.12))
+                        .frame(width: 22, height: 22)
+                    Image(systemName: "power.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(isAuto ? .green : .secondary)
+                }
+                Text("Khởi động cùng hệ thống")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text(isAuto ? "AUTO" : "TẮT")
+                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(isAuto ? Color.green.opacity(0.16) : Color.secondary.opacity(0.12))
+                    .foregroundColor(isAuto ? .green : .secondary)
+                    .clipShape(Capsule())
+                Toggle("", isOn: $prefs.launchAtLogin)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+            }
+
+            Text(isAuto ? "Tự động bật khi đăng nhập macOS" : "Đang tắt • Bấm để bật tự động")
+                .font(.system(size: 10.5))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(cardSurfaceColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(isAuto ? Color.green.opacity(isDark ? 0.55 : 0.40) : cardBorderColor, lineWidth: 1.0)
+        )
+    }
+
+    private var quickTestBar: some View {
+        let placeholder = prefs.inputMethod == .vni
+            ? "Gõ thử (VNI): tru7o7ng3 → trưởng • 12ha2 → 12hà • window user..."
+            : "Gõ thử (Telex): truowngr → trưởng • 12haf → 12hà • window user..."
+        return HStack(spacing: 8) {
+            Text("✦ Thử gõ:")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.indigo)
+            TextField(placeholder, text: $quickTestText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .frame(maxWidth: .infinity)
+            if !quickTestText.isEmpty {
+                Button("Xoá thử") {
+                    quickTestText = ""
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(cardSurfaceColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.indigo.opacity(isDark ? 0.45 : 0.28), lineWidth: 1.0)
         )
     }
 
@@ -788,25 +840,72 @@ struct SettingsView: View {
                     .strokeBorder(cardBorderColor, lineWidth: 0.9)
             )
 
-            // Hàng 2: 2 thẻ Hệ sinh thái AI đặt song song cân đối (NidoOffice | YouPersona.com)
+            // Hàng 2: 2 thẻ Thông tin kỹ thuật & Giấy phép (Cân đối, không quảng cáo)
             HStack(spacing: 12) {
-                // Thẻ Trái: NidoOffice
+                // Thẻ Trái: Quyền riêng tư & An toàn
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Color.green.opacity(0.14))
+                                .frame(width: 28, height: 28)
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 13.5, weight: .semibold))
+                                .foregroundColor(.green)
+                        }
+
+                        VStack(alignment: .leading, spacing: 1.5) {
+                            HStack(spacing: 5) {
+                                Text("Quyền riêng tư & An toàn")
+                                    .font(.system(size: 12.5, weight: .bold))
+                                Text("100% OFFLINE")
+                                    .font(.system(size: 8.5, weight: .bold))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1.5)
+                                    .background(Color.green.opacity(0.14))
+                                    .foregroundColor(.green)
+                                    .clipShape(Capsule())
+                            }
+                            Text("Không thu thập hay gửi dữ liệu phím gõ")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+
+                    Text("Xử lý toàn bộ phím gõ cục bộ trên thiết bị, không cần quyền Trợ năng và tự động bỏ qua ô mật khẩu.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(cardSurfaceColor)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.green.opacity(isDark ? 0.35 : 0.22), lineWidth: 0.9)
+                )
+
+                // Thẻ Phải: Giấy phép Mã nguồn mở MIT
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 7, style: .continuous)
                                 .fill(Color.indigo.opacity(0.14))
                                 .frame(width: 28, height: 28)
-                            Image(systemName: "doc.text.image.fill")
-                                .font(.system(size: 13.5, weight: .semibold))
+                            Image(systemName: "chevron.left.forwardslash.chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(.indigo)
                         }
 
                         VStack(alignment: .leading, spacing: 1.5) {
                             HStack(spacing: 5) {
-                                Text("NidoOffice")
-                                    .font(.system(size: 13, weight: .bold))
-                                Text("EDUCENTER.APP")
+                                Text("Mã nguồn mở")
+                                    .font(.system(size: 12.5, weight: .bold))
+                                Text("MIT LICENSE")
                                     .font(.system(size: 8.5, weight: .bold))
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 1.5)
@@ -814,28 +913,18 @@ struct SettingsView: View {
                                     .foregroundColor(.indigo)
                                     .clipShape(Capsule())
                             }
-                            Text("Bộ ứng dụng Văn phòng AI thế hệ mới")
+                            Text("Đa nền tảng macOS • Windows • Linux")
                                 .font(.system(size: 10.5))
                                 .foregroundColor(.secondary)
                         }
 
-                        Spacer(minLength: 4)
-
-                        if let url = URL(string: "https://educenter.app") {
-                            Link("Mở ↗", destination: url)
-                                .font(.system(size: 10.5, weight: .semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4.5)
-                                .background(Color.indigo)
-                                .foregroundColor(.white)
-                                .clipShape(Capsule())
-                        }
+                        Spacer(minLength: 0)
                     }
 
-                    Text("Soạn thảo Tài liệu, Thiết kế Trang trình bày & Bảng tính thông minh tích hợp AI.")
+                    Text("Sen Việt (VieLotusIM) phát hành miễn phí theo giấy phép MIT. Mã nguồn minh bạch, kiểm chứng công khai trên GitHub.")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(12)
@@ -844,67 +933,10 @@ struct SettingsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.indigo.opacity(isDark ? 0.38 : 0.22), lineWidth: 0.9)
-                )
-
-                // Thẻ Phải: YouPersona.com
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(Color.teal.opacity(0.14))
-                                .frame(width: 28, height: 28)
-                            Image(systemName: "chart.pie.fill")
-                                .font(.system(size: 13.5, weight: .semibold))
-                                .foregroundColor(.teal)
-                        }
-
-                        VStack(alignment: .leading, spacing: 1.5) {
-                            HStack(spacing: 5) {
-                                Text("YouPersona.com")
-                                    .font(.system(size: 13, weight: .bold))
-                                Text("THU CHI AI")
-                                    .font(.system(size: 8.5, weight: .bold))
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 1.5)
-                                    .background(Color.teal.opacity(0.14))
-                                    .foregroundColor(.teal)
-                                    .clipShape(Capsule())
-                            }
-                            Text("Trợ lý Tài chính cá nhân thông minh")
-                                .font(.system(size: 10.5))
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer(minLength: 4)
-
-                        if let url = URL(string: "https://youpersona.com") {
-                            Link("Mở ↗", destination: url)
-                                .font(.system(size: 10.5, weight: .semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4.5)
-                                .background(Color.teal)
-                                .foregroundColor(.white)
-                                .clipShape(Capsule())
-                        }
-                    }
-
-                    Text("Quét hoá đơn tự động, phân bổ Ngân sách 6 chiếc lọ & dự báo dòng tiền bằng AI.")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .background(cardSurfaceColor)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.teal.opacity(isDark ? 0.38 : 0.22), lineWidth: 0.9)
+                        .strokeBorder(Color.indigo.opacity(isDark ? 0.35 : 0.22), lineWidth: 0.9)
                 )
             }
-            .frame(height: 98)
+            .frame(height: 112)
 
             // Hàng 3: Thanh Hỗ trợ, Cộng đồng & Mã nguồn (Toàn chiều ngang)
             HStack(spacing: 12) {
@@ -929,14 +961,6 @@ struct SettingsView: View {
 
                 if let zaloURL = URL(string: "https://zalo.me/g/6wwyvywyvhsb0n6rwkze") {
                     Link("Cộng đồng Zalo ↗", destination: zaloURL)
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundColor(.primary)
-                }
-
-                Text("•").foregroundColor(.secondary)
-
-                if let authorURL = URL(string: "https://www.linkedin.com/in/stevedat/?isSelfProfile=true") {
-                    Link("Tác giả: Trần Phát Đạt ↗", destination: authorURL)
                         .font(.system(size: 11.5, weight: .medium))
                         .foregroundColor(.primary)
                 }

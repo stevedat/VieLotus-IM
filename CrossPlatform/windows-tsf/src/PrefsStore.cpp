@@ -86,7 +86,7 @@ void EnsureDefaultPrefsInitializedOnce() {
             WriteRegDword(hKey, c_szPrefsMacroEnabledVal, 1u);
         }
         if (!ReadRegDword(hKey, c_szPrefsStartWithWindowsVal, dummy)) {
-            WriteRegDword(hKey, c_szPrefsStartWithWindowsVal, 0u);
+            WriteRegDword(hKey, c_szPrefsStartWithWindowsVal, 1u);
         }
     }
     if (!ReadRegDword(hKey, c_szPrefsDefaultMigrationVal, migVer) || migVer < 12u) {
@@ -94,6 +94,12 @@ void EnsureDefaultPrefsInitializedOnce() {
         // Disable legacy System Tray autostart cleanly while preserving all user typing preferences.
         WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 12u);
         WriteRegDword(hKey, c_szPrefsStartWithWindowsVal, 0u);
+    }
+    if (!ReadRegDword(hKey, c_szPrefsDefaultMigrationVal, migVer) || migVer < 13u) {
+        // One-time v2.0.10+ Pure TSF auto-start migration:
+        // Default StartWithWindows to ON (Auto, Pure TSF login profile, zero background tray daemon).
+        WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 13u);
+        WriteRegDword(hKey, c_szPrefsStartWithWindowsVal, 1u);
     }
 
     RegCloseKey(hKey);
@@ -143,6 +149,7 @@ bool LoadPersistedVniPreference(bool &outIsVni) {
 }
 
 void SavePersistedVniPreference(bool isVni) {
+    bool startWithWindowsEnabled = true;
     HKEY hKey = nullptr;
     if (RegCreateKeyExW(
             HKEY_CURRENT_USER,
@@ -155,7 +162,11 @@ void SavePersistedVniPreference(bool isVni) {
             &hKey,
             nullptr
         ) == ERROR_SUCCESS && hKey) {
-        WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 12u);
+        DWORD startWithWinVal = 1u;
+        if (ReadRegDword(hKey, c_szPrefsStartWithWindowsVal, startWithWinVal)) {
+            startWithWindowsEnabled = (startWithWinVal != 0u);
+        }
+        WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 13u);
         WriteRegDword(hKey, c_szPrefsInputMethodVal, isVni ? 1u : 0u);
         DWORD curImRev = 0;
         ReadRegDword(hKey, c_szPrefsInputMethodRevisionVal, curImRev);
@@ -165,25 +176,27 @@ void SavePersistedVniPreference(bool isVni) {
         RegCloseKey(hKey);
     }
 
-    // Keep Windows User Profile InputMethodOverride and vi-VN tip order synced with the user's chosen input method
+    // Keep Windows User Profile InputMethodOverride (when StartWithWindows is ON) and vi-VN tip order synced
     LPCWSTR preferredTipString = isVni ? kTipVniLayoutString : kTipTelexLayoutString;
-    HKEY hUserProfile = nullptr;
-    if (RegOpenKeyExW(
-            HKEY_CURRENT_USER,
-            L"Control Panel\\International\\User Profile",
-            0,
-            KEY_SET_VALUE,
-            &hUserProfile
-        ) == ERROR_SUCCESS && hUserProfile) {
-        RegSetValueExW(
-            hUserProfile,
-            L"InputMethodOverride",
-            0,
-            REG_SZ,
-            reinterpret_cast<const BYTE *>(preferredTipString),
-            static_cast<DWORD>((wcslen(preferredTipString) + 1) * sizeof(WCHAR))
-        );
-        RegCloseKey(hUserProfile);
+    if (startWithWindowsEnabled) {
+        HKEY hUserProfile = nullptr;
+        if (RegOpenKeyExW(
+                HKEY_CURRENT_USER,
+                L"Control Panel\\International\\User Profile",
+                0,
+                KEY_SET_VALUE,
+                &hUserProfile
+            ) == ERROR_SUCCESS && hUserProfile) {
+            RegSetValueExW(
+                hUserProfile,
+                L"InputMethodOverride",
+                0,
+                REG_SZ,
+                reinterpret_cast<const BYTE *>(preferredTipString),
+                static_cast<DWORD>((wcslen(preferredTipString) + 1) * sizeof(WCHAR))
+            );
+            RegCloseKey(hUserProfile);
+        }
     }
     HKEY hViKey = nullptr;
     if (RegOpenKeyExW(
@@ -291,7 +304,7 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs, bool fromSettingsApp) 
         const bool hadPrevInputMethod = ReadRegDword(hKey, c_szPrefsInputMethodVal, prevInputMethod);
         inputMethodChanged = !hadPrevInputMethod || ((prevInputMethod == 1u) != prefs.isVni);
 
-        WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 12u);
+        WriteRegDword(hKey, c_szPrefsDefaultMigrationVal, 13u);
         WriteRegDword(hKey, c_szPrefsInputMethodVal, prefs.isVni ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsVnEnabledVal, prefs.vietnameseEnabled ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsSmartBilingualVal, prefs.smartBilingual ? 1u : 0u);

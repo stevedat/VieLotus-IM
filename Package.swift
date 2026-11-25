@@ -55,6 +55,7 @@ let package = Package(
                 .linkedFramework("Cocoa"),
                 .linkedFramework("InputMethodKit"),
                 .linkedFramework("Carbon"),
+                .linkedFramework("ServiceManagement"),
             ]
         ),
         .testTarget(
