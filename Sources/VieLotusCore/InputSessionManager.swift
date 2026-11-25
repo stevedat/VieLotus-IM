@@ -77,9 +77,29 @@ public class InputSessionManager {
     public var activeDotPrefix: (raw: String, rendered: String)? = nil
     public var pendingSpacePrefix: (raw: String, rendered: String)? = nil
     public var activeSpacePrefix: (raw: String, rendered: String)? = nil
-    public var precededByTechnicalDelimiter: Bool = false
+    private var isInternalTechDelimiterUpdate: Bool = false
+    private var precededByDigitOnly: Bool = false
+    public var precededByTechnicalDelimiter: Bool = false {
+        didSet {
+            if !isInternalTechDelimiterUpdate {
+                precededByDigitOnly = false
+            }
+        }
+    }
     public var precededByLeadingSlash: Bool = false
     private let sessionLock = NSRecursiveLock()
+
+    private func updatePrecededByBoundaryUnlocked(_ char: Character?) {
+        isInternalTechDelimiterUpdate = true
+        defer { isInternalTechDelimiterUpdate = false }
+        if let c = char {
+            precededByTechnicalDelimiter = MacroEngine.isTechnicalDelimiter(c)
+            precededByDigitOnly = c.isASCII && c.isNumber
+        } else {
+            precededByTechnicalDelimiter = false
+            precededByDigitOnly = false
+        }
+    }
 
     // MARK: - Per-Keystroke Sentence Language State Cache (iOS Latency Optimization)
     // `evaluateSentenceLanguageState` is called 3-4 times per keystroke from different paths.
@@ -714,7 +734,7 @@ public class InputSessionManager {
             activeDotPrefix = nil
             pendingSpacePrefix = nil
             activeSpacePrefix = nil
-            precededByTechnicalDelimiter = MacroEngine.isTechnicalDelimiter(char)
+            updatePrecededByBoundaryUnlocked(char)
             precededByLeadingSlash = (char == "/")
         }
         return isBoundary
@@ -1159,7 +1179,7 @@ public class InputSessionManager {
         if effectiveBilingual && shouldPreserveTechnicalToken(rawWord, followsDot: followsDot) {
             return (rawWord, false)
         }
-        if effectiveBilingual,
+        if (effectiveBilingual || engine.inputMethod == .vni),
            !hasExplicitAccentSelection,
            let mixedCompound = resolveMixedCaseCompoundUnlocked(
                rawWord: rawWord,
@@ -1632,6 +1652,159 @@ public class InputSessionManager {
         return segments
     }
 
+    internal static func mayBeVniMixedCaseCompoundCandidate(_ raw: String) -> Bool {
+        guard raw.utf8.count >= 4, raw.utf8.count < 64 else { return false }
+        var hasUpper = false
+        var hasLower = false
+        var hasInternalUpper = false
+        var idx = 0
+        for byte in raw.utf8 {
+            if byte >= 65 && byte <= 90 {
+                hasUpper = true
+                if idx > 0 { hasInternalUpper = true }
+            } else if byte >= 97 && byte <= 122 {
+                hasLower = true
+            } else if byte >= 48 && byte <= 57 {
+                // ASCII digits are VNI modifiers or numeric bridges
+            } else {
+                return false
+            }
+            idx += 1
+        }
+        return hasUpper && hasLower && hasInternalUpper
+    }
+
+    internal static func partitionVniMixedCaseSubwords(_ raw: String) -> [String]? {
+        guard mayBeVniMixedCaseCompoundCandidate(raw) else { return nil }
+        let bytes = Array(raw.utf8)
+        let rawLen = bytes.count
+        guard rawLen >= 4 else { return nil }
+
+        @inline(__always)
+        func isUpper(_ b: UInt8) -> Bool { b >= 65 && b <= 90 }
+        @inline(__always)
+        func isLower(_ b: UInt8) -> Bool { b >= 97 && b <= 122 }
+        @inline(__always)
+        func isDigit(_ b: UInt8) -> Bool { b >= 48 && b <= 57 }
+        @inline(__always)
+        func isBaseVowel(_ b: UInt8) -> Bool {
+            let lo = b | 0x20
+            return lo == 97 || lo == 101 || lo == 105 || lo == 111 || lo == 117 || lo == 121
+        }
+        @inline(__always)
+        func isVniLeadDigit(_ upperLetter: UInt8, _ digit: UInt8) -> Bool {
+            if upperLetter == 68 { return digit == 57 } // 'D' + '9'
+            if isBaseVowel(upperLetter) { return digit >= 49 && digit <= 56 } // vowel + '1'..'8'
+            return false
+        }
+
+        var segments: [String] = []
+        var pos = 0
+
+        while pos < rawLen {
+            if segments.count >= 24 { return nil }
+            let cur = bytes[pos]
+
+            if isUpper(cur) {
+                var uEnd = pos
+                while uEnd < rawLen && isUpper(bytes[uEnd]) {
+                    uEnd += 1
+                }
+                let uLen = uEnd - pos
+
+                // Acronym (>= 2 uppercase) followed by a capitalized VNI word
+                // (e.g. TPVie65t -> TP + Vie65t, TPD9a5t -> TP + D9a5t, TPA1nh -> TP + A1nh)
+                if uLen >= 3 {
+                    let stdSplit = (uEnd < rawLen && isLower(bytes[uEnd]))
+                    var vniDigitSplit = false
+                    if !stdSplit && uEnd < rawLen && isDigit(bytes[uEnd]) && isVniLeadDigit(bytes[uEnd - 1], bytes[uEnd]) {
+                        var dEnd = uEnd
+                        while dEnd < rawLen && isDigit(bytes[dEnd]) { dEnd += 1 }
+                        if dEnd < rawLen && isLower(bytes[dEnd]) {
+                            vniDigitSplit = true
+                        }
+                    }
+                    if stdSplit || vniDigitSplit {
+                        let splitAt = uEnd - 1
+                        segments.append(String(decoding: bytes[pos..<splitAt], as: UTF8.self))
+                        pos = splitAt
+                        continue
+                    }
+                }
+
+                if uEnd == rawLen {
+                    segments.append(String(decoding: bytes[pos..<rawLen], as: UTF8.self))
+                    pos = rawLen
+                    continue
+                }
+
+                if isDigit(bytes[uEnd]) {
+                    var dEnd = uEnd
+                    while dEnd < rawLen && isDigit(bytes[dEnd]) { dEnd += 1 }
+                    let isCapitalizedVniLead =
+                        uLen == 1 &&
+                        isVniLeadDigit(bytes[pos], bytes[uEnd]) &&
+                        dEnd < rawLen &&
+                        isLower(bytes[dEnd])
+                    if !isCapitalizedVniLead {
+                        // Pure ALL-CAPS + trailing digits (e.g. TP123, TPD9, D9, GPT4)
+                        segments.append(String(decoding: bytes[pos..<dEnd], as: UTF8.self))
+                        pos = dEnd
+                        continue
+                    }
+                } else if uLen >= 2 {
+                    // Two uppercase letters immediately followed by lowercase (e.g. IDs, OKay): not a valid split
+                    return nil
+                }
+
+                // Capitalized VNI syllable (+ optional trailing digits) until next uppercase letter
+                var end = pos + 1
+                while end < rawLen && !isUpper(bytes[end]) {
+                    end += 1
+                }
+                segments.append(String(decoding: bytes[pos..<end], as: UTF8.self))
+                pos = end
+            } else if isLower(cur) && segments.isEmpty {
+                var end = pos + 1
+                while end < rawLen && !isUpper(bytes[end]) {
+                    end += 1
+                }
+                guard end - pos >= 2 else { return nil }
+                segments.append(String(decoding: bytes[pos..<end], as: UTF8.self))
+                pos = end
+            } else {
+                return nil
+            }
+        }
+
+        guard segments.count >= 2 else { return nil }
+        for (segIdx, seg) in segments.enumerated() {
+            let segBytes = Array(seg.utf8)
+            guard !segBytes.isEmpty else { return nil }
+            let hasLowerInSeg = segBytes.contains(where: isLower)
+            if !hasLowerInSeg {
+                // All-caps (+ optional trailing digits): allow len >= 1 only at the trailing position (mid-typing)
+                let upperCount = segBytes.prefix(while: isUpper).count
+                guard upperCount >= 1 else { return nil }
+                if segIdx < segments.count - 1 && upperCount < 2 {
+                    return nil
+                }
+                continue
+            }
+            guard segBytes.count >= 2 else { return nil }
+            guard segBytes.contains(where: isBaseVowel) else { return nil }
+            if segIdx == 0 && isLower(segBytes[0]) {
+                continue
+            }
+            guard isUpper(segBytes[0]) else { return nil }
+        }
+        return segments
+    }
+
+    internal static func partitionMixedCaseSubwordsForMethod(_ raw: String, isVNI: Bool) -> [String]? {
+        return isVNI ? partitionVniMixedCaseSubwords(raw) : partitionMixedCaseSubwords(raw)
+    }
+
     public func resolveMixedCaseCompound(
         rawWord: String,
         wholeRendered: String,
@@ -1652,18 +1825,21 @@ public class InputSessionManager {
         rawWord: String,
         wholeRendered: String,
         smartBilingualEnabled: Bool? = nil,
-        followsDot: Bool = false
+        followsDot: Bool = false,
+        precededByNonDigitTechDelimiter: Bool? = nil
     ) -> String? {
         let effectiveBilingual = smartBilingualEnabled ?? self.smartBilingualEnabled
-        guard effectiveBilingual,
+        let isVni = (engine.inputMethod == .vni)
+        let blockedByTechDelimiter = precededByNonDigitTechDelimiter ?? (self.precededByTechnicalDelimiter && !self.precededByDigitOnly)
+        guard (effectiveBilingual || isVni),
               !hasExplicitAccentSelection,
               explicitBilingualSelection == nil,
               !followsDot,
-              !precededByTechnicalDelimiter,
+              !blockedByTechDelimiter,
               !precededByLeadingSlash,
               activeDotPrefix == nil,
-              engine.inputMethod == .telex,
-              let segments = Self.partitionMixedCaseSubwords(rawWord) else {
+              (engine.inputMethod == .telex || isVni),
+              let segments = Self.partitionMixedCaseSubwordsForMethod(rawWord, isVNI: isVni) else {
             return nil
         }
 
@@ -1678,19 +1854,34 @@ public class InputSessionManager {
         combined.reserveCapacity(rawWord.count)
         var compoundHasNonASCII = false
         var allSegmentsEnglish = true
+        var prevSegWasEnglishWord = false
         let profile = engine.grammarProfile
         let modernOrtho = engine.modernOrthography
         let effectiveGenZ = self.genZMode
 
         for seg in segments {
-            let isAllCaps = seg.utf8.allSatisfy { $0 >= 65 && $0 <= 90 }
-            if isAllCaps {
+            let isAllCapsOrDigitsOnly = seg.utf8.allSatisfy { ($0 >= 65 && $0 <= 90) || (isVni && $0 >= 48 && $0 <= 57) }
+            if isAllCapsOrDigitsOnly {
                 combined.append(seg)
+                prevSegWasEnglishWord = false
                 continue
             }
 
+            if isVni && effectiveBilingual && !compoundHasNonASCII && prevSegWasEnglishWord {
+                // Preserve English CamelCase + trailing digits (e.g. IronMan3, SuperMan1, TopGun2, BigBang1)
+                let alphaPrefix = seg.prefix(while: { $0.isASCII && $0.isLetter })
+                let trailingSuffix = seg.dropFirst(alphaPrefix.count)
+                if alphaPrefix.count >= 3 &&
+                   !trailingSuffix.isEmpty &&
+                   trailingSuffix.allSatisfy({ $0.isASCII && $0.isNumber }) {
+                    combined.append(seg)
+                    prevSegWasEnglishWord = true
+                    continue
+                }
+            }
+
             let subEngine = VietnameseEngine()
-            subEngine.inputMethod = .telex
+            subEngine.inputMethod = isVni ? .vni : .telex
             subEngine.grammarProfile = profile
             subEngine.modernOrthography = modernOrtho
             for ch in seg {
@@ -1699,32 +1890,58 @@ public class InputSessionManager {
             let subOut = subEngine.currentOutput()
             let lowerSeg = seg.lowercased()
 
-            let subIsKnownEnglish =
-                EmbeddedEnglishSpellChecker.shared.isWordInEnglishDictionary(lowerSeg) ||
-                BilingualIntentArbiter.englishCollisionLogFrequencies[lowerSeg] != nil ||
-                BilingualIntentArbiter.prefersEnglishInDefaultNoContext(lowerRaw: lowerSeg, lowerRendered: subOut.lowercased()) ||
-                SmartBilingualDetector.isEnglishAnchorTokenForArbiter(lowerSeg) ||
-                Self.sentenceInitialSpacePrefixStarters.contains(lowerSeg) ||
-                SmartBilingualDetector.isContextSensitiveEnglishCollision(lowerSeg)
+            let subIsEnglish: Bool
+            if isVni {
+                if subOut.lowercased() == lowerSeg {
+                    subIsEnglish = true
+                } else {
+                    subIsEnglish = false
+                }
+            } else {
+                let subIsKnownEnglish =
+                    EmbeddedEnglishSpellChecker.shared.isWordInEnglishDictionary(lowerSeg) ||
+                    BilingualIntentArbiter.englishCollisionLogFrequencies[lowerSeg] != nil ||
+                    BilingualIntentArbiter.prefersEnglishInDefaultNoContext(lowerRaw: lowerSeg, lowerRendered: subOut.lowercased()) ||
+                    SmartBilingualDetector.isEnglishAnchorTokenForArbiter(lowerSeg) ||
+                    Self.sentenceInitialSpacePrefixStarters.contains(lowerSeg) ||
+                    SmartBilingualDetector.isContextSensitiveEnglishCollision(lowerSeg)
 
-            let subIsEnglish =
-                subOut.lowercased() == lowerSeg ||
-                subIsKnownEnglish ||
-                SmartBilingualDetector.isInlineEnglishWord(raw: lowerSeg, rendered: subOut.lowercased(), context: "the is", genZMode: effectiveGenZ) ||
-                SmartBilingualDetector.isEnglishWord(raw: lowerSeg, context: "the is", rendered: subOut.lowercased(), genZMode: effectiveGenZ)
+                subIsEnglish =
+                    subOut.lowercased() == lowerSeg ||
+                    subIsKnownEnglish ||
+                    SmartBilingualDetector.isInlineEnglishWord(raw: lowerSeg, rendered: subOut.lowercased(), context: "the is", genZMode: effectiveGenZ) ||
+                    SmartBilingualDetector.isEnglishWord(raw: lowerSeg, context: "the is", rendered: subOut.lowercased(), genZMode: effectiveGenZ)
+            }
 
             if subIsEnglish {
                 combined.append(seg)
+                if isVni {
+                    let alphaPrefix = seg.prefix(while: { $0.isASCII && $0.isLetter }).lowercased()
+                    prevSegWasEnglishWord = !alphaPrefix.isEmpty &&
+                        !VietnameseSyllableDictionary.shared.isValidSyllable(alphaPrefix)
+                }
             } else {
                 allSegmentsEnglish = false
+                prevSegWasEnglishWord = false
                 let subHasNonASCII = !subOut.unicodeScalars.allSatisfy(\.isASCII)
                 if subHasNonASCII {
                     let lowerSubOut = subOut.lowercased()
+                    let validationTarget: String
+                    if isVni, let firstDigitIdx = lowerSubOut.firstIndex(where: { $0.isASCII && $0.isNumber }) {
+                        let digitTail = lowerSubOut[firstDigitIdx...]
+                        guard digitTail.allSatisfy({ $0.isASCII && $0.isNumber }) else {
+                            return nil
+                        }
+                        validationTarget = String(lowerSubOut[..<firstDigitIdx])
+                        guard !validationTarget.isEmpty else { return nil }
+                    } else {
+                        validationTarget = lowerSubOut
+                    }
                     let isValidSubVN =
-                        lowerSubOut == "đ" ||
-                        VietnameseSyllableDictionary.shared.isValidSyllable(lowerSubOut) ||
-                        VietnameseSyllableDictionary.shared.isValidUntonedSyllable(lowerSubOut, genZMode: effectiveGenZ) ||
-                        VietnameseSyllableDictionary.shared.hasStrictSyllablePrefix(lowerSubOut)
+                        validationTarget == "đ" ||
+                        VietnameseSyllableDictionary.shared.isValidSyllable(validationTarget) ||
+                        VietnameseSyllableDictionary.shared.isValidUntonedSyllable(validationTarget, genZMode: effectiveGenZ) ||
+                        VietnameseSyllableDictionary.shared.hasStrictSyllablePrefix(validationTarget)
                     guard isValidSubVN else {
                         return nil
                     }
@@ -1734,7 +1951,7 @@ public class InputSessionManager {
             }
         }
 
-        if allSegmentsEnglish && rawWord != wholeRendered {
+        if !isVni && allSegmentsEnglish && rawWord != wholeRendered {
             return rawWord
         }
         guard compoundHasNonASCII else { return nil }
@@ -1761,11 +1978,13 @@ public class InputSessionManager {
         smartBilingualEnabled: Bool? = nil
     ) -> (backspaces: Int, suffix: String)? {
         let effectiveBilingual = smartBilingualEnabled ?? self.smartBilingualEnabled
-        if effectiveBilingual,
-           engine.inputMethod == .telex,
+        let isVni = (engine.inputMethod == .vni)
+        let blockedByTechDelimiter = self.precededByTechnicalDelimiter && !self.precededByDigitOnly
+        if (effectiveBilingual || isVni),
+           (engine.inputMethod == .telex || isVni),
            !hasExplicitAccentSelection,
            explicitBilingualSelection == nil,
-           !precededByTechnicalDelimiter,
+           !blockedByTechDelimiter,
            !precededByLeadingSlash,
            activeDotPrefix == nil {
             if resolveMixedCaseCompoundUnlocked(
@@ -1773,16 +1992,16 @@ public class InputSessionManager {
                 wholeRendered: engine.currentOutput(),
                 smartBilingualEnabled: effectiveBilingual
             ) != nil,
-               let segments = Self.partitionMixedCaseSubwords(currentRaw),
+               let segments = Self.partitionMixedCaseSubwordsForMethod(currentRaw, isVNI: isVni),
                segments.count >= 2 {
                 let lastSeg = segments[segments.count - 1]
-                let isAllCaps = lastSeg.utf8.allSatisfy { $0 >= 65 && $0 <= 90 }
+                let isAllCapsOrDigitsOnly = lastSeg.utf8.allSatisfy { ($0 >= 65 && $0 <= 90) || (isVni && $0 >= 48 && $0 <= 57) }
                 let shortenedLast: String
-                if isAllCaps {
+                if isAllCapsOrDigitsOnly {
                     shortenedLast = String(lastSeg.dropLast())
                 } else {
                     let subEngine = VietnameseEngine()
-                    subEngine.inputMethod = .telex
+                    subEngine.inputMethod = isVni ? .vni : .telex
                     subEngine.grammarProfile = engine.grammarProfile
                     subEngine.modernOrthography = engine.modernOrthography
                     subEngine.backspaceStyle = engine.backspaceStyle
@@ -1792,16 +2011,21 @@ public class InputSessionManager {
                     let subOut = subEngine.currentOutput()
                     let lowerSeg = lastSeg.lowercased()
                     let effectiveGenZ = self.genZMode
-                    let subIsEnglish =
-                        subOut.lowercased() == lowerSeg ||
-                        EmbeddedEnglishSpellChecker.shared.isWordInEnglishDictionary(lowerSeg) ||
-                        BilingualIntentArbiter.englishCollisionLogFrequencies[lowerSeg] != nil ||
-                        BilingualIntentArbiter.prefersEnglishInDefaultNoContext(lowerRaw: lowerSeg, lowerRendered: subOut.lowercased()) ||
-                        SmartBilingualDetector.isEnglishAnchorTokenForArbiter(lowerSeg) ||
-                        Self.sentenceInitialSpacePrefixStarters.contains(lowerSeg) ||
-                        SmartBilingualDetector.isContextSensitiveEnglishCollision(lowerSeg) ||
-                        SmartBilingualDetector.isInlineEnglishWord(raw: lowerSeg, rendered: subOut.lowercased(), context: "the is", genZMode: effectiveGenZ) ||
-                        SmartBilingualDetector.isEnglishWord(raw: lowerSeg, context: "the is", rendered: subOut.lowercased(), genZMode: effectiveGenZ)
+                    let subIsEnglish: Bool
+                    if isVni {
+                        subIsEnglish = (subOut.lowercased() == lowerSeg)
+                    } else {
+                        subIsEnglish =
+                            subOut.lowercased() == lowerSeg ||
+                            EmbeddedEnglishSpellChecker.shared.isWordInEnglishDictionary(lowerSeg) ||
+                            BilingualIntentArbiter.englishCollisionLogFrequencies[lowerSeg] != nil ||
+                            BilingualIntentArbiter.prefersEnglishInDefaultNoContext(lowerRaw: lowerSeg, lowerRendered: subOut.lowercased()) ||
+                            SmartBilingualDetector.isEnglishAnchorTokenForArbiter(lowerSeg) ||
+                            Self.sentenceInitialSpacePrefixStarters.contains(lowerSeg) ||
+                            SmartBilingualDetector.isContextSensitiveEnglishCollision(lowerSeg) ||
+                            SmartBilingualDetector.isInlineEnglishWord(raw: lowerSeg, rendered: subOut.lowercased(), context: "the is", genZMode: effectiveGenZ) ||
+                            SmartBilingualDetector.isEnglishWord(raw: lowerSeg, context: "the is", rendered: subOut.lowercased(), genZMode: effectiveGenZ)
+                    }
                     if subIsEnglish {
                         shortenedLast = String(lastSeg.dropLast())
                     } else {
@@ -1816,7 +2040,7 @@ public class InputSessionManager {
                     _ = engine.feed(ch)
                 }
                 return Self.computeUTF16Diff(oldStr: prevOut, newStr: engine.currentOutput())
-            } else if currentRaw.count >= 3,
+            } else if !isVni && currentRaw.count >= 3,
                       Self.partitionMixedCaseSubwords(currentRaw) == nil,
                       Self.partitionMixedCaseSubwords(currentRaw + "a") != nil {
                 let newRaw = String(currentRaw.dropLast())
@@ -2316,7 +2540,7 @@ public class InputSessionManager {
             activeDotPrefix = nil
             pendingSpacePrefix = nil
             activeSpacePrefix = nil
-            precededByTechnicalDelimiter = boundaryChar.map { MacroEngine.isTechnicalDelimiter($0) } ?? false
+            updatePrecededByBoundaryUnlocked(boundaryChar)
             precededByLeadingSlash = (boundaryChar == "/")
             return .passThrough
         }
@@ -2335,7 +2559,6 @@ public class InputSessionManager {
         var isOverride = false
         let wasPrecededByTechnicalDelimiter = precededByTechnicalDelimiter || activeDotPrefix != nil
         let wasPrecededByLeadingSlash = precededByLeadingSlash
-        precededByTechnicalDelimiter = boundaryChar.map { MacroEngine.isTechnicalDelimiter($0) } ?? false
         let dotPrefixToRestore: (raw: String, rendered: String)? = {
             guard let dotPrefix = activeDotPrefix,
                   !rawWord.isEmpty,
@@ -2434,6 +2657,7 @@ public class InputSessionManager {
         }
 
         let savedRaw = rawWord.isEmpty ? output : rawWord
+        updatePrecededByBoundaryUnlocked(boundaryChar)
         precededByLeadingSlash = (boundaryChar == "/" && wasPrecededByLeadingSlash && finalWord == savedRaw)
         let effectiveEngineOutput = rawEngineOutput.isEmpty ? output : rawEngineOutput
         if !isOverride &&

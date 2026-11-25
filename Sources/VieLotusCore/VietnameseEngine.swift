@@ -3641,7 +3641,17 @@ internal final class VietnameseEngine: @unchecked Sendable {
                         for idx in stride(from: result.count - 1, through: 0, by: -1) {
                             let lower = Character(result[idx].lowercased())
                             let upper = result[idx].isUppercase
-                            if lower == "d" { result[idx] = upper ? "Đ" : "đ"; transformed = true; break }
+                            if lower == "d" {
+                                // Only stroke consonant-only 'd'/'D' at index 0 (d9, D9, d9t, d9c) or index 1
+                                // of a non-doubled abbreviation (sd9t -> sđt, bd9s -> bđs, hd9nd -> hđnd);
+                                // keep trailing 'D' in hardware acronyms like SSD9, HDD9, DVD9, LCD9, BSD9 literal.
+                                let allowedConsonantD = (idx == 0) || (idx == 1 && result[0].lowercased() != "d")
+                                if allowedConsonantD {
+                                    result[idx] = upper ? "Đ" : "đ"
+                                    transformed = true
+                                }
+                                break
+                            }
                         }
                     } else if let first = result.first, first.lowercased() == "d" {
                         result[0] = first.isUppercase ? "Đ" : "đ"

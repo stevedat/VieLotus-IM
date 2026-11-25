@@ -1352,5 +1352,131 @@ final class VietnameseEngineTests: XCTestCase {
         XCTAssertEqual(driveVNI("duoc975 "), "được")
         XCTAssertEqual(driveVNI("duoc9759 "), "dược9")
         XCTAssertEqual(driveVNI("truo7ng27 "), "truòng7")
+
+        // Mixed-Case + Digit-Bridge VNI compounds (parity with Telex TPĐạt123TPĐạt123ĐạtTP123)
+        XCTAssertEqual(driveVNI("TPD9a5t123TPD9a5t123D9a5tTP123 "), "TPĐạt123TPĐạt123ĐạtTP123")
+        XCTAssertEqual(driveVNI("TPD9at5123TPD9at5123D9at5TP123 "), "TPĐạt123TPĐạt123ĐạtTP123")
+        XCTAssertEqual(driveVNI("TPD9a5t "), "TPĐạt")
+        XCTAssertEqual(driveVNI("TPD9at5 "), "TPĐạt")
+        XCTAssertEqual(driveVNI("VND9a5t "), "VNĐạt")
+        XCTAssertEqual(driveVNI("HND9o6i5 "), "HNĐội")
+        XCTAssertEqual(driveVNI("TPA1nh "), "TPÁnh")
+        XCTAssertEqual(driveVNI("TPHo62Chi1Minh "), "TPHồChíMinh")
+        XCTAssertEqual(driveVNI("D9a5tVie65t "), "ĐạtViệt")
+        XCTAssertEqual(driveVNI("D9a5t123D9a5t "), "Đạt123Đạt")
+        XCTAssertEqual(driveVNI("D9a5t2026Vie65t "), "Đạt2026Việt")
+        XCTAssertEqual(driveVNI("123TPD9a5t "), "123TPĐạt")
+        XCTAssertEqual(driveVNI("vie65tNam "), "việtNam")
+        XCTAssertEqual(driveVNI("d9a5tTP "), "đạtTP")
+        XCTAssertEqual(driveVNI("ThanhHoa1 "), "ThanhHoá")
+
+        // Anti-regression: acronyms, English CamelCase+digits, and passwords remain intact in VNI
+        XCTAssertEqual(driveVNI("SSD9 "), "SSD9")
+        XCTAssertEqual(driveVNI("HDD9 "), "HDD9")
+        XCTAssertEqual(driveVNI("DVD9 "), "DVD9")
+        XCTAssertEqual(driveVNI("sd9t "), "sđt")
+        XCTAssertEqual(driveVNI("SlotD9 "), "SlotD9")
+        XCTAssertEqual(driveVNI("ChatGPT4 "), "ChatGPT4")
+        XCTAssertEqual(driveVNI("GPT4o "), "GPT4o")
+        XCTAssertEqual(driveVNI("MacBook14 "), "MacBook14")
+        XCTAssertEqual(driveVNI("YouTube5 "), "YouTube5")
+        XCTAssertEqual(driveVNI("IronMan3 "), "IronMan3")
+        XCTAssertEqual(driveVNI("SuperMan1 "), "SuperMan1")
+        XCTAssertEqual(driveVNI("TopGun2 "), "TopGun2")
+        XCTAssertEqual(driveVNI("BigBang1 "), "BigBang1")
+        XCTAssertEqual(driveVNI("TPViet123 "), "TPViet123")
+        XCTAssertEqual(driveVNI("pass123a1 "), "pass123a1")
+        XCTAssertEqual(driveVNI("Pass123a1 "), "Pass123a1")
+        XCTAssertEqual(driveVNI("a65a5 "), "âa5")
+        XCTAssertEqual(driveVNI("e6re6 "), "e6re6")
+        XCTAssertEqual(driveVNI("tu33u1 "), "tu3u1")
+        XCTAssertEqual(driveVNI("d99u1 "), "d9u1")
+    }
+
+    func testTelexAndVNIMixedCaseDigitChainAndBackspaceInSessionManager() {
+        func driveSession(method: InputMethodType, keys: String) -> String {
+            let session = InputSessionManager()
+            session.setInputMethod(method)
+            session.smartBilingualEnabled = true
+            session.inlineBilingualEnabled = true
+            var out = ""
+            for ch in keys {
+                if ch == "\u{8}" {
+                    let act = session.handleBackspace()
+                    switch act {
+                    case .replace(let bs, let text):
+                        if bs > 0 { out.removeLast(min(bs, out.count)) }
+                        out += text
+                    case .reset, .passThrough:
+                        if !out.isEmpty { out.removeLast() }
+                    default:
+                        break
+                    }
+                    continue
+                }
+                if session.isWordBoundary(ch) {
+                    let act = session.commitWord(smartBilingualEnabled: true, boundaryChar: ch)
+                    if case let .commit(bs, text, isOverride) = act, isOverride {
+                        if bs > 0 { out.removeLast(min(bs, out.count)) }
+                        out += text
+                    }
+                    out.append(ch)
+                } else {
+                    let act = session.handleCharacter(ch)
+                    if case let .replace(bs, text) = act {
+                        if bs > 0 { out.removeLast(min(bs, out.count)) }
+                        out += text
+                    }
+                }
+            }
+            return out.trimmingCharacters(in: .whitespaces)
+        }
+
+        // Telex: InputSessionManager (iOS path) must keep TPĐạt across digit boundaries just like macOS & C++20
+        XCTAssertEqual(
+            driveSession(method: .telex, keys: "TPDDatj123TPDDatj123DDatjTP123 "),
+            "TPĐạt123TPĐạt123ĐạtTP123"
+        )
+        XCTAssertEqual(driveSession(method: .telex, keys: "123TPDDatj "), "123TPĐạt")
+        // Non-digit technical delimiters must still suppress mixed-case transformation on code paths
+        XCTAssertEqual(driveSession(method: .telex, keys: "foo_TPDDatj "), "foo_TPDDatj")
+        XCTAssertEqual(driveSession(method: .telex, keys: "/TPDDatj "), "/TPDDatj")
+
+        // VNI: live backspace inside mixed-case digit chain (both .appleSemantic and .gboardCharacter)
+        XCTAssertEqual(
+            driveSession(method: .vni, keys: "TPD9a5t123TPD9a5t123D9a5tTP123\u{8}\u{8}\u{8} "),
+            "TPĐạt123TPĐạt123ĐạtTP"
+        )
+        XCTAssertEqual(
+            driveSession(method: .vni, keys: "TPD9a5t\u{8}1 "),
+            "TPĐát"
+        )
+        do {
+            let gboardSession = InputSessionManager()
+            gboardSession.setInputMethod(.vni)
+            gboardSession.backspaceStyle = .gboardCharacter
+            gboardSession.smartBilingualEnabled = true
+            gboardSession.inlineBilingualEnabled = true
+            var out = ""
+            for ch in "TPD9a5t\u{8}p " {
+                if ch == "\u{8}" {
+                    if case let .replace(bs, text) = gboardSession.handleBackspace() {
+                        if bs > 0 { out.removeLast(min(bs, out.count)) }
+                        out += text
+                    }
+                } else if gboardSession.isWordBoundary(ch) {
+                    let act = gboardSession.commitWord(smartBilingualEnabled: true, boundaryChar: ch)
+                    if case let .commit(bs, text, isOverride) = act, isOverride {
+                        if bs > 0 { out.removeLast(min(bs, out.count)) }
+                        out += text
+                    }
+                    out.append(ch)
+                } else if case let .replace(bs, text) = gboardSession.handleCharacter(ch) {
+                    if bs > 0 { out.removeLast(min(bs, out.count)) }
+                    out += text
+                }
+            }
+            XCTAssertEqual(out.trimmingCharacters(in: .whitespaces), "TPĐạp")
+        }
     }
 }

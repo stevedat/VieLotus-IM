@@ -2141,7 +2141,21 @@ int main(int argc, char **argv) {
         {"iPhone16", "iPhone16"}, {"iPhone6", "iPhone6"}, {"iPad9", "iPad9"},
         {"Java8", "Java8"}, {"Chrome6", "Chrome6"},
         {"Pass123", "Pass123"}, {"Hello123", "Hello123"}, {"user123", "user123"},
-        {"TP123", "TP123"}, {"Q1", "Q1"}
+        {"TP123", "TP123"}, {"Q1", "Q1"},
+        {"TPD9a5t123TPD9a5t123D9a5tTP123", "TPĐạt123TPĐạt123ĐạtTP123"},
+        {"TPD9at5123TPD9at5123D9at5TP123", "TPĐạt123TPĐạt123ĐạtTP123"},
+        {"TPD9a5t", "TPĐạt"}, {"TPD9at5", "TPĐạt"},
+        {"VND9a5t", "VNĐạt"}, {"HND9o6i5", "HNĐội"},
+        {"TPA1nh", "TPÁnh"}, {"TPHo62Chi1Minh", "TPHồChíMinh"},
+        {"D9a5tVie65t", "ĐạtViệt"}, {"D9a5t123D9a5t", "Đạt123Đạt"},
+        {"D9a5t2026Vie65t", "Đạt2026Việt"}, {"123TPD9a5t", "123TPĐạt"},
+        {"vie65tNam", "việtNam"}, {"d9a5tTP", "đạtTP"}, {"ThanhHoa1", "ThanhHoá"},
+        {"SSD9", "SSD9"}, {"HDD9", "HDD9"}, {"DVD9", "DVD9"}, {"SlotD9", "SlotD9"},
+        {"ChatGPT4", "ChatGPT4"}, {"GPT4o", "GPT4o"},
+        {"MacBook14", "MacBook14"}, {"YouTube5", "YouTube5"},
+        {"IronMan3", "IronMan3"}, {"SuperMan1", "SuperMan1"},
+        {"TopGun2", "TopGun2"}, {"BigBang1", "BigBang1"},
+        {"TPViet123", "TPViet123"}, {"pass123a1", "pass123a1"}, {"Pass123a1", "Pass123a1"}
     };
     for (const auto &kv : kVniEscapes) {
         checkWordBoth(kv.first, kv.second, true);
@@ -2183,6 +2197,28 @@ int main(int argc, char **argv) {
         checkP06("backspace:in-comp", bsOk,
                  "s1=" + sim1.doc + " s2=" + sim2.doc + " s3=" + sim3.doc + " s4=" + sim4.doc +
                  " c1=" + capiBs1 + " c2=" + capiBs2);
+
+        // 4a-bis. VNI mixed-case digit-bridge in-composition Backspace (WinTsfSimulator & C-ABI)
+        WinTsfSimulator vniBs1;
+        vniBs1.setVni(true);
+        vniBs1.typeString("TPD9a5t123TPD9a5t123D9a5tTP123\b\b\b ");
+        WinTsfSimulator vniBs2;
+        vniBs2.setVni(true);
+        vniBs2.typeString("TPD9a5t\bp ");
+        vielotus_reset_session(p06Capi);
+        vielotus_set_smart_bilingual(p06Capi, true);
+        vielotus_set_input_method(p06Capi, VIELOTUS_INPUT_VNI);
+        for (char c : std::string("TPD9a5t123TPD9a5t123D9a5tTP123")) vielotus_feed_char(p06Capi, static_cast<uint32_t>(c));
+        vielotus_feed_backspace(p06Capi);
+        vielotus_feed_backspace(p06Capi);
+        vielotus_feed_backspace(p06Capi);
+        std::string capiVniBs1 = vielotus_get_composing_text(p06Capi);
+        vielotus_reset_session(p06Capi);
+        vielotus_set_input_method(p06Capi, VIELOTUS_INPUT_TELEX);
+        checkP06("vni:mixed-case-backspace",
+                 vniBs1.doc == "TPĐạt123TPĐạt123ĐạtTP " && vniBs2.doc == "TPĐạp " &&
+                 capiVniBs1 == "TPĐạt123TPĐạt123ĐạtTP",
+                 "v1=" + vniBs1.doc + " v2=" + vniBs2.doc + " c1=" + capiVniBs1);
 
         // 4b. Post-commit Space + Backspace reopen on 'turrus' & 'tuowwus' & 'tuoww'
         WinTsfSimulator reopen1;

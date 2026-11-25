@@ -993,7 +993,7 @@ struct NativeEngineState {
     void findVowelCluster(int &outStart, int &outEnd, bool &outHasCoda) const;
     int resolveToneTargetIndex(int vowelStart, int vowelEnd, bool hasCoda) const;
     bool hasVietnameseTransformation() const;
-    bool isValidVietnameseSyllable() const;
+    bool isValidVietnameseSyllable(bool ignoreNumericLiteralTail = false) const;
     bool shouldRestoreRawEnglish() const;
     bool tryComposeMixedCaseCompound(wchar_t *outBuf, int maxLen) const;
     int composeOutputWord(wchar_t *outBuf, int maxLen) const;
@@ -1204,7 +1204,7 @@ bool NativeEngineState::hasVietnameseTransformation() const {
     return false;
 }
 
-bool NativeEngineState::isValidVietnameseSyllable() const {
+bool NativeEngineState::isValidVietnameseSyllable(bool ignoreNumericLiteralTail) const {
     if (m_tokenLen == 0) return true;
 
     int vStart = -1, vEnd = -1;
@@ -1252,7 +1252,12 @@ bool NativeEngineState::isValidVietnameseSyllable() const {
         return false;
     }
 
-    if (m_literalTailLen > 0) return false;
+    if (m_literalTailLen > 0) {
+        if (!ignoreNumericLiteralTail) return false;
+        for (int i = 0; i < m_literalTailLen; ++i) {
+            if (m_literalTail[i] < L'0' || m_literalTail[i] > L'9') return false;
+        }
+    }
 
     if (m_tone == 0 && (m_tokenLen == 3 || m_tokenLen == 4) &&
         m_tokens[0].baseLower == L'u' && m_tokens[0].shape == 2 &&
@@ -1813,6 +1818,151 @@ int partitionMixedCaseSubwords(const wchar_t *raw, int rawLen, int segStarts[16]
     return segCount;
 }
 
+int partitionVniMixedCaseSubwords(const wchar_t *raw, int rawLen, int segStarts[24], int segLens[24]) {
+    if (rawLen < 4 || rawLen >= WindowsNativeEngine::kMaxWordTokens) return 0;
+    auto isUpper = [](wchar_t c) { return c >= L'A' && c <= L'Z'; };
+    auto isLower = [](wchar_t c) { return c >= L'a' && c <= L'z'; };
+    auto isDigit = [](wchar_t c) { return c >= L'0' && c <= L'9'; };
+    auto isVniLeadDigit = [&](wchar_t upperLetter, wchar_t digit) {
+        if (upperLetter == L'D') return digit == L'9';
+        if (NativeEngineState::isAsciiBaseVowel(toLowerAscii(upperLetter))) {
+            return digit >= L'1' && digit <= L'8';
+        }
+        return false;
+    };
+
+    bool hasUpper = false;
+    bool hasLower = false;
+    bool hasInternalUpper = false;
+    for (int i = 0; i < rawLen; ++i) {
+        const wchar_t c = raw[i];
+        if (isUpper(c)) {
+            hasUpper = true;
+            if (i > 0) hasInternalUpper = true;
+        } else if (isLower(c)) {
+            hasLower = true;
+        } else if (!isDigit(c)) {
+            return 0;
+        }
+    }
+    if (!hasUpper || !hasLower || !hasInternalUpper) return 0;
+
+    int segCount = 0;
+    int pos = 0;
+    while (pos < rawLen) {
+        if (segCount >= 24) return 0;
+        const wchar_t cur = raw[pos];
+        if (isUpper(cur)) {
+            int uEnd = pos;
+            while (uEnd < rawLen && isUpper(raw[uEnd])) ++uEnd;
+            const int uLen = uEnd - pos;
+
+            if (uLen >= 3) {
+                const bool stdSplit = (uEnd < rawLen && isLower(raw[uEnd]));
+                bool vniDigitSplit = false;
+                if (!stdSplit && uEnd < rawLen && isDigit(raw[uEnd]) &&
+                    isVniLeadDigit(raw[uEnd - 1], raw[uEnd])) {
+                    int dEnd = uEnd;
+                    while (dEnd < rawLen && isDigit(raw[dEnd])) ++dEnd;
+                    if (dEnd < rawLen && isLower(raw[dEnd])) {
+                        vniDigitSplit = true;
+                    }
+                }
+                if (stdSplit || vniDigitSplit) {
+                    const int splitAt = uEnd - 1;
+                    segStarts[segCount] = pos;
+                    segLens[segCount] = splitAt - pos;
+                    ++segCount;
+                    pos = splitAt;
+                    continue;
+                }
+            }
+
+            if (uEnd == rawLen) {
+                segStarts[segCount] = pos;
+                segLens[segCount] = rawLen - pos;
+                ++segCount;
+                pos = rawLen;
+                continue;
+            }
+
+            if (isDigit(raw[uEnd])) {
+                int dEnd = uEnd;
+                while (dEnd < rawLen && isDigit(raw[dEnd])) ++dEnd;
+                const bool isCapitalizedVniLead =
+                    uLen == 1 &&
+                    isVniLeadDigit(raw[pos], raw[uEnd]) &&
+                    dEnd < rawLen &&
+                    isLower(raw[dEnd]);
+                if (!isCapitalizedVniLead) {
+                    segStarts[segCount] = pos;
+                    segLens[segCount] = dEnd - pos;
+                    ++segCount;
+                    pos = dEnd;
+                    continue;
+                }
+            } else if (uLen >= 2) {
+                return 0;
+            }
+
+            int end = pos + 1;
+            while (end < rawLen && !isUpper(raw[end])) ++end;
+            segStarts[segCount] = pos;
+            segLens[segCount] = end - pos;
+            ++segCount;
+            pos = end;
+        } else if (isLower(cur) && segCount == 0) {
+            int end = pos + 1;
+            while (end < rawLen && !isUpper(raw[end])) ++end;
+            if (end - pos < 2) return 0;
+            segStarts[segCount] = pos;
+            segLens[segCount] = end - pos;
+            ++segCount;
+            pos = end;
+        } else {
+            return 0;
+        }
+    }
+
+    if (segCount < 2) return 0;
+    for (int s = 0; s < segCount; ++s) {
+        const int len = segLens[s];
+        if (len < 1) return 0;
+        const wchar_t *seg = raw + segStarts[s];
+        bool hasLowerInSeg = false;
+        bool hasVowel = false;
+        for (int j = 0; j < len; ++j) {
+            if (isLower(seg[j])) hasLowerInSeg = true;
+            if (NativeEngineState::isAsciiBaseVowel(toLowerAscii(seg[j]))) hasVowel = true;
+        }
+        if (!hasLowerInSeg) {
+            int upperCount = 0;
+            while (upperCount < len && isUpper(seg[upperCount])) ++upperCount;
+            if (upperCount < 1) return 0;
+            if (s < segCount - 1 && upperCount < 2) return 0;
+            continue;
+        }
+        if (len < 2 || !hasVowel) return 0;
+        if (s == 0 && isLower(seg[0])) continue;
+        if (!isUpper(seg[0])) return 0;
+    }
+    return segCount;
+}
+
+int partitionMixedCaseSubwordsForMethod(const wchar_t *raw, int rawLen, InputMethod method, int segStarts[24], int segLens[24]) {
+    if (method == InputMethod::VNI) {
+        return partitionVniMixedCaseSubwords(raw, rawLen, segStarts, segLens);
+    }
+    int telexStarts[16]{};
+    int telexLens[16]{};
+    const int count = partitionMixedCaseSubwords(raw, rawLen, telexStarts, telexLens);
+    for (int i = 0; i < count; ++i) {
+        segStarts[i] = telexStarts[i];
+        segLens[i] = telexLens[i];
+    }
+    return count;
+}
+
 bool NativeEngineState::shouldRestoreRawEnglish() const {
     if (!m_smartBilingual || !hasVietnameseTransformation() || m_suppressEnglishRestoreAfterBackspace) return false;
 
@@ -1959,64 +2109,91 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
 }
 
 bool NativeEngineState::tryComposeMixedCaseCompound(wchar_t *outBuf, int maxLen) const {
-    if (m_inSubwordEval || !m_smartBilingual || m_inputMethod != InputMethod::Telex ||
+    const bool isVni = (m_inputMethod == InputMethod::VNI);
+    if (m_inSubwordEval || (!m_smartBilingual && !isVni) ||
+        (m_inputMethod != InputMethod::Telex && !isVni) ||
         m_precededByTechDelimiter || m_precededByLeadingSlash ||
         m_suppressEnglishRestoreAfterBackspace || isValidVietnameseSyllable()) {
         return false;
     }
 
-    int segStarts[16]{};
-    int segLens[16]{};
-    const int segCount = partitionMixedCaseSubwords(m_rawWord, m_rawLen, segStarts, segLens);
+    int segStarts[24]{};
+    int segLens[24]{};
+    const int segCount = partitionMixedCaseSubwordsForMethod(m_rawWord, m_rawLen, m_inputMethod, segStarts, segLens);
     if (segCount < 2) return false;
 
     wchar_t combined[kMaxWordTokens]{};
     int combinedLen = 0;
     bool compoundHasNonAscii = false;
     bool compoundRestoredEscapeSubword = false;
+    bool prevSegWasEnglishWord = false;
 
     for (int s = 0; s < segCount; ++s) {
         const wchar_t *segPtr = m_rawWord + segStarts[s];
         const int segLen = segLens[s];
-        bool segAllCaps = true;
+        bool segAllCapsOrDigits = true;
         for (int j = 0; j < segLen; ++j) {
-            if (!(segPtr[j] >= L'A' && segPtr[j] <= L'Z')) {
-                segAllCaps = false;
+            const bool okUpper = (segPtr[j] >= L'A' && segPtr[j] <= L'Z');
+            const bool okDigit = (isVni && segPtr[j] >= L'0' && segPtr[j] <= L'9');
+            if (!okUpper && !okDigit) {
+                segAllCapsOrDigits = false;
                 break;
             }
         }
-        if (segAllCaps) {
+        if (segAllCapsOrDigits) {
             if (combinedLen + segLen >= kMaxWordTokens) return false;
             for (int j = 0; j < segLen; ++j) {
                 combined[combinedLen++] = segPtr[j];
             }
+            prevSegWasEnglishWord = false;
             continue;
+        }
+
+        if (isVni && m_smartBilingual && !compoundHasNonAscii && prevSegWasEnglishWord) {
+            int alphaLen = 0;
+            while (alphaLen < segLen &&
+                   ((segPtr[alphaLen] >= L'A' && segPtr[alphaLen] <= L'Z') ||
+                    (segPtr[alphaLen] >= L'a' && segPtr[alphaLen] <= L'z'))) {
+                ++alphaLen;
+            }
+            bool trailingDigitsOnly = (alphaLen < segLen);
+            for (int j = alphaLen; j < segLen && trailingDigitsOnly; ++j) {
+                if (segPtr[j] < L'0' || segPtr[j] > L'9') trailingDigitsOnly = false;
+            }
+            if (alphaLen >= 3 && trailingDigitsOnly) {
+                if (combinedLen + segLen >= kMaxWordTokens) return false;
+                for (int j = 0; j < segLen; ++j) combined[combinedLen++] = segPtr[j];
+                prevSegWasEnglishWord = true;
+                continue;
+            }
         }
 
         wchar_t segLower[kMaxWordTokens]{};
         for (int j = 0; j < segLen; ++j) {
             segLower[j] = toLowerAscii(segPtr[j]);
         }
-        if (isExtendedEnglishEscapeWord(segLower, segLen)) {
-            compoundRestoredEscapeSubword = true;
-        }
-        if (isEnglishContextAnchor(segLower, segLen) || isSpacePrefixStarter(segLower, segLen)) {
-            if (combinedLen + segLen >= kMaxWordTokens) return false;
-            for (int j = 0; j < segLen; ++j) {
-                combined[combinedLen++] = segPtr[j];
+        if (!isVni) {
+            if (isExtendedEnglishEscapeWord(segLower, segLen)) {
+                compoundRestoredEscapeSubword = true;
             }
-            continue;
+            if (isEnglishContextAnchor(segLower, segLen) || isSpacePrefixStarter(segLower, segLen)) {
+                if (combinedLen + segLen >= kMaxWordTokens) return false;
+                for (int j = 0; j < segLen; ++j) {
+                    combined[combinedLen++] = segPtr[j];
+                }
+                continue;
+            }
         }
 
         NativeEngineState sub{};
         sub.m_inputMethod = m_inputMethod;
         sub.m_grammarProfile = m_grammarProfile;
-        sub.m_smartBilingual = true;
+        sub.m_smartBilingual = m_smartBilingual;
         sub.m_modernOrthography = m_modernOrthography;
         sub.m_quickTelex = m_quickTelex;
         sub.m_relaxedCoda = false;
-        sub.m_inEnglishContext = true;
-        sub.m_lastWordWasEnglishAnchor = true;
+        sub.m_inEnglishContext = !isVni;
+        sub.m_lastWordWasEnglishAnchor = !isVni;
         sub.m_inSubwordEval = true;
         for (int j = 0; j < segLen; ++j) {
             sub.feedChar(static_cast<uint32_t>(segPtr[j]));
@@ -2030,10 +2207,27 @@ bool NativeEngineState::tryComposeMixedCaseCompound(wchar_t *outBuf, int maxLen)
             }
         }
         if (segHasNonAscii) {
-            if (!sub.isValidVietnameseSyllable()) {
+            if (!sub.isValidVietnameseSyllable(isVni)) {
                 return false;
             }
             compoundHasNonAscii = true;
+            prevSegWasEnglishWord = false;
+        } else if (isVni) {
+            bool isUntonedStopCoda = false;
+            if (sub.m_tone == 0 && sub.m_tokenLen > 0) {
+                int svStart = -1, svEnd = -1;
+                bool sHasCoda = false;
+                sub.findVowelCluster(svStart, svEnd, sHasCoda);
+                if (svStart != -1 && sHasCoda) {
+                    wchar_t scoda[16]{};
+                    int scodaLen = 0;
+                    for (int j = svEnd + 1; j < sub.m_tokenLen && scodaLen < 15; ++j) {
+                        scoda[scodaLen++] = sub.m_tokens[j].baseLower;
+                    }
+                    isUntonedStopCoda = isStopCoda(scoda, scodaLen);
+                }
+            }
+            prevSegWasEnglishWord = !sub.isValidVietnameseSyllable(true) || isUntonedStopCoda;
         }
         if (combinedLen + sub.m_displayedLen >= kMaxWordTokens) return false;
         for (int j = 0; j < sub.m_displayedLen; ++j) {
@@ -2879,6 +3073,9 @@ bool NativeEngineState::applyVniCharacter(wchar_t ch) {
 
     if (ch == L'9') {
         if (m_tokenLen > 0 && m_tokens[0].baseLower == L'd') {
+            if (vStart == -1 && m_tokenLen >= 3 && m_tokens[m_tokenLen - 1].baseLower == L'd') {
+                return false;
+            }
             if (vStart != -1) {
                 wchar_t coda9[16]{};
                 int coda9Len = 0;
@@ -3614,9 +3811,10 @@ int32_t NativeEngineState::feedBackspace() {
 
     wchar_t mixedCompoundBuf[kMaxWordTokens]{};
     if (tryComposeMixedCaseCompound(mixedCompoundBuf, kMaxWordTokens)) {
-        int segStarts[16]{};
-        int segLens[16]{};
-        const int segCount = partitionMixedCaseSubwords(m_rawWord, m_rawLen, segStarts, segLens);
+        const bool isVni = (m_inputMethod == InputMethod::VNI);
+        int segStarts[24]{};
+        int segLens[24]{};
+        const int segCount = partitionMixedCaseSubwordsForMethod(m_rawWord, m_rawLen, m_inputMethod, segStarts, segLens);
         if (segCount >= 2) {
             const int lastStart = segStarts[segCount - 1];
             const int lastLen = segLens[segCount - 1];
@@ -3625,15 +3823,18 @@ int32_t NativeEngineState::feedBackspace() {
             for (int i = 0; i < lastStart && newRawLen < kMaxWordTokens - 1; ++i) {
                 newRaw[newRawLen++] = m_rawWord[i];
             }
-            bool lastAllCaps = true;
+            bool lastAllCapsOrDigits = true;
             for (int j = 0; j < lastLen; ++j) {
-                if (!(m_rawWord[lastStart + j] >= L'A' && m_rawWord[lastStart + j] <= L'Z')) {
-                    lastAllCaps = false;
+                const wchar_t c = m_rawWord[lastStart + j];
+                const bool okUpper = (c >= L'A' && c <= L'Z');
+                const bool okDigit = (isVni && c >= L'0' && c <= L'9');
+                if (!okUpper && !okDigit) {
+                    lastAllCapsOrDigits = false;
                     break;
                 }
             }
-            bool lastDirectPop = lastAllCaps;
-            if (!lastDirectPop) {
+            bool lastDirectPop = lastAllCapsOrDigits;
+            if (!lastDirectPop && !isVni) {
                 wchar_t lastLower[kMaxWordTokens]{};
                 for (int j = 0; j < lastLen; ++j) {
                     lastLower[j] = toLowerAscii(m_rawWord[lastStart + j]);
@@ -3650,12 +3851,12 @@ int32_t NativeEngineState::feedBackspace() {
                 NativeEngineState sub{};
                 sub.m_inputMethod = m_inputMethod;
                 sub.m_grammarProfile = m_grammarProfile;
-                sub.m_smartBilingual = true;
+                sub.m_smartBilingual = m_smartBilingual;
                 sub.m_modernOrthography = m_modernOrthography;
                 sub.m_quickTelex = m_quickTelex;
                 sub.m_relaxedCoda = false;
-                sub.m_inEnglishContext = true;
-                sub.m_lastWordWasEnglishAnchor = true;
+                sub.m_inEnglishContext = !isVni;
+                sub.m_lastWordWasEnglishAnchor = !isVni;
                 sub.m_inSubwordEval = true;
                 for (int j = 0; j < lastLen; ++j) {
                     sub.feedChar(static_cast<uint32_t>(m_rawWord[lastStart + j]));
