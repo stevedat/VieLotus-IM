@@ -219,6 +219,22 @@ jobs:
           CHANGES="$(ls /tmp/deb-src/vielotus_*-1_*.changes | head -n 1)"
           lintian -I --fail-on error,warning --tag-display-limit 0 "$CHANGES"
 
+      - name: Run Debian DEP-8 autopkgtest suite
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
+          VERSION="${VERSION:-2.0.9}"
+          LIB_DEB="$(ls /tmp/deb-src/libvielotus0_${VERSION}-1_*.deb | head -n 1)"
+          FCITX_DEB="$(ls /tmp/deb-src/fcitx5-vielotus_${VERSION}-1_*.deb | head -n 1)"
+          IBUS_DEB="$(ls /tmp/deb-src/ibus-vielotus_${VERSION}-1_*.deb | head -n 1)"
+          META_DEB="$(ls /tmp/deb-src/vielotus_${VERSION}-1_all.deb | head -n 1)"
+          DSC="/tmp/deb-src/vielotus_${VERSION}-1.dsc"
+          autopkgtest -U --no-built-binaries \
+            "$LIB_DEB" "$FCITX_DEB" "$IBUS_DEB" "$META_DEB" \
+            "$DSC" \
+            -- null
+          apt-get purge -y vielotus fcitx5-vielotus ibus-vielotus libvielotus0 >/dev/null 2>&1 || true
+
       - name: Verify standalone engine installs, co-install, symbol resolution & purge
         run: |
           export DEBIAN_FRONTEND=noninteractive
@@ -298,21 +314,6 @@ jobs:
           rm -rf "$TMP_FCITX_HOME"
           apt-get purge -y vielotus fcitx5-vielotus ibus-vielotus libvielotus0
           apt-get autoremove -y
-
-      - name: Run Debian DEP-8 autopkgtest suite
-        run: |
-          export DEBIAN_FRONTEND=noninteractive
-          VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-          VERSION="${VERSION:-2.0.9}"
-          LIB_DEB="$(ls /tmp/deb-src/libvielotus0_${VERSION}-1_*.deb | head -n 1)"
-          FCITX_DEB="$(ls /tmp/deb-src/fcitx5-vielotus_${VERSION}-1_*.deb | head -n 1)"
-          IBUS_DEB="$(ls /tmp/deb-src/ibus-vielotus_${VERSION}-1_*.deb | head -n 1)"
-          META_DEB="$(ls /tmp/deb-src/vielotus_${VERSION}-1_all.deb | head -n 1)"
-          DSC="/tmp/deb-src/vielotus_${VERSION}-1.dsc"
-          autopkgtest -U --no-built-binaries \
-            "$LIB_DEB" "$FCITX_DEB" "$IBUS_DEB" "$META_DEB" \
-            "$DSC" \
-            -- null
 
   arch-build:
     name: Arch Linux (makepkg + pacman Install + KDE/GNOME Wayland Activation)
