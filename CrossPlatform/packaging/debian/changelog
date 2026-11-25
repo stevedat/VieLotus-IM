@@ -1,3 +1,19 @@
+vielotus (2.0.10-1) unstable; urgency=medium
+
+  * New upstream release 2.0.10:
+    - VNI alphanumeric, mixed-case, and digit-bridge parity across Swift 6 and
+      C++20 (leading digits, phonotactics, 1-step Tone-Replace Rollback,
+      literal desktop Numpad 0-9, and mixed-case compounds such as
+      TPĐạt123TPĐạt123ĐạtTP123 while preserving English CamelCase+digits,
+      hardware acronyms, passwords, and P0.6 repeated-digit escapes).
+    - Windows TSF reliability: fix cross-process Telex/VNI Taskbar switching,
+      restore [V]/[E] LangBar badge, prevent duplicate MSIX/Store entries,
+      hot-reload macros.json, and drop Ctrl+Shift+S hijack.
+    - macOS & Linux polish: clean ESC passthrough in macOS overlays, IBus/Fcitx5
+      preedit/numpad/modifier fixes, and headless Debian DEP-8 autopkgtest gate.
+
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Wed, 25 Nov 2026 17:10:00 +0700
+
 vielotus (2.0.9-1) unstable; urgency=medium
 
   * New upstream release 2.0.9:

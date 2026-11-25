@@ -17,7 +17,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-VERSION="${1:-2.0.9}"
+VERSION="${1:-2.0.10}"
 DEB_REV="${2:-1}"
 OUT_DIR="${ROOT_DIR}/dist/debian-src"
 

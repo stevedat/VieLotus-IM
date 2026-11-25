@@ -1,5 +1,5 @@
 Name:           vielotus
-Version:        2.0.9
+Version:        2.0.10
 Release:        1%{?dist}
 Summary:        Sen Việt (VieLotusIM) - Bộ gõ tiếng Việt thế hệ mới cho Linux (IBus & Fcitx5)
 
@@ -78,6 +78,9 @@ fi
 /usr/share/vielotus/*
 
 %changelog
+* Wed Nov 25 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.10-1
+- Release 2.0.10: VNI alphanumeric/mixed-case/digit-bridge parity, literal Numpad 0-9, Windows TSF Telex/VNI switching fixes, and Linux IBus/Fcitx5/DEP-8 hardening
+
 * Mon Nov 23 2026 Trần Phát Đạt (Steve Dat) <https://github.com/stevedat/VieLotus-IM> - 2.0.9-1
 - Release 2.0.9: CLI/Homebrew-safe macOS installer scripts (exact pkill -x and detached launch)
 

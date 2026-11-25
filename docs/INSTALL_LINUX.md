@@ -25,7 +25,7 @@ sudo apt install vielotus
 Download the matching `vielotus_<version>_<arch>.deb` from the latest release (`amd64` for x86_64, `arm64` for ARM64), then install it with APT. Replace the values below with the downloaded file's version and architecture:
 
 ```sh
-version=2.0.9
+version=2.0.10
 arch=amd64 # use arm64 on ARM64
 sudo apt install "./vielotus_${version}_${arch}.deb"
 ```
