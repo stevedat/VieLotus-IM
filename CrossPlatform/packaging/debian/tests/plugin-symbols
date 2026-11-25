@@ -1,0 +1,54 @@
+#!/usr/bin/python3
+"""Superficial DEP-8 autopkgtest verifying symbol resolution and package files."""
+
+import ctypes
+import os
+import subprocess
+import sys
+
+
+def find_pkg_files(pkg, suffix):
+    out = subprocess.check_output(["dpkg", "-L", pkg], text=True)
+    return [line.strip() for line in out.splitlines() if line.strip().endswith(suffix)]
+
+
+def main():
+    capi_libs = find_pkg_files("libvielotus0", "/libVieLotusCAPI.so.0")
+    assert capi_libs, "libVieLotusCAPI.so.0 missing from libvielotus0"
+    for lib_path in capi_libs:
+        ctypes.CDLL(lib_path, mode=os.RTLD_NOW)
+        print(f"Loaded core library (RTLD_NOW): {lib_path}")
+
+    fcitx_libs = find_pkg_files("fcitx5-vielotus", "/fcitx5/vielotus.so")
+    assert fcitx_libs, "fcitx5/vielotus.so missing from fcitx5-vielotus"
+    for lib_path in fcitx_libs:
+        ctypes.CDLL(lib_path, mode=os.RTLD_NOW)
+        print(f"Loaded Fcitx5 addon (RTLD_NOW): {lib_path}")
+
+    ibus_bin = "/usr/libexec/ibus-engine-vielotus"
+    assert os.path.isfile(ibus_bin) and os.access(ibus_bin, os.X_OK), f"Missing {ibus_bin}"
+    env = os.environ.copy()
+    env["LC_ALL"] = "C"
+    ldd_out = subprocess.check_output(["ldd", "-r", ibus_bin], env=env, text=True)
+    for bad in ("not found", "undefined symbol"):
+        assert bad not in ldd_out, f"Dynamic linker error ({bad}) in {ibus_bin}:\n{ldd_out}"
+    print(f"Verified dynamic symbols (ldd -r): {ibus_bin}")
+
+    required_files = [
+        "/usr/share/fcitx5/addon/vielotus.conf",
+        "/usr/share/fcitx5/inputmethod/vielotus-telex.conf",
+        "/usr/share/fcitx5/inputmethod/vielotus-vni.conf",
+        "/usr/share/fcitx5/vielotus/typing-modes.yml",
+        "/usr/share/ibus/component/vielotus.xml",
+        "/usr/share/ibus-vielotus/typing-modes.yml",
+        "/usr/bin/vielotus-settings",
+    ]
+    for path in required_files:
+        assert os.path.isfile(path) and os.path.getsize(path) > 0, f"Missing or empty {path}"
+    assert os.path.islink("/usr/bin/vielotus"), "/usr/bin/vielotus symlink missing"
+
+    print("plugin-symbols: PASS")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

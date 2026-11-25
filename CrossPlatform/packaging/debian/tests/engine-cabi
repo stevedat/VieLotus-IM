@@ -1,0 +1,163 @@
+#!/usr/bin/python3
+"""Headless DEP-8 autopkgtest for libvielotus0 (C-ABI engine core)."""
+
+import ctypes
+import os
+import subprocess
+import sys
+import unicodedata
+
+VIELOTUS_INPUT_TELEX = 0
+VIELOTUS_INPUT_VNI = 1
+VIELOTUS_GRAMMAR_CLASSIC = 0
+VIELOTUS_GRAMMAR_SEN_FLEX = 1
+VIELOTUS_ACTION_COMMIT = 3
+
+
+def load_capi():
+    so_path = os.environ.get("VIELOTUS_CAPI_LIB", "libVieLotusCAPI.so.0")
+    if so_path == "libVieLotusCAPI.so.0" and not os.path.exists(so_path):
+        # Verify the package owns a multi-arch SONAME library on Debian
+        if os.path.exists("/usr/bin/dpkg"):
+            files = subprocess.check_output(
+                ["dpkg", "-L", "libvielotus0"], text=True
+            ).splitlines()
+            matches = [f for f in files if f.endswith("/libVieLotusCAPI.so.0")]
+            assert matches, f"libVieLotusCAPI.so.0 not found in libvielotus0: {files}"
+    lib = ctypes.CDLL(so_path, mode=os.RTLD_NOW)
+
+    lib.vielotus_get_version.restype = ctypes.c_char_p
+    lib.vielotus_create_session.restype = ctypes.c_void_p
+    lib.vielotus_destroy_session.argtypes = [ctypes.c_void_p]
+    lib.vielotus_reset_session.argtypes = [ctypes.c_void_p]
+    lib.vielotus_set_input_method.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+    lib.vielotus_set_grammar_profile.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+    lib.vielotus_get_grammar_profile.argtypes = [ctypes.c_void_p]
+    lib.vielotus_get_grammar_profile.restype = ctypes.c_int32
+    lib.vielotus_set_smart_bilingual.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+    lib.vielotus_set_modern_orthography.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+    lib.vielotus_set_macro_enabled.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+    lib.vielotus_set_relaxed_coda.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+    lib.vielotus_load_macros_json.argtypes = [ctypes.c_char_p]
+    lib.vielotus_load_macros_json.restype = ctypes.c_bool
+    lib.vielotus_reset_default_macros.argtypes = []
+    lib.vielotus_feed_char.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    lib.vielotus_feed_char.restype = ctypes.c_int32
+    lib.vielotus_feed_backspace.argtypes = [ctypes.c_void_p]
+    lib.vielotus_feed_backspace.restype = ctypes.c_int32
+    lib.vielotus_commit_word.argtypes = [ctypes.c_void_p]
+    lib.vielotus_commit_word.restype = ctypes.c_int32
+    lib.vielotus_is_composing.argtypes = [ctypes.c_void_p]
+    lib.vielotus_is_composing.restype = ctypes.c_bool
+    lib.vielotus_get_composing_text.argtypes = [ctypes.c_void_p]
+    lib.vielotus_get_composing_text.restype = ctypes.c_char_p
+    lib.vielotus_get_last_text.argtypes = [ctypes.c_void_p]
+    lib.vielotus_get_last_text.restype = ctypes.c_char_p
+    return lib
+
+
+def drive_sequence(lib, session, mode, keystrokes):
+    lib.vielotus_set_input_method(session, mode)
+    lib.vielotus_reset_session(session)
+    committed = []
+    for ch in keystrokes:
+        code = ord(ch)
+        is_alpha = ("a" <= ch <= "z") or ("A" <= ch <= "Z")
+        is_digit = "0" <= ch <= "9"
+        is_word = is_alpha or (
+            mode == VIELOTUS_INPUT_VNI and is_digit and lib.vielotus_is_composing(session)
+        )
+        if not is_word:
+            if lib.vielotus_is_composing(session):
+                lib.vielotus_feed_char(session, code)
+                txt = lib.vielotus_get_last_text(session)
+                committed.append((txt.decode("utf-8") if txt else "") + ch)
+                lib.vielotus_reset_session(session)
+            else:
+                lib.vielotus_feed_char(session, code)
+                committed.append(ch)
+            continue
+
+        action = lib.vielotus_feed_char(session, code)
+        if action == VIELOTUS_ACTION_COMMIT:
+            txt = lib.vielotus_get_last_text(session)
+            if txt:
+                committed.append(txt.decode("utf-8"))
+            lib.vielotus_reset_session(session)
+
+    if lib.vielotus_is_composing(session):
+        lib.vielotus_commit_word(session)
+        txt = lib.vielotus_get_last_text(session)
+        if txt:
+            committed.append(txt.decode("utf-8"))
+        lib.vielotus_reset_session(session)
+
+    return "".join(committed)
+
+
+def main():
+    lib = load_capi()
+    ver = lib.vielotus_get_version()
+    assert ver, "vielotus_get_version() returned empty"
+    ver_str = ver.decode("utf-8")
+    assert "." in ver_str, f"Unexpected version format: {ver_str!r}"
+    print(f"Loaded libVieLotusCAPI version {ver_str}")
+
+    session = lib.vielotus_create_session()
+    assert session, "vielotus_create_session() returned NULL"
+    try:
+        # Grammar profile roundtrip
+        lib.vielotus_set_grammar_profile(session, VIELOTUS_GRAMMAR_CLASSIC)
+        assert lib.vielotus_get_grammar_profile(session) == VIELOTUS_GRAMMAR_CLASSIC
+        lib.vielotus_set_grammar_profile(session, VIELOTUS_GRAMMAR_SEN_FLEX)
+        assert lib.vielotus_get_grammar_profile(session) == VIELOTUS_GRAMMAR_SEN_FLEX
+
+        lib.vielotus_set_smart_bilingual(session, True)
+        lib.vielotus_set_modern_orthography(session, True)
+        lib.vielotus_set_macro_enabled(session, False)
+        lib.vielotus_set_relaxed_coda(session, False)
+
+        typing_cases = [
+            (VIELOTUS_INPUT_TELEX, "vieetj nam ddax hoaf binhf", "việt nam đã hoà bình"),
+            (VIELOTUS_INPUT_TELEX, "dduwocj", "được"),
+            (VIELOTUS_INPUT_TELEX, "huwou", "hươu"),
+            (VIELOTUS_INPUT_TELEX, "uwfaaa", "ừaaa"),
+            (VIELOTUS_INPUT_TELEX, "dessert", "dessert"),
+            (VIELOTUS_INPUT_TELEX, "saveFile", "saveFile"),
+            (VIELOTUS_INPUT_TELEX, "unit test commit print(x) ", "unit test commit print(x) "),
+            (VIELOTUS_INPUT_VNI, "vie65t nam d9a4 hoa2 binh2", "việt nam đã hoà bình"),
+            (VIELOTUS_INPUT_VNI, "d9uo75c", "được"),
+        ]
+        for mode, raw, expected in typing_cases:
+            got = drive_sequence(lib, session, mode, raw)
+            assert got == expected, f"mode={mode} raw={raw!r}: got {got!r}, expected {expected!r}"
+            assert unicodedata.normalize("NFC", got) == got, f"Non-NFC output: {got!r}"
+
+        # Backspace & session reset
+        lib.vielotus_set_input_method(session, VIELOTUS_INPUT_TELEX)
+        lib.vielotus_reset_session(session)
+        for ch in "vieetj":
+            lib.vielotus_feed_char(session, ord(ch))
+        assert lib.vielotus_is_composing(session)
+        lib.vielotus_feed_backspace(session)
+        after_bs = lib.vielotus_get_composing_text(session).decode("utf-8")
+        assert after_bs != "việt" and len(after_bs) > 0, f"Unexpected backspace state: {after_bs!r}"
+        lib.vielotus_reset_session(session)
+        assert not lib.vielotus_is_composing(session)
+
+        # Macro JSON reload + invalid JSON rejection + reset
+        lib.vielotus_set_macro_enabled(session, True)
+        assert lib.vielotus_load_macros_json(b'{"vltest": "Sen Vi\\u1ec7t"}')
+        assert not lib.vielotus_load_macros_json(b"{invalid json")
+        got_macro = drive_sequence(lib, session, VIELOTUS_INPUT_TELEX, "vltest ")
+        assert got_macro == "Sen Việt ", f"Macro expansion failed: got {got_macro!r}"
+        lib.vielotus_reset_default_macros()
+        lib.vielotus_set_macro_enabled(session, False)
+    finally:
+        lib.vielotus_destroy_session(session)
+
+    print("engine-cabi: PASS")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

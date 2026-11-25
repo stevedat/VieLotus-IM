@@ -173,7 +173,8 @@ with tarfile.open(fileobj=deb_buf, mode="w", format=tarfile.GNU_FORMAT) as tf:
             sub_rel = os.path.relpath(fp, deb_src).replace(os.sep, "/")
             arc = f"debian/{sub_rel}"
             ti = tf.gettarinfo(fp, arcname=arc)
-            ti.mode = 0o755 if (fn == "rules" or fn.endswith((".postinst", ".postrm", ".preinst", ".prerm"))) else 0o644
+            is_exec_test = sub_rel.startswith("tests/") and fn != "control"
+            ti.mode = 0o755 if (fn == "rules" or fn.endswith((".postinst", ".postrm", ".preinst", ".prerm")) or is_exec_test) else 0o644
             with open(fp, "rb") as f:
                 tf.addfile(norm_tarinfo(ti), fileobj=f)
 
@@ -213,6 +214,21 @@ vcs_git = parse_deb822_field(src_stanza, "Vcs-Git")
 build_deps = parse_deb822_field(src_stanza, "Build-Depends")
 build_deps = ", ".join(p.strip() for p in build_deps.split(",") if p.strip())
 
+own_binaries = set(re.findall(r"^Package:\s*(\S+)", control_text, re.M))
+testsuite_lines = ""
+tests_ctrl_path = os.path.join(deb_src, "tests", "control")
+if os.path.isfile(tests_ctrl_path):
+    tc_text = open(tests_ctrl_path, "r", encoding="utf-8").read()
+    triggers = set()
+    for dep_block in re.findall(r"^Depends:\s*(.*?)(?=\n[^\s#:]+:|\n\s*\n|\Z)", tc_text, re.M | re.S):
+        for alt in re.split(r"[,|]", dep_block):
+            tok = alt.strip().split()[0] if alt.strip() else ""
+            if tok and not tok.startswith("@") and tok not in own_binaries:
+                triggers.add(tok)
+    testsuite_lines = "Testsuite: autopkgtest\n"
+    if triggers:
+        testsuite_lines += f"Testsuite-Triggers: {', '.join(sorted(triggers))}\n"
+
 dsc_content = f"""Format: 3.0 (quilt)
 Source: vielotus
 Binary: libvielotus0, ibus-vielotus, fcitx5-vielotus, vielotus
@@ -223,7 +239,7 @@ Homepage: {homepage}
 Standards-Version: {standards}
 Vcs-Browser: {vcs_browser}
 Vcs-Git: {vcs_git}
-Build-Depends: {build_deps}
+{testsuite_lines}Build-Depends: {build_deps}
 Package-List:
  fcitx5-vielotus deb utils optional arch=any
  ibus-vielotus deb utils optional arch=any

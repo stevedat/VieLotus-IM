@@ -161,6 +161,8 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get install -y --no-install-recommends \
+            apt-utils \
+            autopkgtest \
             build-essential \
             ca-certificates \
             cmake \
@@ -204,6 +206,7 @@ jobs:
           DSC="/tmp/deb-src/vielotus_${VERSION}-1.dsc"
           CHANGES="$(ls /tmp/deb-src/vielotus_${VERSION}-1_*.changes | head -n 1)"
           grep -q '^Vcs-Git: https://github.com/stevedat/VieLotus-IM.git \[CrossPlatform/packaging\]$' "$DSC"
+          grep -q '^Testsuite: autopkgtest$' "$DSC"
           if grep -qi '^Closes:' "$CHANGES"; then
             echo "::error::Unexpected Closes field in $CHANGES (ITP #1152533 was already closed in 2.0.1-1)"
             cat "$CHANGES"
@@ -295,6 +298,21 @@ jobs:
           rm -rf "$TMP_FCITX_HOME"
           apt-get purge -y vielotus fcitx5-vielotus ibus-vielotus libvielotus0
           apt-get autoremove -y
+
+      - name: Run Debian DEP-8 autopkgtest suite
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
+          VERSION="${VERSION:-2.0.9}"
+          LIB_DEB="$(ls /tmp/deb-src/libvielotus0_${VERSION}-1_*.deb | head -n 1)"
+          FCITX_DEB="$(ls /tmp/deb-src/fcitx5-vielotus_${VERSION}-1_*.deb | head -n 1)"
+          IBUS_DEB="$(ls /tmp/deb-src/ibus-vielotus_${VERSION}-1_*.deb | head -n 1)"
+          META_DEB="$(ls /tmp/deb-src/vielotus_${VERSION}-1_all.deb | head -n 1)"
+          DSC="/tmp/deb-src/vielotus_${VERSION}-1.dsc"
+          autopkgtest \
+            "$LIB_DEB" "$FCITX_DEB" "$IBUS_DEB" "$META_DEB" \
+            -B "$DSC" \
+            -- null
 
   arch-build:
     name: Arch Linux (makepkg + pacman Install + KDE/GNOME Wayland Activation)

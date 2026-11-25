@@ -1,0 +1,9 @@
+Tests: engine-cabi
+Depends: libvielotus0, python3
+
+Tests: plugin-symbols
+Depends: @, python3
+Restrictions: superficial
+
+Tests: settings-cli
+Depends: ibus-vielotus, python3

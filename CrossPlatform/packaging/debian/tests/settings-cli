@@ -1,0 +1,118 @@
+#!/usr/bin/python3
+"""Headless DEP-8 autopkgtest for vielotus-settings CLI and Fcitx5 profile hygiene."""
+
+import os
+import subprocess
+import sys
+import tempfile
+
+
+def run_settings(script, args, env):
+    res = subprocess.run(
+        [script, *args],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 0, (
+        f"{script} {args} failed ({res.returncode}):\n"
+        f"stdout:\n{res.stdout}\nstderr:\n{res.stderr}"
+    )
+    assert not res.stderr.strip(), (
+        f"Unexpected stderr from {script} {args}:\n{res.stderr}"
+    )
+    return res.stdout
+
+
+def main():
+    script = os.environ.get("VIELOTUS_SETTINGS_BIN", "/usr/bin/vielotus-settings")
+    assert os.path.isfile(script) and os.access(script, os.X_OK), f"Missing {script}"
+
+    # Verify Debian packaging never installs system fontconfig overrides or login autostart
+    for forbidden in (
+        "/etc/fonts/conf.d/51-vielotus-vietnamese.conf",
+        "/etc/xdg/autostart/vielotus-onboard.desktop",
+    ):
+        assert not os.path.exists(forbidden), f"Forbidden system file present: {forbidden}"
+
+    tmp_root = os.environ.get("AUTOPKGTEST_TMP") or tempfile.mkdtemp(prefix="vl-adt-")
+    home_dir = os.path.join(tmp_root, "home")
+    cfg_dir = os.path.join(home_dir, ".config")
+    os.makedirs(cfg_dir, exist_ok=True)
+
+    env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": home_dir,
+        "XDG_CONFIG_HOME": cfg_dir,
+        "LC_ALL": "C.UTF-8",
+    }
+
+    # 1. Saving preferences must not create fcitx5/profile
+    run_settings(script, ["--vni"], env)
+    status = run_settings(script, ["--status"], env)
+    assert "INPUT_METHOD=vni" in status.splitlines(), f"Expected INPUT_METHOD=vni:\n{status}"
+    fcitx_profile = os.path.join(cfg_dir, "fcitx5", "profile")
+    assert not os.path.exists(fcitx_profile), "--vni must not create fcitx5/profile"
+
+    # 2. Seed existing VNI-default Fcitx5 profile (without Telex)
+    os.makedirs(os.path.dirname(fcitx_profile), exist_ok=True)
+    seed_profile = (
+        "[Groups/0]\n"
+        "Name=Default\n"
+        "Default Layout=us\n"
+        "DefaultIM=vielotus-vni\n"
+        "\n"
+        "[Groups/0/Items/0]\n"
+        "Name=keyboard-us\n"
+        "Layout=\n"
+        "\n"
+        "[Groups/0/Items/1]\n"
+        "Name=vielotus-vni\n"
+        "Layout=\n"
+        "\n"
+        "[GroupOrder]\n"
+        "0=Default\n"
+    )
+    with open(fcitx_profile, "w", encoding="utf-8") as f:
+        f.write(seed_profile)
+
+    # 3. --telex saves VieLotus preference only; Fcitx5 profile must remain byte-identical
+    run_settings(script, ["--telex"], env)
+    status = run_settings(script, ["--status"], env)
+    assert "INPUT_METHOD=telex" in status.splitlines(), f"Expected INPUT_METHOD=telex:\n{status}"
+    with open(fcitx_profile, "r", encoding="utf-8") as f:
+        assert f.read() == seed_profile, "--telex unexpectedly mutated fcitx5/profile"
+
+    # 4. --activate without --set-default keeps vielotus-vni, appends vielotus-telex, preserves DefaultIM
+    run_settings(script, ["--activate"], env)
+    with open(fcitx_profile, "r", encoding="utf-8") as f:
+        after_activate = f.read()
+    lines = set(after_activate.splitlines())
+    assert "Name=vielotus-vni" in lines, f"vielotus-vni lost:\n{after_activate}"
+    assert "Name=vielotus-telex" in lines, f"vielotus-telex not added:\n{after_activate}"
+    assert "DefaultIM=vielotus-vni" in lines, f"DefaultIM changed without --set-default:\n{after_activate}"
+
+    # 5. --activate --set-default updates DefaultIM while keeping both entries
+    run_settings(script, ["--activate", "--set-default"], env)
+    with open(fcitx_profile, "r", encoding="utf-8") as f:
+        after_default = f.read()
+    lines = set(after_default.splitlines())
+    assert "Name=vielotus-vni" in lines, f"vielotus-vni lost on --set-default:\n{after_default}"
+    assert "Name=vielotus-telex" in lines, f"vielotus-telex lost on --set-default:\n{after_default}"
+    assert "DefaultIM=vielotus-telex" in lines, f"DefaultIM not updated:\n{after_default}"
+
+    # 6. Empty profile without --set-default initializes DefaultIM=keyboard-us + vielotus-telex
+    with open(fcitx_profile, "w", encoding="utf-8") as f:
+        f.write("")
+    run_settings(script, ["--activate"], env)
+    with open(fcitx_profile, "r", encoding="utf-8") as f:
+        after_fresh = f.read()
+    lines = set(after_fresh.splitlines())
+    assert "DefaultIM=keyboard-us" in lines, f"Fresh profile changed DefaultIM:\n{after_fresh}"
+    assert "Name=vielotus-telex" in lines, f"Fresh profile missing vielotus-telex:\n{after_fresh}"
+
+    print("settings-cli: PASS")
+
+
+if __name__ == "__main__":
+    sys.exit(main())
