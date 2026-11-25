@@ -17,49 +17,94 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
     func showSettingsWindow() {
         DispatchQueue.main.async {
             NSApp.setActivationPolicy(.regular)
-            
+
             if let existingWindow = self.window {
                 existingWindow.setContentSize(NSSize(width: 640, height: 420))
-                existingWindow.makeKeyAndOrderFront(nil)
-                self.activateApp()
+                self.bringWindowToFront(existingWindow)
                 return
             }
-            
+
             let settingsView = SettingsView()
             let hostingController = NSHostingController(rootView: settingsView)
-            
+
             let newWindow = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 640, height: 420),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
             )
-            
+
             newWindow.title = "Cài đặt Sen Việt"
             newWindow.titlebarAppearsTransparent = false
             newWindow.isMovableByWindowBackground = true
+            newWindow.collectionBehavior.insert([.moveToActiveSpace, .fullScreenAuxiliary])
             newWindow.contentViewController = hostingController
             newWindow.setContentSize(NSSize(width: 640, height: 420))
             newWindow.contentMinSize = NSSize(width: 640, height: 420)
-            newWindow.center()
+            self.centerWindowOnActiveScreen(newWindow)
             newWindow.isReleasedWhenClosed = false
             newWindow.delegate = self
-            
+
             self.window = newWindow
-            newWindow.makeKeyAndOrderFront(nil)
+            self.bringWindowToFront(newWindow)
+        }
+    }
+
+    private func centerWindowOnActiveScreen(_ targetWindow: NSWindow) {
+        let mouseLocation = NSEvent.mouseLocation
+        if let activeScreen = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) }) ?? NSScreen.main {
+            let visible = activeScreen.visibleFrame
+            let size = targetWindow.frame.size
+            let origin = NSPoint(
+                x: visible.midX - size.width / 2.0,
+                y: visible.midY - size.height / 2.0
+            )
+            targetWindow.setFrameOrigin(origin)
+        } else {
+            targetWindow.center()
+        }
+    }
+
+    private func bringWindowToFront(_ targetWindow: NSWindow) {
+        targetWindow.collectionBehavior.insert([.moveToActiveSpace, .fullScreenAuxiliary])
+        if targetWindow.isMiniaturized {
+            targetWindow.deminiaturize(nil)
+        }
+        activateApp()
+        targetWindow.orderFrontRegardless()
+        targetWindow.makeKeyAndOrderFront(nil)
+
+        // TextInputMenuAgent finishes dismissing the Input Menu dropdown ~20–60ms after
+        // invoking openSettings() and can restore focus to the host app; the .accessory -> .regular
+        // activation policy transform also settles asynchronously. Re-assert foreground once.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self, weak targetWindow] in
+            guard let self, let targetWindow, self.window === targetWindow, targetWindow.isVisible else {
+                return
+            }
             self.activateApp()
+            targetWindow.orderFrontRegardless()
+            targetWindow.makeKeyAndOrderFront(nil)
         }
     }
 
     private func activateApp() {
-        if #available(macOS 14.0, *) {
-            NSApp.activate()
-        } else {
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        // Cooperative NSApp.activate() on macOS 14+ is silently ignored when an InputMethodKit
+        // server is invoked from TextInputMenuAgent without cooperative yield from the active app.
+        NSRunningApplication.current.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+        NSApp.activate(ignoringOtherApps: true)
     }
     
     func windowWillClose(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        guard let closedWindow = notification.object as? NSWindow,
+              closedWindow === self.window else {
+            return
+        }
+        closedWindow.delegate = nil
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.window === closedWindow else { return }
+            closedWindow.contentViewController = nil
+            self.window = nil
+        }
     }
 }

@@ -7,6 +7,11 @@ import NaturalLanguage
 internal protocol LanguageRecognizerProvider: Sendable {
     func isDominantLanguageEnglish(_ text: String) -> Bool
     func isConfidentEnglishContext(_ context: String) -> Bool
+    func purgeCaches(keepingCapacity: Bool)
+}
+
+extension LanguageRecognizerProvider {
+    internal func purgeCaches(keepingCapacity: Bool) {}
 }
 
 #if canImport(NaturalLanguage)
@@ -38,6 +43,15 @@ internal final class AppleLanguageRecognizerProvider: LanguageRecognizerProvider
     private var confidentContextCacheKeys: [String] = []
 
     internal init() {}
+
+    internal func purgeCaches(keepingCapacity: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        dominantLangCache.removeAll(keepingCapacity: keepingCapacity)
+        dominantLangCacheKeys.removeAll(keepingCapacity: keepingCapacity)
+        confidentContextCache.removeAll(keepingCapacity: keepingCapacity)
+        confidentContextCacheKeys.removeAll(keepingCapacity: keepingCapacity)
+    }
 
     private func storeConfidentContextCache(_ context: String, result: Bool) {
         if confidentContextCacheKeys.count >= Self.confidentContextCacheCapacity {

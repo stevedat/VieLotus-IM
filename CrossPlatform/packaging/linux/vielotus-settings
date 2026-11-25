@@ -1260,7 +1260,7 @@ try:
     import gi
     gi.require_version("Gtk", "3.0")
     gi.require_version("GdkPixbuf", "2.0")
-    from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Pango
+    from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib, Pango
 except Exception:
     sys.exit(2)
 
@@ -1274,6 +1274,44 @@ macros_path = os.path.join(config_dir, "macros.json")
 typing_modes_path = os.path.join(config_dir, "typing-modes.yml")
 smoke_mode = len(sys.argv) > 2 and sys.argv[2] == "1"
 invoked_script = sys.argv[3] if len(sys.argv) > 3 else "/usr/bin/vielotus-settings"
+
+def _has_usable_session_dbus():
+    addr = os.environ.get("DBUS_SESSION_BUS_ADDRESS", "").strip()
+    if addr:
+        if addr.startswith("unix:path="):
+            sock_path = addr[len("unix:path="):].split(",", 1)[0]
+            return os.path.exists(sock_path)
+        return True
+    rt = os.environ.get("XDG_RUNTIME_DIR", "").strip()
+    return bool(rt and os.path.exists(os.path.join(rt, "bus")))
+
+# Protocol-safe single-instance via Gio.Application on session D-Bus:
+# - Skipped in smoke_mode (CI/xvfb-run) or minimal WMs without a live session bus
+#   (avoids 25s D-Bus autolaunch hangs or GError crashes).
+# - If another window is already open, wakes/raises it over D-Bus and exits before
+#   allocating GTK widgets (~40 MB RAM saved and zero config.env write races).
+single_instance_app = None
+if not smoke_mode and _has_usable_session_dbus():
+    try:
+        _app_flags = getattr(
+            Gio.ApplicationFlags,
+            "DEFAULT_FLAGS",
+            getattr(Gio.ApplicationFlags, "FLAGS_NONE", 0),
+        )
+        _app = Gio.Application(
+            application_id="org.vielotus.VieLotusSettings",
+            flags=_app_flags,
+        )
+        if _app.register(None):
+            if _app.get_is_remote():
+                _app.activate()
+                _conn = _app.get_dbus_connection()
+                if _conn is not None:
+                    _conn.flush_sync(None)
+                sys.exit(0)
+            single_instance_app = _app
+    except Exception:
+        single_instance_app = None
 
 FACTORY_DEFAULT_MACROS = {
     "sg": "Sài Gòn",
@@ -1332,43 +1370,49 @@ CANONICAL_KEYS = (
     "AUTOSTART",
 )
 
-cfg = {
-    "INPUT_METHOD": "telex",
-    "GRAMMAR_PROFILE": "classic",
-    "SMART_BILINGUAL": "true",
-    "MODERN_ORTHOGRAPHY": "true",
-    "QUICK_TELEX": "false",
-    "RELAXED_CODA": "false",
-    "MACRO_ENABLED": "false",
-    "DEVELOPER_MODE": "false",
-    "PREEDIT_UNDERLINE": "false",
-    "AUTOSTART": "true",
-}
-if os.path.exists(config_path):
-    with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            if "=" in line and not line.lstrip().startswith("#"):
-                k, v = line.strip().split("=", 1)
-                cfg[k.strip()] = v.strip().strip('"').strip("'")
+def reload_cfg_from_disk():
+    defaults = {
+        "INPUT_METHOD": "telex",
+        "GRAMMAR_PROFILE": "classic",
+        "SMART_BILINGUAL": "true",
+        "MODERN_ORTHOGRAPHY": "true",
+        "QUICK_TELEX": "false",
+        "RELAXED_CODA": "false",
+        "MACRO_ENABLED": "false",
+        "DEVELOPER_MODE": "false",
+        "PREEDIT_UNDERLINE": "false",
+        "AUTOSTART": "true",
+    }
+    cfg.update(defaults)
+    if os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if "=" in line and not line.lstrip().startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    cfg[k.strip()] = v.strip().strip('"').strip("'")
 
-# Normalize legacy values without clobbering user preferences
-cfg["INPUT_METHOD"] = "vni" if cfg.get("INPUT_METHOD", "").lower() == "vni" else "telex"
-cfg["GRAMMAR_PROFILE"] = "sen_flex" if cfg.get("GRAMMAR_PROFILE", "").lower() in ("sen_flex", "senflex") else "classic"
-for bool_key, default_val in (
-    ("SMART_BILINGUAL", "true"),
-    ("MODERN_ORTHOGRAPHY", "true"),
-    ("QUICK_TELEX", "false"),
-    ("RELAXED_CODA", "false"),
-    ("MACRO_ENABLED", "false"),
-    ("DEVELOPER_MODE", "false"),
-    ("PREEDIT_UNDERLINE", "false"),
-    ("AUTOSTART", "true"),
-):
-    raw_b = cfg.get(bool_key, default_val).strip().lower()
-    if default_val == "true":
-        cfg[bool_key] = "false" if raw_b in ("false", "0", "no", "off") else "true"
-    else:
-        cfg[bool_key] = "true" if raw_b in ("true", "1", "yes", "on") else "false"
+    # Normalize legacy values without clobbering user preferences
+    cfg["INPUT_METHOD"] = "vni" if cfg.get("INPUT_METHOD", "").lower() == "vni" else "telex"
+    cfg["GRAMMAR_PROFILE"] = "sen_flex" if cfg.get("GRAMMAR_PROFILE", "").lower() in ("sen_flex", "senflex") else "classic"
+    for bool_key, default_val in (
+        ("SMART_BILINGUAL", "true"),
+        ("MODERN_ORTHOGRAPHY", "true"),
+        ("QUICK_TELEX", "false"),
+        ("RELAXED_CODA", "false"),
+        ("MACRO_ENABLED", "false"),
+        ("DEVELOPER_MODE", "false"),
+        ("PREEDIT_UNDERLINE", "false"),
+        ("AUTOSTART", "true"),
+    ):
+        raw_b = cfg.get(bool_key, default_val).strip().lower()
+        if default_val == "true":
+            cfg[bool_key] = "false" if raw_b in ("false", "0", "no", "off") else "true"
+        else:
+            cfg[bool_key] = "true" if raw_b in ("true", "1", "yes", "on") else "false"
+
+cfg = {}
+reload_cfg_from_disk()
+_syncing_from_disk = False
 
 def atomic_write_text(path, content):
     parent = os.path.dirname(os.path.abspath(path))
@@ -2553,11 +2597,15 @@ def refresh_tile3_chrome():
     tile3.show_all()
 
 def on_qt_toggled(btn):
+    if _syncing_from_disk:
+        return
     cfg["QUICK_TELEX"] = "true" if btn.get_active() else "false"
     refresh_tile3_chrome()
     save_current_config()
 
 def on_rc_toggled(btn):
+    if _syncing_from_disk:
+        return
     cfg["RELAXED_CODA"] = "true" if btn.get_active() else "false"
     refresh_tile3_chrome()
     save_current_config()
@@ -3831,12 +3879,58 @@ footer_bar.pack_end(btn_f_fb, False, False, 0)
 
 root_vbox.pack_end(footer_bar, False, False, 0)
 
+def _present_window_safely(target_win):
+    try:
+        target_win.deiconify()
+    except Exception:
+        pass
+    try:
+        target_win.show()
+    except Exception:
+        pass
+    try:
+        ev_time = Gtk.get_current_event_time()
+        if ev_time:
+            target_win.present_with_time(ev_time)
+        else:
+            target_win.present()
+    except Exception:
+        try:
+            target_win.present()
+        except Exception:
+            pass
+
+def _on_remote_activate(_app):
+    global _syncing_from_disk
+    try:
+        _syncing_from_disk = True
+        reload_cfg_from_disk()
+        chk_qt.set_active(cfg["QUICK_TELEX"] == "true")
+        chk_rc.set_active(cfg["RELAXED_CODA"] == "true")
+        refresh_hero_cards()
+        refresh_tile1()
+        refresh_tile2()
+        refresh_tile3_chrome()
+        refresh_tile4()
+        refresh_status_card()
+        refresh_autostart_card()
+        refresh_test_entry_placeholder()
+        refresh_footer_status()
+    except Exception:
+        pass
+    finally:
+        _syncing_from_disk = False
+    _present_window_safely(win)
+
+if single_instance_app is not None:
+    try:
+        single_instance_app.connect("activate", _on_remote_activate)
+    except Exception:
+        pass
+
 win.connect("destroy", Gtk.main_quit)
 win.show_all()
-try:
-    win.present()
-except Exception:
-    pass
+_present_window_safely(win)
 
 def _capture_gtk_window_png(gtk_win, out_path):
     try:

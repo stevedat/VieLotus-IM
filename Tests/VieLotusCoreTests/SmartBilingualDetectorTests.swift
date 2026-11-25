@@ -345,6 +345,46 @@ final class SmartBilingualDetectorTests: XCTestCase {
         }
     }
 
+    func testDirectLexiconCompoundSplitsRespectCacheLimitAndPurgeClearsAllCaches() {
+        SmartBilingualDetector.resetCache()
+        let previousLimit = SmartBilingualDetector.maxCacheEntries
+        defer {
+            SmartBilingualDetector.maxCacheEntries = previousLimit
+            SmartBilingualDetector.resetCache()
+        }
+
+        // Exercise isKnownEnglishWord -> isInflectedOrCompoundDoubleConsonantEnglishWord -> isDirectEnglishLexiconWord
+        // with a tight cap so compound splits must never bypass maxCacheEntries or leak out of cacheKeys.
+        SmartBilingualDetector.maxCacheEntries = 16
+        for i in 0..<24 {
+            let token = "zzbb\(String(repeating: "a", count: (i % 4) + 1))xx\(Character(UnicodeScalar(97 + (i % 26))!))ing"
+            _ = SmartBilingualDetector.isKnownEnglishWord(token)
+        }
+        XCTAssertLessThanOrEqual(SmartBilingualDetector.cacheCount, 16)
+        SmartBilingualDetector.lockForTesting {
+            XCTAssertEqual(SmartBilingualDetector.spellCheckCache.count, SmartBilingualDetector.cacheKeys.count)
+        }
+
+        // Verify configureCacheLimit clamps minimum to 64 and evicts overflow cleanly
+        SmartBilingualDetector.maxCacheEntries = 128
+        for i in 0..<100 {
+            _ = SmartBilingualDetector.isEnglishWord(raw: "limitprobe\(i)")
+        }
+        SmartBilingualDetector.configureCacheLimit(64)
+        XCTAssertLessThanOrEqual(SmartBilingualDetector.cacheCount, 64)
+        SmartBilingualDetector.configureCacheLimit(10)
+        XCTAssertEqual(SmartBilingualDetector.maxCacheEntries, 64)
+
+        // Verify low-memory purge drains spell-check and context caches completely
+        _ = SmartBilingualDetector.isEnglishWord(raw: "test", context: "please check the server status")
+        SmartBilingualDetector.purgeMemoryForLowMemoryWarning()
+        XCTAssertEqual(SmartBilingualDetector.cacheCount, 0)
+        SmartBilingualDetector.lockForTesting {
+            XCTAssertTrue(SmartBilingualDetector.cacheKeys.isEmpty)
+            XCTAssertTrue(SmartBilingualDetector.contextConfidenceCache.isEmpty)
+        }
+    }
+
     func testEnglishDiacriticCollisionWordsRestoredWithoutContext() {
         let testWords = [
             ("test", "tét"),

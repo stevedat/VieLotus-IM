@@ -1665,11 +1665,11 @@ public struct BilingualIntentArbiter: Sendable {
     private static var arbitrationCache: [ArbitrationCacheKey: BilingualArbitrationResult] = [:]
     private static var arbitrationCacheKeys: [ArbitrationCacheKey] = []
 
-    internal static func resetArbitrationCache() {
+    internal static func resetArbitrationCache(keepingCapacity: Bool = true) {
         arbitrationCacheLock.lock()
         defer { arbitrationCacheLock.unlock() }
-        arbitrationCache.removeAll(keepingCapacity: true)
-        arbitrationCacheKeys.removeAll(keepingCapacity: true)
+        arbitrationCache.removeAll(keepingCapacity: keepingCapacity)
+        arbitrationCacheKeys.removeAll(keepingCapacity: keepingCapacity)
     }
 
     /// Arbitrates between Raw Literal, Vietnamese Telex, and Explicit Escape/User-Selected candidates.

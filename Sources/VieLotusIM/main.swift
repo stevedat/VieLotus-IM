@@ -5,6 +5,7 @@ import VieLotusTrace
 
 final class VieLotusIMAppDelegate: NSObject, NSApplicationDelegate {
     private var server: IMKServer?
+    private var memoryPressureSource: DispatchSourceMemoryPressure?
 
     override init() {
         super.init()
@@ -22,14 +23,25 @@ final class VieLotusIMAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSLog("VieLotusIM (Sen Việt): Application finished launching and ready for input")
 
-        // Pre-warm NaturalLanguage recognizer & system spell daemon when main runloop is idle
-        DispatchQueue.main.async {
-            _ = SmartBilingualDetector.isEnglishWord(raw: "test", context: "vietlotus cold start prewarm")
+        // Pre-warm NaturalLanguage recognizer & bilingual lookup tables off the main thread
+        SmartBilingualDetector.warmUpModelsAsync()
+
+        // Proactively release bilingual/NLP caches when macOS signals memory pressure
+        let pressureSource = DispatchSource.makeMemoryPressureSource(
+            eventMask: [.warning, .critical],
+            queue: DispatchQueue.global(qos: .utility)
+        )
+        pressureSource.setEventHandler {
+            SmartBilingualDetector.purgeMemoryForLowMemoryWarning()
         }
+        pressureSource.resume()
+        memoryPressureSource = pressureSource
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         NSLog("VieLotusIM (Sen Việt): InputMethodKit server terminating")
+        memoryPressureSource?.cancel()
+        memoryPressureSource = nil
         CFPreferencesAppSynchronize(kCFPreferencesCurrentApplication)
     }
 }

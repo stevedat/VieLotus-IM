@@ -27,26 +27,79 @@ public struct SmartBilingualDetector {
 
     internal static func resetCache() {
         lock.lock()
-        defer { lock.unlock() }
         spellCheckCache.removeAll(keepingCapacity: true)
         cacheKeys.removeAll(keepingCapacity: true)
         contextConfidenceCache.removeAll(keepingCapacity: true)
         contextConfidenceKeys.removeAll(keepingCapacity: true)
         rawContextConfidenceCache.removeAll(keepingCapacity: true)
         rawContextConfidenceKeys.removeAll(keepingCapacity: true)
-        BilingualIntentArbiter.resetArbitrationCache()
+        let provider = languageRecognizerProvider
+        lock.unlock()
+        provider.purgeCaches(keepingCapacity: true)
+        BilingualIntentArbiter.resetArbitrationCache(keepingCapacity: true)
     }
 
     public static func purgeMemoryForLowMemoryWarning() {
         lock.lock()
-        defer { lock.unlock() }
         spellCheckCache.removeAll(keepingCapacity: false)
         cacheKeys.removeAll(keepingCapacity: false)
         contextConfidenceCache.removeAll(keepingCapacity: false)
         contextConfidenceKeys.removeAll(keepingCapacity: false)
         rawContextConfidenceCache.removeAll(keepingCapacity: false)
         rawContextConfidenceKeys.removeAll(keepingCapacity: false)
-        BilingualIntentArbiter.resetArbitrationCache()
+        let provider = languageRecognizerProvider
+        lock.unlock()
+        provider.purgeCaches(keepingCapacity: false)
+        BilingualIntentArbiter.resetArbitrationCache(keepingCapacity: false)
+    }
+
+    /// Configures the upper bound of `spellCheckCache` (clamped to at least 64 entries)
+    /// and immediately evicts oldest entries if the current cache exceeds the new ceiling.
+    /// Useful on memory-constrained environments such as the iOS Keyboard Extension.
+    public static func configureCacheLimit(_ limit: Int) {
+        let clamped = max(64, limit)
+        lock.lock()
+        maxCacheEntries = clamped
+        if spellCheckCache.count > clamped {
+            let overflow = spellCheckCache.count - clamped
+            let actualEvict = min(overflow, cacheKeys.count)
+            if actualEvict > 0 {
+                let keysToEvict = Array(cacheKeys.prefix(actualEvict))
+                for oldKey in keysToEvict {
+                    spellCheckCache.removeValue(forKey: oldKey)
+                }
+                cacheKeys.removeFirst(actualEvict)
+            }
+            if spellCheckCache.count > clamped {
+                spellCheckCache.removeAll(keepingCapacity: false)
+                cacheKeys.removeAll(keepingCapacity: false)
+            }
+        }
+        lock.unlock()
+    }
+
+    /// Inserts or updates a spell-check cache entry while holding `lock`, guaranteeing
+    /// that every key is tracked in `cacheKeys` and `spellCheckCache.count <= maxCacheEntries`.
+    private static func storeSpellCheckCacheLocked(_ key: String, value: Bool, preferTrue: Bool = false) {
+        if spellCheckCache[key] == nil {
+            if spellCheckCache.count >= maxCacheEntries {
+                let evictCount = max(1, maxCacheEntries / 4)
+                let actualEvict = min(evictCount, cacheKeys.count)
+                if actualEvict > 0 {
+                    let keysToEvict = Array(cacheKeys.prefix(actualEvict))
+                    for oldKey in keysToEvict {
+                        spellCheckCache.removeValue(forKey: oldKey)
+                    }
+                    cacheKeys.removeFirst(actualEvict)
+                } else {
+                    spellCheckCache.removeAll(keepingCapacity: true)
+                }
+            }
+            cacheKeys.append(key)
+            spellCheckCache[key] = value
+        } else if !preferTrue || value {
+            spellCheckCache[key] = value
+        }
     }
 
     /// Pre-warms `NLLanguageRecognizer` and static bilingual lookup tables off the main thread
@@ -969,21 +1022,7 @@ public struct SmartBilingualDetector {
                 (spellCheckerProvider?.isWordInEnglishDictionary(raw) ?? false)
 
             lock.lock()
-            if spellCheckCache[lowerRaw] == nil {
-                if spellCheckCache.count >= maxCacheEntries {
-                    let evictCount = max(1, maxCacheEntries / 4)
-                    let actualEvict = min(evictCount, cacheKeys.count)
-                    let keysToEvict = Array(cacheKeys.prefix(actualEvict))
-                    for oldKey in keysToEvict {
-                        spellCheckCache.removeValue(forKey: oldKey)
-                    }
-                    cacheKeys.removeFirst(actualEvict)
-                }
-                cacheKeys.append(lowerRaw)
-            }
-            if result || spellCheckCache[lowerRaw] == nil {
-                spellCheckCache[lowerRaw] = result
-            }
+            storeSpellCheckCacheLocked(lowerRaw, value: result, preferTrue: true)
             isEnglishDictWord = spellCheckCache[lowerRaw] ?? result
             lock.unlock()
         }
@@ -1657,9 +1696,9 @@ public struct SmartBilingualDetector {
         lock.unlock()
         let res = spellCheckerProvider?.isWordInEnglishDictionary(queryWord) ?? false
         lock.lock()
-        spellCheckCache[queryWord] = res
-        if queryWord == lower || res {
-            spellCheckCache[lower] = res
+        storeSpellCheckCacheLocked(queryWord, value: res)
+        if queryWord != lower && res {
+            storeSpellCheckCacheLocked(lower, value: res, preferTrue: true)
         }
         lock.unlock()
         return res
@@ -1746,26 +1785,9 @@ public struct SmartBilingualDetector {
             isInflectedOrCompoundDoubleConsonantEnglishWord(lower)
 
         lock.lock()
-        if spellCheckCache[word] == nil {
-            if spellCheckCache.count >= maxCacheEntries {
-                let evictCount = max(1, maxCacheEntries / 4)
-                let actualEvict = min(evictCount, cacheKeys.count)
-                let keysToEvict = Array(cacheKeys.prefix(actualEvict))
-                for oldKey in keysToEvict {
-                    spellCheckCache.removeValue(forKey: oldKey)
-                }
-                cacheKeys.removeFirst(actualEvict)
-            }
-            cacheKeys.append(word)
-        }
-        spellCheckCache[word] = result
-        if word == lower || result || spellCheckCache[lower] == nil {
-            if spellCheckCache[lower] == nil {
-                cacheKeys.append(lower)
-            }
-            if result || spellCheckCache[lower] == nil {
-                spellCheckCache[lower] = result
-            }
+        storeSpellCheckCacheLocked(word, value: result)
+        if word != lower && (result || spellCheckCache[lower] == nil) {
+            storeSpellCheckCacheLocked(lower, value: result, preferTrue: true)
         }
         let finalCached = spellCheckCache[word] ?? result
         lock.unlock()
