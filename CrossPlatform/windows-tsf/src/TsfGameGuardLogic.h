@@ -395,4 +395,140 @@ inline bool IsVniDigitModifierKey(bool isVniMode, uint32_t vkCode, uint32_t ch) 
     return isVniMode && !IsNumpadDigitVk(vkCode) && ch >= static_cast<uint32_t>('0') && ch <= static_cast<uint32_t>('9');
 }
 
+// ============================================================================
+// Bidirectional Windows TSF <-> VieLotusSettings Control Panel Sync Policy
+// ============================================================================
+
+inline constexpr uint32_t kSettingsSyncHintReload   = 0u;
+inline constexpr uint32_t kSettingsSyncHintTipTelex = 1u;
+inline constexpr uint32_t kSettingsSyncHintTipVni   = 2u;
+inline constexpr uint32_t kSettingsSyncHintTsfTelex = 3u;
+inline constexpr uint32_t kSettingsSyncHintTsfVni   = 4u;
+
+enum class SettingsPipeCommand {
+    None = 0,
+    ShowWindow = 1,
+    SyncPrefsOnly = 2,
+    SyncTelex = 3,
+    SyncVni = 4
+};
+
+inline SettingsPipeCommand ParseSettingsPipeCommand(const char *buf, size_t len) {
+    if (!buf || len < 4u) {
+        return SettingsPipeCommand::None;
+    }
+    if (buf[0] == 'S' && buf[1] == 'H' && buf[2] == 'O' && buf[3] == 'W') {
+        return SettingsPipeCommand::ShowWindow;
+    }
+    if (buf[0] == 'S' && buf[1] == 'Y' && buf[2] == 'N' && buf[3] == 'C') {
+        return SettingsPipeCommand::SyncPrefsOnly;
+    }
+    if (buf[0] == 'V' && buf[1] == 'N' && buf[2] == 'I' && buf[3] == '0') {
+        return SettingsPipeCommand::SyncTelex;
+    }
+    if (buf[0] == 'V' && buf[1] == 'N' && buf[2] == 'I' && buf[3] == '1') {
+        return SettingsPipeCommand::SyncVni;
+    }
+    return SettingsPipeCommand::None;
+}
+
+enum class SettingsSyncTrigger {
+    InitialCreate = 0,
+    PeriodicOrWindowEvent = 1,
+    TsfProfileNotifySink = 2,
+    TipCrossProcessHint = 3
+};
+
+struct SettingsImSyncInput {
+    SettingsSyncTrigger trigger{SettingsSyncTrigger::PeriodicOrWindowEvent};
+    bool currentUiIsVni{false};
+    bool registryIsVni{false};
+    uint32_t lastSeenImRevision{0};
+    uint32_t currentRegistryImRevision{0};
+    bool hasActiveTsfProfile{false};
+    bool activeTsfIsVni{false};
+    bool hasLastObservedTsf{false};
+    bool lastObservedTsfIsVni{false};
+    bool explicitHintIsVni{false};
+};
+
+struct SettingsImSyncResult {
+    bool nextUiIsVni{false};
+    bool uiChanged{false};
+    bool shouldPersistToRegistry{false};
+    bool shouldSyncProcessProfile{false};
+    bool shouldAutoActivateOnCreate{false};
+};
+
+inline SettingsImSyncResult ResolveSettingsInputMethodSync(const SettingsImSyncInput &in) {
+    SettingsImSyncResult out{};
+    out.nextUiIsVni = in.currentUiIsVni;
+
+    if (in.trigger == SettingsSyncTrigger::InitialCreate) {
+        if (in.hasActiveTsfProfile) {
+            out.nextUiIsVni = in.activeTsfIsVni;
+            out.uiChanged = (out.nextUiIsVni != in.currentUiIsVni);
+            out.shouldPersistToRegistry = (in.registryIsVni != in.activeTsfIsVni);
+            out.shouldSyncProcessProfile = false;
+            out.shouldAutoActivateOnCreate = false;
+        } else {
+            out.nextUiIsVni = in.registryIsVni;
+            out.uiChanged = (out.nextUiIsVni != in.currentUiIsVni);
+            out.shouldPersistToRegistry = false;
+            out.shouldSyncProcessProfile = false;
+            out.shouldAutoActivateOnCreate = true;
+        }
+        return out;
+    }
+
+    if (in.trigger == SettingsSyncTrigger::TsfProfileNotifySink) {
+        // Prefer the live TSF active profile when available so a stale queued OnActivated
+        // message cannot revert a rapid Telex <-> VNI switch made milliseconds later.
+        const bool targetVni = in.hasActiveTsfProfile ? in.activeTsfIsVni : in.explicitHintIsVni;
+        out.nextUiIsVni = targetVni;
+        out.uiChanged = (out.nextUiIsVni != in.currentUiIsVni);
+        out.shouldPersistToRegistry = (in.registryIsVni != targetVni);
+        out.shouldSyncProcessProfile = false;
+        return out;
+    }
+
+    if (in.trigger == SettingsSyncTrigger::TipCrossProcessHint) {
+        out.nextUiIsVni = in.explicitHintIsVni;
+        out.uiChanged = (out.nextUiIsVni != in.currentUiIsVni);
+        out.shouldPersistToRegistry = (in.registryIsVni != in.explicitHintIsVni);
+        out.shouldSyncProcessProfile = (!in.hasActiveTsfProfile || in.activeTsfIsVni != in.explicitHintIsVni);
+        return out;
+    }
+
+    // SettingsSyncTrigger::PeriodicOrWindowEvent
+    const bool unseenRegRev =
+        (in.currentRegistryImRevision != 0u) &&
+        (in.currentRegistryImRevision != in.lastSeenImRevision);
+    const bool tsfChanged =
+        in.hasActiveTsfProfile &&
+        (!in.hasLastObservedTsf || (in.activeTsfIsVni != in.lastObservedTsfIsVni));
+
+    if (unseenRegRev && !tsfChanged) {
+        out.nextUiIsVni = in.registryIsVni;
+        out.uiChanged = (out.nextUiIsVni != in.currentUiIsVni);
+        out.shouldPersistToRegistry = false;
+        out.shouldSyncProcessProfile = (!in.hasActiveTsfProfile || in.activeTsfIsVni != in.registryIsVni);
+        return out;
+    }
+
+    if (tsfChanged) {
+        out.nextUiIsVni = in.activeTsfIsVni;
+        out.uiChanged = (out.nextUiIsVni != in.currentUiIsVni);
+        out.shouldPersistToRegistry = (in.registryIsVni != in.activeTsfIsVni);
+        out.shouldSyncProcessProfile = false;
+        return out;
+    }
+
+    if (in.currentRegistryImRevision == 0u && in.registryIsVni != in.currentUiIsVni) {
+        out.nextUiIsVni = in.registryIsVni;
+        out.uiChanged = true;
+    }
+    return out;
+}
+
 } // namespace vielotus_tsf_guard

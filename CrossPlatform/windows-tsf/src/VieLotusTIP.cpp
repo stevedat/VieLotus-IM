@@ -1328,11 +1328,13 @@ void CVieLotusTIP::HandleLangBarMenuSelect(UINT wID) {
     case LangBarMenuAction::SetTelex:
         ApplyVniMode(false, true);
         SyncActiveLanguageProfile(true);
+        NotifySettingsWindowInputMethodChanged(false);
         UpdateLanguageBar(true);
         break;
     case LangBarMenuAction::SetVni:
         ApplyVniMode(true, true);
         SyncActiveLanguageProfile(true);
+        NotifySettingsWindowInputMethodChanged(true);
         UpdateLanguageBar(true);
         break;
     case LangBarMenuAction::OpenSettings:
@@ -1837,6 +1839,9 @@ STDMETHODIMP CVieLotusTIP::OnActivated(REFCLSID clsid, REFGUID guidProfile, BOOL
             ApplyVniMode(targetVni, persistChoice);
             m_lastInputMethodRevision = LoadInputMethodRevision();
             m_hasInitializedImRevision = true;
+            if (!m_inProfileSync) {
+                NotifySettingsWindowInputMethodChanged(targetVni);
+            }
         }
     }
     return S_OK;

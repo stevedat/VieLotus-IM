@@ -24,6 +24,7 @@ struct VieLotusWindowsPrefs {
 
 inline constexpr UINT kWmVieLotusActivateProfiles = WM_USER + 100;
 inline constexpr UINT kWmVieLotusShowSettings     = WM_USER + 101;
+inline constexpr UINT kWmVieLotusSyncPrefs        = WM_USER + 102;
 inline constexpr UINT kWmVieLotusQuitTray         = WM_USER + 199;
 inline constexpr UINT kWmVieLotusTrayCallback     = WM_USER + 200;
 
@@ -52,3 +53,4 @@ uint32_t LoadInputMethodRevision();
 
 std::wstring GetSettingsWakePipeName();
 bool TryWakeSettingsViaNamedPipe(DWORD waitMs = 50);
+void NotifySettingsWindowInputMethodChanged(bool isVni);

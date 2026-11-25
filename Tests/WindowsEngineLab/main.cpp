@@ -1199,7 +1199,7 @@ int main(int argc, char **argv) {
         }
     };
 
-    int tsfTotal = 35, tsfPass = 0;
+    int tsfTotal = 37, tsfPass = 0;
     auto checkTsf = [&](int id, bool cond, const char *desc, const std::string &actual) {
         if (cond) {
             tsfPass++;
@@ -1900,6 +1900,191 @@ int main(int argc, char **argv) {
         ok = ok && !vl_is_numpad_digit_keysym(0xFFABu); // KP_Add
 #endif
         checkTsf(35, ok, "Desktop Numpad 0-9 literal-digit policy in VNI", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 36: Settings Named Pipe command parser (SHOW / SYNC / VNI0 / VNI1)
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+        ok = ok && (ParseSettingsPipeCommand("SHOW", 4) == SettingsPipeCommand::ShowWindow);
+        ok = ok && (ParseSettingsPipeCommand("SYNC", 4) == SettingsPipeCommand::SyncPrefsOnly);
+        ok = ok && (ParseSettingsPipeCommand("VNI0", 4) == SettingsPipeCommand::SyncTelex);
+        ok = ok && (ParseSettingsPipeCommand("VNI1", 4) == SettingsPipeCommand::SyncVni);
+        ok = ok && (ParseSettingsPipeCommand("VNI1\n", 5) == SettingsPipeCommand::SyncVni);
+        ok = ok && (ParseSettingsPipeCommand("VNI", 3) == SettingsPipeCommand::None);
+        ok = ok && (ParseSettingsPipeCommand("NOOP", 4) == SettingsPipeCommand::None);
+        ok = ok && (ParseSettingsPipeCommand(nullptr, 4) == SettingsPipeCommand::None);
+        checkTsf(36, ok, "Settings Named Pipe command parser (SHOW/SYNC/VNI0/VNI1)", ok ? "OK" : "MISMATCH");
+    }
+
+    // TSF 37: Bidirectional Windows TSF <-> Control Panel (SettingsUI) input method sync policy
+    {
+        using namespace vielotus_tsf_guard;
+        bool ok = true;
+
+        // 1. InitialCreate: Windows TSF already on Telex while stale Registry says VNI
+        //    -> adopt Telex, heal Registry, do NOT call onActivateProfiles(false) to revert!
+        {
+            SettingsImSyncInput in{};
+            in.trigger = SettingsSyncTrigger::InitialCreate;
+            in.currentUiIsVni = true;
+            in.registryIsVni = true;
+            in.hasActiveTsfProfile = true;
+            in.activeTsfIsVni = false;
+            const auto r = ResolveSettingsInputMethodSync(in);
+            ok = ok && !r.nextUiIsVni && r.uiChanged && r.shouldPersistToRegistry &&
+                 !r.shouldSyncProcessProfile && !r.shouldAutoActivateOnCreate;
+        }
+
+        // 2. InitialCreate: Windows TSF on ENG US (Sen Viet inactive), Registry says VNI
+        //    -> keep Registry VNI and auto-activate Sen Viet on open.
+        {
+            SettingsImSyncInput in{};
+            in.trigger = SettingsSyncTrigger::InitialCreate;
+            in.currentUiIsVni = true;
+            in.registryIsVni = true;
+            in.hasActiveTsfProfile = false;
+            const auto r = ResolveSettingsInputMethodSync(in);
+            ok = ok && r.nextUiIsVni && !r.uiChanged && !r.shouldPersistToRegistry &&
+                 !r.shouldSyncProcessProfile && r.shouldAutoActivateOnCreate;
+        }
+
+        // 3. TsfProfileNotifySink: Win+Spacebar switches VNI -> Telex while Settings open
+        //    -> update UI immediately, heal stale Registry; skip Registry write if already synced;
+        //    live TSF active profile overrides a stale queued OnActivated hint on rapid double-switch.
+        {
+            SettingsImSyncInput in{};
+            in.trigger = SettingsSyncTrigger::TsfProfileNotifySink;
+            in.currentUiIsVni = true;
+            in.registryIsVni = true;
+            in.hasActiveTsfProfile = true;
+            in.activeTsfIsVni = false;
+            in.explicitHintIsVni = false;
+            const auto r = ResolveSettingsInputMethodSync(in);
+            ok = ok && !r.nextUiIsVni && r.uiChanged && r.shouldPersistToRegistry && !r.shouldSyncProcessProfile;
+
+            in.registryIsVni = false;
+            const auto rAlreadyReg = ResolveSettingsInputMethodSync(in);
+            ok = ok && !rAlreadyReg.nextUiIsVni && rAlreadyReg.uiChanged && !rAlreadyReg.shouldPersistToRegistry;
+
+            // Stale queued VNI hint while live TSF is already back on Telex -> live TSF wins
+            in.currentUiIsVni = false;
+            in.explicitHintIsVni = true;
+            const auto rStale = ResolveSettingsInputMethodSync(in);
+            ok = ok && !rStale.nextUiIsVni && !rStale.uiChanged && !rStale.shouldPersistToRegistry;
+        }
+
+        // 4. TipCrossProcessHint from AppContainer host (e.g. Win11 Notepad / Edge):
+        //    AppContainer couldn't write Registry (still VNI) -> Settings updates UI to Telex,
+        //    heals Registry on its behalf, and syncs Settings' own process profile.
+        {
+            SettingsImSyncInput in{};
+            in.trigger = SettingsSyncTrigger::TipCrossProcessHint;
+            in.currentUiIsVni = true;
+            in.registryIsVni = true;
+            in.hasActiveTsfProfile = true;
+            in.activeTsfIsVni = true;
+            in.explicitHintIsVni = false;
+            const auto r = ResolveSettingsInputMethodSync(in);
+            ok = ok && !r.nextUiIsVni && r.uiChanged && r.shouldPersistToRegistry && r.shouldSyncProcessProfile;
+        }
+
+        // 5. TipCrossProcessHint from Win32 host (e.g. Chrome LangBar): Registry already Telex -> no redundant write
+        {
+            SettingsImSyncInput in{};
+            in.trigger = SettingsSyncTrigger::TipCrossProcessHint;
+            in.currentUiIsVni = true;
+            in.registryIsVni = false;
+            in.hasActiveTsfProfile = true;
+            in.activeTsfIsVni = false;
+            in.explicitHintIsVni = false;
+            const auto r = ResolveSettingsInputMethodSync(in);
+            ok = ok && !r.nextUiIsVni && r.uiChanged && !r.shouldPersistToRegistry && !r.shouldSyncProcessProfile;
+        }
+
+        // 6. PeriodicOrWindowEvent: Desktop Win+Spacebar switch (VNI -> Telex, rev unchanged)
+        //    -> detects TSF profile transition, updates UI & heals Registry.
+        {
+            SettingsImSyncInput in{};
+            in.trigger = SettingsSyncTrigger::PeriodicOrWindowEvent;
+            in.currentUiIsVni = true;
+            in.registryIsVni = true;
+            in.lastSeenImRevision = 5u;
+            in.currentRegistryImRevision = 5u;
+            in.hasActiveTsfProfile = true;
+            in.activeTsfIsVni = false;
+            in.hasLastObservedTsf = true;
+            in.lastObservedTsfIsVni = true;
+            const auto r = ResolveSettingsInputMethodSync(in);
+            ok = ok && !r.nextUiIsVni && r.uiChanged && r.shouldPersistToRegistry && !r.shouldSyncProcessProfile;
+        }
+
+        // 7. PeriodicOrWindowEvent (Per-window mode ON): another app bumped rev 5->6 (Telex),
+        //    Settings' own TSF stayed unchanged at VNI -> adopt Registry Telex & sync process profile.
+        {
+            SettingsImSyncInput in{};
+            in.trigger = SettingsSyncTrigger::PeriodicOrWindowEvent;
+            in.currentUiIsVni = true;
+            in.registryIsVni = false;
+            in.lastSeenImRevision = 5u;
+            in.currentRegistryImRevision = 6u;
+            in.hasActiveTsfProfile = true;
+            in.activeTsfIsVni = true;
+            in.hasLastObservedTsf = true;
+            in.lastObservedTsfIsVni = true;
+            const auto r = ResolveSettingsInputMethodSync(in);
+            ok = ok && !r.nextUiIsVni && r.uiChanged && !r.shouldPersistToRegistry && r.shouldSyncProcessProfile;
+        }
+
+        // 8. Anti-ping-pong after Case 7: next timer tick (rev 6==6, TSF still unchanged at VNI)
+        //    -> MUST stay Telex with zero writes and zero redraws!
+        {
+            SettingsImSyncInput in{};
+            in.trigger = SettingsSyncTrigger::PeriodicOrWindowEvent;
+            in.currentUiIsVni = false;
+            in.registryIsVni = false;
+            in.lastSeenImRevision = 6u;
+            in.currentRegistryImRevision = 6u;
+            in.hasActiveTsfProfile = true;
+            in.activeTsfIsVni = true;
+            in.hasLastObservedTsf = true;
+            in.lastObservedTsfIsVni = true;
+            const auto r = ResolveSettingsInputMethodSync(in);
+            ok = ok && !r.nextUiIsVni && !r.uiChanged && !r.shouldPersistToRegistry && !r.shouldSyncProcessProfile;
+        }
+
+        // 9. Steady state: zero redraws, zero writes, zero COM activations
+        {
+            SettingsImSyncInput in{};
+            in.trigger = SettingsSyncTrigger::PeriodicOrWindowEvent;
+            in.currentUiIsVni = false;
+            in.registryIsVni = false;
+            in.lastSeenImRevision = 6u;
+            in.currentRegistryImRevision = 6u;
+            in.hasActiveTsfProfile = true;
+            in.activeTsfIsVni = false;
+            in.hasLastObservedTsf = true;
+            in.lastObservedTsfIsVni = false;
+            const auto r = ResolveSettingsInputMethodSync(in);
+            ok = ok && !r.nextUiIsVni && !r.uiChanged && !r.shouldPersistToRegistry && !r.shouldSyncProcessProfile;
+        }
+
+        // 10. ENG US (hasLastObservedTsf=false) -> Sen Viet Telex while UI/Registry were VNI
+        {
+            SettingsImSyncInput in{};
+            in.trigger = SettingsSyncTrigger::PeriodicOrWindowEvent;
+            in.currentUiIsVni = true;
+            in.registryIsVni = true;
+            in.lastSeenImRevision = 6u;
+            in.currentRegistryImRevision = 6u;
+            in.hasActiveTsfProfile = true;
+            in.activeTsfIsVni = false;
+            in.hasLastObservedTsf = false;
+            const auto r = ResolveSettingsInputMethodSync(in);
+            ok = ok && !r.nextUiIsVni && r.uiChanged && r.shouldPersistToRegistry;
+        }
+
+        checkTsf(37, ok, "Bidirectional TSF <-> Control Panel input method sync state machine", ok ? "OK" : "MISMATCH");
     }
 
     // =========================================================================

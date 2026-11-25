@@ -4,6 +4,7 @@
 
 #include <windows.h>
 #include <objidl.h>
+#include <msctf.h>
 #include <gdiplus.h>
 #include <dwmapi.h>
 #include <shellapi.h>
@@ -25,9 +26,30 @@
 #define PIPE_REJECT_REMOTE_CLIENTS 0x00000008
 #endif
 
+#ifndef TF_PROFILETYPE_INPUTPROCESSOR
+#define TF_PROFILETYPE_INPUTPROCESSOR 1
+#endif
+#ifndef TF_INVALID_COOKIE
+#define TF_INVALID_COOKIE ((DWORD)(-1))
+#endif
+
 namespace {
 
 using namespace Gdiplus;
+
+static constexpr LANGID kViLangId = 0x042A;
+static constexpr UINT_PTR kTimerIdSyncPrefs = 101;
+
+// Must stay bit-for-bit identical to Globals.cpp CLSID_VieLotusTIP / GUID_VieLotusProfile*
+static const GUID kClsidVieLotusTip = {
+    0xc7b08e9d, 0x4762, 0x4c97, { 0x8b, 0x1f, 0x52, 0x21, 0x97, 0xa5, 0x98, 0xde }
+};
+static const GUID kGuidVieLotusProfileTelex = {
+    0x8e2a7b44, 0x5a1f, 0x4b82, { 0x9b, 0x7c, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc }
+};
+static const GUID kGuidVieLotusProfileVni = {
+    0x8e2a7b45, 0x5a1f, 0x4b82, { 0x9b, 0x7c, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc }
+};
 
 static HINSTANCE g_settingsInst{nullptr};
 
@@ -177,9 +199,38 @@ static DWORD WINAPI SettingsWakePipeThreadProc(LPVOID param) {
                     GetOverlappedResult(hPipe, &ovRead, &canceled, TRUE);
                 }
             }
-            if (readOk && bytesRead >= 4 && std::memcmp(buf, "SHOW", 4) == 0) {
-                if (IsWindow(srv->targetHwnd)) {
+            if (readOk && IsWindow(srv->targetHwnd)) {
+                using vielotus_tsf_guard::SettingsPipeCommand;
+                switch (vielotus_tsf_guard::ParseSettingsPipeCommand(buf, static_cast<size_t>(bytesRead))) {
+                case SettingsPipeCommand::ShowWindow:
                     PostMessageW(srv->targetHwnd, kWmVieLotusShowSettings, 0, 0);
+                    break;
+                case SettingsPipeCommand::SyncPrefsOnly:
+                    PostMessageW(
+                        srv->targetHwnd,
+                        kWmVieLotusSyncPrefs,
+                        static_cast<WPARAM>(vielotus_tsf_guard::kSettingsSyncHintReload),
+                        0
+                    );
+                    break;
+                case SettingsPipeCommand::SyncTelex:
+                    PostMessageW(
+                        srv->targetHwnd,
+                        kWmVieLotusSyncPrefs,
+                        static_cast<WPARAM>(vielotus_tsf_guard::kSettingsSyncHintTipTelex),
+                        0
+                    );
+                    break;
+                case SettingsPipeCommand::SyncVni:
+                    PostMessageW(
+                        srv->targetHwnd,
+                        kWmVieLotusSyncPrefs,
+                        static_cast<WPARAM>(vielotus_tsf_guard::kSettingsSyncHintTipVni),
+                        0
+                    );
+                    break;
+                case SettingsPipeCommand::None:
+                    break;
                 }
             }
             DisconnectNamedPipe(hPipe);
@@ -230,6 +281,57 @@ struct SettingsDialogInitParams {
     VieLotusActivateProfilesFn onActivateProfiles{nullptr};
 };
 
+class SettingsProfileNotifySink final : public ITfActiveLanguageProfileNotifySink {
+public:
+    explicit SettingsProfileNotifySink(HWND hwndTarget) : m_hwndTarget(hwndTarget) {}
+
+    void Detach() {
+        m_hwndTarget = nullptr;
+    }
+
+    STDMETHODIMP QueryInterface(REFIID riid, void **ppvObj) override {
+        if (!ppvObj) return E_POINTER;
+        *ppvObj = nullptr;
+        if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_ITfActiveLanguageProfileNotifySink)) {
+            *ppvObj = static_cast<ITfActiveLanguageProfileNotifySink *>(this);
+            AddRef();
+            return S_OK;
+        }
+        return E_NOINTERFACE;
+    }
+
+    STDMETHODIMP_(ULONG) AddRef() override {
+        return static_cast<ULONG>(InterlockedIncrement(&m_cRef));
+    }
+
+    STDMETHODIMP_(ULONG) Release() override {
+        LONG c = InterlockedDecrement(&m_cRef);
+        if (c == 0) {
+            delete this;
+        }
+        return static_cast<ULONG>(c);
+    }
+
+    STDMETHODIMP OnActivated(REFCLSID clsid, REFGUID guidProfile, BOOL fActivated) override {
+        if (fActivated && m_hwndTarget && IsWindow(m_hwndTarget) && IsEqualCLSID(clsid, kClsidVieLotusTip)) {
+            WPARAM hint = 0;
+            if (IsEqualGUID(guidProfile, kGuidVieLotusProfileTelex)) {
+                hint = static_cast<WPARAM>(vielotus_tsf_guard::kSettingsSyncHintTsfTelex);
+            } else if (IsEqualGUID(guidProfile, kGuidVieLotusProfileVni)) {
+                hint = static_cast<WPARAM>(vielotus_tsf_guard::kSettingsSyncHintTsfVni);
+            }
+            if (hint != 0) {
+                PostMessageW(m_hwndTarget, kWmVieLotusSyncPrefs, hint, 0);
+            }
+        }
+        return S_OK;
+    }
+
+private:
+    LONG m_cRef{1};
+    HWND m_hwndTarget{nullptr};
+};
+
 struct BentoSettingsState {
     VieLotusWindowsPrefs prefs{};
     int selectedTab{0}; // 0 = Cài đặt, 1 = Thông tin
@@ -244,9 +346,227 @@ struct BentoSettingsState {
     HBRUSH hEditBgBrush{nullptr};
     std::wstring conflictImeSummary{};
     ULONGLONG lastConflictScanMs{0};
+    uint32_t lastImRevision{0};
+    bool hasLastObservedTsf{false};
+    bool lastObservedTsfIsVni{false};
+    ITfThreadMgr *pThreadMgr{nullptr};
+    DWORD profileNotifyCookie{TF_INVALID_COOKIE};
+    SettingsProfileNotifySink *profileNotifySink{nullptr};
     VieLotusActivateProfilesFn onActivateProfiles{nullptr};
     SettingsWakePipeServer *wakePipeServer{nullptr};
 };
+
+static bool QueryActiveSenVietTsfProfile(bool &outIsVni) {
+    outIsVni = false;
+    ITfInputProcessorProfiles *pProfiles = nullptr;
+    if (FAILED(CoCreateInstance(
+            CLSID_TF_InputProcessorProfiles,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_ITfInputProcessorProfiles,
+            reinterpret_cast<void **>(&pProfiles)
+        )) || !pProfiles) {
+        return false;
+    }
+
+    bool matched = false;
+    ITfInputProcessorProfileMgr *pProfileMgr = nullptr;
+    if (SUCCEEDED(pProfiles->QueryInterface(
+            IID_ITfInputProcessorProfileMgr,
+            reinterpret_cast<void **>(&pProfileMgr)
+        )) && pProfileMgr) {
+        TF_INPUTPROCESSORPROFILE activeProfile{};
+        if (SUCCEEDED(pProfileMgr->GetActiveProfile(GUID_TFCAT_TIP_KEYBOARD, &activeProfile)) &&
+            IsEqualCLSID(activeProfile.clsid, kClsidVieLotusTip)) {
+            if (IsEqualGUID(activeProfile.guidProfile, kGuidVieLotusProfileVni)) {
+                outIsVni = true;
+                matched = true;
+            } else if (IsEqualGUID(activeProfile.guidProfile, kGuidVieLotusProfileTelex)) {
+                outIsVni = false;
+                matched = true;
+            }
+        }
+        pProfileMgr->Release();
+    }
+    pProfiles->Release();
+    return matched;
+}
+
+static void ActivateSettingsProcessProfile(bool isVni) {
+    ITfInputProcessorProfiles *pProfiles = nullptr;
+    if (FAILED(CoCreateInstance(
+            CLSID_TF_InputProcessorProfiles,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_ITfInputProcessorProfiles,
+            reinterpret_cast<void **>(&pProfiles)
+        )) || !pProfiles) {
+        return;
+    }
+
+    const GUID &targetGuid = isVni ? kGuidVieLotusProfileVni : kGuidVieLotusProfileTelex;
+    ITfInputProcessorProfileMgr *pProfileMgr = nullptr;
+    if (SUCCEEDED(pProfiles->QueryInterface(
+            IID_ITfInputProcessorProfileMgr,
+            reinterpret_cast<void **>(&pProfileMgr)
+        )) && pProfileMgr) {
+        pProfileMgr->ActivateProfile(
+            TF_PROFILETYPE_INPUTPROCESSOR,
+            kViLangId,
+            kClsidVieLotusTip,
+            targetGuid,
+            nullptr,
+            static_cast<DWORD>(vielotus_tsf_guard::kActivateProfileProcessFlags)
+        );
+        pProfileMgr->Release();
+    }
+    pProfiles->Release();
+}
+
+static void StartSettingsProfileNotifySink(BentoSettingsState *st, HWND hwnd) {
+    if (!st || !hwnd || st->profileNotifySink) return;
+    ITfThreadMgr *pThreadMgr = nullptr;
+    if (FAILED(CoCreateInstance(
+            CLSID_TF_ThreadMgr,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_ITfThreadMgr,
+            reinterpret_cast<void **>(&pThreadMgr)
+        )) || !pThreadMgr) {
+        return;
+    }
+
+    ITfSource *pSource = nullptr;
+    if (SUCCEEDED(pThreadMgr->QueryInterface(IID_ITfSource, reinterpret_cast<void **>(&pSource))) && pSource) {
+        auto *sink = new (std::nothrow) SettingsProfileNotifySink(hwnd);
+        if (sink) {
+            DWORD cookie = TF_INVALID_COOKIE;
+            if (SUCCEEDED(pSource->AdviseSink(
+                    IID_ITfActiveLanguageProfileNotifySink,
+                    static_cast<ITfActiveLanguageProfileNotifySink *>(sink),
+                    &cookie
+                ))) {
+                st->pThreadMgr = pThreadMgr;
+                st->profileNotifySink = sink;
+                st->profileNotifyCookie = cookie;
+                pSource->Release();
+                return;
+            }
+            sink->Detach();
+            sink->Release();
+        }
+        pSource->Release();
+    }
+    pThreadMgr->Release();
+}
+
+static void StopSettingsProfileNotifySink(BentoSettingsState *st) {
+    if (!st) return;
+    if (st->profileNotifySink) {
+        st->profileNotifySink->Detach();
+    }
+    if (st->pThreadMgr) {
+        if (st->profileNotifyCookie != TF_INVALID_COOKIE) {
+            ITfSource *pSource = nullptr;
+            if (SUCCEEDED(st->pThreadMgr->QueryInterface(IID_ITfSource, reinterpret_cast<void **>(&pSource))) && pSource) {
+                pSource->UnadviseSink(st->profileNotifyCookie);
+                pSource->Release();
+            }
+            st->profileNotifyCookie = TF_INVALID_COOKIE;
+        }
+        st->pThreadMgr->Release();
+        st->pThreadMgr = nullptr;
+    }
+    if (st->profileNotifySink) {
+        st->profileNotifySink->Release();
+        st->profileNotifySink = nullptr;
+    }
+}
+
+static void UpdateTestEditCueBanner(BentoSettingsState *st) {
+    if (!st || !st->hTestEdit) return;
+    const wchar_t *cue = st->prefs.isVni
+        ? L"G\u00F5 th\u1EED (VNI): tru7o7ng3 \u2192 tr\u01B0\u1EDFng \u2022 12ha2 \u2192 12h\u00E0 \u2022 window user..."
+        : L"G\u00F5 th\u1EED (Telex): truowngr \u2192 tr\u01B0\u1EDFng \u2022 12haf \u2192 12h\u00E0 \u2022 window user...";
+    SendMessageW(st->hTestEdit, 0x1501, TRUE, reinterpret_cast<LPARAM>(cue));
+}
+
+static vielotus_tsf_guard::SettingsImSyncResult SyncSettingsWithSystemInputMethod(
+    HWND hwnd,
+    BentoSettingsState *st,
+    vielotus_tsf_guard::SettingsSyncTrigger trigger,
+    bool explicitHintIsVni = false,
+    bool reloadAllPrefs = false
+) {
+    vielotus_tsf_guard::SettingsImSyncResult result{};
+    if (!st) return result;
+
+    const bool oldUiVni = st->prefs.isVni;
+    VieLotusWindowsPrefs regPrefs{};
+    LoadVieLotusPrefs(regPrefs);
+    const uint32_t currentImRev = LoadInputMethodRevision();
+
+    bool otherPrefsChanged = false;
+    if (reloadAllPrefs) {
+        otherPrefsChanged =
+            (regPrefs.vietnameseEnabled != st->prefs.vietnameseEnabled) ||
+            (regPrefs.smartBilingual != st->prefs.smartBilingual) ||
+            (regPrefs.modernOrthography != st->prefs.modernOrthography) ||
+            (regPrefs.senFlex != st->prefs.senFlex) ||
+            (regPrefs.macroEnabled != st->prefs.macroEnabled) ||
+            (regPrefs.developerMode != st->prefs.developerMode) ||
+            (regPrefs.quickTelex != st->prefs.quickTelex) ||
+            (regPrefs.relaxedCoda != st->prefs.relaxedCoda) ||
+            (regPrefs.autoBypassRemoteApps != st->prefs.autoBypassRemoteApps) ||
+            (regPrefs.startWithWindows != st->prefs.startWithWindows);
+        const bool keepUiVni = st->prefs.isVni;
+        st->prefs = regPrefs;
+        st->prefs.isVni = keepUiVni;
+    }
+
+    bool activeTsfIsVni = false;
+    const bool hasActiveTsf = QueryActiveSenVietTsfProfile(activeTsfIsVni);
+
+    vielotus_tsf_guard::SettingsImSyncInput in{};
+    in.trigger = trigger;
+    in.currentUiIsVni = oldUiVni;
+    in.registryIsVni = regPrefs.isVni;
+    in.lastSeenImRevision = st->lastImRevision;
+    in.currentRegistryImRevision = currentImRev;
+    in.hasActiveTsfProfile = hasActiveTsf;
+    in.activeTsfIsVni = activeTsfIsVni;
+    in.hasLastObservedTsf = st->hasLastObservedTsf;
+    in.lastObservedTsfIsVni = st->lastObservedTsfIsVni;
+    in.explicitHintIsVni = explicitHintIsVni;
+
+    result = vielotus_tsf_guard::ResolveSettingsInputMethodSync(in);
+
+    st->prefs.isVni = result.nextUiIsVni;
+    if (result.shouldPersistToRegistry) {
+        SavePersistedVniPreference(st->prefs.isVni);
+        st->lastImRevision = LoadInputMethodRevision();
+    } else {
+        st->lastImRevision = currentImRev;
+    }
+
+    if (result.shouldSyncProcessProfile) {
+        ActivateSettingsProcessProfile(st->prefs.isVni);
+        bool refreshedVni = st->prefs.isVni;
+        st->hasLastObservedTsf = QueryActiveSenVietTsfProfile(refreshedVni);
+        st->lastObservedTsfIsVni = st->hasLastObservedTsf ? refreshedVni : st->prefs.isVni;
+    } else {
+        st->hasLastObservedTsf = hasActiveTsf;
+        st->lastObservedTsfIsVni = activeTsfIsVni;
+    }
+
+    if (result.uiChanged) {
+        UpdateTestEditCueBanner(st);
+    }
+    if ((result.uiChanged || otherPrefsChanged) && hwnd && IsWindow(hwnd)) {
+        InvalidateRect(hwnd, nullptr, FALSE);
+    }
+    return result;
+}
 
 static void RefreshConflictSummaryThrottled(BentoSettingsState *st, bool force = false) {
     if (!st) return;
@@ -930,7 +1250,9 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
             );
             if (!st->hTestEdit) {
                 g.DrawString(
-                    L"truowngr \u2192 tr\u01B0\u1EDFng \u2022 12haf \u2192 12h\u00E0 \u2022 window user",
+                    st->prefs.isVni
+                        ? L"tru7o7ng3 \u2192 tr\u01B0\u1EDFng \u2022 12ha2 \u2192 12h\u00E0 \u2022 window user"
+                        : L"truowngr \u2192 tr\u01B0\u1EDFng \u2022 12haf \u2192 12h\u00E0 \u2022 window user",
                     -1, &fSub, RectF(110.0f * s, 332.0f * s, 476.0f * s, 40.0f * s), &sfLeft, &secondaryBrush
                 );
             }
@@ -1778,6 +2100,7 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
                 constexpr DWORD kMsgFltAllow = 1; // MSGFLT_ALLOW
                 pfnFilter(hwnd, kWmVieLotusShowSettings, kMsgFltAllow, nullptr);
                 pfnFilter(hwnd, kWmVieLotusActivateProfiles, kMsgFltAllow, nullptr);
+                pfnFilter(hwnd, kWmVieLotusSyncPrefs, kMsgFltAllow, nullptr);
             }
         }
 
@@ -1837,16 +2160,23 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
             if (st->hEditFont) {
                 SendMessageW(st->hTestEdit, WM_SETFONT, reinterpret_cast<WPARAM>(st->hEditFont), TRUE);
             }
-            SendMessageW(
-                st->hTestEdit, 0x1501, TRUE,
-                reinterpret_cast<LPARAM>(L"G\u00F5 th\u1EED: truowngr \u2192 tr\u01B0\u1EDFng \u2022 12haf \u2192 12h\u00E0 \u2022 window user...")
-            );
         }
+        const auto initSync = SyncSettingsWithSystemInputMethod(
+            hwnd,
+            st,
+            vielotus_tsf_guard::SettingsSyncTrigger::InitialCreate
+        );
+        UpdateTestEditCueBanner(st);
         RefreshConflictSummaryThrottled(st, true);
-        if (st->onActivateProfiles) {
+        StartSettingsProfileNotifySink(st, hwnd);
+        if (initSync.shouldAutoActivateOnCreate && st->onActivateProfiles) {
             st->onActivateProfiles(false);
+            bool postActVni = st->prefs.isVni;
+            st->hasLastObservedTsf = QueryActiveSenVietTsfProfile(postActVni);
+            st->lastObservedTsfIsVni = st->hasLastObservedTsf ? postActVni : st->prefs.isVni;
         }
         StartSettingsWakePipeServer(st, hwnd);
+        SetTimer(hwnd, kTimerIdSyncPrefs, 300, nullptr);
         if (st->hTestEdit && IsWindowVisible(hwnd)) {
             SetFocus(st->hTestEdit);
         }
@@ -1865,7 +2195,13 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
 
     case kWmVieLotusActivateProfiles: {
         if (st) {
-            LoadVieLotusPrefs(st->prefs);
+            SyncSettingsWithSystemInputMethod(
+                hwnd,
+                st,
+                vielotus_tsf_guard::SettingsSyncTrigger::PeriodicOrWindowEvent,
+                false,
+                true
+            );
             if (IsWindowVisible(hwnd)) {
                 RefreshConflictSummaryThrottled(st, false);
             }
@@ -1881,7 +2217,13 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
     case kWmVieLotusShowSettings: {
         BringSettingsWindowToFront(hwnd);
         if (st) {
-            LoadVieLotusPrefs(st->prefs);
+            SyncSettingsWithSystemInputMethod(
+                hwnd,
+                st,
+                vielotus_tsf_guard::SettingsSyncTrigger::PeriodicOrWindowEvent,
+                false,
+                true
+            );
             RefreshConflictSummaryThrottled(st, false);
             InvalidateRect(hwnd, nullptr, FALSE);
             if (st->hTestEdit && st->selectedTab == 0) {
@@ -1889,6 +2231,48 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
             }
         }
         return 0;
+    }
+
+    case kWmVieLotusSyncPrefs: {
+        if (st) {
+            const uint32_t hint = static_cast<uint32_t>(wParam);
+            if (hint == vielotus_tsf_guard::kSettingsSyncHintTipTelex) {
+                SyncSettingsWithSystemInputMethod(
+                    hwnd, st, vielotus_tsf_guard::SettingsSyncTrigger::TipCrossProcessHint, false, false
+                );
+            } else if (hint == vielotus_tsf_guard::kSettingsSyncHintTipVni) {
+                SyncSettingsWithSystemInputMethod(
+                    hwnd, st, vielotus_tsf_guard::SettingsSyncTrigger::TipCrossProcessHint, true, false
+                );
+            } else if (hint == vielotus_tsf_guard::kSettingsSyncHintTsfTelex) {
+                SyncSettingsWithSystemInputMethod(
+                    hwnd, st, vielotus_tsf_guard::SettingsSyncTrigger::TsfProfileNotifySink, false, false
+                );
+            } else if (hint == vielotus_tsf_guard::kSettingsSyncHintTsfVni) {
+                SyncSettingsWithSystemInputMethod(
+                    hwnd, st, vielotus_tsf_guard::SettingsSyncTrigger::TsfProfileNotifySink, true, false
+                );
+            } else {
+                SyncSettingsWithSystemInputMethod(
+                    hwnd, st, vielotus_tsf_guard::SettingsSyncTrigger::PeriodicOrWindowEvent, false, true
+                );
+            }
+        }
+        return 0;
+    }
+
+    case WM_TIMER: {
+        if (wParam == kTimerIdSyncPrefs && st && IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
+            SyncSettingsWithSystemInputMethod(
+                hwnd,
+                st,
+                vielotus_tsf_guard::SettingsSyncTrigger::PeriodicOrWindowEvent,
+                false,
+                false
+            );
+            return 0;
+        }
+        break;
     }
 
     case kWmVieLotusQuitTray: {
@@ -1900,10 +2284,15 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
     case WM_INPUTLANGCHANGE:
     case WM_SETTINGCHANGE: {
         if (st) {
-            bool oldVni = st->prefs.isVni;
             bool oldDark = st->isDark;
             std::wstring oldConflicts = st->conflictImeSummary;
-            LoadVieLotusPrefs(st->prefs);
+            SyncSettingsWithSystemInputMethod(
+                hwnd,
+                st,
+                vielotus_tsf_guard::SettingsSyncTrigger::PeriodicOrWindowEvent,
+                false,
+                true
+            );
             if (msg == WM_ACTIVATE && LOWORD(wParam) != WA_INACTIVE && IsWindowVisible(hwnd)) {
                 RefreshConflictSummaryThrottled(st, false);
             }
@@ -1914,7 +2303,7 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
                 BOOL darkTitle = st->isDark ? TRUE : FALSE;
                 DwmSetWindowAttribute(hwnd, 20, &darkTitle, sizeof(darkTitle));
             }
-            if (st->prefs.isVni != oldVni || st->isDark != oldDark || st->conflictImeSummary != oldConflicts) {
+            if (st->isDark != oldDark || st->conflictImeSummary != oldConflicts) {
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
         }
@@ -2004,6 +2393,10 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
             st->prefs.isVni = false;
             SaveVieLotusPrefs(st->prefs, true);
             if (st->onActivateProfiles) st->onActivateProfiles(true);
+            st->lastImRevision = LoadInputMethodRevision();
+            st->hasLastObservedTsf = true;
+            st->lastObservedTsfIsVni = false;
+            UpdateTestEditCueBanner(st);
             InvalidateRect(hwnd, nullptr, FALSE);
             if (st->hTestEdit) SetFocus(st->hTestEdit);
             break;
@@ -2011,6 +2404,10 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
             st->prefs.isVni = true;
             SaveVieLotusPrefs(st->prefs, true);
             if (st->onActivateProfiles) st->onActivateProfiles(true);
+            st->lastImRevision = LoadInputMethodRevision();
+            st->hasLastObservedTsf = true;
+            st->lastObservedTsfIsVni = true;
+            UpdateTestEditCueBanner(st);
             InvalidateRect(hwnd, nullptr, FALSE);
             if (st->hTestEdit) SetFocus(st->hTestEdit);
             break;
@@ -2092,7 +2489,9 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
         return 0;
 
     case WM_DESTROY:
+        KillTimer(hwnd, kTimerIdSyncPrefs);
         if (st) {
+            StopSettingsProfileNotifySink(st);
             StopSettingsWakePipeServer(st);
             delete st->pAppIcon;
             if (st->hWndIconBig) DestroyIcon(st->hWndIconBig);

@@ -1,4 +1,5 @@
 #include "PrefsStore.h"
+#include "TsfGameGuardLogic.h"
 #include <atomic>
 #include <cstring>
 
@@ -360,7 +361,7 @@ std::wstring GetSettingsWakePipeName() {
     return L"\\\\.\\pipe\\VieLotusIM_Settings_S" + std::to_wstring(static_cast<unsigned long>(sessionId));
 }
 
-bool TryWakeSettingsViaNamedPipe(DWORD waitMs) {
+static bool TrySendSettingsPipeCommand(const char cmd[4], DWORD waitMs) {
     const std::wstring pipeName = GetSettingsWakePipeName();
     const DWORD desiredAccess = FILE_WRITE_DATA | SYNCHRONIZE;
     HANDLE hPipe = CreateFileW(
@@ -389,9 +390,31 @@ bool TryWakeSettingsViaNamedPipe(DWORD waitMs) {
         return false;
     }
 
-    static const char kCmdShow[4] = {'S', 'H', 'O', 'W'};
     DWORD written = 0;
-    const BOOL ok = WriteFile(hPipe, kCmdShow, sizeof(kCmdShow), &written, nullptr);
+    const BOOL ok = WriteFile(hPipe, cmd, 4u, &written, nullptr);
     CloseHandle(hPipe);
-    return (ok != FALSE) && (written == sizeof(kCmdShow));
+    return (ok != FALSE) && (written == 4u);
+}
+
+bool TryWakeSettingsViaNamedPipe(DWORD waitMs) {
+    static const char kCmdShow[4] = {'S', 'H', 'O', 'W'};
+    return TrySendSettingsPipeCommand(kCmdShow, waitMs);
+}
+
+void NotifySettingsWindowInputMethodChanged(bool isVni) {
+    const WPARAM hint = isVni
+        ? static_cast<WPARAM>(vielotus_tsf_guard::kSettingsSyncHintTipVni)
+        : static_cast<WPARAM>(vielotus_tsf_guard::kSettingsSyncHintTipTelex);
+    HWND hExisting = FindWindowW(kSettingsWndClassName, nullptr);
+    if (hExisting && IsWindow(hExisting)) {
+        if (PostMessageW(hExisting, kWmVieLotusSyncPrefs, hint, 0)) {
+            return;
+        }
+    }
+    // Fallback for AppContainer / UIPI-isolated hosts (Windows 11 Notepad, Edge, Search, Store)
+    // where FindWindowW returns NULL or PostMessageW is filtered by UIPI.
+    // When VieLotusSettings.exe is not running, CreateFileW fails in microseconds with ERROR_FILE_NOT_FOUND.
+    static const char kCmdTelex[4] = {'V', 'N', 'I', '0'};
+    static const char kCmdVni[4]   = {'V', 'N', 'I', '1'};
+    TrySendSettingsPipeCommand(isVni ? kCmdVni : kCmdTelex, 15);
 }
