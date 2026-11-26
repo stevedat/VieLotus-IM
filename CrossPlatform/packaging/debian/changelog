@@ -1,3 +1,20 @@
+vielotus (2.0.11-1) unstable; urgency=medium
+
+  * New upstream release 2.0.11:
+    - Desktop VI-EN UI localization (Auto / Vietnamese / English) across macOS,
+      Windows TSF Control Panel, and Linux Settings, plus Auto launch-at-login
+      settings, cleaner About tabs, tightened memory lifecycle, macOS Settings
+      focus & slim menu, and Linux single-instance guard.
+    - Smart Bilingual precision: prioritize digit-boundary English hardware
+      tokens (arm64, x64, utf8) and grammatical perfect-tense arbitration for
+      "been" vs Vietnamese "bên".
+    - Windows Store & Smart App Control compatibility: register MSIX
+      VieLotusTIP.dll / VieLotusTIP32.dll in-place inside WindowsApps so
+      CodeIntegrity.cat trust is preserved (fixes 0xc0e90002), and sync
+      Control Panel UI live with Windows TSF Telex/VNI profile.
+
+ -- Trần Phát Đạt (Steve Dat) <ttd1232004@gmail.com>  Thu, 26 Nov 2026 15:50:00 +0700
+
 vielotus (2.0.10-1) unstable; urgency=medium
 
   * New upstream release 2.0.10:

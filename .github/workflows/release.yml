@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 2.0.10)'
+        description: 'Release version (e.g. 2.0.11)'
         required: false
         default: ''
 
@@ -34,7 +34,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-            VERSION="${VERSION:-2.0.10}"
+            VERSION="${VERSION:-2.0.11}"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -88,7 +88,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' Sources/VieLotusIM/Info.plist | head -n 1)"
-            VERSION="${VERSION:-2.0.10}"
+            VERSION="${VERSION:-2.0.11}"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -171,7 +171,7 @@ jobs:
           fi
           if [ "$VERSION" = "main" ] || [ -z "$VERSION" ]; then
             VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist)"
-            VERSION="${VERSION:-2.0.10}"
+            VERSION="${VERSION:-2.0.11}"
             TAG="v${VERSION}"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
@@ -339,17 +339,15 @@ jobs:
 
           ## What's New in {os.environ["TAG"]}
 
-          - **VNI Alphanumeric, Mixed-Case & Digit-Bridge Parity (macOS, Windows, Linux, WASM):**
-            - Added full VNI phonotactic validation (onset, coda, single vowel cluster, stop-coda), idle leading-digit word boundary (`123ĐatTP`, `123đồng`, `100đ`), and hardware-acronym protection (`SSD9`, `HDD9`, `DVD9`, `Win11`, `iPhone16`, `iPad9`).
-            - Added 1-step Tone-Replace Rollback for consecutive numeric suffixes (`Đạt123`, `việt123`, `cò123`, `được123`) while preserving 1-step tone correction (`d9at51 → đát`), clear (`to6i10 → tôi`), and P0.6 repeated-digit escapes (`tu33u1 → tu3u1`, `a65a5 → âa5`, `e6re6 → e6re6`).
-            - Made desktop Numpad `0–9` always emit literal digits in VNI mode across macOS (`numericPad`), Windows (`VK_NUMPAD0..9`), and Linux (IBus & Fcitx5).
-            - Extended mixed-case & digit-bridge compound resolution to VNI (`TPĐạt123TPĐạt123ĐạtTP123`, `TPĐạt`, `VNĐạt`, `ĐạtViệt`, `Đạt123Đạt`, `Đạt2026Việt`, `TPHồChíMinh`, `ThanhHoá`) while preserving English CamelCase+digits (`IronMan3`, `SuperMan1`, `TopGun2`, `BigBang1`, `MacBook14`, `ChatGPT4`) and passwords (`pass123a1`, `Pass123a1`).
-          - **Windows TSF Reliability & UX:**
-            - Fixed cross-process Taskbar Telex ↔ VNI profile switching (`TF_IPPMF_FORPROCESS` / `TF_IPPMF_FORSESSION`, monotonic `InputMethodRevision`, `ShouldPersistOnProfileActivated`).
-            - Restored `[V]/[E]` LangBar indicator, prevented duplicate Start Menu / Installed Apps entries on MSIX/Store installs, enabled `macros.json` hot-reload, and removed `Ctrl+Shift+S` hijack.
-          - **macOS & Linux Hardening:**
-            - macOS: clean `ESC` passthrough in overlays and `directReplacement`, plus Helium & iPhone Mirroring client classification.
-            - Linux: cleared preedit before commit, removed IBus double-commit, normalized Numpad & modifier keys, and added headless Debian DEP-8 `autopkgtest` CI gate.
+          - **Desktop VI–EN Localization & Settings Polish (macOS, Windows, Linux):**
+            - Added full Auto / Vietnamese / English UI localization (`UILanguagePreference` / `WinL10n` / Linux Settings) across macOS, Windows TSF Control Panel, and Linux Settings.
+            - Added unified Auto launch-at-login toggle, cleaner About tabs, tightened memory lifecycle, macOS Settings focus & slim menu improvements, and a Linux single-instance guard.
+          - **Smart Bilingual Precision (`arm64` & `been`/`bên`):**
+            - Prioritized digit-boundary restoration for hardware & architecture tokens (`arm64`, `x64`, `utf8`).
+            - Added grammatical perfect-tense context arbitration for `"been"` vs Vietnamese `"bên"` (`have/has/had been` and progressive/participle phrases restore `"been"`, while `"bên"` stays Vietnamese in non-perfect contexts).
+          - **Windows Store, Smart App Control & TSF Live Sync:**
+            - Registered Microsoft Store MSIX `VieLotusTIP.dll` and `VieLotusTIP32.dll` in-place inside `WindowsApps` (`CodeIntegrity.cat` preserved) to prevent Smart App Control `0xc0e90002` launch blocks on Windows 11 25H2 (`26200+`).
+            - Synchronized Windows TSF Control Panel UI live with active Windows Taskbar Telex/VNI profiles.
             - Homebrew Tap (macOS): `brew install --cask stevedat/tap/vielotusim` (or `brew upgrade --cask vielotusim`).
 
           ## Swift CLI regression benchmark

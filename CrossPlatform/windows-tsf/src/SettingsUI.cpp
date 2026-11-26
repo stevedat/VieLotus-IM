@@ -1132,7 +1132,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
         RectF verPill(142.0f * s, 10.0f * s, 48.0f * s, 17.0f * s);
         FillRoundRect(g, verPill, 8.5f * s, Color(isDark ? 55 : 36, blueCol.GetR(), blueCol.GetG(), blueCol.GetB()));
-        g.DrawString(L"v2.0.10", -1, &fVersion, verPill, &sfCenter, &blueBrush);
+        g.DrawString(L"v2.0.11", -1, &fVersion, verPill, &sfCenter, &blueBrush);
 
         RectF modePill(195.0f * s, 10.0f * s, 132.0f * s, 17.0f * s);
         FillRoundRect(g, modePill, 8.5f * s, isDark ? Color(255, 28, 54, 42) : Color(255, 232, 250, 238));
@@ -1636,8 +1636,8 @@ static std::wstring GetWindowsDiagnosticsSummary(const VieLotusWindowsPrefs &pre
         ARRAYSIZE(summary),
         win_l10n::Tr(
             isEn,
-            L"Sen Vi\u1EC7t v2.0.10 \u2022 Windows %s (Build %lu, %s) \u2022 %s \u2022 D\u1EA5u tr\u01B0\u1EDBc \u00E2m: %s \u2022 G\u00F5 t\u1EAFt: %s",
-            L"Sen Vi\u1EC7t v2.0.10 \u2022 Windows %s (Build %lu, %s) \u2022 %s \u2022 Tone-First: %s \u2022 Macros: %s"
+            L"Sen Vi\u1EC7t v2.0.11 \u2022 Windows %s (Build %lu, %s) \u2022 %s \u2022 D\u1EA5u tr\u01B0\u1EDBc \u00E2m: %s \u2022 G\u00F5 t\u1EAFt: %s",
+            L"Sen Vi\u1EC7t v2.0.11 \u2022 Windows %s (Build %lu, %s) \u2022 %s \u2022 Tone-First: %s \u2022 Macros: %s"
         ),
         (buildNum >= 22000) ? L"11" : L"10",
         static_cast<unsigned long>(buildNum),
@@ -1743,8 +1743,8 @@ static std::wstring BuildFeedbackIssueTitle(FeedbackDialogState *st) {
     } else {
         title += win_l10n::Tr(
             isEn,
-            L"B\u00E1o c\u00E1o t\u1EEB ng\u01B0\u1EDDi d\u00F9ng Sen Vi\u1EC7t v2.0.10",
-            L"User report from Sen Vi\u1EC7t v2.0.10"
+            L"B\u00E1o c\u00E1o t\u1EEB ng\u01B0\u1EDDi d\u00F9ng Sen Vi\u1EC7t v2.0.11",
+            L"User report from Sen Vi\u1EC7t v2.0.11"
         );
     }
     return title;

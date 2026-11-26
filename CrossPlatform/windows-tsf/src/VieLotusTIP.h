@@ -110,6 +110,7 @@ private:
     void SyncSurroundingContextSession(const std::wstring &precedingText);
     bool IsComposingSession() const;
     bool HasActiveWordSession() const;
+    bool WillRestoreOnTelexDigitSession() const;
     int32_t FeedCharSession(uint32_t codePoint);
     int32_t FeedBackspaceSession();
     int32_t CommitWordSession();

@@ -711,6 +711,15 @@ bool CVieLotusTIP::HasActiveWordSession() const {
 #endif
 }
 
+bool CVieLotusTIP::WillRestoreOnTelexDigitSession() const {
+#if defined(VIELOTUS_EMBEDDED_ENGINE)
+    if (!m_session) {
+        return m_nativeEngine.willRestoreOnTelexDigit();
+    }
+#endif
+    return false;
+}
+
 int32_t CVieLotusTIP::FeedCharSession(uint32_t codePoint) {
     const auto &api = GetCApi();
     if (m_session && api.isValid) {
@@ -1559,7 +1568,7 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
                     static_cast<uint32_t>(wParam),
                     static_cast<uint32_t>(ch)
                 );
-                const bool isTelexDigitRestore = (!m_isVniMode && ch >= L'0' && ch <= L'9' && m_nativeEngine.willRestoreOnTelexDigit());
+                const bool isTelexDigitRestore = (!m_isVniMode && ch >= L'0' && ch <= L'9' && WillRestoreOnTelexDigitSession());
                 const bool isBoundary = IsEngineBoundaryPunctuation(ch);
                 if (isVniDigit || isBoundary || isTelexDigitRestore || m_session != nullptr) {
                     *pfEaten = TRUE;

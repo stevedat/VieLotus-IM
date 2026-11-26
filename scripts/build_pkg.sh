@@ -9,7 +9,7 @@ cd "$SCRIPT_DIR"
 if [ -n "${1:-}" ]; then
     VERSION="${1#v}"
 else
-    PLIST_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist 2>/dev/null || echo '2.0.10')"
+    PLIST_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Sources/VieLotusIM/Info.plist 2>/dev/null || echo '2.0.11')"
     GIT_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
     GIT_TAG="${GIT_TAG#v}"
     VERSION="$(printf '%s\n%s\n' "$PLIST_VERSION" "$GIT_TAG" | sed '/^$/d' | sort -V | tail -n 1)"

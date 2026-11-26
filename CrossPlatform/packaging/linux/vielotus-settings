@@ -2127,7 +2127,7 @@ ver_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
 ver_box.get_style_context().add_class("bento-ver-pill")
 ver_box.set_valign(Gtk.Align.CENTER)
 ver_lbl = Gtk.Label()
-ver_lbl.set_markup(f"<span size='8500' weight='bold' foreground='{P['accent']}'>v2.0.10</span>")
+ver_lbl.set_markup(f"<span size='8500' weight='bold' foreground='{P['accent']}'>v2.0.11</span>")
 ver_box.pack_start(ver_lbl, False, False, 0)
 brand_top.pack_start(title_lbl, False, False, 0)
 brand_top.pack_start(ver_box, False, False, 0)
@@ -3547,7 +3547,7 @@ def open_feedback_sheet(*_, auto_close=False):
     sess_type = (os.environ.get("XDG_SESSION_TYPE") or ("wayland" if os.environ.get("WAYLAND_DISPLAY") else "x11")).upper()
     os_name = detect_os_pretty_name()
     arch_name = platform.machine() or "linux"
-    sys_badge_str = f"Sen Việt v2.0.10 • {os_name} ({arch_name}) • {sess_type} • {im_title}"
+    sys_badge_str = f"Sen Việt v2.0.11 • {os_name} ({arch_name}) • {sess_type} • {im_title}"
 
     meta_pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
     meta_pill.get_style_context().add_class("bento-pill")
@@ -3741,7 +3741,7 @@ def open_feedback_sheet(*_, auto_close=False):
             hdr_topic = k_title
             issue_sum = k_title
 
-        issue_title = f"{k_prefix} {issue_sum} (Linux v2.0.10)"
+        issue_title = f"{k_prefix} {issue_sum} (Linux v2.0.11)"
         lines = [f"### {k_prefix} {hdr_topic}", ""]
         if t_keys or t_act or t_exp:
             lines.append(f"- **Chuỗi phím đã gõ (Typed Keys):** `{t_keys or '—'}`")
@@ -4296,9 +4296,9 @@ case "${1:-}" in
     --check-update|--update)
         load_config
         if vl_cli_is_en; then
-            echo "ℹ Sen Việt (VieLotusIM v2.0.10): Updates are managed by your system package manager."
+            echo "ℹ Sen Việt (VieLotusIM v2.0.11): Updates are managed by your system package manager."
         else
-            echo "ℹ Sen Việt (VieLotusIM v2.0.10): Bản cập nhật được quản lý qua trình quản lý gói hệ thống."
+            echo "ℹ Sen Việt (VieLotusIM v2.0.11): Bản cập nhật được quản lý qua trình quản lý gói hệ thống."
         fi
         if command -v apt-get >/dev/null 2>&1; then
             echo "  • Debian / Ubuntu : sudo apt update && sudo apt upgrade"
@@ -4384,7 +4384,7 @@ def tr(vi_text, en_text):
     return en_text if _tk_is_english() else vi_text
 
 root = tk.Tk()
-root.title(tr("Sen Việt (VieLotusIM v2.0.10) — Cài đặt", "Sen Việt (VieLotusIM v2.0.10) — Settings"))
+root.title(tr("Sen Việt (VieLotusIM v2.0.11) — Cài đặt", "Sen Việt (VieLotusIM v2.0.11) — Settings"))
 root.geometry("460x350")
 root.resizable(False, False)
 
@@ -4459,7 +4459,7 @@ def apply_changes(*_):
 
 frm = ttk.Frame(root, padding=16)
 frm.pack(fill="both", expand=True)
-ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.10)", font=("Sans", 13, "bold")).pack(anchor="w")
+ttk.Label(frm, text="Sen Việt (VieLotusIM v2.0.11)", font=("Sans", 13, "bold")).pack(anchor="w")
 ttk.Label(frm, text=tr("Kiểu gõ Tiếng Việt (tự động lưu & áp dụng):", "Vietnamese Input Method (auto-saved):")).pack(anchor="w", pady=(10, 4))
 ttk.Radiobutton(frm, text=tr("Telex Tự Do (s f r x j w — vieetj → việt)", "Telex (s f r x j w — vieetj → việt)"), variable=im_var, value="telex", command=apply_changes).pack(anchor="w")
 ttk.Radiobutton(frm, text=tr("VNI Chuẩn (phím số 1–9 — vie65t → việt)", "VNI (keys 1–9 — vie65t → việt)"), variable=im_var, value="vni", command=apply_changes).pack(anchor="w")
