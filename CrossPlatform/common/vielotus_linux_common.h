@@ -381,7 +381,82 @@ typedef struct {
     bool macro_enabled;
     bool developer_mode;
     bool preedit_underline;
+    char ui_language[8];
 } vl_env_config_t;
+
+static inline VL_COMMON_UNUSED void vl_normalize_ui_language(const char *val, char out[8]) {
+    if (!out) return;
+    if (!val || val[0] == '\0') {
+        strcpy(out, "auto");
+        return;
+    }
+    char lv[16];
+    size_t i = 0;
+    for (; val[i] != '\0' && i + 1 < sizeof(lv); i++) {
+        lv[i] = vl_ascii_tolower(val[i]);
+    }
+    lv[i] = '\0';
+    if (strcmp(lv, "vi") == 0) {
+        strcpy(out, "vi");
+    } else if (strcmp(lv, "en") == 0) {
+        strcpy(out, "en");
+    } else {
+        strcpy(out, "auto");
+    }
+}
+
+static inline VL_COMMON_UNUSED bool vl_ui_is_english(const char *ui_language) {
+    char norm[8];
+    vl_normalize_ui_language(ui_language, norm);
+    if (strcmp(norm, "vi") == 0) {
+        return false;
+    }
+    if (strcmp(norm, "en") == 0) {
+        return true;
+    }
+
+    char cand[128] = {0};
+    const char *lc_all = getenv("LC_ALL");
+    if (lc_all && lc_all[0] != '\0') {
+        if (strcmp(lc_all, "C") == 0 || strcmp(lc_all, "POSIX") == 0) {
+            return true;
+        }
+        snprintf(cand, sizeof(cand), "%s", lc_all);
+    } else {
+        const char *language = getenv("LANGUAGE");
+        if (language && language[0] != '\0') {
+            const char *colon = strchr(language, ':');
+            size_t len = colon ? (size_t)(colon - language) : strlen(language);
+            if (len >= sizeof(cand)) len = sizeof(cand) - 1;
+            memcpy(cand, language, len);
+            cand[len] = '\0';
+        }
+        if (cand[0] == '\0') {
+            const char *lc_msg = getenv("LC_MESSAGES");
+            if (lc_msg && lc_msg[0] != '\0') {
+                snprintf(cand, sizeof(cand), "%s", lc_msg);
+            }
+        }
+        if (cand[0] == '\0') {
+            const char *lang = getenv("LANG");
+            if (lang && lang[0] != '\0') {
+                snprintf(cand, sizeof(cand), "%s", lang);
+            }
+        }
+    }
+
+    if (cand[0] == '\0') {
+        return true;
+    }
+    char c0 = vl_ascii_tolower(cand[0]);
+    char c1 = vl_ascii_tolower(cand[1]);
+    char c2 = cand[2];
+    if (c0 == 'v' && c1 == 'i' &&
+        (c2 == '\0' || c2 == '_' || c2 == '-' || c2 == '.' || c2 == '@')) {
+        return false;
+    }
+    return true;
+}
 
 static inline VL_COMMON_UNUSED void vl_env_config_init_defaults(vl_env_config_t *cfg) {
     if (!cfg) return;
@@ -395,6 +470,7 @@ static inline VL_COMMON_UNUSED void vl_env_config_init_defaults(vl_env_config_t 
     cfg->macro_enabled = false;
     cfg->developer_mode = false;
     cfg->preedit_underline = false;
+    strcpy(cfg->ui_language, "auto");
 }
 
 static inline VL_COMMON_UNUSED bool vl_resolve_config_dir(char *out_dir, size_t cap) {
@@ -534,13 +610,15 @@ static inline VL_COMMON_UNUSED bool vl_env_config_load(
             cfg->developer_mode = vl_parse_bool_str(val, false);
         } else if (strcmp(key, "PREEDIT_UNDERLINE") == 0) {
             cfg->preedit_underline = vl_parse_bool_str(val, false);
+        } else if (strcmp(key, "UI_LANGUAGE") == 0) {
+            vl_normalize_ui_language(val, cfg->ui_language);
         }
     }
     fclose(fp);
     return true;
 }
 
-/* Non-destructive merge-writer: updates the 9 known keys in place, preserves all
+/* Non-destructive merge-writer: updates the 10 known keys in place, preserves all
  * comments, blank lines, and unknown/custom user keys, and writes atomically. */
 static inline VL_COMMON_UNUSED bool vl_env_config_save_merged(
     const char *path,
@@ -560,7 +638,10 @@ static inline VL_COMMON_UNUSED bool vl_env_config_save_merged(
         }
     }
 
-    static const char *const kKnownKeys[9] = {
+    char norm_lang[8];
+    vl_normalize_ui_language(cfg->ui_language, norm_lang);
+
+    static const char *const kKnownKeys[10] = {
         "INPUT_METHOD",
         "GRAMMAR_PROFILE",
         "SMART_BILINGUAL",
@@ -569,9 +650,10 @@ static inline VL_COMMON_UNUSED bool vl_env_config_save_merged(
         "RELAXED_CODA",
         "MACRO_ENABLED",
         "DEVELOPER_MODE",
-        "PREEDIT_UNDERLINE"
+        "PREEDIT_UNDERLINE",
+        "UI_LANGUAGE"
     };
-    const char *knownVals[9] = {
+    const char *knownVals[10] = {
         cfg->is_vni ? "vni" : "telex",
         cfg->sen_flex ? "sen_flex" : "classic",
         cfg->smart_bilingual ? "true" : "false",
@@ -580,9 +662,10 @@ static inline VL_COMMON_UNUSED bool vl_env_config_save_merged(
         cfg->relaxed_coda ? "true" : "false",
         cfg->macro_enabled ? "true" : "false",
         cfg->developer_mode ? "true" : "false",
-        cfg->preedit_underline ? "true" : "false"
+        cfg->preedit_underline ? "true" : "false",
+        norm_lang
     };
-    bool seen[9] = { false, false, false, false, false, false, false, false, false };
+    bool seen[10] = { false, false, false, false, false, false, false, false, false, false };
 
     char tmp_path[1100];
     int tn = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp.XXXXXX", path);
@@ -607,7 +690,7 @@ static inline VL_COMMON_UNUSED bool vl_env_config_save_merged(
             vl_trim_key_value(line, key, sizeof(key), val, sizeof(val));
             int matched_idx = -1;
             if (key[0] != '\0') {
-                for (int i = 0; i < 9; i++) {
+                for (int i = 0; i < 10; i++) {
                     if (strcmp(key, kKnownKeys[i]) == 0) {
                         matched_idx = i;
                         break;
@@ -631,7 +714,7 @@ static inline VL_COMMON_UNUSED bool vl_env_config_save_merged(
         fclose(in_fp);
     }
 
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < 10; i++) {
         if (!seen[i]) {
             fprintf(out_fp, "%s=\"%s\"\n", kKnownKeys[i], knownVals[i]);
         }

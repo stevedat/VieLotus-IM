@@ -301,6 +301,18 @@ inline bool ShouldRequireWin32UninstallEntryForTipCheck(bool isMsixPackage) {
     return !isMsixPackage;
 }
 
+inline bool ShouldCopyBinariesToProgramFilesOnProvision(bool isMsixPackage) {
+    return !isMsixPackage;
+}
+
+inline bool ShouldPreferLocalPackageTipDll(bool isMsixPackage) {
+    return isMsixPackage;
+}
+
+inline bool ShouldRequireExactInprocPathMatch(bool isMsixPackage) {
+    return isMsixPackage;
+}
+
 // ITfInputProcessorProfileMgr::ActivateProfile scope flags are mutually exclusive on Windows
 // (TF_IPPMF_FORPROCESS = 0x10000000, TF_IPPMF_FORSESSION = 0x20000000); combining both in one
 // call returns E_INVALIDARG and leaves the desktop profile unchanged.

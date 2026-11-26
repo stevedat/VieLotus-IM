@@ -4,8 +4,8 @@ import SwiftUI
 import AppKit
 
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case settings = "Cài đặt"
-    case about = "Thông tin"
+    case settings = "settings"
+    case about = "about"
 
     var id: String { rawValue }
 
@@ -13,6 +13,13 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .settings: return "slider.horizontal.3"
         case .about: return "info.circle"
+        }
+    }
+
+    func title(isEnglish: Bool) -> String {
+        switch self {
+        case .settings: return isEnglish ? "Settings" : "Cài đặt"
+        case .about: return isEnglish ? "About" : "Thông tin"
         }
     }
 }
@@ -87,11 +94,14 @@ struct SettingsView: View {
                             .background(Color.accentColor.opacity(0.14))
                             .foregroundColor(.accentColor)
                             .clipShape(Capsule())
-                            .help("Phiên bản chi tiết: v\(AppInfo.appVersion)")
+                            .help(prefs.tr("Phiên bản chi tiết: v\(AppInfo.appVersion)", "Detailed version: v\(AppInfo.appVersion)"))
 
                         headerUpdatePill
                     }
-                    Text("Thuần chuẩn Apple • 100% Offline • Không quyền Trợ năng")
+                    Text(prefs.tr(
+                        "Thuần chuẩn Apple • 100% Offline • Không quyền Trợ năng",
+                        "Pure Apple Native • 100% Offline • No Accessibility Needed"
+                    ))
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: true, vertical: false)
@@ -109,7 +119,7 @@ struct SettingsView: View {
                             HStack(spacing: 5) {
                                 Image(systemName: tab.icon)
                                     .font(.system(size: 11, weight: .semibold))
-                                Text(tab.rawValue)
+                                Text(tab.title(isEnglish: prefs.isEnglishUI))
                                     .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
                             }
                             .padding(.horizontal, 12)
@@ -156,26 +166,72 @@ struct SettingsView: View {
                     Circle()
                         .fill(tisStatusColor)
                         .frame(width: 6.5, height: 6.5)
-                    Text("Song ngữ Anh–Việt • Chính tả chuẩn mới tự động")
+                    Text(prefs.tr(
+                        "Song ngữ Anh–Việt • Chính tả chuẩn mới tự động",
+                        "Smart Bilingual EN–VI • Modern Orthography"
+                    ))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
-                        .fixedSize(horizontal: true, vertical: false)
+                        .lineLimit(1)
                 }
 
-                Spacer(minLength: 12)
+                Spacer(minLength: 10)
+
+                Menu {
+                    Button {
+                        prefs.uiLanguage = .auto
+                    } label: {
+                        if prefs.uiLanguage == .auto {
+                            Label(prefs.tr("Tự động (Theo hệ thống)", "Auto (System)"), systemImage: "checkmark")
+                        } else {
+                            Text(prefs.tr("Tự động (Theo hệ thống)", "Auto (System)"))
+                        }
+                    }
+                    Button {
+                        prefs.uiLanguage = .vietnamese
+                    } label: {
+                        if prefs.uiLanguage == .vietnamese {
+                            Label("Tiếng Việt", systemImage: "checkmark")
+                        } else {
+                            Text("Tiếng Việt")
+                        }
+                    }
+                    Button {
+                        prefs.uiLanguage = .english
+                    } label: {
+                        if prefs.uiLanguage == .english {
+                            Label("English", systemImage: "checkmark")
+                        } else {
+                            Text("English")
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "globe")
+                        Text(prefs.uiLanguage.shortBadge)
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                }
+                .menuStyle(.borderedButton)
+                .controlSize(.small)
+                .fixedSize()
+                .help(prefs.tr("Ngôn ngữ giao diện (VI / EN)", "Interface Language (VI / EN)"))
 
                 Button {
                     showingFeedbackSheet = true
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "bubble.left.and.text.bubble.right")
-                        Text("Góp ý & Báo lỗi")
+                        Text(prefs.tr("Góp ý & Báo lỗi", "Feedback & Bugs"))
                     }
                     .font(.system(size: 11, weight: .semibold))
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .help("Gửi góp ý, báo lỗi gõ từ hoặc đề xuất tính năng")
+                .help(prefs.tr(
+                    "Gửi góp ý, báo lỗi gõ từ hoặc đề xuất tính năng",
+                    "Send feedback, report typing bugs, or suggest features"
+                ))
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 9)
@@ -184,7 +240,7 @@ struct SettingsView: View {
         .background(windowCanvasColor)
         .frame(width: 640, height: 468)
         .sheet(isPresented: $showingMacroEditor) {
-            MacroEditorView()
+            MacroEditorView(prefs: prefs)
         }
         .sheet(isPresented: $showingAdaptiveSheet) {
             AdaptiveCompatibilitySheet(prefs: prefs)
@@ -240,11 +296,11 @@ struct SettingsView: View {
             // Hàng 1: Kiểu gõ tiếng Việt (3 thẻ ngang trên cùng 1 hàng: Telex Tự Do | VNI | Dấu trước âm)
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("KIỂU GÕ TIẾNG VIỆT")
+                    Text(prefs.tr("KIỂU GÕ TIẾNG VIỆT", "VIETNAMESE INPUT METHOD"))
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text("Bỏ dấu tự do • Z xoá dấu")
+                    Text(prefs.tr("Bỏ dấu tự do • Z xoá dấu", "Free-tone typing • Z removes tone"))
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundColor(.accentColor)
                 }
@@ -252,14 +308,14 @@ struct SettingsView: View {
                 HStack(spacing: 10) {
                     inputMethodCard(
                         method: .telex,
-                        title: "Telex Tự Do",
+                        title: prefs.tr("Telex Tự Do", "Telex"),
                         badge: "s f r x j w",
                         subtitle: "vieetj → việt",
                         icon: "command.square.fill"
                     )
                     inputMethodCard(
                         method: .vni,
-                        title: "VNI (Số 1–9)",
+                        title: prefs.tr("VNI (Số 1–9)", "VNI (1–9)"),
                         badge: "1–5 • 6–9",
                         subtitle: "viet65 → việt",
                         icon: "number.square.fill"
@@ -270,7 +326,7 @@ struct SettingsView: View {
 
             // Hàng 2: Tiện ích & Tương thích (Bento Grid 2x2 ngang rộng rãi)
             VStack(alignment: .leading, spacing: 6) {
-                Text("TIỆN ÍCH & TƯƠNG THÍCH")
+                Text(prefs.tr("TIỆN ÍCH & TƯƠNG THÍCH", "UTILITIES & COMPATIBILITY"))
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.secondary)
 
@@ -279,12 +335,14 @@ struct SettingsView: View {
                     bentoFeatureCard(
                         icon: "text.badge.plus",
                         accent: .indigo,
-                        title: "Bảng gõ tắt",
-                        subtitle: prefs.macroEnabled ? "Đang bật • \(macroCount) cụm từ" : "Đang tắt • Bấm để bật",
+                        title: prefs.tr("Bảng gõ tắt", "Text Shortcuts"),
+                        subtitle: prefs.macroEnabled
+                            ? prefs.tr("Đang bật • \(macroCount) cụm từ", "On • \(macroCount) shortcuts")
+                            : prefs.tr("Đang tắt • Bấm để bật", "Off • Click to enable"),
                         isActive: prefs.macroEnabled,
                         onToggle: { prefs.macroEnabled.toggle() }
                     ) {
-                        Button("Quản lý (\(macroCount))") {
+                        Button(prefs.tr("Quản lý (\(macroCount))", "Manage (\(macroCount))")) {
                             showingMacroEditor = true
                         }
                         .buttonStyle(.bordered)
@@ -295,12 +353,14 @@ struct SettingsView: View {
                     bentoFeatureCard(
                         icon: "chevron.left.forwardslash.chevron.right",
                         accent: .teal,
-                        title: "Chế độ Code",
-                        subtitle: prefs.developerMode ? "Tự ngắt dấu trong `code`" : "Gõ tiếng Việt bình thường",
+                        title: prefs.tr("Chế độ Code", "Code Mode"),
+                        subtitle: prefs.developerMode
+                            ? prefs.tr("Tự ngắt dấu trong `code`", "Auto-pause tones in `code`")
+                            : prefs.tr("Gõ tiếng Việt bình thường", "Standard Vietnamese typing"),
                         isActive: prefs.developerMode,
                         onToggle: { prefs.developerMode.toggle() }
                     ) {
-                        Text(prefs.developerMode ? "BẬT" : "TẮT")
+                        Text(prefs.developerMode ? prefs.tr("BẬT", "ON") : prefs.tr("TẮT", "OFF"))
                             .font(.system(size: 9.5, weight: .heavy, design: .rounded))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
@@ -399,7 +459,7 @@ struct SettingsView: View {
                 Image(systemName: "wand.and.rays")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(isFlex ? .accentColor : .secondary)
-                Text("Dấu trước âm")
+                Text(prefs.tr("Dấu trước âm", "Tone-First"))
                     .font(.system(size: 12.5, weight: .bold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
@@ -425,7 +485,7 @@ struct SettingsView: View {
                     .foregroundColor(isFlex ? .accentColor : .secondary)
                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
 
-                Text(isFlex ? "Đang bật" : "Đang tắt")
+                Text(isFlex ? prefs.tr("Đang bật", "On") : prefs.tr("Đang tắt", "Off"))
                     .font(.system(size: 10.5))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -516,7 +576,7 @@ struct SettingsView: View {
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundColor(anyActive ? .orange : .secondary)
                 }
-                Text("Tốc gõ phụ âm")
+                Text(prefs.tr("Tốc gõ phụ âm", "Quick Consonants"))
                     .font(.system(size: 12.5, weight: .bold))
                     .lineLimit(1)
                 Spacer()
@@ -524,13 +584,13 @@ struct SettingsView: View {
 
             HStack(spacing: 6) {
                 chipToggleButton(
-                    label: "Đầu (cc/gg/qq)",
+                    label: prefs.tr("Đầu (cc/gg/qq)", "Initial (cc/gg/qq)"),
                     isOn: prefs.quickTelex
                 ) {
                     prefs.quickTelex.toggle()
                 }
                 chipToggleButton(
-                    label: "Cuối (-g/-h/-k)",
+                    label: prefs.tr("Cuối (-g/-h/-k)", "Final (-g/-h/-k)"),
                     isOn: prefs.relaxedCoda
                 ) {
                     prefs.relaxedCoda.toggle()
@@ -560,17 +620,17 @@ struct SettingsView: View {
         let overrideCount = prefs.appModeOverrides.count
         let subtitleText: String = {
             if overrideCount > 0 {
-                return "Đã ghim \(overrideCount) ứng dụng riêng"
+                return prefs.tr("Đã ghim \(overrideCount) ứng dụng riêng", "Pinned \(overrideCount) custom apps")
             }
             switch prefs.presentationModePreference {
             case .automatic:
-                return "Mặc định (Direct & Native Marked Text)"
+                return prefs.tr("Mặc định (Direct & Native Marked Text)", "Automatic (Direct & Native Marked Text)")
             case .directReplacement:
-                return "Ưu tiên Direct (Thử nghiệm trên Web)"
+                return prefs.tr("Ưu tiên Direct (Thử nghiệm trên Web)", "Prefer Direct (Experimental on Web)")
             case .markedText:
                 return "Native Marked Text"
             case .passthrough:
-                return "Tạm ngắt bộ gõ"
+                return prefs.tr("Tạm ngắt bộ gõ", "Bypass IME (Passthrough)")
             }
         }()
 
@@ -584,11 +644,11 @@ struct SettingsView: View {
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundColor(.indigo)
                 }
-                Text("Tương thích App")
+                Text(prefs.tr("Tương thích App", "App Compatibility"))
                     .font(.system(size: 12.5, weight: .bold))
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                Button("Tuỳ chỉnh") {
+                Button(prefs.tr("Tuỳ chỉnh", "Configure")) {
                     showingAdaptiveSheet = true
                 }
                 .buttonStyle(.bordered)
@@ -672,19 +732,19 @@ struct SettingsView: View {
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundColor(tisStatusColor)
                 }
-                Text(tisStatus.summaryTitle)
+                Text(tisStatus.localizedSummaryTitle(isEnglish: prefs.isEnglishUI))
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                Button("Bàn phím ↗") {
+                Button(prefs.tr("Bàn phím ↗", "Keyboards ↗")) {
                     openSystemKeyboardSettings()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
             }
 
-            Text(tisStatus.summarySubtitle)
+            Text(tisStatus.localizedSummarySubtitle(isEnglish: prefs.isEnglishUI))
                 .font(.system(size: 10.5))
                 .foregroundColor(tisStatus.hasAnyInputConflict ? .orange : .secondary)
                 .lineLimit(1)
@@ -714,12 +774,12 @@ struct SettingsView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(isAuto ? .green : .secondary)
                 }
-                Text("Khởi động cùng hệ thống")
+                Text(prefs.tr("Khởi động cùng hệ thống", "Launch at Login"))
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                Text(isAuto ? "AUTO" : "TẮT")
+                Text(isAuto ? "AUTO" : prefs.tr("TẮT", "OFF"))
                     .font(.system(size: 9, weight: .heavy, design: .rounded))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -732,7 +792,9 @@ struct SettingsView: View {
                     .controlSize(.mini)
             }
 
-            Text(isAuto ? "Tự động bật khi đăng nhập macOS" : "Đang tắt • Bấm để bật tự động")
+            Text(isAuto
+                 ? prefs.tr("Tự động bật khi đăng nhập macOS", "Automatically enabled at macOS login")
+                 : prefs.tr("Đang tắt • Bấm để bật tự động", "Off • Click switch to enable"))
                 .font(.system(size: 10.5))
                 .foregroundColor(.secondary)
                 .lineLimit(1)
@@ -752,10 +814,16 @@ struct SettingsView: View {
 
     private var quickTestBar: some View {
         let placeholder = prefs.inputMethod == .vni
-            ? "Gõ thử (VNI): tru7o7ng3 → trưởng • 12ha2 → 12hà • window user..."
-            : "Gõ thử (Telex): truowngr → trưởng • 12haf → 12hà • window user..."
+            ? prefs.tr(
+                "Gõ thử (VNI): tru7o7ng3 → trưởng • 12ha2 → 12hà • window user...",
+                "Test typing (VNI): tru7o7ng3 → trưởng • 12ha2 → 12hà • window user..."
+            )
+            : prefs.tr(
+                "Gõ thử (Telex): truowngr → trưởng • 12haf → 12hà • window user...",
+                "Test typing (Telex): truowngr → trưởng • 12haf → 12hà • window user..."
+            )
         return HStack(spacing: 8) {
-            Text("✦ Thử gõ:")
+            Text(prefs.tr("✦ Thử gõ:", "✦ Test:"))
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.indigo)
             TextField(placeholder, text: $quickTestText)
@@ -763,7 +831,7 @@ struct SettingsView: View {
                 .font(.system(size: 12))
                 .frame(maxWidth: .infinity)
             if !quickTestText.isEmpty {
-                Button("Xoá thử") {
+                Button(prefs.tr("Xoá thử", "Clear")) {
                     quickTestText = ""
                 }
                 .buttonStyle(.bordered)
@@ -810,25 +878,31 @@ struct SettingsView: View {
             // Hàng 1: Thẻ Sứ mệnh & Chuẩn mực Kỹ thuật Sen Việt (Toàn chiều ngang)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
-                    Label("SỨ MỆNH SEN VIỆT", systemImage: "sparkles")
+                    Label(prefs.tr("SỨ MỆNH SEN VIỆT", "SEN VIỆT MISSION"), systemImage: "sparkles")
                         .font(.system(size: 10.5, weight: .bold))
                         .foregroundColor(.indigo)
                     Spacer()
-                    Text("InputMethodKit Chuẩn Apple • Pure Swift 6 • 100% Offline")
+                    Text(prefs.tr(
+                        "InputMethodKit Chuẩn Apple • Pure Swift 6 • 100% Offline",
+                        "Apple InputMethodKit Native • Pure Swift 6 • 100% Offline"
+                    ))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.secondary)
                 }
 
-                Text("\"Hãy để việc gõ là gõ — dù bạn gõ tiếng Việt hay tiếng Anh; nhanh hay chậm; gõ là Sen Việt.\"")
+                Text(prefs.tr(
+                    "\"Hãy để việc gõ là gõ — dù bạn gõ tiếng Việt hay tiếng Anh; nhanh hay chậm; gõ là Sen Việt.\"",
+                    "\"Just type naturally — Vietnamese or English, fast or slow; Sen Việt handles the rest seamlessly.\""
+                ))
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundColor(.primary)
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 8) {
-                    aboutFeaturePill(icon: "bolt.fill", text: "Phản hồi tức thì (< 1ms)", color: .orange)
-                    aboutFeaturePill(icon: "globe", text: "Song ngữ Anh–Việt tự động", color: .indigo)
-                    aboutFeaturePill(icon: "lock.shield.fill", text: "Không cần quyền Trợ năng", color: .green)
+                    aboutFeaturePill(icon: "bolt.fill", text: prefs.tr("Phản hồi tức thì (< 1ms)", "Instant response (< 1ms)"), color: .orange)
+                    aboutFeaturePill(icon: "globe", text: prefs.tr("Song ngữ Anh–Việt tự động", "Auto EN–VI Bilingual"), color: .indigo)
+                    aboutFeaturePill(icon: "lock.shield.fill", text: prefs.tr("Không cần quyền Trợ năng", "No Accessibility needed"), color: .green)
                 }
             }
             .padding(12)
@@ -856,7 +930,7 @@ struct SettingsView: View {
 
                         VStack(alignment: .leading, spacing: 1.5) {
                             HStack(spacing: 5) {
-                                Text("Quyền riêng tư & An toàn")
+                                Text(prefs.tr("Quyền riêng tư & An toàn", "Privacy & Security"))
                                     .font(.system(size: 12.5, weight: .bold))
                                 Text("100% OFFLINE")
                                     .font(.system(size: 8.5, weight: .bold))
@@ -866,7 +940,7 @@ struct SettingsView: View {
                                     .foregroundColor(.green)
                                     .clipShape(Capsule())
                             }
-                            Text("Không thu thập hay gửi dữ liệu phím gõ")
+                            Text(prefs.tr("Không thu thập hay gửi dữ liệu phím gõ", "Never collects or uploads keystrokes"))
                                 .font(.system(size: 10.5))
                                 .foregroundColor(.secondary)
                         }
@@ -874,7 +948,10 @@ struct SettingsView: View {
                         Spacer(minLength: 0)
                     }
 
-                    Text("Xử lý toàn bộ phím gõ cục bộ trên thiết bị, không cần quyền Trợ năng và tự động bỏ qua ô mật khẩu.")
+                    Text(prefs.tr(
+                        "Xử lý toàn bộ phím gõ cục bộ trên thiết bị, không cần quyền Trợ năng và tự động bỏ qua ô mật khẩu.",
+                        "All keystrokes are processed locally on-device with no Accessibility permissions, automatically bypassing password fields."
+                    ))
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .lineLimit(3)
@@ -903,7 +980,7 @@ struct SettingsView: View {
 
                         VStack(alignment: .leading, spacing: 1.5) {
                             HStack(spacing: 5) {
-                                Text("Mã nguồn mở")
+                                Text(prefs.tr("Mã nguồn mở", "Open Source"))
                                     .font(.system(size: 12.5, weight: .bold))
                                 Text("MIT LICENSE")
                                     .font(.system(size: 8.5, weight: .bold))
@@ -913,7 +990,7 @@ struct SettingsView: View {
                                     .foregroundColor(.indigo)
                                     .clipShape(Capsule())
                             }
-                            Text("Đa nền tảng macOS • Windows • Linux")
+                            Text(prefs.tr("Đa nền tảng macOS • Windows • Linux", "Cross-platform: macOS • Windows • Linux"))
                                 .font(.system(size: 10.5))
                                 .foregroundColor(.secondary)
                         }
@@ -921,7 +998,10 @@ struct SettingsView: View {
                         Spacer(minLength: 0)
                     }
 
-                    Text("Sen Việt (VieLotusIM) phát hành miễn phí theo giấy phép MIT. Mã nguồn minh bạch, kiểm chứng công khai trên GitHub.")
+                    Text(prefs.tr(
+                        "Sen Việt (VieLotusIM) phát hành miễn phí theo giấy phép MIT. Mã nguồn minh bạch, kiểm chứng công khai trên GitHub.",
+                        "Sen Việt (VieLotusIM) is free and open-source under the MIT License, with verifiable source code on GitHub."
+                    ))
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                         .lineLimit(3)
@@ -946,7 +1026,7 @@ struct SettingsView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "bubble.left.and.text.bubble.right.fill")
                             .foregroundColor(.indigo)
-                        Text("Gửi Góp ý & Báo lỗi")
+                        Text(prefs.tr("Gửi Góp ý & Báo lỗi", "Feedback & Bug Report"))
                             .fontWeight(.semibold)
                     }
                     .font(.system(size: 11.5))
@@ -960,7 +1040,7 @@ struct SettingsView: View {
                 Spacer()
 
                 if let zaloURL = URL(string: "https://zalo.me/g/6wwyvywyvhsb0n6rwkze") {
-                    Link("Cộng đồng Zalo ↗", destination: zaloURL)
+                    Link(prefs.tr("Cộng đồng Zalo ↗", "Zalo Community ↗"), destination: zaloURL)
                         .font(.system(size: 11.5, weight: .medium))
                         .foregroundColor(.primary)
                 }
@@ -968,7 +1048,7 @@ struct SettingsView: View {
                 Text("•").foregroundColor(.secondary)
 
                 if let ghURL = URL(string: "https://github.com/stevedat/VieLotus-IM") {
-                    Link("Mã nguồn GitHub ↗", destination: ghURL)
+                    Link(prefs.tr("Mã nguồn GitHub ↗", "GitHub Source ↗"), destination: ghURL)
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundColor(.indigo)
                 }
@@ -1000,7 +1080,7 @@ struct SettingsView: View {
                 HStack(spacing: 3.5) {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 9, weight: .semibold))
-                    Text("Kiểm tra cập nhật")
+                    Text(prefs.tr("Kiểm tra cập nhật", "Check Updates"))
                         .font(.system(size: 10, weight: .medium))
                 }
                 .padding(.horizontal, 7)
@@ -1010,13 +1090,16 @@ struct SettingsView: View {
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
-            .help("Kiểm tra phiên bản mới từ GitHub Releases (có xác thực SHA-256)")
+            .help(prefs.tr(
+                "Kiểm tra phiên bản mới từ GitHub Releases (có xác thực SHA-256)",
+                "Check for updates from GitHub Releases (SHA-256 verified)"
+            ))
 
         case .checking:
             HStack(spacing: 4) {
                 Image(systemName: "hourglass")
                     .font(.system(size: 9, weight: .semibold))
-                Text("Đang kiểm tra...")
+                Text(prefs.tr("Đang kiểm tra...", "Checking..."))
                     .font(.system(size: 10, weight: .medium))
             }
             .padding(.horizontal, 7)
@@ -1032,7 +1115,7 @@ struct SettingsView: View {
                 HStack(spacing: 3.5) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 9.5, weight: .semibold))
-                    Text("Bản mới nhất")
+                    Text(prefs.tr("Bản mới nhất", "Up to date"))
                         .font(.system(size: 10, weight: .semibold))
                 }
                 .padding(.horizontal, 7)
@@ -1042,7 +1125,7 @@ struct SettingsView: View {
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
-            .help("Đang dùng bản mới nhất • Bấm để kiểm tra lại")
+            .help(prefs.tr("Đang dùng bản mới nhất • Bấm để kiểm tra lại", "You're up to date • Click to recheck"))
 
         case .updateAvailable(let manifest):
             Button {
@@ -1051,7 +1134,7 @@ struct SettingsView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.system(size: 9.5, weight: .bold))
-                    Text("Cập nhật v\(manifest.version)")
+                    Text(prefs.tr("Cập nhật v\(manifest.version)", "Update v\(manifest.version)"))
                         .font(.system(size: 10, weight: .bold))
                 }
                 .padding(.horizontal, 8)
@@ -1061,13 +1144,16 @@ struct SettingsView: View {
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
-            .help("Tải về VieLotusIM.pkg v\(manifest.version), đối chiếu SHA-256 và cài đặt tự động")
+            .help(prefs.tr(
+                "Tải về VieLotusIM.pkg v\(manifest.version), đối chiếu SHA-256 và cài đặt tự động",
+                "Download VieLotusIM.pkg v\(manifest.version), verify SHA-256 and install"
+            ))
 
         case .downloading(let progress):
             HStack(spacing: 4) {
                 Image(systemName: "arrow.down.circle")
                     .font(.system(size: 9.5, weight: .semibold))
-                Text("Đang tải \(Int(progress * 100))%...")
+                Text(prefs.tr("Đang tải \(Int(progress * 100))%...", "Downloading \(Int(progress * 100))%..."))
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
             }
             .padding(.horizontal, 7)
@@ -1080,7 +1166,7 @@ struct SettingsView: View {
             HStack(spacing: 4) {
                 Image(systemName: "gearshape.2.fill")
                     .font(.system(size: 9.5, weight: .semibold))
-                Text("Đang cài đặt...")
+                Text(prefs.tr("Đang cài đặt...", "Installing..."))
                     .font(.system(size: 10, weight: .semibold))
             }
             .padding(.horizontal, 7)
@@ -1096,7 +1182,7 @@ struct SettingsView: View {
                 HStack(spacing: 3.5) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 9, weight: .semibold))
-                    Text("Thử lại cập nhật")
+                    Text(prefs.tr("Thử lại cập nhật", "Retry Update"))
                         .font(.system(size: 10, weight: .semibold))
                 }
                 .padding(.horizontal, 7)
@@ -1149,14 +1235,17 @@ private struct AdaptiveCompatibilitySheet: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Tương thích Ứng dụng")
+                    Text(prefs.tr("Tương thích Ứng dụng", "App Compatibility"))
                         .font(.system(size: 14, weight: .bold))
-                    Text("Mặc định dùng Direct cho app native và Native Marked Text (ổn định nhất đã kiểm thử) cho Chromium/Electron")
+                    Text(prefs.tr(
+                        "Mặc định dùng Direct cho app native và Native Marked Text (ổn định nhất đã kiểm thử) cho Chromium/Electron",
+                        "Defaults to Direct for native apps and tested Native Marked Text for Chromium/Electron"
+                    ))
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
                 Spacer()
-                Button("Đóng") {
+                Button(prefs.tr("Đóng", "Close")) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
@@ -1168,11 +1257,11 @@ private struct AdaptiveCompatibilitySheet: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("Chế độ toàn cục:")
+                    Text(prefs.tr("Chế độ toàn cục:", "Global Mode:"))
                         .font(.system(size: 11.5, weight: .semibold))
                     Picker("", selection: $prefs.presentationModePreference) {
-                        Text("Mặc định (Tự động theo ứng dụng)").tag(PresentationModePreference.automatic)
-                        Text("Ưu tiên Direct (Thử nghiệm trên Web)").tag(PresentationModePreference.directReplacement)
+                        Text(prefs.tr("Mặc định (Tự động theo ứng dụng)", "Automatic (Per-app smart default)")).tag(PresentationModePreference.automatic)
+                        Text(prefs.tr("Ưu tiên Direct (Thử nghiệm trên Web)", "Prefer Direct (Experimental on Web)")).tag(PresentationModePreference.directReplacement)
                         Text("Native Marked Text").tag(PresentationModePreference.markedText)
                     }
                     .labelsHidden()
@@ -1184,7 +1273,7 @@ private struct AdaptiveCompatibilitySheet: View {
                         !ClientAdapter.forcedMarkedTextBundles().isEmpty ||
                         prefs.presentationModePreference != .automatic ||
                         prefs.experimentalVerifiedExplicitRange {
-                        Button("Khôi phục mặc định") {
+                        Button(prefs.tr("Khôi phục mặc định", "Restore Defaults")) {
                             prefs.presentationModePreference = .automatic
                             prefs.experimentalVerifiedExplicitRange = false
                             prefs.appModeOverrides.removeAll()
@@ -1269,8 +1358,10 @@ private struct AdaptiveCompatibilitySheet: View {
                     ClientAdapter.clearForcedMarkedText(for: app.id)
                 }
             )) {
-                Text("Mặc định").tag(PresentationModePreference.automatic)
-                Text(app.category == .chromium ? "Direct (Thử nghiệm)" : "Direct (Không gạch)").tag(PresentationModePreference.directReplacement)
+                Text(prefs.tr("Mặc định", "Automatic")).tag(PresentationModePreference.automatic)
+                Text(app.category == .chromium
+                     ? prefs.tr("Direct (Thử nghiệm)", "Direct (Experimental)")
+                     : prefs.tr("Direct (Không gạch)", "Direct (No underline)")).tag(PresentationModePreference.directReplacement)
                 Text("Native Marked Text").tag(PresentationModePreference.markedText)
                 Text("Passthrough").tag(PresentationModePreference.passthrough)
             }
@@ -1298,25 +1389,25 @@ private struct AdaptiveCompatibilitySheet: View {
             switch mode {
             case .directReplacement:
                 if category == .chromium {
-                    return ("Ghim • Direct (Thử nghiệm)", .orange)
+                    return (prefs.tr("Ghim • Direct (Thử nghiệm)", "Pinned • Direct (Experimental)"), .orange)
                 }
-                return ("Ghim • Không gạch chân", .green)
-            case .markedText: return ("Ghim • Native Marked Text", .blue)
-            case .terminalDirect: return ("Ghim • Terminal Direct", .teal)
-            case .passthrough: return ("Ghim • Tắt bộ gõ", .secondary)
+                return (prefs.tr("Ghim • Không gạch chân", "Pinned • No underline"), .green)
+            case .markedText: return (prefs.tr("Ghim • Native Marked Text", "Pinned • Native Marked Text"), .blue)
+            case .terminalDirect: return (prefs.tr("Ghim • Terminal Direct", "Pinned • Terminal Direct"), .teal)
+            case .passthrough: return (prefs.tr("Ghim • Tắt bộ gõ", "Pinned • Bypass IME"), .secondary)
             }
         default:
             switch mode {
             case .directReplacement:
                 if category == .chromium {
-                    return ("Direct • Thử nghiệm", .orange)
+                    return (prefs.tr("Direct • Thử nghiệm", "Direct • Experimental"), .orange)
                 }
-                return ("Direct • Không gạch chân", .green)
+                return (prefs.tr("Direct • Không gạch chân", "Direct • No underline"), .green)
             case .markedText:
                 if category == .chromium {
-                    return ("Native Marked Text • Mặc định", .indigo)
+                    return (prefs.tr("Native Marked Text • Mặc định", "Native Marked Text • Default"), .indigo)
                 }
-                return ("Native Marked Text • Ổn định", .blue)
+                return (prefs.tr("Native Marked Text • Ổn định", "Native Marked Text • Stable"), .blue)
             case .terminalDirect:
                 return ("Terminal Direct", .teal)
             case .passthrough:

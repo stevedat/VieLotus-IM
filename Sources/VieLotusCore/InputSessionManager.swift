@@ -183,9 +183,9 @@ public class InputSessionManager {
         "is", "was", "has", "had", "will", "can", "may", "must", "should", "would", "could", "are", "were"
     ]
 
-    /// Common pure-ASCII English nouns/verbs after `His`/`Her`/`This`/`Is`/`Was` that share spelling with untoned Vietnamese syllables.
+    /// Common pure-ASCII English nouns/verbs/articles after `His`/`Her`/`This`/`Is`/`Was`/`Has` that share spelling with untoned Vietnamese syllables.
     private static let asciiEnglishSecondWordsAfterDeterminer: Set<String> = [
-        "son", "man", "men", "can", "may", "fan", "van", "pan", "pen", "map", "hat", "cup", "plan"
+        "the", "son", "man", "men", "can", "may", "fan", "van", "pan", "pen", "map", "hat", "cup", "plan"
     ]
 
     internal static func shouldArmSpacePrefix(raw: String, rendered: String, priorContext: String = "") -> Bool {
@@ -1098,6 +1098,9 @@ public class InputSessionManager {
               VietnameseSyllableDictionary.shared.isValidSyllable(rendered),
               !SmartBilingualDetector.isExplicitTelexEscape(raw: raw, rendered: rendered),
               !SmartBilingualDetector.isVNIDigitTransformationOrEscape(raw: raw, rendered: rendered) else { return nil }
+        if raw == "been" && rendered == "bên" {
+            return !SmartBilingualDetector.hasEnglishPerfectContextForBeen(context)
+        }
         // General English coordination evidence: preserve a recognized plural
         // following another recognized plural (with an optional coordinator).
         // This uses morphology + lexical membership, not a phrase whitelist.
@@ -1463,11 +1466,23 @@ public class InputSessionManager {
             rawWord, context: context, technical: followsDot || effectiveTech) {
             return rawPreferred
         }
-        if !effectiveTech, let preferVN = mixedInputPrefersVietnamese(raw: rawWord, rendered: rendered) { return !preferVN }
-        if SmartBilingualDetector.isEnglishCompound(raw: rawWord, rendered: rendered) { return true }
         if hasConfirmedNonEnglishSemanticEscapeUnlocked(rawWord: rawWord, rendered: rendered) {
             return false
         }
+        if engine.inputMethod == .telex,
+           let boundaryChar,
+           !SmartBilingualDetector.isExplicitTelexEscape(raw: rawWord, rendered: rendered) {
+            if boundaryChar.isASCII && boundaryChar.isNumber &&
+               SmartBilingualDetector.shouldRestoreRawBeforeDigitBoundary(raw: rawWord, rendered: rendered) {
+                return true
+            }
+            if (boundaryChar == "'" || boundaryChar == "\u{2019}") &&
+               SmartBilingualDetector.shouldRestoreRawBeforeApostropheBoundary(raw: rawWord, rendered: rendered) {
+                return true
+            }
+        }
+        if !effectiveTech, let preferVN = mixedInputPrefersVietnamese(raw: rawWord, rendered: rendered) { return !preferVN }
+        if SmartBilingualDetector.isEnglishCompound(raw: rawWord, rendered: rendered) { return true }
         if engine.inputMethod == .vni && rawWord.contains(where: \.isNumber) {
             // If an invalid Vietnamese vowel/tone stem got followed by trailing digits (e.g. `viet123` -> `viét23`),
             // restore the original ASCII alphanumeric token instead of keeping a mangled non-syllable.

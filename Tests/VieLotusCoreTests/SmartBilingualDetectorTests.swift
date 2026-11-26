@@ -1188,6 +1188,129 @@ final class SmartBilingualDetectorTests: XCTestCase {
         }
     }
     #endif
+
+    func testArm64DigitBoundaryAndBeenPerfectContextParity() {
+        let arm64Cases: [(raw: String, expected: String)] = [
+            ("arm64 ", "arm64 "),
+            ("ARM64 ", "ARM64 "),
+            ("arm64e ", "arm64e "),
+            ("arm64x ", "arm64x "),
+            ("arm64ec ", "arm64ec "),
+            ("arm32 ", "arm32 "),
+            ("aarch64 ", "aarch64 "),
+            ("es6 ", "es6 "),
+            ("os2 ", "os2 "),
+            ("tooi dungf arm64 ", "tôi dùng arm64 "),
+            ("build arm64 ", "build arm64 "),
+            ("chayj treen arm64 ", "chạy trên arm64 "),
+            ("tooi dungf arm64 been nayf ", "tôi dùng arm64 bên này "),
+            // Protected Vietnamese words with trailing digits & normal Vietnamese `ảm đạm`
+            ("baif1 ", "bài1 "),
+            ("caau2 ", "câu2 "),
+            ("soos1 ", "số1 "),
+            ("tooi1 ", "tôi1 "),
+            ("been1 ", "bên1 "),
+            ("teen1 ", "tên1 "),
+            ("moon1 ", "môn1 "),
+            ("amr ddamj ", "ảm đạm "),
+            ("arm ddamj ", "ảm đạm ")
+        ]
+
+        let beenVietnameseCases: [(raw: String, expected: String)] = [
+            ("been ", "bên "),
+            ("Been ", "Bên "),
+            ("BEEN ", "BÊN "),
+            ("owr been ", "ở bên "),
+            ("deploy been server ", "deploy bên server "),
+            ("tooi deploy been server ", "tôi deploy bên server "),
+            ("tooi chayj build been linux ", "tôi chạy build bên linux "),
+            ("moowr terminal been phair ", "mở terminal bên phải "),
+            ("suwar code been mays ", "sửa code bên máy "),
+            ("caif chrome been mac ", "cài chrome bên mac "),
+            ("taoj branch been github ", "tạo branch bên github "),
+            ("banj check been nayf ", "bạn check bên này "),
+            ("windows been nayf ", "windows bên này "),
+            ("linux been kia ", "linux bên kia "),
+            ("apple been myx ", "apple bên mỹ "),
+            ("iphone been nayf ", "iphone bên này "),
+            ("flutter been android ", "flutter bên android "),
+            ("react been client ", "react bên client "),
+            ("window been trais ", "window bên trái "),
+            ("test been emulator ", "test bên emulator "),
+            ("repo been github ", "repo bên github "),
+            ("the been ", "the bên "),
+            ("this been ", "thí bên "),
+            ("he is been ", "he is bên "),
+            ("long been ", "long bên "),
+            ("I have the file been kia ", "I have the file bên kia ")
+        ]
+
+        let beenEnglishCases: [(raw: String, expected: String)] = [
+            ("have been ", "have been "),
+            ("has been ", "has been "),
+            ("Has been ", "Has been "),
+            ("had been ", "had been "),
+            ("I have been ", "I have been "),
+            ("it has been ", "it has been "),
+            ("I've been ", "I've been "),
+            ("we've been ", "we've been "),
+            ("she's been ", "she's been "),
+            ("he's been ", "he's been "),
+            ("it's been ", "it's been "),
+            ("there's been ", "there's been "),
+            ("haven't been ", "haven't been "),
+            ("hasn't been ", "hasn't been "),
+            ("hadn't been ", "hadn't been "),
+            ("never been ", "never been "),
+            ("always been ", "always been "),
+            ("not been ", "not been "),
+            ("already been ", "already been "),
+            ("just been ", "just been "),
+            ("ever been ", "ever been "),
+            ("still been ", "still been "),
+            ("also been ", "also been "),
+            ("really been ", "really been "),
+            ("Have you been ", "Have you been "),
+            ("Has it been ", "Has it been "),
+            ("Has the server been ", "Has the server been "),
+            ("It has long been ", "It has long been "),
+            ("would have been ", "would have been "),
+            ("could have been ", "could have been "),
+            ("tooi ddax I have been ", "tôi đã I have been ")
+        ]
+
+        for (raw, expected) in arm64Cases + beenVietnameseCases + beenEnglishCases {
+            XCTAssertEqual(driveMacSentence(raw, inlineBilingual: false), expected, "commit mismatch for \(raw.debugDescription)")
+            XCTAssertEqual(driveMacSentence(raw, inlineBilingual: true), expected, "inline mismatch for \(raw.debugDescription)")
+        }
+
+        // VNI non-regression for arm64 family
+        for token in ["arm64 ", "ARM64 ", "arm64e ", "arm32 "] {
+            let s = InputSessionManager()
+            s.setInputMethod(.vni)
+            s.setGrammarProfile(.senFlex)
+            var screen = ""
+            for ch in token {
+                if s.isWordBoundary(ch) {
+                    if case let .commit(bs, txt, true) = s.commitWord(smartBilingualEnabled: true, boundaryChar: ch) {
+                        if bs > 0 { screen.removeLast(min(bs, screen.count)) }
+                        screen += txt
+                    }
+                    screen.append(ch)
+                } else {
+                    switch s.handleCharacter(ch) {
+                    case let .replace(bs, txt):
+                        if bs > 0 { screen.removeLast(min(bs, screen.count)) }
+                        screen += txt
+                    case .passThrough:
+                        screen.append(ch)
+                    default: break
+                    }
+                }
+            }
+            XCTAssertEqual(screen, token, "VNI mismatch for \(token.debugDescription)")
+        }
+    }
 }
 
 

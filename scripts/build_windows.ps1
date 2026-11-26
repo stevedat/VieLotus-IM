@@ -529,7 +529,7 @@ if ($makeappx) {
     <DisplayName>Sen Việt (VieLotusIM)</DisplayName>
     <PublisherDisplayName>Nido Holdings</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <Description>Bộ gõ Tiếng Việt thế hệ mới chuẩn Native TSF cho Windows 10/11 (Telex, VNI, Smart Bilingual 100% Offline).</Description>
+    <Description>Modern Native Windows TSF Vietnamese Input Method (Telex, VNI, Smart Bilingual — 100% Offline).</Description>
   </Properties>
 
   <Dependencies>
@@ -545,7 +545,7 @@ if ($makeappx) {
     <Application Id="VieLotusIM" Executable="VieLotusSettings.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="Sen Việt (VieLotusIM)"
-        Description="Cài đặt &amp; Quản lý Bộ gõ Tiếng Việt Sen Việt (VieLotusIM)"
+        Description="Sen Việt (VieLotusIM) Vietnamese Input Method Settings"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">

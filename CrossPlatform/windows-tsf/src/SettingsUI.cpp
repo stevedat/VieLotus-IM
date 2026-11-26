@@ -16,6 +16,7 @@
 
 #include "SettingsUI.h"
 #include "TsfGameGuardLogic.h"
+#include "WinL10n.h"
 #include "vielotus_win_installer.h"
 
 #ifndef DWMWA_WINDOW_CORNER_PREFERENCE
@@ -267,6 +268,7 @@ enum class HitRegion : int {
     RowFeedback,
     RowZalo,
     RowGitHub,
+    FooterLanguage,
     FooterGitHub,
     FooterFeedback
 };
@@ -569,9 +571,18 @@ static void StopSettingsProfileNotifySink(BentoSettingsState *st) {
 
 static void UpdateTestEditCueBanner(BentoSettingsState *st) {
     if (!st || !st->hTestEdit) return;
+    const bool isEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
     const wchar_t *cue = st->prefs.isVni
-        ? L"G\u00F5 th\u1EED (VNI): tru7o7ng3 \u2192 tr\u01B0\u1EDFng \u2022 12ha2 \u2192 12h\u00E0 \u2022 window user..."
-        : L"G\u00F5 th\u1EED (Telex): truowngr \u2192 tr\u01B0\u1EDFng \u2022 12haf \u2192 12h\u00E0 \u2022 window user...";
+        ? win_l10n::Tr(
+            isEn,
+            L"G\u00F5 th\u1EED (VNI): tru7o7ng3 \u2192 tr\u01B0\u1EDFng \u2022 12ha2 \u2192 12h\u00E0 \u2022 window user...",
+            L"Test typing (VNI): tru7o7ng3 \u2192 tr\u01B0\u1EDFng \u2022 12ha2 \u2192 12h\u00E0 \u2022 window user..."
+        )
+        : win_l10n::Tr(
+            isEn,
+            L"G\u00F5 th\u1EED (Telex): truowngr \u2192 tr\u01B0\u1EDFng \u2022 12haf \u2192 12h\u00E0 \u2022 window user...",
+            L"Test typing (Telex): truowngr \u2192 tr\u01B0\u1EDFng \u2022 12haf \u2192 12h\u00E0 \u2022 window user..."
+        );
     SendMessageW(st->hTestEdit, 0x1501, TRUE, reinterpret_cast<LPARAM>(cue));
 }
 
@@ -602,10 +613,16 @@ static vielotus_tsf_guard::SettingsImSyncResult SyncSettingsWithSystemInputMetho
             (regPrefs.quickTelex != st->prefs.quickTelex) ||
             (regPrefs.relaxedCoda != st->prefs.relaxedCoda) ||
             (regPrefs.autoBypassRemoteApps != st->prefs.autoBypassRemoteApps) ||
-            (regPrefs.startWithWindows != st->prefs.startWithWindows);
+            (regPrefs.startWithWindows != st->prefs.startWithWindows) ||
+            (regPrefs.uiLanguage != st->prefs.uiLanguage);
+        const bool oldIsEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
+        const bool newIsEn = win_l10n::ResolveWindowsIsEnglish(regPrefs.uiLanguage);
         const bool keepUiVni = st->prefs.isVni;
         st->prefs = regPrefs;
         st->prefs.isVni = keepUiVni;
+        if (oldIsEn != newIsEn) {
+            UpdateTestEditCueBanner(st);
+        }
     }
 
     bool activeTsfIsVni = false;
@@ -821,6 +838,7 @@ static HitRegion HitTestBentoUI(const BentoSettingsState *st, float xDip, float 
     if (PtInDipRect(xDip, yDip, 456.0f, 11.0f, 102.0f, 32.0f)) return HitRegion::TabSettings;
     if (PtInDipRect(xDip, yDip, 558.0f, 11.0f, 102.0f, 32.0f)) return HitRegion::TabAbout;
 
+    if (PtInDipRect(xDip, yDip, 404.0f, 388.0f, 68.0f, 32.0f)) return HitRegion::FooterLanguage;
     if (PtInDipRect(xDip, yDip, 476.0f, 388.0f, 122.0f, 32.0f)) return HitRegion::FooterFeedback;
     if (PtInDipRect(xDip, yDip, 608.0f, 388.0f, 54.0f, 32.0f)) return HitRegion::FooterGitHub;
 
@@ -1021,6 +1039,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
         float s = st->dpiScale;
         bool isDark = st->isDark;
+        const bool isEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
 
         FontFamily ffSans(L"Segoe UI");
         FontFamily ffMono(L"Consolas");
@@ -1119,7 +1138,9 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         FillRoundRect(g, modePill, 8.5f * s, isDark ? Color(255, 28, 54, 42) : Color(255, 232, 250, 238));
         SolidBrush greenTextBrush(isDark ? Color(255, 74, 222, 128) : Color(255, 22, 163, 74));
         g.DrawString(
-            st->prefs.isVni ? L"\u25CF \u0110ang b\u1EADt: Chu\u1EA9n VNI" : L"\u25CF \u0110ang b\u1EADt: Chu\u1EA9n Telex",
+            st->prefs.isVni
+                ? win_l10n::Tr(isEn, L"\u25CF \u0110ang b\u1EADt: Chu\u1EA9n VNI", L"\u25CF Active: VNI")
+                : win_l10n::Tr(isEn, L"\u25CF \u0110ang b\u1EADt: Chu\u1EA9n Telex", L"\u25CF Active: Telex"),
             -1, &fVersion, modePill, &sfCenter, &greenTextBrush
         );
 
@@ -1135,7 +1156,14 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         }
 
         RectF subBrandRect(64.0f * s, 29.0f * s, 380.0f * s, 17.0f * s);
-        g.DrawString(L"B\u1ED9 g\u00F5 ti\u1EBFng Vi\u1EC7t thu\u1EA7n chu\u1EA9n Native TSF \u2022 100% Offline", -1, &fHeaderSub, subBrandRect, &sfLeft, &secondaryBrush);
+        g.DrawString(
+            win_l10n::Tr(
+                isEn,
+                L"B\u1ED9 g\u00F5 ti\u1EBFng Vi\u1EC7t thu\u1EA7n chu\u1EA9n Native TSF \u2022 100% Offline",
+                L"Native Windows TSF Vietnamese IME \u2022 100% Offline"
+            ),
+            -1, &fHeaderSub, subBrandRect, &sfLeft, &secondaryBrush
+        );
 
         RectF segBg(456.0f * s, 11.0f * s, 204.0f * s, 32.0f * s);
         FillRoundRect(g, segBg, 8.5f * s, isDark ? Color(255, 42, 42, 54) : Color(255, 235, 235, 240));
@@ -1152,12 +1180,12 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
         SolidBrush tab0Brush(st->selectedTab == 0 ? blueCol : fgSecondary);
         SolidBrush tab1Brush(st->selectedTab == 1 ? blueCol : fgSecondary);
-        g.DrawString(L"C\u00E0i \u0111\u1EB7t", -1, &fTab, tab0Rect, &sfCenter, &tab0Brush);
-        g.DrawString(L"Th\u00F4ng tin", -1, &fTab, tab1Rect, &sfCenter, &tab1Brush);
+        g.DrawString(win_l10n::Tr(isEn, L"C\u00E0i \u0111\u1EB7t", L"Settings"), -1, &fTab, tab0Rect, &sfCenter, &tab0Brush);
+        g.DrawString(win_l10n::Tr(isEn, L"Th\u00F4ng tin", L"About"), -1, &fTab, tab1Rect, &sfCenter, &tab1Brush);
 
         if (st->selectedTab == 0) {
             g.DrawString(
-                L"KI\u1EC2U G\u00D5 TI\u1EBENG VI\u1EC6T",
+                win_l10n::Tr(isEn, L"KI\u1EC2U G\u00D5 TI\u1EBENG VI\u1EC6T", L"VIETNAMESE INPUT METHOD"),
                 -1, &fSecHdr, RectF(20.0f * s, 61.0f * s, 240.0f * s, 17.0f * s), &sfLeft, &secondaryBrush
             );
             if (!st->conflictImeSummary.empty() && st->prefs.vietnameseEnabled) {
@@ -1176,14 +1204,16 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 sfWarn.SetLineAlignment(StringAlignmentCenter);
                 sfWarn.SetTrimming(StringTrimmingEllipsisCharacter);
                 sfWarn.SetFormatFlags(StringFormatFlagsNoWrap);
-                std::wstring warnMsg = L"\u26A0 \u0110ang ch\u1EA1y " + st->conflictImeSummary + L" \u2014 B\u1EA5m \u0111\u1EC3 t\u1EAFt";
+                std::wstring warnMsg = isEn
+                    ? (L"\u26A0 " + st->conflictImeSummary + L" running \u2014 Click to close")
+                    : (L"\u26A0 \u0110ang ch\u1EA1y " + st->conflictImeSummary + L" \u2014 B\u1EA5m \u0111\u1EC3 t\u1EAFt");
                 g.DrawString(
                     warnMsg.c_str(), -1, &fSecRight,
                     RectF(346.0f * s, 59.0f * s, 308.0f * s, 20.0f * s), &sfWarn, &warnBrush
                 );
             } else {
                 g.DrawString(
-                    L"B\u1ECF d\u1EA5u t\u1EF1 do \u2022 Ph\u00EDm Z xo\u00E1 d\u1EA5u",
+                    win_l10n::Tr(isEn, L"B\u1ECF d\u1EA5u t\u1EF1 do \u2022 Ph\u00EDm Z xo\u00E1 d\u1EA5u", L"Free-tone typing \u2022 Z removes tone"),
                     -1, &fSecRight, RectF(380.0f * s, 61.0f * s, 280.0f * s, 17.0f * s), &sfRight, &blueBrush
                 );
             }
@@ -1193,7 +1223,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 !st->prefs.isVni,
                 st->hoveredRegion == HitRegion::CardTelex,
                 L"TX",
-                L"Chu\u1EA9n Telex",
+                win_l10n::Tr(isEn, L"Chu\u1EA9n Telex", L"Telex"),
                 L"s f r x j w",
                 L"vieetj \u2192 vi\u1EC7t",
                 fCardTitle, fMonoBadge, fSub, sfLeft, sfCenter
@@ -1204,7 +1234,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 st->prefs.isVni,
                 st->hoveredRegion == HitRegion::CardVni,
                 L"19",
-                L"Chu\u1EA9n VNI",
+                win_l10n::Tr(isEn, L"Chu\u1EA9n VNI", L"VNI"),
                 L"1\u20135 \u2022 6\u20139",
                 L"viet65 \u2192 vi\u1EC7t",
                 fCardTitle, fMonoBadge, fSub, sfLeft, sfCenter
@@ -1215,14 +1245,16 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 st->prefs.senFlex,
                 st->hoveredRegion == HitRegion::BarSenFlex,
                 L"\u2726",
-                L"D\u1EA5u tr\u01B0\u1EDBc \u00E2m",
+                win_l10n::Tr(isEn, L"D\u1EA5u tr\u01B0\u1EDBc \u00E2m", L"Tone-First"),
                 L"rrung \u2192 r\u1EE7ng",
-                st->prefs.senFlex ? L"\u0110ang b\u1EADt" : L"\u0110ang t\u1EAFt",
+                st->prefs.senFlex
+                    ? win_l10n::Tr(isEn, L"\u0110ang b\u1EADt", L"On")
+                    : win_l10n::Tr(isEn, L"\u0110ang t\u1EAFt", L"Off"),
                 fCardTitle, fMonoBadge, fSub, sfLeft, sfCenter
             );
 
             g.DrawString(
-                L"TI\u1EC6N \u00CDCH, T\u01AF\u01A0NG TH\u00CDCH & H\u1EC6 TH\u1ED0NG",
+                win_l10n::Tr(isEn, L"TI\u1EC6N \u00CDCH, T\u01AF\u01A0NG TH\u00CDCH & H\u1EC6 TH\u1ED0NG", L"UTILITIES, COMPATIBILITY & SYSTEM"),
                 -1, &fSecHdr, RectF(20.0f * s, 160.0f * s, 360.0f * s, 17.0f * s), &sfLeft, &secondaryBrush
             );
 
@@ -1232,11 +1264,11 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 st->hoveredRegion == HitRegion::TileMacroToggle || st->hoveredRegion == HitRegion::BtnMacroManage,
                 indigoCol,
                 L"GT",
-                L"B\u1EA3ng g\u00F5 t\u1EAFt (Macro)",
+                win_l10n::Tr(isEn, L"B\u1EA3ng g\u00F5 t\u1EAFt (Macro)", L"Text Shortcuts"),
                 st->prefs.macroEnabled
-                    ? L"\u0110ang b\u1EADt \u2022 T\u1EF1 bung c\u1EE5m t\u1EEB vi\u1EBFt t\u1EAFt"
-                    : L"\u0110ang t\u1EAFt \u2022 B\u1EA5m c\u00F4ng t\u1EAFc \u0111\u1EC3 b\u1EADt",
-                L"Qu\u1EA3n l\u00FD \u2197",
+                    ? win_l10n::Tr(isEn, L"\u0110ang b\u1EADt \u2022 T\u1EF1 bung c\u1EE5m t\u1EEB vi\u1EBFt t\u1EAFt", L"On \u2022 Auto-expand abbreviations")
+                    : win_l10n::Tr(isEn, L"\u0110ang t\u1EAFt \u2022 B\u1EA5m c\u00F4ng t\u1EAFc \u0111\u1EC3 b\u1EADt", L"Off \u2022 Click switch to enable"),
+                win_l10n::Tr(isEn, L"Qu\u1EA3n l\u00FD \u2197", L"Manage \u2197"),
                 true,
                 fTileTitle, fSub, fPill, sfLeft, sfCenter
             );
@@ -1247,10 +1279,10 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 st->hoveredRegion == HitRegion::TileDevMode,
                 tealCol,
                 L"<>",
-                L"Ch\u1EBF \u0111\u1ED9 Code / IDE",
+                win_l10n::Tr(isEn, L"Ch\u1EBF \u0111\u1ED9 Code / IDE", L"Code / IDE Mode"),
                 st->prefs.developerMode
-                    ? L"T\u1EF1 ng\u1EAFt d\u1EA5u trong c\u1EB7p `code` & CLI"
-                    : L"Song ng\u1EEF th\u00F4ng minh ti\u00EAu chu\u1EA9n",
+                    ? win_l10n::Tr(isEn, L"T\u1EF1 ng\u1EAFt d\u1EA5u trong c\u1EB7p `code` & CLI", L"Auto-pause tones in `code` & CLI")
+                    : win_l10n::Tr(isEn, L"Song ng\u1EEF th\u00F4ng minh ti\u00EAu chu\u1EA9n", L"Standard Smart Bilingual typing"),
                 nullptr,
                 true,
                 fTileTitle, fSub, fPill, sfLeft, sfCenter
@@ -1277,7 +1309,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 g.DrawString(L"\u26A1", -1, &fPill, iconBox, &sfCenter, &iconBr);
 
                 g.DrawString(
-                    L"T\u1ED1c g\u00F5 ph\u1EE5 \u00E2m nhanh",
+                    win_l10n::Tr(isEn, L"T\u1ED1c g\u00F5 ph\u1EE5 \u00E2m nhanh", L"Quick Consonants"),
                     -1, &fTileTitle, RectF(62.0f * s, 266.0f * s, 250.0f * s, 20.0f * s), &sfLeft, &primaryBrush
                 );
 
@@ -1297,8 +1329,8 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                     g.DrawString(label, -1, &fPill, chipRect, &sfCenter, &cText);
                 };
 
-                drawConsonantChip(32.0f, L"\u0110\u1EA7u (cc/gg/qq)", st->prefs.quickTelex, st->hoveredRegion == HitRegion::ChipQuickTelex);
-                drawConsonantChip(182.0f, L"Cu\u1ED1i (-g/-h/-k)", st->prefs.relaxedCoda, st->hoveredRegion == HitRegion::ChipRelaxedCoda);
+                drawConsonantChip(32.0f, win_l10n::Tr(isEn, L"\u0110\u1EA7u (cc/gg/qq)", L"Initial (cc/gg/qq)"), st->prefs.quickTelex, st->hoveredRegion == HitRegion::ChipQuickTelex);
+                drawConsonantChip(182.0f, win_l10n::Tr(isEn, L"Cu\u1ED1i (-g/-h/-k)", L"Final (-g/-h/-k)"), st->prefs.relaxedCoda, st->hoveredRegion == HitRegion::ChipRelaxedCoda);
             }
 
             Color greenAcc = isDark ? Color(255, 74, 222, 128) : Color(255, 22, 163, 74);
@@ -1308,11 +1340,11 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 st->hoveredRegion == HitRegion::TileStartWithWindows,
                 greenAcc,
                 L"SV",
-                L"Kh\u1EDFi \u0111\u1ED9ng c\u00F9ng h\u1EC7 th\u1ED1ng",
+                win_l10n::Tr(isEn, L"Kh\u1EDFi \u0111\u1ED9ng c\u00F9ng h\u1EC7 th\u1ED1ng", L"Start with Windows"),
                 st->prefs.startWithWindows
-                    ? L"T\u1EF1 \u0111\u1ED9ng b\u1EADt khi m\u1EDF m\u00E1y (Auto) \u2022 Thu\u1EA7n TSF"
-                    : L"\u0110ang t\u1EAFt \u2022 B\u1EA5m c\u00F4ng t\u1EAFc \u0111\u1EC3 b\u1EADt t\u1EF1 \u0111\u1ED9ng",
-                st->prefs.startWithWindows ? L"AUTO" : L"T\u1EAE" L"T",
+                    ? win_l10n::Tr(isEn, L"T\u1EF1 \u0111\u1ED9ng b\u1EADt khi m\u1EDF m\u00E1y (Auto) \u2022 Thu\u1EA7n TSF", L"Auto-enable on sign-in (Auto) \u2022 Pure TSF")
+                    : win_l10n::Tr(isEn, L"\u0110ang t\u1EAFt \u2022 B\u1EA5m c\u00F4ng t\u1EAFc \u0111\u1EC3 b\u1EADt t\u1EF1 \u0111\u1ED9ng", L"Off \u2022 Click switch to enable"),
+                st->prefs.startWithWindows ? L"AUTO" : win_l10n::Tr(isEn, L"T\u1EAE" L"T", L"OFF"),
                 true,
                 fTileTitle, fSub, fPill, sfLeft, sfCenter
             );
@@ -1327,7 +1359,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
             SolidBrush indigoBrush(indigoCol);
             g.DrawString(
-                L"\u2726 Th\u1EED g\u00F5:",
+                win_l10n::Tr(isEn, L"\u2726 Th\u1EED g\u00F5:", L"\u2726 Test:"),
                 -1, &fBodyBold, RectF(32.0f * s, 332.0f * s, 76.0f * s, 40.0f * s), &sfLeft, &indigoBrush
             );
             if (!st->hTestEdit) {
@@ -1347,7 +1379,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                     : (isDark ? Color(255, 46, 46, 60) : Color(255, 242, 242, 247))
             );
             DrawRoundRect(g, clearBtn, 6.5f * s, isDark ? Color(255, 70, 70, 88) : Color(255, 220, 220, 228), 1.0f * s);
-            g.DrawString(L"Xo\u00E1 th\u1EED", -1, &fPill, clearBtn, &sfCenter, &secondaryBrush);
+            g.DrawString(win_l10n::Tr(isEn, L"Xo\u00E1 th\u1EED", L"Clear"), -1, &fPill, clearBtn, &sfCenter, &secondaryBrush);
         } else {
             SolidBrush indigoBrush(indigoCol);
             Color greenCol = isDark ? Color(255, 74, 222, 128) : Color(255, 22, 163, 74);
@@ -1356,15 +1388,23 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
 
             DrawCard(g, RectF(20.0f * s, 68.0f * s, 640.0f * s, 88.0f * s), 10.0f * s, cardCol, cardBorderCol);
             g.DrawString(
-                L"\u2726 S\u1EE8 M\u1EC6NH SEN VI\u1EC6T",
+                win_l10n::Tr(isEn, L"\u2726 S\u1EE8 M\u1EC6NH SEN VI\u1EC6T", L"\u2726 SEN VI\u1EC6T MISSION"),
                 -1, &fSecHdr, RectF(34.0f * s, 77.0f * s, 220.0f * s, 18.0f * s), &sfLeft, &indigoBrush
             );
             g.DrawString(
-                L"Windows TSF Native \u2022 100% Offline \u2022 An to\u00E0n tuy\u1EC7t \u0111\u1ED1i",
+                win_l10n::Tr(
+                    isEn,
+                    L"Windows TSF Native \u2022 100% Offline \u2022 An to\u00E0n tuy\u1EC7t \u0111\u1ED1i",
+                    L"Windows TSF Native \u2022 100% Offline \u2022 Private"
+                ),
                 -1, &fSub, RectF(280.0f * s, 77.0f * s, 366.0f * s, 18.0f * s), &sfRight, &secondaryBrush
             );
             g.DrawString(
-                L"\"H\u00E3y \u0111\u1EC3 vi\u1EC7c g\u00F5 l\u00E0 g\u00F5 \u2014 d\u00F9 b\u1EA1n g\u00F5 ti\u1EBFng Vi\u1EC7t hay ti\u1EBFng Anh; nhanh hay ch\u1EADm; g\u00F5 l\u00E0 Sen Vi\u1EC7t.\"",
+                win_l10n::Tr(
+                    isEn,
+                    L"\"H\u00E3y \u0111\u1EC3 vi\u1EC7c g\u00F5 l\u00E0 g\u00F5 \u2014 d\u00F9 b\u1EA1n g\u00F5 ti\u1EBFng Vi\u1EC7t hay ti\u1EBFng Anh; nhanh hay ch\u1EADm; g\u00F5 l\u00E0 Sen Vi\u1EC7t.\"",
+                    L"\"Just type naturally \u2014 Vietnamese or English, fast or slow; Sen Vi\u1EC7t handles the rest seamlessly.\""
+                ),
                 -1, &fTileTitle, RectF(34.0f * s, 102.0f * s, 612.0f * s, 44.0f * s), &sfWrap, &primaryBrush
             );
 
@@ -1374,14 +1414,18 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 Color(120, greenCol.GetR(), greenCol.GetG(), greenCol.GetB()), 1.1f * s
             );
             g.DrawString(
-                L"Quy\u1EC1n ri\u00EAng t\u01B0 & An to\u00E0n",
+                win_l10n::Tr(isEn, L"Quy\u1EC1n ri\u00EAng t\u01B0 & An to\u00E0n", L"Privacy & Security"),
                 -1, &fTileTitle, RectF(34.0f * s, 180.0f * s, 180.0f * s, 20.0f * s), &sfLeft, &primaryBrush
             );
             RectF privacyBadge(220.0f * s, 181.0f * s, 100.0f * s, 18.0f * s);
             FillRoundRect(g, privacyBadge, 9.0f * s, Color(isDark ? 55 : 36, greenCol.GetR(), greenCol.GetG(), greenCol.GetB()));
             g.DrawString(L"100% OFFLINE", -1, &fPill, privacyBadge, &sfCenter, &greenBrush);
             g.DrawString(
-                L"Thu\u1EA7n chu\u1EA9n Windows TSF, kh\u00F4ng ch\u1EA1y ti\u1EBFn tr\u00ECnh n\u1EC1n, kh\u00F4ng thu th\u1EADp ph\u00EDm b\u1EA5m hay g\u1EEDi d\u1EEF li\u1EC7u ra m\u1EA1ng.",
+                win_l10n::Tr(
+                    isEn,
+                    L"Thu\u1EA7n chu\u1EA9n Windows TSF, kh\u00F4ng ch\u1EA1y ti\u1EBFn tr\u00ECnh n\u1EC1n, kh\u00F4ng thu th\u1EADp ph\u00EDm b\u1EA5m hay g\u1EEDi d\u1EEF li\u1EC7u ra m\u1EA1ng.",
+                    L"Pure Windows TSF with no background daemon, zero keylogging, and no network telemetry."
+                ),
                 -1, &fSub, RectF(34.0f * s, 209.0f * s, 286.0f * s, 54.0f * s), &sfWrap, &secondaryBrush
             );
 
@@ -1391,14 +1435,18 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 Color(120, blueCol.GetR(), blueCol.GetG(), blueCol.GetB()), 1.1f * s
             );
             g.DrawString(
-                L"M\u00E3 ngu\u1ED3n m\u1EDF",
+                win_l10n::Tr(isEn, L"M\u00E3 ngu\u1ED3n m\u1EDF", L"Open Source"),
                 -1, &fTileTitle, RectF(360.0f * s, 180.0f * s, 178.0f * s, 20.0f * s), &sfLeft, &primaryBrush
             );
             RectF ossBadge(548.0f * s, 181.0f * s, 98.0f * s, 18.0f * s);
             FillRoundRect(g, ossBadge, 9.0f * s, Color(isDark ? 55 : 36, blueCol.GetR(), blueCol.GetG(), blueCol.GetB()));
             g.DrawString(L"MIT LICENSE", -1, &fPill, ossBadge, &sfCenter, &blueBrush);
             g.DrawString(
-                L"Ph\u00E1t tri\u1EC3n minh b\u1EA1ch b\u1EB1ng C++20, m\u1ECDi ng\u01B0\u1EDDi c\u00F3 th\u1EC3 ki\u1EC3m tra m\u00E3 ngu\u1ED3n v\u00E0 \u0111\u00F3ng g\u00F3p tr\u00EAn GitHub.",
+                win_l10n::Tr(
+                    isEn,
+                    L"Ph\u00E1t tri\u1EC3n minh b\u1EA1ch b\u1EB1ng C++20, m\u1ECDi ng\u01B0\u1EDDi c\u00F3 th\u1EC3 ki\u1EC3m tra m\u00E3 ngu\u1ED3n v\u00E0 \u0111\u00F3ng g\u00F3p tr\u00EAn GitHub.",
+                    L"Built transparently in modern C++20. Anyone can inspect the code and contribute on GitHub."
+                ),
                 -1, &fSub, RectF(360.0f * s, 209.0f * s, 286.0f * s, 54.0f * s), &sfWrap, &secondaryBrush
             );
 
@@ -1421,9 +1469,9 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 }
             };
 
-            drawLinkBtn(32.0f, 197.0f, L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i", st->hoveredRegion == HitRegion::RowFeedback, true);
-            drawLinkBtn(241.0f, 197.0f, L"C\u1ED9ng \u0111\u1ED3ng Zalo \u2197", st->hoveredRegion == HitRegion::RowZalo, false);
-            drawLinkBtn(450.0f, 198.0f, L"M\u00E3 ngu\u1ED3n GitHub \u2197", st->hoveredRegion == HitRegion::RowGitHub, false);
+            drawLinkBtn(32.0f, 197.0f, win_l10n::Tr(isEn, L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i", L"Feedback & Bugs"), st->hoveredRegion == HitRegion::RowFeedback, true);
+            drawLinkBtn(241.0f, 197.0f, win_l10n::Tr(isEn, L"C\u1ED9ng \u0111\u1ED3ng Zalo \u2197", L"Zalo Community \u2197"), st->hoveredRegion == HitRegion::RowZalo, false);
+            drawLinkBtn(450.0f, 198.0f, win_l10n::Tr(isEn, L"M\u00E3 ngu\u1ED3n GitHub \u2197", L"GitHub Source \u2197"), st->hoveredRegion == HitRegion::RowGitHub, false);
         }
 
         g.FillRectangle(&barBrush, 0.0f, 384.0f * s, static_cast<float>(width), 40.0f * s);
@@ -1432,9 +1480,24 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
         SolidBrush greenDotBrush(Color(255, 34, 197, 94));
         g.FillEllipse(&greenDotBrush, RectF(20.0f * s, 401.0f * s, 6.5f * s, 6.5f * s));
         g.DrawString(
-            L"Song ng\u1EEF Anh\u2013Vi\u1EC7t \u2022 Ch\u00EDnh t\u1EA3 chu\u1EA9n m\u1EDBi t\u1EF1 \u0111\u1ED9ng",
-            -1, &fFooter, RectF(32.0f * s, 384.0f * s, 436.0f * s, 40.0f * s), &sfLeft, &secondaryBrush
+            win_l10n::Tr(
+                isEn,
+                L"Song ng\u1EEF Anh\u2013Vi\u1EC7t \u2022 Ch\u00EDnh t\u1EA3 chu\u1EA9n m\u1EDBi t\u1EF1 \u0111\u1ED9ng",
+                L"Smart Bilingual EN\u2013VI \u2022 Modern Orthography"
+            ),
+            -1, &fFooter, RectF(32.0f * s, 384.0f * s, 366.0f * s, 40.0f * s), &sfLeft, &secondaryBrush
         );
+
+        RectF langPill(406.0f * s, 391.0f * s, 64.0f * s, 26.0f * s);
+        FillRoundRect(
+            g, langPill, 13.0f * s,
+            st->hoveredRegion == HitRegion::FooterLanguage
+                ? (isDark ? Color(255, 58, 58, 76) : Color(255, 232, 234, 244))
+                : (isDark ? Color(255, 42, 42, 54) : Color(255, 242, 242, 247))
+        );
+        DrawRoundRect(g, langPill, 13.0f * s, isDark ? Color(255, 70, 70, 88) : Color(255, 214, 214, 224), 1.0f * s);
+        std::wstring langLabel = std::wstring(win_l10n::LanguageShortLabel(st->prefs.uiLanguage)) + L" \u25BE";
+        g.DrawString(langLabel.c_str(), -1, &fFooterBold, langPill, &sfCenter, &primaryBrush);
 
         RectF fbPill(478.0f * s, 391.0f * s, 118.0f * s, 26.0f * s);
         FillRoundRect(
@@ -1444,7 +1507,7 @@ static void RenderBentoSettingsUI(HWND hwnd, HDC hdc, BentoSettingsState *st) {
                 : Color(isDark ? 55 : 32, blueCol.GetR(), blueCol.GetG(), blueCol.GetB())
         );
         DrawRoundRect(g, fbPill, 13.0f * s, Color(140, blueCol.GetR(), blueCol.GetG(), blueCol.GetB()), 1.0f * s);
-        g.DrawString(L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i", -1, &fFooterBold, fbPill, &sfCenter, &blueBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i", L"Feedback & Bugs"), -1, &fFooterBold, fbPill, &sfCenter, &blueBrush);
 
         g.DrawString(L"\u2022", -1, &fFooter, RectF(598.0f * s, 384.0f * s, 12.0f * s, 40.0f * s), &sfCenter, &secondaryBrush);
         g.DrawString(L"GitHub", -1, &fFooter, RectF(610.0f * s, 384.0f * s, 50.0f * s, 40.0f * s), &sfCenter, &secondaryBrush);
@@ -1546,6 +1609,7 @@ static std::wstring GetEditControlText(HWND hEdit) {
 }
 
 static std::wstring GetWindowsDiagnosticsSummary(const VieLotusWindowsPrefs &prefs) {
+    const bool isEn = win_l10n::ResolveWindowsIsEnglish(prefs.uiLanguage);
     SYSTEM_INFO si{};
     GetNativeSystemInfo(&si);
     const wchar_t *arch = L"x64";
@@ -1570,18 +1634,28 @@ static std::wstring GetWindowsDiagnosticsSummary(const VieLotusWindowsPrefs &pre
     StringCchPrintfW(
         summary,
         ARRAYSIZE(summary),
-        L"Sen Vi\u1EC7t v2.0.10 \u2022 Windows %s (Build %lu, %s) \u2022 %s \u2022 D\u1EA5u tr\u01B0\u1EDBc \u00E2m: %s \u2022 G\u00F5 t\u1EAFt: %s",
+        win_l10n::Tr(
+            isEn,
+            L"Sen Vi\u1EC7t v2.0.10 \u2022 Windows %s (Build %lu, %s) \u2022 %s \u2022 D\u1EA5u tr\u01B0\u1EDBc \u00E2m: %s \u2022 G\u00F5 t\u1EAFt: %s",
+            L"Sen Vi\u1EC7t v2.0.10 \u2022 Windows %s (Build %lu, %s) \u2022 %s \u2022 Tone-First: %s \u2022 Macros: %s"
+        ),
         (buildNum >= 22000) ? L"11" : L"10",
         static_cast<unsigned long>(buildNum),
         arch,
-        prefs.isVni ? L"Chu\u1EA9n VNI" : L"Chu\u1EA9n Telex",
-        prefs.senFlex ? L"B\u1EACT" : L"T\u1EAET",
-        prefs.macroEnabled ? L"B\u1EACT" : L"T\u1EAET"
+        prefs.isVni
+            ? win_l10n::Tr(isEn, L"Chu\u1EA9n VNI", L"VNI")
+            : win_l10n::Tr(isEn, L"Chu\u1EA9n Telex", L"Telex"),
+        prefs.senFlex
+            ? win_l10n::Tr(isEn, L"B\u1EACT", L"ON")
+            : win_l10n::Tr(isEn, L"T\u1EAET", L"OFF"),
+        prefs.macroEnabled
+            ? win_l10n::Tr(isEn, L"B\u1EACT", L"ON")
+            : win_l10n::Tr(isEn, L"T\u1EAET", L"OFF")
     );
     std::wstring out(summary);
     auto conflicts = vielotus_win_installer::DetectConflictingHookImes();
     if (!conflicts.empty()) {
-        out += L" \u2022 C\u1EA3nh b\u00E1o xung \u0111\u1ED9t: ";
+        out += win_l10n::Tr(isEn, L" \u2022 C\u1EA3nh b\u00E1o xung \u0111\u1ED9t: ", L" \u2022 Conflict: ");
         out += vielotus_win_installer::FormatConflictingImeNames(conflicts);
     }
     return out;
@@ -1589,11 +1663,18 @@ static std::wstring GetWindowsDiagnosticsSummary(const VieLotusWindowsPrefs &pre
 
 static std::wstring BuildFeedbackReportMarkdown(FeedbackDialogState *st, bool includeContact) {
     if (!st) return L"";
-    const wchar_t *catNames[4] = {
+    const bool isEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
+    const wchar_t *catNamesVi[4] = {
         L"L\u1ED7i g\u00F5 t\u1EEB / Song ng\u1EEF",
         L"T\u01B0\u01A1ng th\u00EDch App / Web",
         L"\u0110\u1EC1 xu\u1EA5t t\u00EDnh n\u0103ng",
         L"G\u00F3p \u00FD chung"
+    };
+    const wchar_t *catNamesEn[4] = {
+        L"Word / Bilingual Bug",
+        L"App / Web Compat",
+        L"Feature Request",
+        L"General Feedback"
     };
     int catIdx = (st->category >= 0 && st->category < 4) ? st->category : 0;
 
@@ -1605,52 +1686,66 @@ static std::wstring BuildFeedbackReportMarkdown(FeedbackDialogState *st, bool in
     std::wstring notes = GetEditControlText(st->hEditNotes);
 
     std::wstring md = L"### [Sen Vi\u1EC7t Windows] ";
-    md += catNames[catIdx];
+    md += isEn ? catNamesEn[catIdx] : catNamesVi[catIdx];
     md += L"\r\n\r\n";
 
     if (!raw.empty() || !actual.empty() || !expected.empty()) {
-        md += L"- **Ph\u00EDm \u0111\u00E3 g\u00F5 (Raw):** `" + (raw.empty() ? L"(tr\u1ED1ng)" : raw) + L"`\r\n";
-        md += L"- **Sen Vi\u1EC7t hi\u1EC7n ra:** `" + (actual.empty() ? L"(tr\u1ED1ng)" : actual) + L"`\r\n";
-        md += L"- **Mong mu\u1ED1n \u0111\u00FAng:** `" + (expected.empty() ? L"(tr\u1ED1ng)" : expected) + L"`\r\n";
+        const wchar_t *emptyVal = win_l10n::Tr(isEn, L"(tr\u1ED1ng)", L"(empty)");
+        md += win_l10n::Tr(isEn, L"- **Ph\u00EDm \u0111\u00E3 g\u00F5 (Raw):** `", L"- **Typed Keys (Raw):** `") + (raw.empty() ? emptyVal : raw) + L"`\r\n";
+        md += win_l10n::Tr(isEn, L"- **Sen Vi\u1EC7t hi\u1EC7n ra:** `", L"- **Actual Output:** `") + (actual.empty() ? emptyVal : actual) + L"`\r\n";
+        md += win_l10n::Tr(isEn, L"- **Mong mu\u1ED1n \u0111\u00FAng:** `", L"- **Expected Output:** `") + (expected.empty() ? emptyVal : expected) + L"`\r\n";
     }
     if (!app.empty()) {
-        md += L"- **\u1EE8ng d\u1EE5ng / Ch\u1EE7 \u0111\u1EC1:** " + app + L"\r\n";
+        md += win_l10n::Tr(isEn, L"- **\u1EE8ng d\u1EE5ng / Ch\u1EE7 \u0111\u1EC1:** ", L"- **App / Topic:** ") + app + L"\r\n";
     }
     if (includeContact && !contact.empty()) {
-        md += L"- **Li\u00EAn h\u1EC7 ph\u1EA3n h\u1ED3i:** " + contact + L"\r\n";
+        md += win_l10n::Tr(isEn, L"- **Li\u00EAn h\u1EC7 ph\u1EA3n h\u1ED3i:** ", L"- **Contact:** ") + contact + L"\r\n";
     }
     if (!notes.empty()) {
-        md += L"\r\n**M\u00F4 t\u1EA3 chi ti\u1EBFt:**\r\n" + notes + L"\r\n";
+        md += win_l10n::Tr(isEn, L"\r\n**M\u00F4 t\u1EA3 chi ti\u1EBFt:**\r\n", L"\r\n**Details:**\r\n") + notes + L"\r\n";
     }
     if (st->includeDiagnostics) {
         const std::wstring &diag = st->cachedDiagnostics.empty()
             ? GetWindowsDiagnosticsSummary(st->prefs)
             : st->cachedDiagnostics;
-        md += L"\r\n---\r\n**C\u1EA5u h\u00ECnh k\u1EF9 thu\u1EADt:** `" + diag + L"`\r\n";
+        md += win_l10n::Tr(isEn, L"\r\n---\r\n**C\u1EA5u h\u00ECnh k\u1EF9 thu\u1EADt:** `", L"\r\n---\r\n**Diagnostics:** `") + diag + L"`\r\n";
     }
     return md;
 }
 
 static std::wstring BuildFeedbackIssueTitle(FeedbackDialogState *st) {
-    if (!st) return L"[Windows] G\u00F3p \u00FD Sen Vi\u1EC7t";
-    const wchar_t *catShort[4] = {
+    if (!st) return L"[Windows] Sen Vi\u1EC7t Feedback";
+    const bool isEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
+    const wchar_t *catShortVi[4] = {
         L"[Windows][L\u1ED7i g\u00F5 t\u1EEB] ",
         L"[Windows][T\u01B0\u01A1ng th\u00EDch App] ",
         L"[Windows][\u0110\u1EC1 xu\u1EA5t] ",
         L"[Windows][G\u00F3p \u00FD] "
+    };
+    const wchar_t *catShortEn[4] = {
+        L"[Windows][Word Bug] ",
+        L"[Windows][App Compat] ",
+        L"[Windows][Feature Request] ",
+        L"[Windows][Feedback] "
     };
     int catIdx = (st->category >= 0 && st->category < 4) ? st->category : 0;
     std::wstring raw = GetEditControlText(st->hEditRaw);
     std::wstring expected = GetEditControlText(st->hEditExpected);
     std::wstring app = GetEditControlText(st->hEditApp);
 
-    std::wstring title = catShort[catIdx];
+    std::wstring title = isEn ? catShortEn[catIdx] : catShortVi[catIdx];
     if (!raw.empty() && !expected.empty()) {
-        title += L"G\u00F5 '" + raw + L"' mong mu\u1ED1n '" + expected + L"'";
+        title += isEn
+            ? (L"Typed '" + raw + L"' expected '" + expected + L"'")
+            : (L"G\u00F5 '" + raw + L"' mong mu\u1ED1n '" + expected + L"'");
     } else if (!app.empty()) {
         title += app;
     } else {
-        title += L"B\u00E1o c\u00E1o t\u1EEB ng\u01B0\u1EDDi d\u00F9ng Sen Vi\u1EC7t v2.0.10";
+        title += win_l10n::Tr(
+            isEn,
+            L"B\u00E1o c\u00E1o t\u1EEB ng\u01B0\u1EDDi d\u00F9ng Sen Vi\u1EC7t v2.0.10",
+            L"User report from Sen Vi\u1EC7t v2.0.10"
+        );
     }
     return title;
 }
@@ -1699,6 +1794,7 @@ static std::wstring UrlEncodeWideToUtf8W(const std::wstring &input) {
 
 static void LaunchBoundedReportUrl(
     HWND hwnd,
+    bool isEn,
     const std::wstring &urlPrefixWithTitle,
     const std::wstring &encodedTitle,
     const std::wstring &markdownBody
@@ -1706,8 +1802,11 @@ static void LaunchBoundedReportUrl(
     static constexpr size_t kMaxShellUrlChars = 1800u;
     std::wstring url = urlPrefixWithTitle + encodedTitle + L"&body=" + UrlEncodeWideToUtf8W(markdownBody);
     if (url.size() > kMaxShellUrlChars) {
-        static const wchar_t kFallbackNote[] =
-            L"N\u1ED9i dung b\u00E1o c\u00E1o \u0111\u1EA7y \u0111\u1EE7 \u0111\u00E3 \u0111\u01B0\u1EE3c sao ch\u00E9p v\u00E0o Clipboard. Vui l\u00F2ng d\u00E1n (Ctrl+V) v\u00E0o \u0111\u00E2y.";
+        const wchar_t *kFallbackNote = win_l10n::Tr(
+            isEn,
+            L"N\u1ED9i dung b\u00E1o c\u00E1o \u0111\u1EA7y \u0111\u1EE7 \u0111\u00E3 \u0111\u01B0\u1EE3c sao ch\u00E9p v\u00E0o Clipboard. Vui l\u00F2ng d\u00E1n (Ctrl+V) v\u00E0o \u0111\u00E2y.",
+            L"Full report copied to Clipboard. Please paste (Ctrl+V) here."
+        );
         const std::wstring fallbackSuffix = L"&body=" + UrlEncodeWideToUtf8W(kFallbackNote);
         std::wstring boundedTitle = encodedTitle;
         const size_t overhead = urlPrefixWithTitle.size() + fallbackSuffix.size();
@@ -1761,6 +1860,7 @@ static void RenderFeedbackDialogUI(HWND hwnd, HDC hdc, FeedbackDialogState *st) 
 
         float s = st->dpiScale;
         bool isDark = st->isDark;
+        const bool isEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
 
         Color bgColor       = isDark ? Color(255, 22, 22, 29)    : Color(255, 245, 246, 250);
         Color cardBg        = isDark ? Color(255, 34, 34, 44)    : Color(255, 255, 255, 255);
@@ -1807,28 +1907,44 @@ static void RenderFeedbackDialogUI(HWND hwnd, HDC hdc, FeedbackDialogState *st) 
             g.DrawString(L"SV", -1, &fCatTitle, iconRect, &sfCenter, &whiteBrush);
         }
 
-        g.DrawString(L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i nhanh", -1, &fTitle, RectF(62.0f * s, 12.0f * s, 480.0f * s, 20.0f * s), &sfLeft, &primaryBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i nhanh", L"Quick Feedback & Bug Report"), -1, &fTitle, RectF(62.0f * s, 12.0f * s, 480.0f * s, 20.0f * s), &sfLeft, &primaryBrush);
         g.DrawString(
-            L"\u00DD ki\u1EBFn c\u1EE7a b\u1EA1n gi\u00FAp Sen Vi\u1EC7t ho\u00E0n thi\u1EC7n m\u1ED7i ng\u00E0y \u2014 g\u1EEDi b\u00E1o c\u00E1o trong 10 gi\u00E2y.",
+            win_l10n::Tr(
+                isEn,
+                L"\u00DD ki\u1EBFn c\u1EE7a b\u1EA1n gi\u00FAp Sen Vi\u1EC7t ho\u00E0n thi\u1EC7n m\u1ED7i ng\u00E0y \u2014 g\u1EEDi b\u00E1o c\u00E1o trong 10 gi\u00E2y.",
+                L"Your feedback helps Sen Vi\u1EC7t improve every day \u2014 submit a report in seconds."
+            ),
             -1, &fSub, RectF(62.0f * s, 32.0f * s, 490.0f * s, 18.0f * s), &sfLeft, &secondaryBrush
         );
 
         RectF closeRect(560.0f * s, 16.0f * s, 60.0f * s, 28.0f * s);
         FillRoundRect(g, closeRect, 8.0f * s, st->hovered == FeedbackHit::BtnClose ? cardHoverBg : cardBg);
         DrawRoundRect(g, closeRect, 8.0f * s, cardBorder, 1.0f * s);
-        g.DrawString(L"\u0110\u00F3ng", -1, &fLabel, closeRect, &sfCenter, &primaryBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"\u0110\u00F3ng", L"Close"), -1, &fLabel, closeRect, &sfCenter, &primaryBrush);
 
-        const wchar_t *catTitles[4] = {
+        const wchar_t *catTitlesVi[4] = {
             L"L\u1ED7i g\u00F5 t\u1EEB / Song ng\u1EEF",
             L"T\u01B0\u01A1ng th\u00EDch App / Web",
             L"\u0110\u1EC1 xu\u1EA5t t\u00EDnh n\u0103ng",
             L"G\u00F3p \u00FD chung"
         };
-        const wchar_t *catSubs[4] = {
+        const wchar_t *catTitlesEn[4] = {
+            L"Word / Bilingual Bug",
+            L"App / Web Compat",
+            L"Feature Request",
+            L"General Feedback"
+        };
+        const wchar_t *catSubsVi[4] = {
             L"Sai d\u1EA5u, kh\u00F4i ph\u1EE5c t\u1EEB",
             L"Nh\u1EA3y con tr\u1ECF, l\u1EB7p ch\u1EEF",
             L"\u00DD t\u01B0\u1EDFng, ph\u00EDm t\u1EAFt, t\u1EEB \u0111i\u1EC3n",
             L"C\u1EA3m nh\u1EADn & h\u1ED7 tr\u1EE3"
+        };
+        const wchar_t *catSubsEn[4] = {
+            L"Wrong tone, auto-restore",
+            L"Cursor jump, doubled keys",
+            L"Ideas, shortcuts, dictionary",
+            L"Thoughts & support"
         };
         FeedbackHit catHits[4] = {
             FeedbackHit::CatWordBug,
@@ -1845,31 +1961,31 @@ static void RenderFeedbackDialogUI(HWND hwnd, HDC hdc, FeedbackDialogState *st) 
                              : (hov ? cardHoverBg : cardBg);
             FillRoundRect(g, cRect, 9.0f * s, fill);
             DrawRoundRect(g, cRect, 9.0f * s, sel ? blueCol : cardBorder, (sel ? 1.8f : 1.0f) * s);
-            g.DrawString(catTitles[i], -1, &fCatTitle, RectF(cx + 8.0f * s, 65.0f * s, 128.0f * s, 18.0f * s), &sfLeft, sel ? &blueBrush : &primaryBrush);
-            g.DrawString(catSubs[i], -1, &fCatSub, RectF(cx + 8.0f * s, 84.0f * s, 128.0f * s, 16.0f * s), &sfLeft, &secondaryBrush);
+            g.DrawString(isEn ? catTitlesEn[i] : catTitlesVi[i], -1, &fCatTitle, RectF(cx + 8.0f * s, 65.0f * s, 128.0f * s, 18.0f * s), &sfLeft, sel ? &blueBrush : &primaryBrush);
+            g.DrawString(isEn ? catSubsEn[i] : catSubsVi[i], -1, &fCatSub, RectF(cx + 8.0f * s, 84.0f * s, 128.0f * s, 16.0f * s), &sfLeft, &secondaryBrush);
         }
 
-        g.DrawString(L"1. Ph\u00EDm \u0111\u00E3 g\u00F5 (Raw):", -1, &fLabel, RectF(20.0f * s, 114.0f * s, 194.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"1. Ph\u00EDm \u0111\u00E3 g\u00F5 (Raw):", L"1. Typed Keys (Raw):"), -1, &fLabel, RectF(20.0f * s, 114.0f * s, 194.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
         FillRoundRect(g, RectF(20.0f * s, 134.0f * s, 194.0f * s, 32.0f * s), 7.0f * s, cardBg);
         DrawRoundRect(g, RectF(20.0f * s, 134.0f * s, 194.0f * s, 32.0f * s), 7.0f * s, cardBorder, 1.0f * s);
 
-        g.DrawString(L"2. Sen Vi\u1EC7t hi\u1EC7n ra:", -1, &fLabel, RectF(223.0f * s, 114.0f * s, 194.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"2. Sen Vi\u1EC7t hi\u1EC7n ra:", L"2. Actual Output:"), -1, &fLabel, RectF(223.0f * s, 114.0f * s, 194.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
         FillRoundRect(g, RectF(223.0f * s, 134.0f * s, 194.0f * s, 32.0f * s), 7.0f * s, cardBg);
         DrawRoundRect(g, RectF(223.0f * s, 134.0f * s, 194.0f * s, 32.0f * s), 7.0f * s, cardBorder, 1.0f * s);
 
-        g.DrawString(L"3. Mong mu\u1ED1n \u0111\u00FAng:", -1, &fLabel, RectF(426.0f * s, 114.0f * s, 194.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"3. Mong mu\u1ED1n \u0111\u00FAng:", L"3. Expected Output:"), -1, &fLabel, RectF(426.0f * s, 114.0f * s, 194.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
         FillRoundRect(g, RectF(426.0f * s, 134.0f * s, 194.0f * s, 32.0f * s), 7.0f * s, cardBg);
         DrawRoundRect(g, RectF(426.0f * s, 134.0f * s, 194.0f * s, 32.0f * s), 7.0f * s, cardBorder, 1.0f * s);
 
-        g.DrawString(L"\u1EE8ng d\u1EE5ng / Tr\u00ECnh duy\u1EC7t g\u1EB7p l\u1ED7i (ho\u1EB7c Ch\u1EE7 \u0111\u1EC1):", -1, &fLabel, RectF(20.0f * s, 174.0f * s, 295.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"\u1EE8ng d\u1EE5ng / Tr\u00ECnh duy\u1EC7t g\u1EB7p l\u1ED7i (ho\u1EB7c Ch\u1EE7 \u0111\u1EC1):", L"App / Browser or Topic (Optional):"), -1, &fLabel, RectF(20.0f * s, 174.0f * s, 295.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
         FillRoundRect(g, RectF(20.0f * s, 194.0f * s, 295.0f * s, 32.0f * s), 7.0f * s, cardBg);
         DrawRoundRect(g, RectF(20.0f * s, 194.0f * s, 295.0f * s, 32.0f * s), 7.0f * s, cardBorder, 1.0f * s);
 
-        g.DrawString(L"Email / S\u0110T Zalo li\u00EAn h\u1EC7 (Tu\u1EF3 ch\u1ECDn \u2014 kh\u00F4ng \u0111\u01B0a l\u00EAn GitHub):", -1, &fLabel, RectF(325.0f * s, 174.0f * s, 295.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"Email / S\u0110T Zalo li\u00EAn h\u1EC7 (Tu\u1EF3 ch\u1ECDn \u2014 kh\u00F4ng \u0111\u01B0a l\u00EAn GitHub):", L"Contact Email / Zalo (Optional \u2014 omitted from GitHub):"), -1, &fLabel, RectF(325.0f * s, 174.0f * s, 295.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
         FillRoundRect(g, RectF(325.0f * s, 194.0f * s, 295.0f * s, 32.0f * s), 7.0f * s, cardBg);
         DrawRoundRect(g, RectF(325.0f * s, 194.0f * s, 295.0f * s, 32.0f * s), 7.0f * s, cardBorder, 1.0f * s);
 
-        g.DrawString(L"M\u00F4 t\u1EA3 chi ti\u1EBFt / C\u00E1c b\u01B0\u1EDBc t\u00E1i hi\u1EC7n:", -1, &fLabel, RectF(20.0f * s, 232.0f * s, 600.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"M\u00F4 t\u1EA3 chi ti\u1EBFt / C\u00E1c b\u01B0\u1EDBc t\u00E1i hi\u1EC7n:", L"Details / Steps to Reproduce:"), -1, &fLabel, RectF(20.0f * s, 232.0f * s, 600.0f * s, 18.0f * s), &sfLeft, &primaryBrush);
         FillRoundRect(g, RectF(20.0f * s, 252.0f * s, 600.0f * s, 94.0f * s), 7.0f * s, cardBg);
         DrawRoundRect(g, RectF(20.0f * s, 252.0f * s, 600.0f * s, 94.0f * s), 7.0f * s, cardBorder, 1.0f * s);
 
@@ -1877,7 +1993,11 @@ static void RenderFeedbackDialogUI(HWND hwnd, HDC hdc, FeedbackDialogState *st) 
         FillRoundRect(g, diagRect, 8.0f * s, st->hovered == FeedbackHit::BarDiagToggle ? cardHoverBg : cardBg);
         DrawRoundRect(g, diagRect, 8.0f * s, cardBorder, 1.0f * s);
         g.DrawString(
-            L"\u0110\u00EDnh k\u00E8m c\u1EA5u h\u00ECnh k\u1EF9 thu\u1EADt (phi\u00EAn b\u1EA3n Windows, CPU, ki\u1EC3u g\u00F5 \u2014 kh\u00F4ng ch\u1EE9a d\u1EEF li\u1EC7u c\u00E1 nh\u00E2n)",
+            win_l10n::Tr(
+                isEn,
+                L"\u0110\u00EDnh k\u00E8m c\u1EA5u h\u00ECnh k\u1EF9 thu\u1EADt (phi\u00EAn b\u1EA3n Windows, CPU, ki\u1EC3u g\u00F5 \u2014 kh\u00F4ng ch\u1EE9a d\u1EEF li\u1EC7u c\u00E1 nh\u00E2n)",
+                L"Attach anonymous diagnostics (Windows version, CPU, IME settings \u2014 no personal data)"
+            ),
             -1, &fLabel, RectF(32.0f * s, 356.0f * s, 520.0f * s, 18.0f * s), &sfLeft, &primaryBrush
         );
         // Use cached summary computed once in WM_CREATE — never call process enumeration inside WM_PAINT.
@@ -1894,12 +2014,20 @@ static void RenderFeedbackDialogUI(HWND hwnd, HDC hdc, FeedbackDialogState *st) 
 
         if (st->copiedBanner) {
             g.DrawString(
-                L"\u2713 \u0110\u00E3 sao ch\u00E9p b\u00E1o c\u00E1o v\u00E0o Clipboard! B\u1EA1n c\u00F3 th\u1EC3 d\u00E1n (Ctrl+V) ngay v\u00E0o Zalo / Email / GitHub.",
+                win_l10n::Tr(
+                    isEn,
+                    L"\u2713 \u0110\u00E3 sao ch\u00E9p b\u00E1o c\u00E1o v\u00E0o Clipboard! B\u1EA1n c\u00F3 th\u1EC3 d\u00E1n (Ctrl+V) ngay v\u00E0o Zalo / Email / GitHub.",
+                    L"\u2713 Report copied to Clipboard! Paste (Ctrl+V) directly into Zalo / Email / GitHub."
+                ),
                 -1, &fLabel, RectF(20.0f * s, 398.0f * s, 600.0f * s, 20.0f * s), &sfLeft, &greenBrush
             );
         } else {
             g.DrawString(
-                L"M\u1EB9o: Khi b\u1EA5m Zalo / Email / GitHub, n\u1ED9i dung b\u00E1o c\u00E1o c\u0169ng t\u1EF1 \u0111\u1ED9ng \u0111\u01B0\u1EE3c sao ch\u00E9p v\u00E0o Clipboard.",
+                win_l10n::Tr(
+                    isEn,
+                    L"M\u1EB9o: Khi b\u1EA5m Zalo / Email / GitHub, n\u1ED9i dung b\u00E1o c\u00E1o c\u0169ng t\u1EF1 \u0111\u1ED9ng \u0111\u01B0\u1EE3c sao ch\u00E9p v\u00E0o Clipboard.",
+                    L"Tip: Clicking Zalo / Email / GitHub also copies your formatted report to the Clipboard."
+                ),
                 -1, &fCatSub, RectF(20.0f * s, 398.0f * s, 600.0f * s, 20.0f * s), &sfLeft, &secondaryBrush
             );
         }
@@ -1907,24 +2035,24 @@ static void RenderFeedbackDialogUI(HWND hwnd, HDC hdc, FeedbackDialogState *st) 
         RectF bCopy(20.0f * s, 422.0f * s, 138.0f * s, 34.0f * s);
         FillRoundRect(g, bCopy, 8.0f * s, st->hovered == FeedbackHit::BtnCopyReport ? cardHoverBg : cardBg);
         DrawRoundRect(g, bCopy, 8.0f * s, cardBorder, 1.0f * s);
-        g.DrawString(L"Sao ch\u00E9p B\u00E1o c\u00E1o", -1, &fBtn, bCopy, &sfCenter, &primaryBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"Sao ch\u00E9p B\u00E1o c\u00E1o", L"Copy Report"), -1, &fBtn, bCopy, &sfCenter, &primaryBrush);
 
         RectF bZalo(166.0f * s, 422.0f * s, 144.0f * s, 34.0f * s);
         FillRoundRect(g, bZalo, 8.0f * s, st->hovered == FeedbackHit::BtnOpenZalo ? cardHoverBg : cardBg);
         DrawRoundRect(g, bZalo, 8.0f * s, Color(140, blueCol.GetR(), blueCol.GetG(), blueCol.GetB()), 1.0f * s);
-        g.DrawString(L"Nh\u00F3m Zalo H\u1ED7 tr\u1EE3 \u2197", -1, &fBtn, bZalo, &sfCenter, &blueBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"Nh\u00F3m Zalo H\u1ED7 tr\u1EE3 \u2197", L"Zalo Support \u2197"), -1, &fBtn, bZalo, &sfCenter, &blueBrush);
 
         RectF bEmail(318.0f * s, 422.0f * s, 138.0f * s, 34.0f * s);
         FillRoundRect(g, bEmail, 8.0f * s, st->hovered == FeedbackHit::BtnSendEmail ? cardHoverBg : cardBg);
         DrawRoundRect(g, bEmail, 8.0f * s, cardBorder, 1.0f * s);
-        g.DrawString(L"G\u1EEDi qua Email \u2197", -1, &fBtn, bEmail, &sfCenter, &primaryBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"G\u1EEDi qua Email \u2197", L"Send Email \u2197"), -1, &fBtn, bEmail, &sfCenter, &primaryBrush);
 
         RectF bIssue(464.0f * s, 422.0f * s, 156.0f * s, 34.0f * s);
         FillRoundRect(
             g, bIssue, 8.0f * s,
             st->hovered == FeedbackHit::BtnCreateIssue ? Color(255, 0, 112, 235) : blueCol
         );
-        g.DrawString(L"T\u1EA1o GitHub Issue \u2197", -1, &fBtn, bIssue, &sfCenter, &whiteBrush);
+        g.DrawString(win_l10n::Tr(isEn, L"T\u1EA1o GitHub Issue \u2197", L"Create GitHub Issue \u2197"), -1, &fBtn, bIssue, &sfCenter, &whiteBrush);
     }
 
     BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
@@ -1978,14 +2106,19 @@ static LRESULT CALLBACK VieLotusFeedbackWndProc(HWND hwnd, UINT msg, WPARAM wPar
             return hEd;
         };
 
-        st->hEditRaw      = createField(26, 141, 182, 20, 2101, L"VD: truowngr, 12haf...");
-        st->hEditActual   = createField(229, 141, 182, 20, 2102, L"VD: truowngr, 12haf...");
-        st->hEditExpected = createField(432, 141, 182, 20, 2103, L"VD: tr\u01B0\u1EDFng, 12h\u00E0...");
-        st->hEditApp      = createField(26, 201, 283, 20, 2104, L"VD: Chrome, Zalo PC, Word, VS Code...");
-        st->hEditContact  = createField(331, 201, 283, 20, 2105, L"Email ho\u1EB7c S\u0110T Zalo (\u0111\u1EC3 nh\u1EADn ph\u1EA3n h\u1ED3i)...");
+        const bool fbEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
+        st->hEditRaw      = createField(26, 141, 182, 20, 2101, win_l10n::Tr(fbEn, L"VD: truowngr, 12haf...", L"e.g. truowngr, 12haf..."));
+        st->hEditActual   = createField(229, 141, 182, 20, 2102, win_l10n::Tr(fbEn, L"VD: truowngr, 12haf...", L"e.g. truowngr, 12haf..."));
+        st->hEditExpected = createField(432, 141, 182, 20, 2103, win_l10n::Tr(fbEn, L"VD: tr\u01B0\u1EDFng, 12h\u00E0...", L"e.g. tr\u01B0\u1EDFng, 12h\u00E0..."));
+        st->hEditApp      = createField(26, 201, 283, 20, 2104, win_l10n::Tr(fbEn, L"VD: Chrome, Zalo PC, Word, VS Code...", L"e.g. Chrome, Zalo PC, Word, VS Code..."));
+        st->hEditContact  = createField(331, 201, 283, 20, 2105, win_l10n::Tr(fbEn, L"Email ho\u1EB7c S\u0110T Zalo (\u0111\u1EC3 nh\u1EADn ph\u1EA3n h\u1ED3i)...", L"Email or Zalo number (for follow-up)..."));
         st->hEditNotes    = createField(
             26, 258, 588, 82, 2106,
-            L"M\u00F4 t\u1EA3 th\u00EAm t\u00ECnh hu\u1ED1ng g\u1EB7p l\u1ED7i ho\u1EB7c \u00FD t\u01B0\u1EDFng c\u1EA3i ti\u1EBFn c\u1EE7a b\u1EA1n...",
+            win_l10n::Tr(
+                fbEn,
+                L"M\u00F4 t\u1EA3 th\u00EAm t\u00ECnh hu\u1ED1ng g\u1EB7p l\u1ED7i ho\u1EB7c \u00FD t\u01B0\u1EDFng c\u1EA3i ti\u1EBFn c\u1EE7a b\u1EA1n...",
+                L"Describe what happened or share your feature idea..."
+            ),
             ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL
         );
 
@@ -2081,6 +2214,7 @@ static LRESULT CALLBACK VieLotusFeedbackWndProc(HWND hwnd, UINT msg, WPARAM wPar
         }
         case FeedbackHit::BtnSendEmail: {
             const bool includeContact = vielotus_tsf_guard::ShouldIncludeContactInFeedbackChannel(false);
+            const bool isEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
             std::wstring md = BuildFeedbackReportMarkdown(st, includeContact);
             std::wstring title = BuildFeedbackIssueTitle(st);
             CopyWideTextToClipboard(hwnd, md);
@@ -2088,6 +2222,7 @@ static LRESULT CALLBACK VieLotusFeedbackWndProc(HWND hwnd, UINT msg, WPARAM wPar
             InvalidateRect(hwnd, nullptr, FALSE);
             LaunchBoundedReportUrl(
                 hwnd,
+                isEn,
                 L"mailto:support@vielotus.org?subject=",
                 UrlEncodeWideToUtf8W(title),
                 md
@@ -2097,6 +2232,7 @@ static LRESULT CALLBACK VieLotusFeedbackWndProc(HWND hwnd, UINT msg, WPARAM wPar
         case FeedbackHit::BtnCreateIssue: {
             // Strip personal phone/email contact from public GitHub Issue URL/clipboard report.
             const bool includeContact = vielotus_tsf_guard::ShouldIncludeContactInFeedbackChannel(true);
+            const bool isEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
             std::wstring md = BuildFeedbackReportMarkdown(st, includeContact);
             std::wstring title = BuildFeedbackIssueTitle(st);
             CopyWideTextToClipboard(hwnd, md);
@@ -2104,6 +2240,7 @@ static LRESULT CALLBACK VieLotusFeedbackWndProc(HWND hwnd, UINT msg, WPARAM wPar
             InvalidateRect(hwnd, nullptr, FALSE);
             LaunchBoundedReportUrl(
                 hwnd,
+                isEn,
                 L"https://github.com/stevedat/VieLotus-IM/issues/new?title=",
                 UrlEncodeWideToUtf8W(title),
                 md
@@ -2437,20 +2574,32 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
             OpenMicrosoftStorePage(hwnd);
             break;
         case HitRegion::BadgeImeConflict: {
+            const bool isEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
             auto conflicts = vielotus_win_installer::DetectConflictingHookImes();
             if (!conflicts.empty()) {
                 std::wstring names = vielotus_win_installer::FormatConflictingImeNames(conflicts);
-                std::wstring prompt =
-                    L"Ph\u00E1t hi\u1EC7n b\u1ED9 g\u00F5 kh\u00E1c (" + names +
-                    L") \u0111ang ch\u1EA1y n\u1EC1n c\u00F3 th\u1EC3 ch\u1EB7n ph\u00EDm v\u00E0 g\u00E2y l\u1ED7i l\u1EB7p ch\u1EEF khi d\u00F9ng Sen Vi\u1EC7t.\n\n"
-                    L"B\u1EA1n c\u00F3 mu\u1ED1n \u0111\u00F3ng " + names + L" \u0111\u1EC3 tr\u00E1nh xung \u0111\u1ED9t kh\u00F4ng?";
-                if (MessageBoxW(hwnd, prompt.c_str(), L"Sen Vi\u1EC7t \u2014 Tr\u00E1nh xung \u0111\u1ED9t b\u1ED9 g\u00F5", MB_YESNO | MB_ICONWARNING) == IDYES) {
+                std::wstring prompt = isEn
+                    ? (L"Another IME (" + names +
+                       L") is running in the background and may intercept keys or double characters while using Sen Vi\u1EC7t.\n\n"
+                       L"Close " + names + L" now to avoid conflicts?")
+                    : (L"Ph\u00E1t hi\u1EC7n b\u1ED9 g\u00F5 kh\u00E1c (" + names +
+                       L") \u0111ang ch\u1EA1y n\u1EC1n c\u00F3 th\u1EC3 ch\u1EB7n ph\u00EDm v\u00E0 g\u00E2y l\u1ED7i l\u1EB7p ch\u1EEF khi d\u00F9ng Sen Vi\u1EC7t.\n\n"
+                       L"B\u1EA1n c\u00F3 mu\u1ED1n \u0111\u00F3ng " + names + L" \u0111\u1EC3 tr\u00E1nh xung \u0111\u1ED9t kh\u00F4ng?");
+                const wchar_t *msgTitle = win_l10n::Tr(
+                    isEn,
+                    L"Sen Vi\u1EC7t \u2014 Tr\u00E1nh xung \u0111\u1ED9t b\u1ED9 g\u00F5",
+                    L"Sen Vi\u1EC7t \u2014 Resolve IME Conflict"
+                );
+                if (MessageBoxW(hwnd, prompt.c_str(), msgTitle, MB_YESNO | MB_ICONWARNING) == IDYES) {
                     if (!vielotus_win_installer::CloseConflictingHookImes(conflicts)) {
-                        std::wstring info =
-                            L"Kh\u00F4ng th\u1EC3 t\u1EF1 \u0111\u1ED9ng \u0111\u00F3ng " + names +
-                            L". Vui l\u00F2ng nh\u1EA5p chu\u1ED9t ph\u1EA3i v\u00E0o bi\u1EC3u t\u01B0\u1EE3ng " + names +
-                            L" \u1EDF khay h\u1EC7 th\u1ED1ng (System Tray) v\u00E0 ch\u1ECDn Tho\u00E1t.";
-                        MessageBoxW(hwnd, info.c_str(), L"Sen Vi\u1EC7t \u2014 Tr\u00E1nh xung \u0111\u1ED9t b\u1ED9 g\u00F5", MB_OK | MB_ICONINFORMATION);
+                        std::wstring info = isEn
+                            ? (L"Could not close " + names +
+                               L" automatically. Please right-click the " + names +
+                               L" icon in the System Tray and choose Exit.")
+                            : (L"Kh\u00F4ng th\u1EC3 t\u1EF1 \u0111\u1ED9ng \u0111\u00F3ng " + names +
+                               L". Vui l\u00F2ng nh\u1EA5p chu\u1ED9t ph\u1EA3i v\u00E0o bi\u1EC3u t\u01B0\u1EE3ng " + names +
+                               L" \u1EDF khay h\u1EC7 th\u1ED1ng (System Tray) v\u00E0 ch\u1ECDn Tho\u00E1t.");
+                        MessageBoxW(hwnd, info.c_str(), msgTitle, MB_OK | MB_ICONINFORMATION);
                     }
                     if (st->onActivateProfiles) st->onActivateProfiles(true);
                 }
@@ -2534,6 +2683,48 @@ static LRESULT CALLBACK VieLotusSettingsWndProc(HWND hwnd, UINT msg, WPARAM wPar
         case HitRegion::FooterGitHub:
             ShellExecuteW(hwnd, L"open", L"https://github.com/stevedat/VieLotus-IM", nullptr, nullptr, SW_SHOWNORMAL);
             break;
+        case HitRegion::FooterLanguage: {
+            if (HMENU hLangMenu = CreatePopupMenu()) {
+                const bool isEn = win_l10n::ResolveWindowsIsEnglish(st->prefs.uiLanguage);
+                const uint32_t cur = win_l10n::NormalizeUiLanguagePref(st->prefs.uiLanguage);
+                AppendMenuW(
+                    hLangMenu,
+                    MF_STRING | (cur == 0u ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED),
+                    1u,
+                    win_l10n::Tr(isEn, L"T\u1EF1 \u0111\u1ED9ng (Theo Windows)", L"Auto (System)")
+                );
+                AppendMenuW(
+                    hLangMenu,
+                    MF_STRING | (cur == 1u ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED),
+                    2u,
+                    L"Ti\u1EBFng Vi\u1EC7t"
+                );
+                AppendMenuW(
+                    hLangMenu,
+                    MF_STRING | (cur == 2u ? (MF_CHECKED | MFT_RADIOCHECK) : MF_UNCHECKED),
+                    3u,
+                    L"English"
+                );
+                POINT ptScreen{
+                    static_cast<LONG>(438.0f * st->dpiScale),
+                    static_cast<LONG>(390.0f * st->dpiScale)
+                };
+                ClientToScreen(hwnd, &ptScreen);
+                UINT cmd = static_cast<UINT>(TrackPopupMenuEx(
+                    hLangMenu,
+                    TPM_NONOTIFY | TPM_RETURNCMD | TPM_CENTERALIGN | TPM_BOTTOMALIGN,
+                    ptScreen.x, ptScreen.y, hwnd, nullptr
+                ));
+                DestroyMenu(hLangMenu);
+                if (cmd >= 1u && cmd <= 3u) {
+                    st->prefs.uiLanguage = cmd - 1u;
+                    SaveVieLotusPrefs(st->prefs, true);
+                    UpdateTestEditCueBanner(st);
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
+            }
+            break;
+        }
         case HitRegion::RowFeedback:
         case HitRegion::FooterFeedback:
             ShowVieLotusFeedbackDialog(ResolveSettingsInstance(nullptr), hwnd, st->prefs);
@@ -2669,10 +2860,15 @@ void ShowVieLotusFeedbackDialog(HINSTANCE hInstance, HWND hwndParent, const VieL
         EnableWindow(hwndParent, FALSE);
     }
 
+    const bool isEn = win_l10n::ResolveWindowsIsEnglish(prefs.uiLanguage);
     HWND hwndFb = CreateWindowExW(
         dwExStyle,
         kFeedbackWndClassName,
-        L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i \u2014 Sen Vi\u1EC7t (VieLotusIM)",
+        win_l10n::Tr(
+            isEn,
+            L"G\u00F3p \u00FD & B\u00E1o l\u1ED7i \u2014 Sen Vi\u1EC7t (VieLotusIM)",
+            L"Feedback & Bugs \u2014 Sen Vi\u1EC7t (VieLotusIM)"
+        ),
         dwStyle,
         posX, posY, wndW, wndH,
         hwndParent, nullptr, appInst, &fbState

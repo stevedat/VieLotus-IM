@@ -138,6 +138,7 @@ private:
     VieLotusConfig config_;
     int32_t envInputMethod_{VIELOTUS_INPUT_TELEX};
     bool hasEnvInputMethod_{false};
+    std::string uiLanguage_{"auto"};
     std::string cachedConfigDir_;
     std::string cachedEnvPath_;
     std::string cachedMacrosPath_;

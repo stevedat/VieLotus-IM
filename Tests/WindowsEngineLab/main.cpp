@@ -103,7 +103,12 @@ std::string driveSequence(
     eng.reset();
     eng.setSmartBilingual(bilingual);
     if (primeEnglish) {
-        const char *prime = "he is ";
+        bool isBeenInput = (input.size() == 4 &&
+            (input[0] == 'b' || input[0] == 'B') &&
+            (input[1] == 'e' || input[1] == 'E') &&
+            (input[2] == 'e' || input[2] == 'E') &&
+            (input[3] == 'n' || input[3] == 'N'));
+        const char *prime = isBeenInput ? "he has " : "he is ";
         for (const char *p = prime; *p; ++p) {
             eng.feedChar(static_cast<uint32_t>(*p));
         }
@@ -382,6 +387,53 @@ const PhraseTest kBilingualPhrases[] = {
     { "has gan ",                   "há gan ",              "VN compound 'há gan' preserved" },
     { "was mieengj ",               "ứa miệng ",            "VN compound 'ứa miệng' preserved" },
     { "cofn its vees ",             "còn ít vế ",           "VN 'ít' does not trigger anchor trap on 'vế'" },
+    // arm64 & alphanumeric digit-boundary identifiers (Telex)
+    { "arm64 ",                     "arm64 ",               "Telex digit boundary restores 'arm64'" },
+    { "ARM64 ",                     "ARM64 ",               "Telex digit boundary restores 'ARM64'" },
+    { "arm64e ",                    "arm64e ",              "Telex digit boundary restores 'arm64e'" },
+    { "arm64x ",                    "arm64x ",              "Telex digit boundary restores 'arm64x'" },
+    { "arm64ec ",                   "arm64ec ",             "Telex digit boundary restores 'arm64ec'" },
+    { "arm32 ",                     "arm32 ",               "Telex digit boundary restores 'arm32'" },
+    { "es6 ",                       "es6 ",                 "Telex digit boundary restores 'es6'" },
+    { "os2 ",                       "os2 ",                 "Telex digit boundary restores 'os2'" },
+    { "tooi dungf arm64 ",          "tôi dùng arm64 ",      "Mixed VN + 'arm64' restores 'arm64'" },
+    { "tooi dungf arm64 been nayf ","tôi dùng arm64 bên này ","VN momentum survives 'arm64' before 'bên'" },
+    { "baif1 ",                     "bài1 ",                "Pure VN + digit keeps 'bài1'" },
+    { "been1 ",                     "bên1 ",                "Protected VN 'bên1' preserved" },
+    { "teen1 ",                     "tên1 ",                "Protected VN 'tên1' preserved" },
+    { "moon1 ",                     "môn1 ",                "Protected VN 'môn1' preserved" },
+    { "arm ddamj ",                 "ảm đạm ",              "VN compound 'ảm đạm' preserved" },
+    // Grammatical perfect-tense gating for 'been' vs high-frequency Vietnamese 'bên'
+    { "deploy been server ",        "deploy bên server ",   "Mixed loanword keeps 'bên'" },
+    { "tooi deploy been server ",   "tôi deploy bên server ","Mixed VN+EN keeps 'bên'" },
+    { "tooi chayj build been linux ","tôi chạy build bên linux ","Mixed VN+EN keeps 'bên'" },
+    { "moowr terminal been phair ", "mở terminal bên phải ","Mixed VN+EN keeps 'bên'" },
+    { "suwar code been mays ",      "sửa code bên máy ",    "Mixed VN+EN keeps 'bên'" },
+    { "windows been nayf ",         "windows bên này ",     "Tech noun keeps 'bên'" },
+    { "linux been kia ",            "linux bên kia ",       "Tech noun keeps 'bên'" },
+    { "flutter been android ",      "flutter bên android ", "Tech noun keeps 'bên'" },
+    { "window been trais ",         "window bên trái ",     "Tech noun keeps 'bên'" },
+    { "repo been github ",          "repo bên github ",     "Tech noun 'repo' keeps 'bên'" },
+    { "docker been linux ",         "docker bên linux ",    "Tech noun 'docker' keeps 'bên'" },
+    { "apple been myx ",            "apple bên mỹ ",        "Tech brand 'apple' keeps 'bên'" },
+    { "Has it been ",               "Has it been ",         "Inverted question 'Has it been' restores English" },
+    { "the been ",                  "the bên ",             "Article 'the' does not license 'been'" },
+    { "he is been ",                "he is bên ",           "Ungrammatical 'he is been' keeps 'bên'" },
+    { "long been ",                 "long bên ",            "Standalone 'long' (VN name) keeps 'bên'" },
+    { "I have the file been kia ",  "I have the file bên kia ","Declarative 'I have <obj>' keeps 'bên'" },
+    { "have been ",                 "have been ",           "Perfect 'have been' restores English" },
+    { "has been ",                  "has been ",            "Perfect 'has been' restores English" },
+    { "had been ",                  "had been ",            "Perfect 'had been' restores English" },
+    { "I've been ",                 "I've been ",           "Contraction 'I've been' restores English" },
+    { "she's been ",                "she's been ",          "Contraction 'she's been' restores English" },
+    { "haven't been ",              "haven't been ",        "Negative contraction 'haven't been' restores English" },
+    { "hasn't been ",               "hasn't been ",         "Negative contraction 'hasn't been' restores English" },
+    { "hadn't been ",               "hadn't been ",         "Negative contraction 'hadn't been' restores English" },
+    { "never been ",                "never been ",          "Adverb 'never been' restores English" },
+    { "already been ",              "already been ",        "Adverb 'already been' restores English" },
+    { "Have you been ",             "Have you been ",       "Inverted question 'Have you been' restores English" },
+    { "Has the server been ",       "Has the server been ", "Inverted question 'Has the server been' restores English" },
+    { "It has long been ",          "It has long been ",    "Perfect adverb 'It has long been' restores English" },
 };
 
 void runTraceList(WindowsNativeEngine &eng, const std::string &spec) {
@@ -584,7 +636,12 @@ int main(int argc, char **argv) {
         bool primeEn = (r.behavior == "ambiguous_needs_context");
         vielotus_reset_session(capi);
         vielotus_set_smart_bilingual(capi, bilingual);
-        vielotus_append_context(capi, primeEn ? "he is" : "");
+        bool isBeenInput = (r.input.size() == 4 &&
+            (r.input[0] == 'b' || r.input[0] == 'B') &&
+            (r.input[1] == 'e' || r.input[1] == 'E') &&
+            (r.input[2] == 'e' || r.input[2] == 'E') &&
+            (r.input[3] == 'n' || r.input[3] == 'N'));
+        vielotus_append_context(capi, primeEn ? (isBeenInput ? "he has" : "he is") : "");
         std::string committedOut;
         for (unsigned char ch : r.input) {
             bool isWordChar = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
@@ -1141,8 +1198,9 @@ int main(int argc, char **argv) {
             } else if (ch >= 32 && ch <= 126) {
                 if (isComposing) {
                     const bool isVniDigit = isVniMode && (ch >= '0' && ch <= '9');
+                    const bool isTelexDigitRestore = !isVniMode && (ch >= '0' && ch <= '9') && engine.willRestoreOnTelexDigit();
                     const bool isBoundary = isBoundaryPunct(ch);
-                    if (isVniDigit || isBoundary) {
+                    if (isVniDigit || isBoundary || isTelexDigitRestore) {
                         eaten = true;
                     } else {
                         engine.feedChar(static_cast<uint32_t>(static_cast<unsigned char>(ch)));
@@ -1810,7 +1868,7 @@ int main(int argc, char **argv) {
         checkTsf(32, ok, "'@' tech-delimiter restoration without eating '@'", ok ? "OK" : sim.doc);
     }
 
-    // TSF 33: MSIX vs Classic Win32 Start Menu shortcut & Installed Apps dedup policy
+    // TSF 33: MSIX vs Classic Win32 Start Menu shortcut, Installed Apps & in-place code integrity policy
     {
         using namespace vielotus_tsf_guard;
         bool ok = true;
@@ -1818,7 +1876,13 @@ int main(int argc, char **argv) {
         ok = ok && ShouldRegisterClassicStartMenuAndUninstall(false);
         ok = ok && !ShouldRequireWin32UninstallEntryForTipCheck(true);
         ok = ok && ShouldRequireWin32UninstallEntryForTipCheck(false);
-        checkTsf(33, ok, "MSIX vs Win32 Start Menu & Installed Apps dedup policy", ok ? "OK" : "MISMATCH");
+        ok = ok && !ShouldCopyBinariesToProgramFilesOnProvision(true);
+        ok = ok && ShouldCopyBinariesToProgramFilesOnProvision(false);
+        ok = ok && ShouldPreferLocalPackageTipDll(true);
+        ok = ok && !ShouldPreferLocalPackageTipDll(false);
+        ok = ok && ShouldRequireExactInprocPathMatch(true);
+        ok = ok && !ShouldRequireExactInprocPathMatch(false);
+        checkTsf(33, ok, "MSIX vs Win32 Start Menu, Installed Apps & in-place policy", ok ? "OK" : "MISMATCH");
     }
 
     // TSF 34: Cross-process Telex <-> VNI profile switch & ActivateProfile flag separation policy

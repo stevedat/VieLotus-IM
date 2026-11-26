@@ -354,6 +354,248 @@ public struct SmartBilingualDetector {
         return anchors.contains(String(previous))
     }
 
+    private static let digitBoundaryShortTechPrefixes: Set<String> = [
+        "ar", "as", "ax", "er", "es", "ex", "if", "ir", "is", "ix", "of", "or", "os", "ur", "us"
+    ]
+
+    private static let digitBoundaryProtectedVietnameseCollisions: Set<String> = [
+        "been", "teen", "moon"
+    ]
+
+    /// Returns `true` when a Telex composition immediately followed by an ASCII digit (`arm64`, `ARM64`,
+    /// `arm64e`, `arm32`, `es6`, `os2`) is an English/technical identifier stem rather than a Vietnamese
+    /// syllable (`baif1 -> bài1`, `soos1 -> số1`, `been1 -> bên1`).
+    public static func shouldRestoreRawBeforeDigitBoundary(raw: String, rendered: String) -> Bool {
+        let cleanRaw = trimPunctuationFast(raw)
+        let cleanRendered = trimPunctuationFast(rendered)
+        guard cleanRaw.count >= 2,
+              cleanRaw.unicodeScalars.allSatisfy({ $0.isASCII && CharacterSet.letters.contains($0) }) else {
+            return false
+        }
+        let lower = asciiLowercasedFast(cleanRaw)
+        guard lower != asciiLowercasedFast(cleanRendered) else {
+            return false
+        }
+        if digitBoundaryProtectedVietnameseCollisions.contains(lower) {
+            return false
+        }
+        if digitBoundaryShortTechPrefixes.contains(lower) {
+            return true
+        }
+        if lower.count >= 3 &&
+           (isCommonTechWord(lower) ||
+            isContextSensitiveEnglishCollision(lower) ||
+            BilingualIntentArbiter.englishCollisionLogFrequencies[lower] != nil ||
+            isKnownEnglishWord(cleanRaw)) {
+            return true
+        }
+        return false
+    }
+
+    private static let apostropheContractionStems: Set<String> = [
+        "hasn", "haven", "hadn", "isn", "aren", "wasn", "weren",
+        "don", "doesn", "didn", "won", "wouldn", "couldn", "shouldn",
+        "mustn", "mightn", "needn", "shan", "ain",
+        "there", "here", "where"
+    ]
+
+    /// Returns `true` when a Telex composition immediately followed by an apostrophe (`hasn't`, `there's`,
+    /// `here's`, `where's`) is an English contraction stem that must not be mangled into Vietnamese (`hán't`).
+    public static func shouldRestoreRawBeforeApostropheBoundary(raw: String, rendered: String) -> Bool {
+        let cleanRaw = trimPunctuationFast(raw)
+        let cleanRendered = trimPunctuationFast(rendered)
+        guard cleanRaw.count >= 3,
+              cleanRaw.unicodeScalars.allSatisfy({ $0.isASCII && CharacterSet.letters.contains($0) }) else {
+            return false
+        }
+        let lower = asciiLowercasedFast(cleanRaw)
+        guard lower != asciiLowercasedFast(cleanRendered) else {
+            return false
+        }
+        return apostropheContractionStems.contains(lower)
+    }
+
+    private static let beenDirectAuxiliaries: Set<String> = [
+        "have", "has", "had", "having", "haven't", "hasn't", "hadn't"
+    ]
+
+    private static let beenContractionSuffixSubjects: Set<String> = [
+        "i", "you", "he", "she", "it", "we", "they",
+        "that", "there", "here", "what", "who", "where", "how",
+        "everyone", "everybody", "someone", "somebody", "anyone", "anybody",
+        "nobody", "nothing", "everything", "something",
+        "could", "would", "should", "might", "must", "may"
+    ]
+
+    private static let beenDirectParticipleAdverbs: Set<String> = [
+        "never", "always", "already", "just", "not", "ever", "still", "also",
+        "even", "really", "actually", "recently", "lately", "previously",
+        "definitely", "certainly", "probably", "finally", "hardly", "barely",
+        "rarely", "seldom", "often", "usually"
+    ]
+
+    private static let beenClauseIntervenerAdverbs: Set<String> = beenDirectParticipleAdverbs.union([
+        "only", "long", "truly", "possibly", "nearly", "almost", "scarcely",
+        "frequently", "normally", "generally", "commonly", "widely", "mostly",
+        "mainly", "largely", "partly", "partially", "completely", "totally",
+        "fully", "entirely", "thoroughly", "carefully", "strictly", "officially",
+        "publicly", "privately", "successfully", "repeatedly", "constantly",
+        "continuously", "consistently", "gradually", "temporarily", "permanently",
+        "initially", "formerly", "originally", "so", "too", "well", "all", "both"
+    ])
+
+    private static let beenInvertedQuestionPronouns: Set<String> = [
+        "i", "you", "he", "she", "it", "we", "they", "there", "this", "that",
+        "these", "those", "all", "both", "everyone", "everybody", "someone",
+        "somebody", "anyone", "anybody", "nobody", "nothing", "something", "everything"
+    ]
+
+    private static let beenInvertedQuestionDeterminers: Set<String> = [
+        "the", "this", "that", "these", "those", "my", "your", "his", "her", "its", "our", "their", "any", "no"
+    ]
+
+    /// Evaluates whether `context` grammatically licenses English past participle `"been"`
+    /// (`have/has/had/having`, `'ve/'s/'d`, `haven't/hasn't/hadn't`, inverted questions `Have you been`,
+    /// or perfect-clause adverbs `never/always/already/just/not/ever/... been`).
+    /// Vietnamese `"bên"` has a single Telex keystroke path (`whitelist_safe = never`) and far higher frequency
+    /// in Vietnamese and mixed VN-EN typing (`tôi deploy bên server`, `linux bên kia`, `window bên trái`),
+    /// so generic non-perfect English nouns/loanwords must NOT flip `"bên"` into `"been"`.
+    public static func hasEnglishPerfectContextForBeen(_ context: String) -> Bool {
+        let trimmed = context.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+
+        let hasCurlyQuotes = trimmed.utf8.contains(0xE2) && (trimmed.contains("\u{2019}") || trimmed.contains("\u{2018}"))
+        let normalized = hasCurlyQuotes
+            ? trimmed.replacingOccurrences(of: "\u{2019}", with: "'").replacingOccurrences(of: "\u{2018}", with: "'")
+            : trimmed
+
+        let rawPieces = normalized.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !rawPieces.isEmpty else { return false }
+
+        // Keep only the trailing pure-ASCII clause after the last Vietnamese token or sentence-ending punctuation.
+        var clauseTokens: [String] = []
+        clauseTokens.reserveCapacity(min(rawPieces.count, 8))
+        for piece in rawPieces.reversed() {
+            guard piece.unicodeScalars.allSatisfy(\.isASCII) else { break }
+            if let lastScalar = piece.unicodeScalars.last,
+               ".!?;:,\n\r".unicodeScalars.contains(lastScalar) {
+                break
+            }
+            let cleaned = trimPunctuationFast(piece)
+            guard !cleaned.isEmpty else { break }
+            let lower = asciiLowercasedFast(cleaned)
+            if LexiconDigest.contains(vietnameseAnchorWordDigests, lower) {
+                break
+            }
+            clauseTokens.append(lower)
+            if clauseTokens.count >= 8 { break }
+        }
+        guard !clauseTokens.isEmpty else { return false }
+        clauseTokens.reverse()
+
+        // Re-join apostrophe-split contractions produced by InputSessionManager when `'` commits as a boundary:
+        // e.g. `["haven", "t"] -> ["haven't"]`, `["i", "ve"] -> ["i've"]`, `["she", "s"] -> ["she's"]`, `["we", "d"] -> ["we'd"]`.
+        var words: [String] = []
+        words.reserveCapacity(clauseTokens.count)
+        var idx = 0
+        while idx < clauseTokens.count {
+            let tok = clauseTokens[idx]
+            if idx + 1 < clauseTokens.count {
+                let next = clauseTokens[idx + 1]
+                if next == "t" && (tok == "haven" || tok == "hasn" || tok == "hadn") {
+                    words.append("\(tok)'t")
+                    idx += 2
+                    continue
+                }
+                if next == "ve" && tok.allSatisfy({ $0.isASCII && $0.isLetter }) {
+                    words.append("\(tok)'ve")
+                    idx += 2
+                    continue
+                }
+                if (next == "s" || next == "d") && beenContractionSuffixSubjects.contains(tok) {
+                    words.append("\(tok)'\(next)")
+                    idx += 2
+                    continue
+                }
+            }
+            words.append(tok)
+            idx += 1
+        }
+        guard let last = words.last else { return false }
+
+        @inline(__always)
+        func isPerfectAuxiliary(_ w: String) -> Bool {
+            if beenDirectAuxiliaries.contains(w) { return true }
+            if w.hasSuffix("'ve") && w.count >= 4 { return true }
+            if (w.hasSuffix("'s") || w.hasSuffix("'d")) && w.count >= 3 {
+                let stem = String(w.dropLast(2))
+                return beenContractionSuffixSubjects.contains(stem) || isKnownEnglishWord(stem)
+            }
+            return false
+        }
+
+        // 1. Immediate auxiliary or perfect contraction (`have been`, `has been`, `I've been`, `haven't been`, `she's been`).
+        if isPerfectAuxiliary(last) {
+            return true
+        }
+
+        // 2. Immediate unambiguous English participle adverb (`never been`, `always been`, `not been`, `already been`, `just been`, `ever been`).
+        if beenDirectParticipleAdverbs.contains(last) {
+            return true
+        }
+
+        // 3. Clause-window auxiliary up to 4 tokens earlier (handles intervening adverbs & inverted questions:
+        //    `It has long been`, `I have really never been`, `Have you been`, `Has the server been`, `Has it ever been`).
+        guard words.count >= 2 else { return false }
+        let maxLookback = min(words.count - 1, 4)
+        for back in 1...maxLookback {
+            let auxIdx = words.count - 1 - back
+            let aux = words[auxIdx]
+            guard isPerfectAuxiliary(aux) else { continue }
+            let between = Array(words[(auxIdx + 1)..<words.count])
+            guard !between.isEmpty else { return true }
+
+            let allAdverbsOrNegation = between.allSatisfy { tok in
+                beenClauseIntervenerAdverbs.contains(tok) ||
+                (tok.count >= 5 && tok.hasSuffix("ly") && isKnownEnglishWord(tok))
+            }
+            if allAdverbsOrNegation {
+                return true
+            }
+
+            // Inverted question: `Have you [ever/not] been`, `Has it [already] been`, `Has the build [ever] been`
+            // Guard against declarative `I have the file bên kia` (auxiliary preceded by a subject pronoun).
+            let isBareAuxForInversion = beenDirectAuxiliaries.contains(aux) && aux != "having"
+            let allowsInversion: Bool = {
+                guard isBareAuxForInversion else { return false }
+                if auxIdx == 0 { return true }
+                let beforeAux = words[auxIdx - 1]
+                return ["what", "where", "when", "why", "how", "who", "whom", "which",
+                        "so", "nor", "neither", "never", "seldom", "rarely", "only", "not"].contains(beforeAux)
+            }()
+            if allowsInversion {
+                let firstBetween = between[0]
+                let restAfterSubject: ArraySlice<String>?
+                if beenInvertedQuestionPronouns.contains(firstBetween) {
+                    restAfterSubject = between.dropFirst()
+                } else if beenInvertedQuestionDeterminers.contains(firstBetween) && between.count >= 2 {
+                    restAfterSubject = between.dropFirst(2)
+                } else {
+                    restAfterSubject = nil
+                }
+                if let tail = restAfterSubject,
+                   tail.allSatisfy({ tok in
+                       beenClauseIntervenerAdverbs.contains(tok) ||
+                       (tok.count >= 5 && tok.hasSuffix("ly") && isKnownEnglishWord(tok))
+                   }) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
     private static let nonVietnameseLetters: Set<Character> = ["f", "j", "w", "z"]
     private static let doubleConsonants = ["bb", "cc", "ff", "gg", "ll", "mm", "nn", "pp", "rr", "ss", "tt", "vv"]
     private static let englishEndings = ["sh", "ck", "ts", "ds", "st", "nd", "ld", "rt", "ct", "pt", "lt", "nt", "xt"]
@@ -578,6 +820,9 @@ public struct SmartBilingualDetector {
              (canMatchStandaloneRhyme() && VietnameseSyllableDictionary.shared.isValidVietnameseRhyme(effectiveRendered)))
         )
         if isPlausibleVN {
+            if lower == "been" && lowerRendered == "bên" {
+                return hasEnglishPerfectContextForBeen(context)
+            }
             guard !context.isEmpty,
                   (isConfidentEnglishContext(context) || (lower == "sex" && BilingualIntentArbiter.isVietnameseLoanwordSexContext(context))) else {
                 return false
@@ -879,6 +1124,13 @@ public struct SmartBilingualDetector {
 
         if lowerRaw == "sex" && BilingualIntentArbiter.isVietnameseLoanwordSexContext(context) {
             return true
+        }
+
+        if lowerRaw == "been",
+           let rendered,
+           rendered.lowercased() == "bên",
+           !raw.contains(where: { codeCharacters.contains($0) }) {
+            return hasEnglishPerfectContextForBeen(context)
         }
 
         if lowerRaw.contains(where: { codeCharacters.contains($0) }) {

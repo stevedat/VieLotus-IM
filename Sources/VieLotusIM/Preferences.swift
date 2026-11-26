@@ -34,6 +34,7 @@ final class Preferences: ObservableObject {
         static let macroEnabled = "VieLotusIM.macroEnabledV2"
         static let grammarProfile = "VieLotusIM.grammarProfile"
         static let launchAtLogin = "VieLotusIM.launchAtLogin"
+        static let uiLanguage = UILanguagePreference.userDefaultsKey
     }
     
     private func flushDefaults() {
@@ -246,6 +247,35 @@ final class Preferences: ObservableObject {
         #endif
     }
     
+    @Published var uiLanguage: UILanguagePreference {
+        didSet {
+            guard !isReloading else { return }
+            defaults.set(uiLanguage.rawValue, forKey: Key.uiLanguage)
+            CFPreferencesSetAppValue(
+                Key.uiLanguage as CFString,
+                uiLanguage.rawValue as CFString,
+                kCFPreferencesCurrentApplication
+            )
+            flushDefaults()
+            L10n.setPreference(uiLanguage)
+            NotificationCenter.default.post(name: .vieLotusUILanguageDidChange, object: nil)
+            DistributedNotificationCenter.default().postNotificationName(
+                Self.preferencesChangedNotification,
+                object: nil,
+                userInfo: nil,
+                deliverImmediately: true
+            )
+        }
+    }
+
+    var isEnglishUI: Bool {
+        uiLanguage.resolvedIsEnglish()
+    }
+
+    func tr(_ vi: String, _ en: String) -> String {
+        isEnglishUI ? en : vi
+    }
+
     @Published var engineBackend: EngineBackend {
         didSet {
             defaults.set(engineBackend.rawValue, forKey: Key.engineBackend)
@@ -313,6 +343,12 @@ final class Preferences: ObservableObject {
         
         let rawBackend = defaults.string(forKey: Key.engineBackend) ?? EngineBackend.pureSwift.rawValue
         self.engineBackend = EngineBackend(rawValue: rawBackend) ?? .pureSwift
+
+        let rawUILanguage = (CFPreferencesCopyAppValue(Key.uiLanguage as CFString, kCFPreferencesCurrentApplication) as? String)
+            ?? defaults.string(forKey: Key.uiLanguage)
+        let resolvedUILanguage = UILanguagePreference.fromStored(rawUILanguage)
+        self.uiLanguage = resolvedUILanguage
+        L10n.setPreference(resolvedUILanguage)
 
         DistributedNotificationCenter.default().addObserver(
             self,
@@ -397,6 +433,12 @@ final class Preferences: ObservableObject {
 
         let rawBackend = defaults.string(forKey: Key.engineBackend) ?? EngineBackend.pureSwift.rawValue
         self.engineBackend = EngineBackend(rawValue: rawBackend) ?? .pureSwift
+
+        let rawUILanguage = (CFPreferencesCopyAppValue(Key.uiLanguage as CFString, kCFPreferencesCurrentApplication) as? String)
+            ?? defaults.string(forKey: Key.uiLanguage)
+        let resolvedUILanguage = UILanguagePreference.fromStored(rawUILanguage)
+        self.uiLanguage = resolvedUILanguage
+        L10n.setPreference(resolvedUILanguage)
         ClientAdapter.resetDynamicMarkedText()
     }
 }

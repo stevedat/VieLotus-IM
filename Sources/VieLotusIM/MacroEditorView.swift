@@ -3,6 +3,7 @@ import VieLotusCore
 
 /// Modern, native macOS Editor for personal shorthand / macros.
 struct MacroEditorView: View {
+    @ObservedObject var prefs = Preferences.shared
     @Environment(\.dismiss) private var dismiss
     @State private var entries: [MacroEntry] = []
     @State private var searchText = ""
@@ -36,9 +37,12 @@ struct MacroEditorView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Bảng gõ tắt cá nhân")
+                    Text(prefs.tr("Bảng gõ tắt cá nhân", "Text Shortcuts (Macros)"))
                         .font(.system(size: 15, weight: .bold))
-                    Text("Gõ từ viết tắt rồi nhấn phím Cách hoặc dấu câu để bung cụm từ.")
+                    Text(prefs.tr(
+                        "Gõ từ viết tắt rồi nhấn phím Cách hoặc dấu câu để bung cụm từ.",
+                        "Type an abbreviation then press Space or punctuation to expand it."
+                    ))
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
@@ -53,12 +57,14 @@ struct MacroEditorView: View {
 
             // MARK: - Add / Edit Box
             VStack(alignment: .leading, spacing: 8) {
-                Text(editingKey != nil ? "CHỈNH SỬA PHÍM TẮT: \(editingKey!)" : "THÊM PHÍM TẮT MỚI")
+                Text(editingKey != nil
+                     ? prefs.tr("CHỈNH SỬA PHÍM TẮT: \(editingKey!)", "EDIT SHORTCUT: \(editingKey!)")
+                     : prefs.tr("THÊM PHÍM TẮT MỚI", "ADD NEW SHORTCUT"))
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.secondary)
 
                 HStack(spacing: 8) {
-                    TextField("Viết tắt (vd: hn)", text: $newKey)
+                    TextField(prefs.tr("Viết tắt (vd: hn)", "Shortcut (e.g. hn)"), text: $newKey)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 130)
                         .focused($isKeyFieldFocused)
@@ -67,10 +73,10 @@ struct MacroEditorView: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
 
-                    TextField("Cụm từ thay thế (vd: Hà Nội)", text: $newValue)
+                    TextField(prefs.tr("Cụm từ thay thế (vd: Hà Nội)", "Replacement phrase (e.g. Hà Nội)"), text: $newValue)
                         .textFieldStyle(.roundedBorder)
 
-                    Button(editingKey != nil ? "Lưu" : "Thêm") {
+                    Button(editingKey != nil ? prefs.tr("Lưu", "Save") : prefs.tr("Thêm", "Add")) {
                         saveEntry()
                     }
                     .buttonStyle(.borderedProminent)
@@ -78,7 +84,7 @@ struct MacroEditorView: View {
                               newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                     if editingKey != nil {
-                        Button("Huỷ") {
+                        Button(prefs.tr("Huỷ", "Cancel")) {
                             cancelEditing()
                         }
                         .buttonStyle(.bordered)
@@ -97,7 +103,7 @@ struct MacroEditorView: View {
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
 
-                TextField("Tìm kiếm phím tắt hoặc từ thay thế...", text: $searchText)
+                TextField(prefs.tr("Tìm kiếm phím tắt hoặc từ thay thế...", "Search shortcuts or phrases..."), text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
 
@@ -114,7 +120,7 @@ struct MacroEditorView: View {
 
                 Spacer()
 
-                Text("\(filteredEntries.count) / \(entries.count) từ")
+                Text("\(filteredEntries.count) / \(entries.count) " + prefs.tr("từ", "items"))
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
@@ -131,7 +137,9 @@ struct MacroEditorView: View {
                             .font(.system(size: 32))
                             .foregroundColor(.secondary.opacity(0.6))
                             .padding(.top, 40)
-                        Text(searchText.isEmpty ? "Chưa có từ viết tắt nào." : "Không tìm thấy từ viết tắt phù hợp.")
+                        Text(searchText.isEmpty
+                             ? prefs.tr("Chưa có từ viết tắt nào.", "No shortcuts yet.")
+                             : prefs.tr("Không tìm thấy từ viết tắt phù hợp.", "No matching shortcuts found."))
                             .font(.system(size: 13))
                             .foregroundColor(.secondary)
                     }
@@ -155,7 +163,7 @@ struct MacroEditorView: View {
                 Button {
                     showingResetAlert = true
                 } label: {
-                    Label("Khôi phục mặc định", systemImage: "arrow.counterclockwise")
+                    Label(prefs.tr("Khôi phục mặc định", "Restore Defaults"), systemImage: "arrow.counterclockwise")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -163,14 +171,14 @@ struct MacroEditorView: View {
                 Button {
                     openMacroFile()
                 } label: {
-                    Label("Mở macros.json", systemImage: "folder")
+                    Label(prefs.tr("Mở macros.json", "Open macros.json"), systemImage: "folder")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
                 Spacer()
 
-                Button("Đóng") {
+                Button(prefs.tr("Đóng", "Close")) {
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -182,13 +190,16 @@ struct MacroEditorView: View {
             .background(Color(NSColor.windowBackgroundColor))
         }
         .frame(width: 520, height: 500)
-        .alert("Khôi phục bảng gõ tắt mặc định?", isPresented: $showingResetAlert) {
-            Button("Khôi phục", role: .destructive) {
+        .alert(prefs.tr("Khôi phục bảng gõ tắt mặc định?", "Restore default shortcuts?"), isPresented: $showingResetAlert) {
+            Button(prefs.tr("Khôi phục", "Restore"), role: .destructive) {
                 resetDefaults()
             }
-            Button("Huỷ", role: .cancel) {}
+            Button(prefs.tr("Huỷ", "Cancel"), role: .cancel) {}
         } message: {
-            Text("Toàn bộ các từ gõ tắt tự thêm sẽ bị thay thế bằng danh sách mặc định của Sen Việt.")
+            Text(prefs.tr(
+                "Toàn bộ các từ gõ tắt tự thêm sẽ bị thay thế bằng danh sách mặc định của Sen Việt.",
+                "All custom shortcuts will be replaced with Sen Việt's built-in defaults."
+            ))
         }
         .onAppear {
             loadEntries()
@@ -229,7 +240,7 @@ struct MacroEditorView: View {
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            .help("Chỉnh sửa từ này")
+            .help(prefs.tr("Chỉnh sửa từ này", "Edit this shortcut"))
 
             Button {
                 deleteEntry(entry.key)
@@ -239,7 +250,7 @@ struct MacroEditorView: View {
                     .foregroundColor(.red.opacity(0.8))
             }
             .buttonStyle(.plain)
-            .help("Xoá từ này")
+            .help(prefs.tr("Xoá từ này", "Delete this shortcut"))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

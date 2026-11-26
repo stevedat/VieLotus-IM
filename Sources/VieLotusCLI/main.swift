@@ -30,7 +30,8 @@ func driveInput(session: InputSessionManager, input: String, primeEnglish: Bool,
     // typing), so assign it unconditionally here. Without this, every row after the first
     // primed one silently inherits "he is" and the whole suite measures a contaminated
     // context instead of the per-row condition it claims to test.
-    session.context = primeEnglish ? "he is" : ""
+    let englishPrime = (input.lowercased() == "been") ? "he has" : "he is"
+    session.context = primeEnglish ? englishPrime : ""
     
     var result = ""
     for char in input {

@@ -28,13 +28,26 @@ enum VieLotusFeedbackKind: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .wordBug:
-            return "Lỗi gõ từ / Song ngữ"
+            return L10n.tr("Lỗi gõ từ / Song ngữ", "Word / Bilingual Bug")
         case .appCompat:
-            return "Tương thích App / Web"
+            return L10n.tr("Tương thích App / Web", "App / Web Compatibility")
         case .featureRequest:
-            return "Đề xuất tính năng"
+            return L10n.tr("Đề xuất tính năng", "Feature Request")
         case .general:
-            return "Góp ý chung"
+            return L10n.tr("Góp ý chung", "General Feedback")
+        }
+    }
+
+    func localizedTitle(_ isEnglish: Bool) -> String {
+        switch self {
+        case .wordBug:
+            return isEnglish ? "Word / Bilingual Bug" : "Lỗi gõ từ / Song ngữ"
+        case .appCompat:
+            return isEnglish ? "App / Web Compatibility" : "Tương thích App / Web"
+        case .featureRequest:
+            return isEnglish ? "Feature Request" : "Đề xuất tính năng"
+        case .general:
+            return isEnglish ? "General Feedback" : "Góp ý chung"
         }
     }
 
@@ -84,14 +97,14 @@ struct FeedbackSheetView: View {
         let overrides = prefs.appModeOverrides
         var lines: [String] = []
         lines.append("- **Kiểu gõ (Input Method):** `\(inputMethodTitle)` (`\(prefs.grammarProfile.rawValue)`)")
-        lines.append("- **Song ngữ thông minh (Smart Bilingual):** `\(prefs.smartBilingual ? "Bật" : "Tắt")`")
-        lines.append("- **Chính tả chuẩn mới (oà, uý):** `\(prefs.modernOrthography ? "Bật" : "Tắt")`")
-        lines.append("- **Tối ưu Terminal Direct:** `\(prefs.terminalDirectMode ? "Bật" : "Tắt")`")
+        lines.append("- **Song ngữ thông minh (Smart Bilingual):** `\(prefs.smartBilingual ? "On / Bật" : "Off / Tắt")`")
+        lines.append("- **Chính tả chuẩn mới (oà, uý):** `\(prefs.modernOrthography ? "On / Bật" : "Off / Tắt")`")
+        lines.append("- **Tối ưu Terminal Direct:** `\(prefs.terminalDirectMode ? "On / Bật" : "Off / Tắt")`")
         lines.append("- **Chế độ hiển thị (Presentation Mode):** `\(prefs.presentationModePreference.rawValue)`")
-        lines.append("- **Trạng thái TIS Input Source:** `\(tis.summaryTitle) (conflict=\(tis.hasAnyInputConflict))`")
+        lines.append("- **Trạng thái TIS Input Source:** `\(tis.localizedSummaryTitle(isEnglish: prefs.isEnglishUI)) (conflict=\(tis.hasAnyInputConflict))`")
         lines.append("- **Số lượng cụm gõ tắt (Macros):** `\(MacroEngine.shared.getMacroEntries().count)`")
         if overrides.isEmpty {
-            lines.append("- **Tuỳ chỉnh theo ứng dụng (App Overrides):** `Mặc định tự động (0 overrides)`")
+            lines.append("- **Tuỳ chỉnh theo ứng dụng (App Overrides):** `\(prefs.tr("Mặc định tự động", "Automatic")) (0 overrides)`")
         } else {
             lines.append("- **Tuỳ chỉnh theo ứng dụng (\(overrides.count)):**")
             for (bundleID, mode) in overrides.sorted(by: { $0.key < $1.key }).prefix(15) {
@@ -111,11 +124,14 @@ struct FeedbackSheetView: View {
 
         let headerTopic: String
         if !trimmedKeys.isEmpty {
-            headerTopic = "Gõ `\(trimmedKeys)` ra `\(trimmedActual.isEmpty ? "?" : trimmedActual)` (mong muốn `\(trimmedExpected.isEmpty ? "?" : trimmedExpected)`)"
+            headerTopic = prefs.tr(
+                "Gõ `\(trimmedKeys)` ra `\(trimmedActual.isEmpty ? "?" : trimmedActual)` (mong muốn `\(trimmedExpected.isEmpty ? "?" : trimmedExpected)`)",
+                "Typed `\(trimmedKeys)` -> `\(trimmedActual.isEmpty ? "?" : trimmedActual)` (expected `\(trimmedExpected.isEmpty ? "?" : trimmedExpected)`)"
+            )
         } else if !trimmedTopic.isEmpty {
             headerTopic = trimmedTopic
         } else {
-            headerTopic = selectedKind.title
+            headerTopic = selectedKind.localizedTitle(prefs.isEnglishUI)
         }
 
         var lines: [String] = []
@@ -163,14 +179,17 @@ struct FeedbackSheetView: View {
 
         let summary: String
         if !trimmedKeys.isEmpty {
-            summary = "Gõ \"\(trimmedKeys)\" ra \"\(trimmedActual.isEmpty ? "?" : trimmedActual)\" (mong muốn \"\(trimmedExpected.isEmpty ? "?" : trimmedExpected)\")"
+            summary = prefs.tr(
+                "Gõ \"\(trimmedKeys)\" ra \"\(trimmedActual.isEmpty ? "?" : trimmedActual)\" (mong muốn \"\(trimmedExpected.isEmpty ? "?" : trimmedExpected)\")",
+                "Typed \"\(trimmedKeys)\" -> \"\(trimmedActual.isEmpty ? "?" : trimmedActual)\" (expected \"\(trimmedExpected.isEmpty ? "?" : trimmedExpected)\")"
+            )
         } else if !trimmedTopic.isEmpty {
             summary = trimmedTopic
         } else if !trimmedMsg.isEmpty {
             let firstLine = trimmedMsg.components(separatedBy: .newlines).first ?? trimmedMsg
             summary = String(firstLine.prefix(64))
         } else {
-            summary = selectedKind.title
+            summary = selectedKind.localizedTitle(prefs.isEnglishUI)
         }
         return "\(selectedKind.githubLabelPrefix) \(summary) (v\(AppInfo.appVersion))"
     }
@@ -184,9 +203,12 @@ struct FeedbackSheetView: View {
                     .foregroundStyle(.indigo)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Góp ý & Báo lỗi nhanh")
+                    Text(prefs.tr("Góp ý & Báo lỗi nhanh", "Quick Feedback & Bug Report"))
                         .font(.system(size: 16, weight: .semibold))
-                    Text("Báo lỗi gõ từ song ngữ, tương thích ứng dụng hoặc đề xuất tính năng mới.")
+                    Text(prefs.tr(
+                        "Báo lỗi gõ từ song ngữ, tương thích ứng dụng hoặc đề xuất tính năng mới.",
+                        "Report bilingual typing issues, app compatibility bugs, or suggest new features."
+                    ))
                         .font(.system(size: 11.5))
                         .foregroundStyle(.secondary)
                 }
@@ -222,7 +244,7 @@ struct FeedbackSheetView: View {
 
             // Category Selector
             VStack(alignment: .leading, spacing: 6) {
-                Text("Loại phản hồi")
+                Text(prefs.tr("Loại phản hồi", "Feedback Category"))
                     .font(.system(size: 12, weight: .semibold))
 
                 HStack(spacing: 6) {
@@ -234,7 +256,7 @@ struct FeedbackSheetView: View {
                             HStack(spacing: 5) {
                                 Image(systemName: kind.iconName)
                                     .font(.system(size: 11))
-                                Text(kind.title)
+                                Text(kind.localizedTitle(prefs.isEnglishUI))
                                     .font(.system(size: 11.5, weight: isSelected ? .semibold : .medium))
                                     .lineLimit(1)
                             }
@@ -259,25 +281,25 @@ struct FeedbackSheetView: View {
             if selectedKind == .wordBug || selectedKind == .appCompat {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Phím đã gõ (Tuỳ chọn)")
+                        Text(prefs.tr("Phím đã gõ (Tuỳ chọn)", "Typed Keys (Optional)"))
                             .font(.system(size: 11, weight: .medium))
-                        TextField("VD: just, cos...", text: $typedKeys)
+                        TextField(prefs.tr("VD: just, cos...", "e.g. just, cos..."), text: $typedKeys)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 12, design: .monospaced))
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Sen Việt hiện ra")
+                        Text(prefs.tr("Sen Việt hiện ra", "Actual Output"))
                             .font(.system(size: 11, weight: .medium))
-                        TextField("VD: jút...", text: $actualOutput)
+                        TextField(prefs.tr("VD: jút...", "e.g. jút..."), text: $actualOutput)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 12, design: .monospaced))
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Mong muốn đúng")
+                        Text(prefs.tr("Mong muốn đúng", "Expected Output"))
                             .font(.system(size: 11, weight: .medium))
-                        TextField("VD: just...", text: $expectedOutput)
+                        TextField(prefs.tr("VD: just...", "e.g. just..."), text: $expectedOutput)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 12, design: .monospaced))
                     }
@@ -287,15 +309,15 @@ struct FeedbackSheetView: View {
             // App / Subject + Optional Email
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Ứng dụng / Trang web hoặc Chủ đề (Tuỳ chọn)")
+                    Text(prefs.tr("Ứng dụng / Trang web hoặc Chủ đề (Tuỳ chọn)", "App / Website or Topic (Optional)"))
                         .font(.system(size: 11.5, weight: .medium))
-                    TextField("VD: Safari, Zalo, Chrome, Ghostty, VS Code...", text: $appOrTopic)
+                    TextField(prefs.tr("VD: Safari, Zalo, Chrome, Ghostty, VS Code...", "e.g. Safari, Chrome, Ghostty, VS Code..."), text: $appOrTopic)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 12))
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Email liên hệ (Tuỳ chọn)")
+                    Text(prefs.tr("Email liên hệ (Tuỳ chọn)", "Contact Email (Optional)"))
                         .font(.system(size: 11.5, weight: .medium))
                     TextField("you@example.com", text: $contactEmail)
                         .textFieldStyle(.roundedBorder)
@@ -306,7 +328,7 @@ struct FeedbackSheetView: View {
 
             // Description TextEditor
             VStack(alignment: .leading, spacing: 4) {
-                Text("Nội dung chi tiết")
+                Text(prefs.tr("Nội dung chi tiết", "Details"))
                     .font(.system(size: 11.5, weight: .medium))
 
                 TextEditor(text: $message)
@@ -327,7 +349,10 @@ struct FeedbackSheetView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Toggle(
-                        "Đính kèm cấu hình bộ gõ & trạng thái hệ thống (ẩn danh, không chứa văn bản gõ)",
+                        prefs.tr(
+                            "Đính kèm cấu hình bộ gõ & trạng thái hệ thống (ẩn danh, không chứa văn bản gõ)",
+                            "Attach IME config & system status (anonymous, no typed text)"
+                        ),
                         isOn: $includeDiagnostics
                     )
                     .toggleStyle(.checkbox)
@@ -335,7 +360,9 @@ struct FeedbackSheetView: View {
 
                     Spacer()
 
-                    Button(showDiagnosticPreview ? "Ẩn bản xem trước" : "Xem dữ liệu đính kèm") {
+                    Button(showDiagnosticPreview
+                           ? prefs.tr("Ẩn bản xem trước", "Hide Preview")
+                           : prefs.tr("Xem dữ liệu đính kèm", "Preview Attached Data")) {
                         withAnimation(.easeInOut(duration: 0.15)) {
                             showDiagnosticPreview.toggle()
                         }
@@ -385,21 +412,27 @@ struct FeedbackSheetView: View {
             HStack(spacing: 8) {
                 Button {
                     copyReportToClipboard()
-                    statusBanner = "Đã sao chép báo cáo kèm thông số chẩn đoán vào Clipboard!"
+                    statusBanner = prefs.tr(
+                        "Đã sao chép báo cáo kèm thông số chẩn đoán vào Clipboard!",
+                        "Copied report and diagnostics to Clipboard!"
+                    )
                 } label: {
-                    Label("Sao chép", systemImage: "doc.on.doc")
+                    Label(prefs.tr("Sao chép", "Copy"), systemImage: "doc.on.doc")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
 
                 Button {
                     copyReportToClipboard()
-                    statusBanner = "Đã chép báo cáo vào Clipboard! Hãy nhấn ⌘V (Dán) vào nhóm Zalo Hỗ trợ."
+                    statusBanner = prefs.tr(
+                        "Đã chép báo cáo vào Clipboard! Hãy nhấn ⌘V (Dán) vào nhóm Zalo Hỗ trợ.",
+                        "Copied report to Clipboard! Paste (⌘V) it into the Zalo support group."
+                    )
                     if let url = URL(string: Self.communityZaloURL) {
                         NSWorkspace.shared.open(url)
                     }
                 } label: {
-                    Label("Chép & Mở Zalo", systemImage: "bubble.left.and.bubble.right.fill")
+                    Label(prefs.tr("Chép & Mở Zalo", "Copy & Open Zalo"), systemImage: "bubble.left.and.bubble.right.fill")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
@@ -417,7 +450,7 @@ struct FeedbackSheetView: View {
                         NSWorkspace.shared.open(url)
                     }
                 } label: {
-                    Label("Gửi Email", systemImage: "envelope.fill")
+                    Label(prefs.tr("Gửi Email", "Send Email"), systemImage: "envelope.fill")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
@@ -434,9 +467,12 @@ struct FeedbackSheetView: View {
                     if let url = comps?.url {
                         NSWorkspace.shared.open(url)
                     }
-                    statusBanner = "Đã mở GitHub Issues (điền sẵn thông số) và sao chép dự phòng vào Clipboard!"
+                    statusBanner = prefs.tr(
+                        "Đã mở GitHub Issues (điền sẵn thông số) và sao chép dự phòng vào Clipboard!",
+                        "Opened GitHub Issues with prefilled report and copied a backup to Clipboard!"
+                    )
                 } label: {
-                    Label("Gửi lên GitHub Issues", systemImage: "paperplane.fill")
+                    Label(prefs.tr("Gửi lên GitHub Issues", "Submit to GitHub Issues"), systemImage: "paperplane.fill")
                         .font(.system(size: 12, weight: .semibold))
                 }
                 .buttonStyle(.borderedProminent)

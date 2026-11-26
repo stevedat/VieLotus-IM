@@ -1,5 +1,7 @@
 #include "LangBarButton.h"
+#include "PrefsStore.h"
 #include "VieLotusTIP.h"
+#include "WinL10n.h"
 #include <strsafe.h>
 #include <cmath>
 #include <cstring>
@@ -245,11 +247,24 @@ STDMETHODIMP CLangBarItemButton::Show(BOOL fShow) {
 
 STDMETHODIMP CLangBarItemButton::GetTooltipString(BSTR *pbstrToolTip) {
     if (!pbstrToolTip) return E_INVALIDARG;
+    const bool isEn = win_l10n::ResolveWindowsIsEnglish(LoadUiLanguagePref());
     const WCHAR *tip = m_isVietnamese
         ? (m_isVni
-            ? L"Sen Vi\u1EC7t: Ti\u1EBFng Vi\u1EC7t (VNI)\nB\u1EA5m tr\u00E1i: \u0111\u1ED5i VI/EN \u2022 B\u1EA5m ph\u1EA3i: Menu & C\u00E0i \u0111\u1EB7t"
-            : L"Sen Vi\u1EC7t: Ti\u1EBFng Vi\u1EC7t (Telex)\nB\u1EA5m tr\u00E1i: \u0111\u1ED5i VI/EN \u2022 B\u1EA5m ph\u1EA3i: Menu & C\u00E0i \u0111\u1EB7t")
-        : L"Sen Vi\u1EC7t: Ti\u1EBFng Anh (T\u1EAFt g\u00F5 d\u1EA5u)\nB\u1EA5m tr\u00E1i: b\u1EADt Ti\u1EBFng Vi\u1EC7t \u2022 B\u1EA5m ph\u1EA3i: Menu & C\u00E0i \u0111\u1EB7t";
+            ? win_l10n::Tr(
+                isEn,
+                L"Sen Vi\u1EC7t: Ti\u1EBFng Vi\u1EC7t (VNI)\nB\u1EA5m tr\u00E1i: \u0111\u1ED5i VI/EN \u2022 B\u1EA5m ph\u1EA3i: Menu & C\u00E0i \u0111\u1EB7t",
+                L"Sen Vi\u1EC7t: Vietnamese (VNI)\nLeft-click: toggle VI/EN \u2022 Right-click: Menu & Settings"
+            )
+            : win_l10n::Tr(
+                isEn,
+                L"Sen Vi\u1EC7t: Ti\u1EBFng Vi\u1EC7t (Telex)\nB\u1EA5m tr\u00E1i: \u0111\u1ED5i VI/EN \u2022 B\u1EA5m ph\u1EA3i: Menu & C\u00E0i \u0111\u1EB7t",
+                L"Sen Vi\u1EC7t: Vietnamese (Telex)\nLeft-click: toggle VI/EN \u2022 Right-click: Menu & Settings"
+            ))
+        : win_l10n::Tr(
+            isEn,
+            L"Sen Vi\u1EC7t: Ti\u1EBFng Anh (T\u1EAFt g\u00F5 d\u1EA5u)\nB\u1EA5m tr\u00E1i: b\u1EADt Ti\u1EBFng Vi\u1EC7t \u2022 B\u1EA5m ph\u1EA3i: Menu & C\u00E0i \u0111\u1EB7t",
+            L"Sen Vi\u1EC7t: English (IME Off)\nLeft-click: enable Vietnamese \u2022 Right-click: Menu & Settings"
+        );
     *pbstrToolTip = SysAllocString(tip);
     return (*pbstrToolTip != nullptr) ? S_OK : E_OUTOFMEMORY;
 }
@@ -274,6 +289,7 @@ STDMETHODIMP CLangBarItemButton::OnClick(TfLBIClick click, POINT pt, const RECT 
         HMENU hMenu = CreatePopupMenu();
         if (!hMenu) return S_OK;
 
+        const bool isEn = win_l10n::ResolveWindowsIsEnglish(LoadUiLanguagePref());
         const bool isVn = m_pOwner->IsVietnameseMode();
         const bool isVni = m_pOwner->IsVniMode();
 
@@ -281,33 +297,33 @@ STDMETHODIMP CLangBarItemButton::OnClick(TfLBIClick click, POINT pt, const RECT 
             hMenu,
             MF_STRING | (isVn ? MF_CHECKED : MF_UNCHECKED),
             vielotus_tsf_guard::kLangBarCmdVietnamese,
-            L"Ti\u1EBFng Vi\u1EC7t (B\u1EADt g\u00F5 d\u1EA5u)"
+            win_l10n::Tr(isEn, L"Ti\u1EBFng Vi\u1EC7t (B\u1EADt g\u00F5 d\u1EA5u)", L"Vietnamese (Typing On)")
         );
         AppendMenuW(
             hMenu,
             MF_STRING | (!isVn ? MF_CHECKED : MF_UNCHECKED),
             vielotus_tsf_guard::kLangBarCmdEnglish,
-            L"Ti\u1EBFng Anh (T\u1EAFt g\u00F5 d\u1EA5u)"
+            win_l10n::Tr(isEn, L"Ti\u1EBFng Anh (T\u1EAFt g\u00F5 d\u1EA5u)", L"English (Typing Off)")
         );
         AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(
             hMenu,
             MF_STRING | (!isVni ? MF_CHECKED : MF_UNCHECKED),
             vielotus_tsf_guard::kLangBarCmdTelex,
-            L"Ki\u1EC3u g\u00F5 Telex"
+            win_l10n::Tr(isEn, L"Ki\u1EC3u g\u00F5 Telex", L"Telex Input Method")
         );
         AppendMenuW(
             hMenu,
             MF_STRING | (isVni ? MF_CHECKED : MF_UNCHECKED),
             vielotus_tsf_guard::kLangBarCmdVni,
-            L"Ki\u1EC3u g\u00F5 VNI"
+            win_l10n::Tr(isEn, L"Ki\u1EC3u g\u00F5 VNI", L"VNI Input Method")
         );
         AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(
             hMenu,
             MF_STRING,
             vielotus_tsf_guard::kLangBarCmdOpenSettings,
-            L"M\u1EDF B\u1EA3ng \u0110i\u1EC1u Khi\u1EC3n Sen Vi\u1EC7t..."
+            win_l10n::Tr(isEn, L"M\u1EDF B\u1EA3ng \u0110i\u1EC1u Khi\u1EC3n Sen Vi\u1EC7t...", L"Open Sen Vi\u1EC7t Settings...")
         );
 
         int x = pt.x;
@@ -338,6 +354,7 @@ STDMETHODIMP CLangBarItemButton::OnClick(TfLBIClick click, POINT pt, const RECT 
 STDMETHODIMP CLangBarItemButton::InitMenu(ITfMenu *pMenu) {
     if (!pMenu) return E_INVALIDARG;
 
+    const bool isEn = win_l10n::ResolveWindowsIsEnglish(LoadUiLanguagePref());
     const bool isVn = m_pOwner ? m_pOwner->IsVietnameseMode() : m_isVietnamese;
     const bool isVni = m_pOwner ? m_pOwner->IsVniMode() : m_isVni;
 
@@ -345,33 +362,33 @@ STDMETHODIMP CLangBarItemButton::InitMenu(ITfMenu *pMenu) {
         pMenu,
         vielotus_tsf_guard::kLangBarCmdVietnamese,
         isVn ? TF_LBMENUF_RADIOCHECKED : 0u,
-        L"Ti\u1EBFng Vi\u1EC7t (B\u1EADt g\u00F5 d\u1EA5u)"
+        win_l10n::Tr(isEn, L"Ti\u1EBFng Vi\u1EC7t (B\u1EADt g\u00F5 d\u1EA5u)", L"Vietnamese (Typing On)")
     );
     AddTfMenuEntry(
         pMenu,
         vielotus_tsf_guard::kLangBarCmdEnglish,
         !isVn ? TF_LBMENUF_RADIOCHECKED : 0u,
-        L"Ti\u1EBFng Anh (T\u1EAFt g\u00F5 d\u1EA5u)"
+        win_l10n::Tr(isEn, L"Ti\u1EBFng Anh (T\u1EAFt g\u00F5 d\u1EA5u)", L"English (Typing Off)")
     );
     AddTfMenuEntry(pMenu, 0, TF_LBMENUF_SEPARATOR, nullptr);
     AddTfMenuEntry(
         pMenu,
         vielotus_tsf_guard::kLangBarCmdTelex,
         !isVni ? TF_LBMENUF_RADIOCHECKED : 0u,
-        L"Ki\u1EC3u g\u00F5 Telex"
+        win_l10n::Tr(isEn, L"Ki\u1EC3u g\u00F5 Telex", L"Telex Input Method")
     );
     AddTfMenuEntry(
         pMenu,
         vielotus_tsf_guard::kLangBarCmdVni,
         isVni ? TF_LBMENUF_RADIOCHECKED : 0u,
-        L"Ki\u1EC3u g\u00F5 VNI"
+        win_l10n::Tr(isEn, L"Ki\u1EC3u g\u00F5 VNI", L"VNI Input Method")
     );
     AddTfMenuEntry(pMenu, 0, TF_LBMENUF_SEPARATOR, nullptr);
     AddTfMenuEntry(
         pMenu,
         vielotus_tsf_guard::kLangBarCmdOpenSettings,
         0u,
-        L"M\u1EDF B\u1EA3ng \u0110i\u1EC1u Khi\u1EC3n Sen Vi\u1EC7t..."
+        win_l10n::Tr(isEn, L"M\u1EDF B\u1EA3ng \u0110i\u1EC1u Khi\u1EC3n Sen Vi\u1EC7t...", L"Open Sen Vi\u1EC7t Settings...")
     );
 
     return S_OK;
@@ -396,7 +413,11 @@ STDMETHODIMP CLangBarItemButton::GetIcon(HICON *phIcon) {
 
 STDMETHODIMP CLangBarItemButton::GetText(BSTR *pbstrText) {
     if (!pbstrText) return E_INVALIDARG;
-    *pbstrText = SysAllocString(m_isVietnamese ? L"Ti\u1EBFng Vi\u1EC7t" : L"Ti\u1EBFng Anh");
+    const bool isEn = win_l10n::ResolveWindowsIsEnglish(LoadUiLanguagePref());
+    const WCHAR *txt = m_isVietnamese
+        ? win_l10n::Tr(isEn, L"Ti\u1EBFng Vi\u1EC7t", L"Vietnamese")
+        : win_l10n::Tr(isEn, L"Ti\u1EBFng Anh", L"English");
+    *pbstrText = SysAllocString(txt);
     return (*pbstrText != nullptr) ? S_OK : E_OUTOFMEMORY;
 }
 

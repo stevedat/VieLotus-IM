@@ -20,6 +20,7 @@ struct VieLotusWindowsPrefs {
     bool relaxedCoda{false};
     bool autoBypassRemoteApps{false};
     bool startWithWindows{true};
+    uint32_t uiLanguage{0}; // 0=Auto (OS), 1=Vietnamese, 2=English
 };
 
 inline constexpr UINT kWmVieLotusActivateProfiles = WM_USER + 100;
@@ -50,6 +51,7 @@ void SavePerAppBypassPreference(const wchar_t *exeName, bool bypass);
 uint32_t GetLocalPrefsRevision();
 uint32_t LoadSettingsRevision();
 uint32_t LoadInputMethodRevision();
+uint32_t LoadUiLanguagePref();
 
 std::wstring GetSettingsWakePipeName();
 bool TryWakeSettingsViaNamedPipe(DWORD waitMs = 50);

@@ -778,8 +778,12 @@ VieLotusEngine::VieLotusEngine(Instance* instance)
     auto& uiManager = instance_->userInterfaceManager();
     settingsAction_ = std::make_unique<SimpleAction>();
     settingsAction_->setIcon("preferences-system");
-    settingsAction_->setShortText(_("Bảng cài đặt Sen Việt (Settings)..."));
-    settingsAction_->setLongText(_("Mở bảng điều khiển và cài đặt bộ gõ Sen Việt"));
+    const bool isEn = vl_ui_is_english(uiLanguage_.c_str());
+    settingsAction_->setShortText(
+        isEn ? _("Sen Việt Settings...") : _("Bảng cài đặt Sen Việt (Settings)..."));
+    settingsAction_->setLongText(
+        isEn ? _("Open Sen Việt control panel and settings")
+             : _("Mở bảng điều khiển và cài đặt bộ gõ Sen Việt"));
     connections_.emplace_back(settingsAction_->connect<SimpleAction::Activated>(
         [](InputContext*) {
             if (std::filesystem::exists("/usr/bin/vielotus-settings")) {
@@ -859,6 +863,15 @@ void VieLotusEngine::loadUserEnvConfig() {
     config_.macroEnabled.setValue(env.macro_enabled);
     config_.developerMode.setValue(env.developer_mode);
     config_.preeditUnderline.setValue(env.preedit_underline);
+    uiLanguage_ = env.ui_language;
+    if (settingsAction_) {
+        const bool isEn = vl_ui_is_english(uiLanguage_.c_str());
+        settingsAction_->setShortText(
+            isEn ? _("Sen Việt Settings...") : _("Bảng cài đặt Sen Việt (Settings)..."));
+        settingsAction_->setLongText(
+            isEn ? _("Open Sen Việt control panel and settings")
+                 : _("Mở bảng điều khiển và cài đặt bộ gõ Sen Việt"));
+    }
 }
 
 bool VieLotusEngine::reloadUserEnvConfigIfChanged() {
@@ -904,6 +917,7 @@ void VieLotusEngine::saveUserEnvConfig() const {
     existing.macro_enabled = *config_.macroEnabled;
     existing.developer_mode = *config_.developerMode;
     existing.preedit_underline = *config_.preeditUnderline;
+    vl_normalize_ui_language(uiLanguage_.c_str(), existing.ui_language);
     if (!existing.has_input_method && hasEnvInputMethod_) {
         existing.is_vni = (envInputMethod_ == VIELOTUS_INPUT_VNI);
     }

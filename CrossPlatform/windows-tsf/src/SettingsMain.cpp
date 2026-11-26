@@ -8,6 +8,8 @@
 #include <strsafe.h>
 #include <string>
 #include "SettingsUI.h"
+#include "PrefsStore.h"
+#include "WinL10n.h"
 #include "TsfGameGuardLogic.h"
 #include "vielotus_win_installer.h"
 
@@ -105,6 +107,8 @@ static int RunElevatedSelfCommand(const wchar_t *params, DWORD timeoutMs, DWORD 
 }
 
 static bool IsTipViewRegisteredAndUpToDate(const std::wstring &localDll, REGSAM wow64View) {
+    const bool isMsix = vielotus_win_installer::IsRunningFromMsixPackage();
+    const bool requireExactPath = vielotus_tsf_guard::ShouldRequireExactInprocPathMatch(isMsix);
     HKEY hKey = nullptr;
     LSTATUS st = RegOpenKeyExW(
         HKEY_LOCAL_MACHINE,
@@ -124,12 +128,15 @@ static bool IsTipViewRegisteredAndUpToDate(const std::wstring &localDll, REGSAM 
             if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
                 DWORD localAttrs = GetFileAttributesW(localDll.c_str());
                 if (localAttrs != INVALID_FILE_ATTRIBUTES && !(localAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
+                    if (requireExactPath) {
+                        return _wcsicmp(localDll.c_str(), dllPath) == 0;
+                    }
                     if (_wcsicmp(localDll.c_str(), dllPath) != 0 && !AreFilesIdentical(localDll, dllPath)) {
                         return false;
                     }
                     return true;
                 }
-                return true;
+                return !requireExactPath;
             }
         }
     }
@@ -208,8 +215,53 @@ static void CopyDirectoryPngAssets(const std::wstring &srcAssetsDir, const std::
 static int PerformElevatedMsixTipProvisioning() {
     vielotus_win_installer::CloseRunningSettingsAndTrayWindow();
 
+    const bool isMsix = vielotus_win_installer::IsRunningFromMsixPackage();
     std::wstring srcDir = GetExecutableDir();
     std::wstring dstDir = GetProgramFilesInstallDir();
+
+    if (!vielotus_tsf_guard::ShouldCopyBinariesToProgramFilesOnProvision(isMsix)) {
+        // Microsoft Store (MSIX) builds are code-integrity signed in-place under WindowsApps\<PackageFullName>
+        // via AppxSignature.p7x / CodeIntegrity.cat. Never copy unsigned PE binaries out of WindowsApps to
+        // Program Files, which strips catalog trust and triggers Smart App Control 0xc0e90002 (Event 3077).
+        if (srcDir.empty()) return 1;
+        std::wstring srcDll = srcDir + L"\\VieLotusTIP.dll";
+        DWORD srcAttrs = GetFileAttributesW(srcDll.c_str());
+        if (srcAttrs == INVALID_FILE_ATTRIBUTES || (srcAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            return 2;
+        }
+
+        if (!dstDir.empty()) {
+            DeleteFileW((dstDir + L"\\VieLotusCAPI.dll").c_str());
+            DeleteFileW((dstDir + L"\\VieLotusTIP.dll").c_str());
+            DeleteFileW((dstDir + L"\\VieLotusTIP32.dll").c_str());
+            DeleteFileW((dstDir + L"\\VieLotusSettings.exe").c_str());
+            DeleteFileW((dstDir + L"\\Uninstall-VieLotusIM.exe").c_str());
+        }
+
+        HRESULT hr = E_FAIL;
+        HMODULE hDll = LoadLibraryW(srcDll.c_str());
+        if (hDll) {
+            FARPROC rawReg = GetProcAddress(hDll, "DllRegisterServer");
+            auto pfnReg = reinterpret_cast<PFN_DllRegisterServer>(reinterpret_cast<void *>(rawReg));
+            hr = pfnReg ? pfnReg() : E_FAIL;
+
+            FARPROC rawAct = GetProcAddress(hDll, "ActivateUserProfilesW");
+            auto pfnAct = reinterpret_cast<PFN_RundllEntryW>(reinterpret_cast<void *>(rawAct));
+            if (pfnAct) {
+                pfnAct(nullptr, hDll, const_cast<LPWSTR>(L""), SW_HIDE);
+            }
+            FreeLibrary(hDll);
+        }
+
+        HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        vielotus_win_installer::RegisterWindowsInstalledAppAndShortcuts(dstDir, true);
+        if (SUCCEEDED(hrCo)) {
+            CoUninitialize();
+        }
+
+        return SUCCEEDED(hr) ? 0 : 3;
+    }
+
     if (dstDir.empty()) return 1;
 
     CreateDirectoryW(dstDir.c_str(), nullptr);
@@ -264,7 +316,6 @@ static int PerformElevatedMsixTipProvisioning() {
         FreeLibrary(hDll);
     }
 
-    const bool isMsix = vielotus_win_installer::IsRunningFromMsixPackage();
     HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     vielotus_win_installer::RegisterWindowsInstalledAppAndShortcuts(
         dstDir,
@@ -281,6 +332,13 @@ static std::wstring ResolveExistingTipDllPath() {
     std::wstring exeDir = GetExecutableDir();
     std::wstring localDll = exeDir.empty() ? L"" : (exeDir + L"\\VieLotusTIP.dll");
     std::wstring pfDll = GetProgramFilesInstallDir() + L"\\VieLotusTIP.dll";
+    const bool isMsix = vielotus_win_installer::IsRunningFromMsixPackage();
+    if (vielotus_tsf_guard::ShouldPreferLocalPackageTipDll(isMsix)) {
+        DWORD localAttrs = localDll.empty() ? INVALID_FILE_ATTRIBUTES : GetFileAttributesW(localDll.c_str());
+        if (localAttrs != INVALID_FILE_ATTRIBUTES && !(localAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
+            return localDll;
+        }
+    }
     DWORD pfAttrs = GetFileAttributesW(pfDll.c_str());
     if (pfAttrs != INVALID_FILE_ATTRIBUTES && !(pfAttrs & FILE_ATTRIBUTE_DIRECTORY)) {
         return pfDll;
@@ -718,6 +776,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     (void)hPrevInstance;
     (void)nCmdShow;
     EnablePerMonitorDpiAwareness();
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX);
 
     std::wstring cmdLine = lpCmdLine ? lpCmdLine : L"";
     if (cmdLine.find(L"--uninstall") != std::wstring::npos || cmdLine.find(L"/uninstall") != std::wstring::npos) {
@@ -827,9 +886,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     }
 
     if (ResolveExistingTipDllPath().empty()) {
+        VieLotusWindowsPrefs prefs{};
+        LoadVieLotusPrefs(prefs);
+        const bool isEn = win_l10n::ResolveWindowsIsEnglish(prefs.uiLanguage);
         MessageBoxW(
             nullptr,
-            L"Kh\u00F4ng t\u00ECm th\u1EA5y t\u1EC7p nh\u00E2n b\u1ED9 g\u00F5 VieLotusTIP.dll.",
+            win_l10n::Tr(
+                isEn,
+                L"Kh\u00F4ng t\u00ECm th\u1EA5y t\u1EC7p nh\u00E2n b\u1ED9 g\u00F5 VieLotusTIP.dll.",
+                L"Could not find VieLotusTIP.dll."
+            ),
             L"Sen Vi\u1EC7t (VieLotusIM)",
             MB_ICONERROR | MB_OK
         );

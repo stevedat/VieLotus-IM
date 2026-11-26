@@ -98,7 +98,10 @@ public final class UpdateManager: ObservableObject {
             }
         } catch {
             if userInitiated {
-                status = .error(message: "Không thể kết nối máy chủ cập nhật GitHub.")
+                status = .error(message: L10n.tr(
+                    "Không thể kết nối máy chủ cập nhật GitHub.",
+                    "Unable to reach GitHub update server."
+                ))
             } else {
                 status = .idle
             }
@@ -110,7 +113,10 @@ public final class UpdateManager: ObservableObject {
         guard case .updateAvailable(let manifest) = status else { return }
         guard let pkgDownloadURL = URL(string: manifest.pkgURL),
               pkgDownloadURL.scheme?.lowercased() == "https" else {
-            status = .error(message: "Đường dẫn gói cập nhật không hợp lệ.")
+            status = .error(message: L10n.tr(
+                "Đường dẫn gói cập nhật không hợp lệ.",
+                "Invalid update package URL."
+            ))
             return
         }
 
@@ -168,13 +174,19 @@ public final class UpdateManager: ObservableObject {
 
             guard expectedSha.count == 64 else {
                 try? fm.removeItem(at: tempDir)
-                status = .error(message: "Không tìm thấy mã kiểm tra SHA-256 chính thức.")
+                status = .error(message: L10n.tr(
+                    "Không tìm thấy mã kiểm tra SHA-256 chính thức.",
+                    "Official SHA-256 checksum not found."
+                ))
                 return
             }
 
             guard actualHex.lowercased() == expectedSha.lowercased() else {
                 try? fm.removeItem(at: tempDir)
-                status = .error(message: "Mã băm SHA-256 không khớp. Đã huỷ cài đặt để bảo vệ an toàn.")
+                status = .error(message: L10n.tr(
+                    "Mã băm SHA-256 không khớp. Đã huỷ cài đặt để bảo vệ an toàn.",
+                    "SHA-256 checksum mismatch. Installation cancelled for safety."
+                ))
                 return
             }
 
@@ -197,7 +209,10 @@ public final class UpdateManager: ObservableObject {
             }
         } catch {
             try? fm.removeItem(at: tempDir)
-            status = .error(message: "Tải bản cập nhật thất bại. Vui lòng thử lại.")
+            status = .error(message: L10n.tr(
+                "Tải bản cập nhật thất bại. Vui lòng thử lại.",
+                "Failed to download update. Please try again."
+            ))
         }
     }
 
@@ -365,9 +380,15 @@ public final class UpdateManager: ObservableObject {
                 if errStr.contains("-128") || errStr.localizedCaseInsensitiveContains("canceled") || errStr.localizedCaseInsensitiveContains("cancelled") {
                     return .cancelledByUser
                 }
-                return .failed("Đã mở bộ cài Sen Việt để hoàn tất cập nhật.")
+                return .failed(L10n.tr(
+                    "Đã mở bộ cài Sen Việt để hoàn tất cập nhật.",
+                    "Opened the Sen Việt installer to complete the update."
+                ))
             } catch {
-                return .failed("Đã mở bộ cài Sen Việt để hoàn tất cập nhật.")
+                return .failed(L10n.tr(
+                    "Đã mở bộ cài Sen Việt để hoàn tất cập nhật.",
+                    "Opened the Sen Việt installer to complete the update."
+                ))
             }
         }.value
     }

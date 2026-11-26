@@ -442,7 +442,7 @@ public struct BilingualIntentArbiter: Sendable {
         "mình": 9.0,
         "nhân": 8.4,
         "tên": 8.5,
-        "bên": 8.4,
+        "bên": 9.1,
         "quên": 8.0,
         "trông": 7.9,
         "cân": 7.4,
@@ -1833,6 +1833,14 @@ public struct BilingualIntentArbiter: Sendable {
                       (vnHeads.contains(lastContextToken) || vnHeads.contains(lastTwoContextTokens)) {
                 vnContextScore += 6.0
                 vnCollocationScore += 5.0
+            } else if lowerRaw == "been" && !isTechnical {
+                if SmartBilingualDetector.hasEnglishPerfectContextForBeen(trimmedContext) {
+                    enContextScore += 8.5
+                    enCollocationScore += 5.0
+                } else {
+                    vnContextScore += 6.5
+                    vnCollocationScore += 3.0
+                }
             } else if !isTechnical &&
                       prefersVietnameseAfterShortLabel(raw: cleanRaw, rendered: effectiveRendered, context: trimmedContext) {
                 vnContextScore += 4.5

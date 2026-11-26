@@ -16,6 +16,7 @@ const WCHAR c_szPrefsQuickTelexVal[]       = L"QuickTelex";
 const WCHAR c_szPrefsRelaxedCodaVal[]      = L"RelaxedCoda";
 const WCHAR c_szPrefsAutoBypassRemoteVal[] = L"AutoBypassRemoteApps";
 const WCHAR c_szPrefsStartWithWindowsVal[] = L"StartWithWindows";
+const WCHAR c_szPrefsUiLanguageVal[]       = L"UiLanguage";
 const WCHAR c_szPrefsDefaultMigrationVal[] = L"DefaultPrefsMigrationVer";
 const WCHAR c_szPrefsUpdatedBySettingsVal[] = L"PrefsUpdatedBySettings";
 const WCHAR c_szPrefsSettingsRevisionVal[] = L"SettingsRevision";
@@ -131,6 +132,17 @@ uint32_t LoadInputMethodRevision() {
     const bool ok = ReadRegDword(hKey, c_szPrefsInputMethodRevisionVal, dwVal);
     RegCloseKey(hKey);
     return ok ? static_cast<uint32_t>(dwVal) : 0u;
+}
+
+uint32_t LoadUiLanguagePref() {
+    HKEY hKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kVieLotusPrefsSubKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS || !hKey) {
+        return 0u;
+    }
+    DWORD dwVal = 0;
+    const bool ok = ReadRegDword(hKey, c_szPrefsUiLanguageVal, dwVal);
+    RegCloseKey(hKey);
+    return (ok && dwVal <= 2u) ? static_cast<uint32_t>(dwVal) : 0u;
 }
 
 bool LoadPersistedVniPreference(bool &outIsVni) {
@@ -283,6 +295,9 @@ void LoadVieLotusPrefs(VieLotusWindowsPrefs &outPrefs) {
     if (ReadRegDword(hKey, c_szPrefsStartWithWindowsVal, dwVal)) {
         outPrefs.startWithWindows = (dwVal != 0);
     }
+    if (ReadRegDword(hKey, c_szPrefsUiLanguageVal, dwVal)) {
+        outPrefs.uiLanguage = (dwVal <= 2u) ? static_cast<uint32_t>(dwVal) : 0u;
+    }
     RegCloseKey(hKey);
 }
 
@@ -316,6 +331,7 @@ void SaveVieLotusPrefs(const VieLotusWindowsPrefs &prefs, bool fromSettingsApp) 
         WriteRegDword(hKey, c_szPrefsRelaxedCodaVal, prefs.relaxedCoda ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsAutoBypassRemoteVal, prefs.autoBypassRemoteApps ? 1u : 0u);
         WriteRegDword(hKey, c_szPrefsStartWithWindowsVal, prefs.startWithWindows ? 1u : 0u);
+        WriteRegDword(hKey, c_szPrefsUiLanguageVal, (prefs.uiLanguage <= 2u) ? prefs.uiLanguage : 0u);
         if (fromSettingsApp) {
             DWORD curRev = 0;
             ReadRegDword(hKey, c_szPrefsSettingsRevisionVal, curRev);

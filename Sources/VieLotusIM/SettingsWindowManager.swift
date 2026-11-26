@@ -6,6 +6,7 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
     static let openFeedbackSheetNotification = Notification.Name("org.vielotus.inputmethod.openFeedbackSheet")
 
     private var window: NSWindow?
+    private var languageObserver: NSObjectProtocol?
 
     func showFeedbackSheet() {
         showSettingsWindow()
@@ -34,7 +35,7 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
                 defer: false
             )
 
-            newWindow.title = "Cài đặt Sen Việt"
+            newWindow.title = L10n.tr("Cài đặt Sen Việt", "Sen Việt Settings")
             newWindow.titlebarAppearsTransparent = false
             newWindow.isMovableByWindowBackground = true
             newWindow.collectionBehavior.insert([.moveToActiveSpace, .fullScreenAuxiliary])
@@ -46,6 +47,15 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
             newWindow.delegate = self
 
             self.window = newWindow
+            if self.languageObserver == nil {
+                self.languageObserver = NotificationCenter.default.addObserver(
+                    forName: .vieLotusUILanguageDidChange,
+                    object: nil,
+                    queue: .main
+                ) { [weak newWindow] _ in
+                    newWindow?.title = L10n.tr("Cài đặt Sen Việt", "Sen Việt Settings")
+                }
+            }
             self.bringWindowToFront(newWindow)
         }
     }
@@ -101,6 +111,10 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
             return
         }
         closedWindow.delegate = nil
+        if let observer = self.languageObserver {
+            NotificationCenter.default.removeObserver(observer)
+            self.languageObserver = nil
+        }
         DispatchQueue.main.async { [weak self] in
             guard let self, self.window === closedWindow else { return }
             closedWindow.contentViewController = nil

@@ -40,6 +40,7 @@ struct _IBusVieLotusEngine {
     gboolean macro_enabled;
     gboolean developer_mode;
     gboolean preedit_underline;
+    char ui_language[8];
     gboolean is_password_field;
     gboolean replayed_after_backspace;
     gboolean engine_enabled;
@@ -144,6 +145,7 @@ static void ibus_vielotus_load_user_config(IBusVieLotusEngine *vl_engine) {
     env.macro_enabled = vl_engine->macro_enabled ? true : false;
     env.developer_mode = vl_engine->developer_mode ? true : false;
     env.preedit_underline = vl_engine->preedit_underline ? true : false;
+    vl_normalize_ui_language(vl_engine->ui_language, env.ui_language);
 
     bool loaded = false;
     if (path) {
@@ -158,6 +160,9 @@ static void ibus_vielotus_load_user_config(IBusVieLotusEngine *vl_engine) {
         vl_engine->macro_enabled = env.macro_enabled ? TRUE : FALSE;
         vl_engine->developer_mode = env.developer_mode ? TRUE : FALSE;
         vl_engine->preedit_underline = env.preedit_underline ? TRUE : FALSE;
+        vl_normalize_ui_language(env.ui_language, vl_engine->ui_language);
+    } else if (vl_engine->ui_language[0] == '\0') {
+        strcpy(vl_engine->ui_language, "auto");
     }
 
     const gchar *engine_name = ibus_engine_get_name((IBusEngine *)vl_engine);
@@ -204,6 +209,7 @@ static void ibus_vielotus_save_user_config(IBusVieLotusEngine *vl_engine) {
     env.macro_enabled = vl_engine->macro_enabled ? true : false;
     env.developer_mode = vl_engine->developer_mode ? true : false;
     env.preedit_underline = vl_engine->preedit_underline ? true : false;
+    vl_normalize_ui_language(vl_engine->ui_language, env.ui_language);
     (void)vl_env_config_save_merged(path, &env, &vl_engine->config_mtime);
 }
 
@@ -214,66 +220,85 @@ static void ibus_vielotus_build_prop_list(IBusVieLotusEngine *vl_engine) {
     vl_engine->prop_list = ibus_prop_list_new();
     g_object_ref_sink(vl_engine->prop_list);
 
+    const bool is_en = vl_ui_is_english(vl_engine->ui_language);
     IBusProperty *prop;
     IBusText *label;
 
-    label = ibus_text_new_from_static_string("Kiểu gõ: Telex Tự Do (vieetj → việt)");
+    label = ibus_text_new_from_static_string(
+        is_en ? "Input Method: Telex (vieetj → việt)" : "Kiểu gõ: Telex Tự Do (vieetj → việt)"
+    );
     prop = ibus_property_new("im-telex", PROP_TYPE_TOGGLE, label, NULL, NULL,
                              TRUE, TRUE,
                              !vl_engine->is_vni ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
                              NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
-    label = ibus_text_new_from_static_string("Kiểu gõ: VNI Chuẩn (viet65 → việt)");
+    label = ibus_text_new_from_static_string(
+        is_en ? "Input Method: VNI (viet65 → việt)" : "Kiểu gõ: VNI Chuẩn (viet65 → việt)"
+    );
     prop = ibus_property_new("im-vni", PROP_TYPE_TOGGLE, label, NULL, NULL,
                              TRUE, TRUE,
                              vl_engine->is_vni ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
                              NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
-    label = ibus_text_new_from_static_string("Song ngữ thông minh Anh-Việt (Smart Bilingual)");
+    label = ibus_text_new_from_static_string(
+        is_en ? "Smart Bilingual (EN–VI)" : "Song ngữ thông minh Anh-Việt (Smart Bilingual)"
+    );
     prop = ibus_property_new("smart-bilingual", PROP_TYPE_TOGGLE, label, NULL, NULL,
                              TRUE, TRUE,
                              vl_engine->smart_bilingual ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
                              NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
-    label = ibus_text_new_from_static_string("Gõ dấu tự do (SEN Flex)");
+    label = ibus_text_new_from_static_string(
+        is_en ? "Tone-First Typing (SEN Flex)" : "Gõ dấu tự do (SEN Flex)"
+    );
     prop = ibus_property_new("sen-flex", PROP_TYPE_TOGGLE, label, NULL, NULL,
                              TRUE, TRUE,
                              vl_engine->sen_flex ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
                              NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
-    label = ibus_text_new_from_static_string("Chính tả hiện đại (oà, uý)");
+    label = ibus_text_new_from_static_string(
+        is_en ? "Modern Orthography (oà, uý)" : "Chính tả hiện đại (oà, uý)"
+    );
     prop = ibus_property_new("modern-orthography", PROP_TYPE_TOGGLE, label, NULL, NULL,
                              TRUE, TRUE,
                              vl_engine->modern_orthography ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
                              NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
-    label = ibus_text_new_from_static_string("Gõ tắt thông minh (Smart Macro)");
+    label = ibus_text_new_from_static_string(
+        is_en ? "Text Shortcuts (Smart Macro)" : "Gõ tắt thông minh (Smart Macro)"
+    );
     prop = ibus_property_new("macro-enabled", PROP_TYPE_TOGGLE, label, NULL, NULL,
                              TRUE, TRUE,
                              vl_engine->macro_enabled ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
                              NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
-    label = ibus_text_new_from_static_string("Gõ tắt phụ âm (Quick Telex: cc=ch, gg=gi...)");
+    label = ibus_text_new_from_static_string(
+        is_en ? "Quick Consonants (cc=ch, gg=gi...)" : "Gõ tắt phụ âm (Quick Telex: cc=ch, gg=gi...)"
+    );
     prop = ibus_property_new("quick-telex", PROP_TYPE_TOGGLE, label, NULL, NULL,
                              TRUE, TRUE,
                              vl_engine->quick_telex ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
                              NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
-    label = ibus_text_new_from_static_string("Gõ vần tốc ký cuối từ (-g→-ng, -h, -k)");
+    label = ibus_text_new_from_static_string(
+        is_en ? "Relaxed Coda (-g→-ng, -h, -k)" : "Gõ vần tốc ký cuối từ (-g→-ng, -h, -k)"
+    );
     prop = ibus_property_new("relaxed-coda", PROP_TYPE_TOGGLE, label, NULL, NULL,
                              TRUE, TRUE,
                              vl_engine->relaxed_coda ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
                              NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
-    label = ibus_text_new_from_static_string("Chế độ lập trình viên (bỏ qua trong `code`)");
+    label = ibus_text_new_from_static_string(
+        is_en ? "Code / IDE Mode (skip inside `code`)" : "Chế độ lập trình viên (bỏ qua trong `code`)"
+    );
     prop = ibus_property_new("developer-mode", PROP_TYPE_TOGGLE, label, NULL, NULL,
                              TRUE, TRUE,
                              vl_engine->developer_mode ? PROP_STATE_CHECKED : PROP_STATE_UNCHECKED,
@@ -281,7 +306,9 @@ static void ibus_vielotus_build_prop_list(IBusVieLotusEngine *vl_engine) {
     ibus_prop_list_append(vl_engine->prop_list, prop);
 
 
-    label = ibus_text_new_from_static_string("Bảng cài đặt Sen Việt (Settings)...");
+    label = ibus_text_new_from_static_string(
+        is_en ? "Sen Việt Settings..." : "Bảng cài đặt Sen Việt (Settings)..."
+    );
     prop = ibus_property_new("more-settings", PROP_TYPE_NORMAL, label, "preferences-system", NULL,
                              TRUE, TRUE, PROP_STATE_UNCHECKED, NULL);
     ibus_prop_list_append(vl_engine->prop_list, prop);
@@ -832,8 +859,13 @@ static gboolean ibus_vielotus_reload_config_if_changed(IBusVieLotusEngine *vl_en
     }
     struct stat st;
     if (stat(path, &st) == 0 && st.st_mtime != vl_engine->config_mtime) {
+        char prev_lang[8];
+        snprintf(prev_lang, sizeof(prev_lang), "%s", vl_engine->ui_language);
         ibus_vielotus_load_user_config(vl_engine);
         ibus_vielotus_build_prop_list(vl_engine);
+        if (vl_engine->engine_enabled && strcmp(prev_lang, vl_engine->ui_language) != 0) {
+            ibus_engine_register_properties((IBusEngine *)vl_engine, vl_engine->prop_list);
+        }
         return TRUE;
     }
     return FALSE;

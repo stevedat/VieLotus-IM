@@ -165,8 +165,8 @@ final class AutoRestoreUndoCharacterizationTests: XCTestCase {
 
         let singlePathSession = makeMacSession(inlineBilingual: false)
         var singlePathHost = MacHostBuffer()
-        _ = singlePathHost.type("he is been ", into: singlePathSession)
-        XCTAssertEqual(singlePathHost.text, "he is been ")
+        _ = singlePathHost.type("he has been ", into: singlePathSession)
+        XCTAssertEqual(singlePathHost.text, "he has been ")
         XCTAssertEqual(singlePathSession.lastCommittedProvenance.vietnameseCandidate, "bên")
         XCTAssertEqual(singlePathSession.lastCommittedProvenance.selectedCandidate, "been")
     }

@@ -1559,8 +1559,9 @@ STDMETHODIMP CVieLotusTIP::OnTestKeyDown(ITfContext *pic, WPARAM wParam, LPARAM 
                     static_cast<uint32_t>(wParam),
                     static_cast<uint32_t>(ch)
                 );
+                const bool isTelexDigitRestore = (!m_isVniMode && ch >= L'0' && ch <= L'9' && m_nativeEngine.willRestoreOnTelexDigit());
                 const bool isBoundary = IsEngineBoundaryPunctuation(ch);
-                if (isVniDigit || isBoundary || m_session != nullptr) {
+                if (isVniDigit || isBoundary || isTelexDigitRestore || m_session != nullptr) {
                     *pfEaten = TRUE;
                     return S_OK;
                 }

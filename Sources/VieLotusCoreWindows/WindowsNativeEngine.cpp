@@ -154,6 +154,118 @@ bool isMathFunctionAnchor(const wchar_t *word, int len) {
     return false;
 }
 
+bool isWideWordInList(const wchar_t *word, int len, const wchar_t *const *list, size_t count) {
+    for (size_t i = 0; i < count; ++i) {
+        const wchar_t *item = list[i];
+        int j = 0;
+        while (j < len && item[j] != L'\0' && word[j] == item[j]) ++j;
+        if (j == len && item[j] == L'\0') return true;
+    }
+    return false;
+}
+
+bool shouldRestoreRawBeforeTelexDigit(const wchar_t *rawLower, int rawLen) {
+    if (rawLen < 2) return false;
+    static const wchar_t *const kProtectedVn[] = { L"been", L"teen", L"moon" };
+    if (isWideWordInList(rawLower, rawLen, kProtectedVn, sizeof(kProtectedVn) / sizeof(kProtectedVn[0]))) {
+        return false;
+    }
+    if (rawLen == 2) {
+        static const wchar_t *const kShortTech[] = {
+            L"ar", L"as", L"ax", L"er", L"es", L"ex", L"if", L"ir", L"is", L"ix", L"of", L"or", L"os", L"ur", L"us"
+        };
+        return isWideWordInList(rawLower, rawLen, kShortTech, sizeof(kShortTech) / sizeof(kShortTech[0]));
+    }
+    return isContextEnglishCollisionWord(rawLower, rawLen) ||
+           isUnconditionalEnglishWord(rawLower, rawLen);
+}
+
+bool isApostropheContractionStem(const wchar_t *rawLower, int rawLen) {
+    if (rawLen < 3 || rawLen > 7) return false;
+    static const wchar_t *const kStems[] = {
+        L"hasn", L"haven", L"hadn", L"isn", L"aren", L"wasn", L"weren",
+        L"don", L"doesn", L"didn", L"won", L"wouldn", L"couldn", L"shouldn",
+        L"mustn", L"mightn", L"needn", L"shan", L"ain",
+        L"there", L"here", L"where"
+    };
+    return isWideWordInList(rawLower, rawLen, kStems, sizeof(kStems) / sizeof(kStems[0]));
+}
+
+bool isBeenDirectAuxiliary(const wchar_t *word, int len) {
+    static const wchar_t *const kAux[] = {
+        L"have", L"has", L"had", L"having", L"haven't", L"hasn't", L"hadn't"
+    };
+    return isWideWordInList(word, len, kAux, sizeof(kAux) / sizeof(kAux[0]));
+}
+
+bool isBeenContractionSubject(const wchar_t *word, int len) {
+    static const wchar_t *const kSubjects[] = {
+        L"i", L"you", L"he", L"she", L"it", L"we", L"they",
+        L"that", L"there", L"here", L"what", L"who", L"where", L"how",
+        L"everyone", L"everybody", L"someone", L"somebody", L"anyone", L"anybody",
+        L"nobody", L"nothing", L"everything", L"something",
+        L"could", L"would", L"should", L"might", L"must", L"may"
+    };
+    return isWideWordInList(word, len, kSubjects, sizeof(kSubjects) / sizeof(kSubjects[0]));
+}
+
+bool isBeenDirectParticipleAdverb(const wchar_t *word, int len) {
+    static const wchar_t *const kAdverbs[] = {
+        L"never", L"always", L"already", L"just", L"not", L"ever", L"still", L"also",
+        L"even", L"really", L"actually", L"recently", L"lately", L"previously",
+        L"definitely", L"certainly", L"probably", L"finally", L"hardly", L"barely",
+        L"rarely", L"seldom", L"often", L"usually"
+    };
+    return isWideWordInList(word, len, kAdverbs, sizeof(kAdverbs) / sizeof(kAdverbs[0]));
+}
+
+bool isBeenClauseIntervenerAdverb(const wchar_t *word, int len) {
+    if (isBeenDirectParticipleAdverb(word, len)) return true;
+    static const wchar_t *const kExtra[] = {
+        L"only", L"long", L"truly", L"possibly", L"nearly", L"almost", L"scarcely",
+        L"frequently", L"normally", L"generally", L"commonly", L"widely", L"mostly",
+        L"mainly", L"largely", L"partly", L"partially", L"completely", L"totally",
+        L"fully", L"entirely", L"thoroughly", L"carefully", L"strictly", L"officially",
+        L"publicly", L"privately", L"successfully", L"repeatedly", L"constantly",
+        L"continuously", L"consistently", L"gradually", L"temporarily", L"permanently",
+        L"initially", L"formerly", L"originally", L"so", L"too", L"well", L"all", L"both"
+    };
+    if (isWideWordInList(word, len, kExtra, sizeof(kExtra) / sizeof(kExtra[0]))) return true;
+    return len >= 5 && word[len - 2] == L'l' && word[len - 1] == L'y';
+}
+
+bool isBeenInvertedQuestionPronoun(const wchar_t *word, int len) {
+    static const wchar_t *const kPronouns[] = {
+        L"i", L"you", L"he", L"she", L"it", L"we", L"they", L"there", L"this", L"that",
+        L"these", L"those", L"all", L"both", L"everyone", L"everybody", L"someone",
+        L"somebody", L"anyone", L"anybody", L"nobody", L"nothing", L"something", L"everything"
+    };
+    return isWideWordInList(word, len, kPronouns, sizeof(kPronouns) / sizeof(kPronouns[0]));
+}
+
+bool isBeenInvertedQuestionDeterminer(const wchar_t *word, int len) {
+    static const wchar_t *const kDets[] = {
+        L"the", L"this", L"that", L"these", L"those", L"my", L"your", L"his", L"her", L"its", L"our", L"their", L"any", L"no"
+    };
+    return isWideWordInList(word, len, kDets, sizeof(kDets) / sizeof(kDets[0]));
+}
+
+bool isBeenInversionLeadWord(const wchar_t *word, int len) {
+    static const wchar_t *const kLeads[] = {
+        L"what", L"where", L"when", L"why", L"how", L"who", L"whom", L"which",
+        L"so", L"nor", L"neither", L"never", L"seldom", L"rarely", L"only", L"not"
+    };
+    return isWideWordInList(word, len, kLeads, sizeof(kLeads) / sizeof(kLeads[0]));
+}
+
+bool isEnglishSubjectBeforeHave(const wchar_t *word, int len) {
+    if (len <= 0 || isBeenInversionLeadWord(word, len)) return false;
+    static const wchar_t *const kSubj[] = {
+        L"i", L"you", L"he", L"she", L"it", L"we", L"they", L"this", L"that", L"these", L"those"
+    };
+    return isWideWordInList(word, len, kSubj, sizeof(kSubj) / sizeof(kSubj[0]));
+}
+
 bool isEnglishContextAnchor(const wchar_t *rawLower, int rawLen) {
     if (rawLen <= 0) return false;
     if (rawLen == 1 && (rawLower[0] == L'a' || rawLower[0] == L'i')) return true;
@@ -778,6 +890,12 @@ struct NativeEngineState {
     bool m_hadVietnameseInSentence{false};
     bool m_lastWordWasEnglishAnchor{false};
     int m_mathContextWordsRemaining{0};
+    int m_beenPerfectWindowRemaining{0};
+    uint8_t m_apostrophePrefixKind{0};
+    bool m_apostropheAuxWasInitial{false};
+    bool m_beenAuxWasClauseInitial{false};
+    bool m_beenExpectingInvertedNoun{false};
+    bool m_prevWordWasEnglishSubject{false};
     bool m_lastWordWasSexLoanwordHead{false};
     bool m_lastWordWasTunCollocationHead{false};
     bool m_lastWordWasLotCompoundHead{false};
@@ -1994,6 +2112,32 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
                m_pendingBoundaryCp == '(' || m_pendingBoundaryCp == '[';
     }
 
+    if (m_inputMethod == InputMethod::Telex && isAsciiDigit(m_pendingBoundaryCp) &&
+        !m_classicOrVniEscape && !m_telexToneEscape &&
+        shouldRestoreRawBeforeTelexDigit(rawLower, m_rawLen)) {
+        return true;
+    }
+
+    if (m_inputMethod == InputMethod::Telex &&
+        (m_pendingBoundaryCp == '\'' || m_pendingBoundaryCp == 0x2019) &&
+        !m_classicOrVniEscape && !m_telexToneEscape &&
+        isApostropheContractionStem(rawLower, m_rawLen)) {
+        return true;
+    }
+
+    if (m_rawLen == 4 && rawLower[0] == L'b' && rawLower[1] == L'e' && rawLower[2] == L'e' && rawLower[3] == L'n') {
+        if (m_precededByTechDelimiter || m_pendingBoundaryCp == '_' || m_pendingBoundaryCp == '/' || m_pendingBoundaryCp == '.') {
+            return true;
+        }
+        if (m_prevCollisionRawLen == 3 &&
+            toLowerAscii(m_prevCollisionRaw[0]) == L'h' &&
+            toLowerAscii(m_prevCollisionRaw[1]) == L'a' &&
+            toLowerAscii(m_prevCollisionRaw[2]) == L's') {
+            return true;
+        }
+        return m_beenPerfectWindowRemaining > 0;
+    }
+
     if (m_nonAdjacentCircumflex && isPostCodaCircumflexEnglishWord(rawLower, m_rawLen)) {
         return true;
     }
@@ -2073,7 +2217,8 @@ bool NativeEngineState::shouldRestoreRawEnglish() const {
     if (isContextEnglishCollisionWord(rawLower, m_rawLen)) {
         if (m_precededByTechDelimiter) return true;
         if (m_pendingBoundaryCp == '_' || m_pendingBoundaryCp == '/' || m_pendingBoundaryCp == '.' ||
-            (m_inputMethod == InputMethod::Telex && isAsciiDigit(m_pendingBoundaryCp))) return true;
+            (m_inputMethod == InputMethod::Telex && isAsciiDigit(m_pendingBoundaryCp) &&
+             shouldRestoreRawBeforeTelexDigit(rawLower, m_rawLen))) return true;
         if (m_rawLen == 4 && rawLower[0] == L't' && rawLower[1] == L'u' && rawLower[2] == L'r' && rawLower[3] == L'n') {
             return !m_lastWordWasTunCollocationHead;
         }
@@ -3406,7 +3551,20 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
                 m_inVietnameseContext = false;
                 m_hadVietnameseInSentence = false;
                 m_lastWordWasEnglishAnchor = false;
-        m_mathContextWordsRemaining = 0;
+                m_mathContextWordsRemaining = 0;
+                m_beenPerfectWindowRemaining = 0;
+                m_apostrophePrefixKind = 0;
+                m_apostropheAuxWasInitial = false;
+                m_beenAuxWasClauseInitial = false;
+                m_beenExpectingInvertedNoun = false;
+                m_prevWordWasEnglishSubject = false;
+            } else if (codepoint == ',' || codepoint == ';' || codepoint == ':') {
+                m_beenPerfectWindowRemaining = 0;
+                m_apostrophePrefixKind = 0;
+                m_apostropheAuxWasInitial = false;
+                m_beenAuxWasClauseInitial = false;
+                m_beenExpectingInvertedNoun = false;
+                m_prevWordWasEnglishSubject = false;
             }
             return act;
         }
@@ -3425,7 +3583,20 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
             m_inVietnameseContext = false;
             m_hadVietnameseInSentence = false;
             m_lastWordWasEnglishAnchor = false;
-        m_mathContextWordsRemaining = 0;
+            m_mathContextWordsRemaining = 0;
+            m_beenPerfectWindowRemaining = 0;
+            m_apostrophePrefixKind = 0;
+            m_apostropheAuxWasInitial = false;
+            m_beenAuxWasClauseInitial = false;
+            m_beenExpectingInvertedNoun = false;
+            m_prevWordWasEnglishSubject = false;
+        } else if (codepoint == ',' || codepoint == ';' || codepoint == ':') {
+            m_beenPerfectWindowRemaining = 0;
+            m_apostrophePrefixKind = 0;
+            m_apostropheAuxWasInitial = false;
+            m_beenAuxWasClauseInitial = false;
+            m_beenExpectingInvertedNoun = false;
+            m_prevWordWasEnglishSubject = false;
         }
         m_lastBackspaces = 0;
         m_lastTextUtf8[0] = '\0';
@@ -3434,6 +3605,19 @@ int32_t NativeEngineState::feedChar(uint32_t codepoint) {
 
     const bool isVniDigitCandidate = (m_inputMethod == InputMethod::VNI && isAsciiDigit(codepoint) && m_tokenLen > 0 && !m_literalLock);
     if (!isAsciiAlpha(codepoint) && !isVniDigitCandidate) {
+        if (m_inputMethod == InputMethod::Telex && isAsciiDigit(codepoint) && m_displayedLen > 0) {
+            m_pendingBoundaryCp = codepoint;
+            const bool needsDigitRestore = m_smartBilingual && hasVietnameseTransformation() && shouldRestoreRawEnglish();
+            if (needsDigitRestore) {
+                int32_t act = commitWord();
+                m_pendingBoundaryCp = 0;
+                m_afterDigit = true;
+                m_precededByMacroDelimiter = isMacroTechnicalDelimiter(codepoint);
+                m_precededByLeadingSlash = false;
+                return act;
+            }
+            m_pendingBoundaryCp = 0;
+        }
         if (isComposing()) {
             clearWordState();
         }
@@ -4194,8 +4378,13 @@ int32_t NativeEngineState::commitWord() {
                 if (finalSecond[i] > 0x7F) secondHasNonAscii = true;
                 secondLower[i] = toLowerAscii(finalSecond[i]);
             }
+            const bool secondIsBeenWord =
+                (m_rawLen == 4 && rawLower[0] == L'b' && rawLower[1] == L'e' && rawLower[2] == L'e' && rawLower[3] == L'n');
+            const bool prevIsHasStarter =
+                (m_prevCollisionRawLen == 3 && prevLower[0] == L'h' && prevLower[1] == L'a' && prevLower[2] == L's');
             const bool secondIsEnglishFollower =
                 !secondHasNonAscii &&
+                (!secondIsBeenWord || prevIsHasStarter) &&
                 !isVietnameseCompoundContinuationAfterStarter(prevLower, m_prevCollisionRawLen, secondLower, finalSecondLen, rawLower, m_rawLen) &&
                 ((hasVietnameseTransformation() && shouldRestoreRawEnglish()) ||
                  isUnconditionalEnglishWord(rawLower, m_rawLen) ||
@@ -4219,6 +4408,26 @@ int32_t NativeEngineState::commitWord() {
                 m_inEnglishContext = true;
                 m_inVietnameseContext = false;
                 m_lastWordWasEnglishAnchor = isEnglishContextAnchor(rawLower, m_rawLen);
+                if (prevIsHasStarter && !secondIsBeenWord) {
+                    if (isBeenInvertedQuestionDeterminer(rawLower, m_rawLen)) {
+                        m_beenPerfectWindowRemaining = 3;
+                        m_beenExpectingInvertedNoun = true;
+                        m_beenAuxWasClauseInitial = false;
+                    } else if (isBeenInvertedQuestionPronoun(rawLower, m_rawLen) ||
+                               isBeenClauseIntervenerAdverb(rawLower, m_rawLen)) {
+                        m_beenPerfectWindowRemaining = 3;
+                        m_beenExpectingInvertedNoun = false;
+                        m_beenAuxWasClauseInitial = false;
+                    } else {
+                        m_beenPerfectWindowRemaining = 0;
+                        m_beenExpectingInvertedNoun = false;
+                        m_beenAuxWasClauseInitial = false;
+                    }
+                } else {
+                    m_beenPerfectWindowRemaining = 0;
+                    m_beenExpectingInvertedNoun = false;
+                    m_beenAuxWasClauseInitial = false;
+                }
                 m_lastWordWasSexLoanwordHead = false;
                 m_lastWordWasTunCollocationHead = false;
                 m_lastWordWasLotCompoundHead = false;
@@ -4303,6 +4512,12 @@ int32_t NativeEngineState::commitWord() {
                 m_inEnglishContext = true;
                 m_inVietnameseContext = false;
             }
+            m_beenPerfectWindowRemaining = 0;
+            m_apostrophePrefixKind = 0;
+            m_apostropheAuxWasInitial = false;
+            m_beenAuxWasClauseInitial = false;
+            m_beenExpectingInvertedNoun = false;
+            m_prevWordWasEnglishSubject = false;
             m_lastWordWasEnglishAnchor = false;
             m_lastWordWasSexLoanwordHead = false;
             m_lastWordWasTunCollocationHead = false;
@@ -4397,13 +4612,92 @@ int32_t NativeEngineState::commitWord() {
     m_lastWordWasHoa = curIsHoa;
     if (hasNonAscii || isVietnameseContextReset(finalLower, finalLen)) {
         m_inEnglishContext = false;
+        m_beenPerfectWindowRemaining = 0;
+        m_apostrophePrefixKind = 0;
+        m_apostropheAuxWasInitial = false;
+        m_beenAuxWasClauseInitial = false;
+        m_beenExpectingInvertedNoun = false;
+        m_prevWordWasEnglishSubject = false;
         if (!isTurnOrSex) {
             m_inVietnameseContext = true;
             m_hadVietnameseInSentence = true;
         }
-    } else if (wasBilingualRestore || (!isValidVietnameseSyllable() && !m_classicOrVniEscape && !m_telexToneEscape && !m_overflowLocked && !isOpenSameVowelExtension() && !isSingleModifiedVowelOverflow() && finalLen >= 2) || isUnconditionalEnglishWord(rawLower, m_rawLen) || isAnchor) {
-        m_inEnglishContext = true;
-        m_inVietnameseContext = false;
+    } else {
+        const bool isInlineTelexDigitTech =
+            (m_inputMethod == InputMethod::Telex && isAsciiDigit(m_pendingBoundaryCp) && m_hadVietnameseInSentence);
+        if (!isInlineTelexDigitTech &&
+            (wasBilingualRestore || (!isValidVietnameseSyllable() && !m_classicOrVniEscape && !m_telexToneEscape && !m_overflowLocked && !isOpenSameVowelExtension() && !isSingleModifiedVowelOverflow() && finalLen >= 2) || isUnconditionalEnglishWord(rawLower, m_rawLen) || isAnchor)) {
+            m_inEnglishContext = true;
+            m_inVietnameseContext = false;
+        }
+
+        // Track grammatical English perfect-tense context for past participle "been"
+        const uint8_t prevAposKind = m_apostrophePrefixKind;
+        const bool prevAposInitial = m_apostropheAuxWasInitial;
+        m_apostrophePrefixKind = 0;
+        m_apostropheAuxWasInitial = false;
+
+        if (m_pendingBoundaryCp == '\'' || m_pendingBoundaryCp == 0x2019) {
+            const bool isNegAuxStem =
+                (m_rawLen == 5 && std::wmemcmp(rawLower, L"haven", 5) == 0) ||
+                (m_rawLen == 4 && (std::wmemcmp(rawLower, L"hasn", 4) == 0 || std::wmemcmp(rawLower, L"hadn", 4) == 0));
+            if (isNegAuxStem) {
+                m_apostrophePrefixKind = 1;
+                m_apostropheAuxWasInitial = !m_prevWordWasEnglishSubject;
+            } else if (isBeenContractionSubject(rawLower, m_rawLen)) {
+                m_apostrophePrefixKind = 3;
+            } else if (m_rawLen >= 1) {
+                m_apostrophePrefixKind = 2;
+            }
+            m_beenPerfectWindowRemaining = 0;
+            m_beenAuxWasClauseInitial = false;
+            m_beenExpectingInvertedNoun = false;
+        } else if (prevAposKind == 1 && m_rawLen == 1 && rawLower[0] == L't') {
+            m_beenPerfectWindowRemaining = 4;
+            m_beenAuxWasClauseInitial = prevAposInitial;
+            m_beenExpectingInvertedNoun = false;
+        } else if (prevAposKind >= 2 && m_rawLen == 2 && rawLower[0] == L'v' && rawLower[1] == L'e') {
+            m_beenPerfectWindowRemaining = 4;
+            m_beenAuxWasClauseInitial = false;
+            m_beenExpectingInvertedNoun = false;
+        } else if (prevAposKind == 3 && m_rawLen == 1 && (rawLower[0] == L's' || rawLower[0] == L'd')) {
+            m_beenPerfectWindowRemaining = 4;
+            m_beenAuxWasClauseInitial = false;
+            m_beenExpectingInvertedNoun = false;
+        } else if (isBeenDirectAuxiliary(rawLower, m_rawLen)) {
+            m_beenPerfectWindowRemaining = 4;
+            const bool isHaving = (m_rawLen == 6 && std::wmemcmp(rawLower, L"having", 6) == 0);
+            m_beenAuxWasClauseInitial = !isHaving && !m_prevWordWasEnglishSubject;
+            m_beenExpectingInvertedNoun = false;
+        } else if (isBeenDirectParticipleAdverb(rawLower, m_rawLen)) {
+            m_beenPerfectWindowRemaining = (m_beenPerfectWindowRemaining > 1) ? (m_beenPerfectWindowRemaining - 1) : 1;
+            m_beenExpectingInvertedNoun = false;
+        } else if (m_beenPerfectWindowRemaining > 0) {
+            if (isBeenClauseIntervenerAdverb(rawLower, m_rawLen)) {
+                --m_beenPerfectWindowRemaining;
+            } else if (m_beenExpectingInvertedNoun) {
+                m_beenExpectingInvertedNoun = false;
+                m_beenAuxWasClauseInitial = false;
+                --m_beenPerfectWindowRemaining;
+            } else if (m_beenAuxWasClauseInitial && isBeenInvertedQuestionPronoun(rawLower, m_rawLen)) {
+                m_beenAuxWasClauseInitial = false;
+                --m_beenPerfectWindowRemaining;
+            } else if (m_beenAuxWasClauseInitial && isBeenInvertedQuestionDeterminer(rawLower, m_rawLen)) {
+                m_beenExpectingInvertedNoun = true;
+                --m_beenPerfectWindowRemaining;
+            } else {
+                m_beenPerfectWindowRemaining = 0;
+                m_beenAuxWasClauseInitial = false;
+                m_beenExpectingInvertedNoun = false;
+            }
+        } else {
+            m_beenAuxWasClauseInitial = false;
+            m_beenExpectingInvertedNoun = false;
+        }
+
+        if (m_pendingBoundaryCp != '\'' && m_pendingBoundaryCp != 0x2019) {
+            m_prevWordWasEnglishSubject = isEnglishSubjectBeforeHave(rawLower, m_rawLen);
+        }
     }
 
     const bool isSpaceStarterWord = isSpacePrefixStarter(rawLower, m_rawLen);
@@ -4503,6 +4797,12 @@ void WindowsNativeEngine::reset() {
     impl->m_hadVietnameseInSentence = false;
     impl->m_lastWordWasEnglishAnchor = false;
     impl->m_mathContextWordsRemaining = 0;
+    impl->m_beenPerfectWindowRemaining = 0;
+    impl->m_apostrophePrefixKind = 0;
+    impl->m_apostropheAuxWasInitial = false;
+    impl->m_beenAuxWasClauseInitial = false;
+    impl->m_beenExpectingInvertedNoun = false;
+    impl->m_prevWordWasEnglishSubject = false;
     impl->m_lastWordWasSexLoanwordHead = false;
     impl->m_lastWordWasTunCollocationHead = false;
     impl->m_lastWordWasLotCompoundHead = false;
@@ -4602,6 +4902,19 @@ void WindowsNativeEngine::resetDefaultMacros() {
     GlobalMacroStore::instance().resetToDefaults();
 }
 
+bool WindowsNativeEngine::willRestoreOnTelexDigit() const {
+    const auto *impl = reinterpret_cast<const NativeEngineState *>(m_opaqueState);
+    if (impl->m_inputMethod != InputMethod::Telex || !impl->m_smartBilingual || impl->m_displayedLen <= 0) {
+        return false;
+    }
+    if (impl->m_classicOrVniEscape || impl->m_telexToneEscape || !impl->hasVietnameseTransformation()) {
+        return false;
+    }
+    wchar_t rawLower[kMaxWordTokens]{};
+    for (int i = 0; i < impl->m_rawLen; ++i) rawLower[i] = toLowerAscii(impl->m_rawWord[i]);
+    return shouldRestoreRawBeforeTelexDigit(rawLower, impl->m_rawLen);
+}
+
 void NativeEngineState::appendContextWord(const char *contextWord) {
     if (!contextWord || contextWord[0] == '\0') {
         m_inEnglishContext = false;
@@ -4609,6 +4922,12 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
         m_hadVietnameseInSentence = false;
         m_lastWordWasEnglishAnchor = false;
         m_mathContextWordsRemaining = 0;
+        m_beenPerfectWindowRemaining = 0;
+        m_apostrophePrefixKind = 0;
+        m_apostropheAuxWasInitial = false;
+        m_beenAuxWasClauseInitial = false;
+        m_beenExpectingInvertedNoun = false;
+        m_prevWordWasEnglishSubject = false;
         m_lastWordWasSexLoanwordHead = false;
         m_lastWordWasTunCollocationHead = false;
         m_lastWordWasLotCompoundHead = false;
@@ -4647,6 +4966,12 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
         m_inEnglishContext = false;
         m_lastWordWasEnglishAnchor = false;
         m_mathContextWordsRemaining = 0;
+        m_beenPerfectWindowRemaining = 0;
+        m_apostrophePrefixKind = 0;
+        m_apostropheAuxWasInitial = false;
+        m_beenAuxWasClauseInitial = false;
+        m_beenExpectingInvertedNoun = false;
+        m_prevWordWasEnglishSubject = false;
         m_lastWordWasSexLoanwordHead = isSexLoanwordPrecedingHead(wLower, wLen);
         m_lastWordWasTunCollocationHead = isTunCollocationPrecedingHead(wLower, wLen);
         m_lastWordWasLotCompoundHead = isLotCompoundPrecedingHead(wLower, wLen);
@@ -4684,6 +5009,12 @@ void NativeEngineState::appendContextWord(const char *contextWord) {
     m_hadVietnameseInSentence = temp.m_hadVietnameseInSentence;
     m_lastWordWasEnglishAnchor = temp.m_lastWordWasEnglishAnchor;
     m_mathContextWordsRemaining = temp.m_mathContextWordsRemaining;
+    m_beenPerfectWindowRemaining = temp.m_beenPerfectWindowRemaining;
+    m_apostrophePrefixKind = temp.m_apostrophePrefixKind;
+    m_apostropheAuxWasInitial = temp.m_apostropheAuxWasInitial;
+    m_beenAuxWasClauseInitial = temp.m_beenAuxWasClauseInitial;
+    m_beenExpectingInvertedNoun = temp.m_beenExpectingInvertedNoun;
+    m_prevWordWasEnglishSubject = temp.m_prevWordWasEnglishSubject;
     m_lastWordWasSexLoanwordHead = temp.m_lastWordWasSexLoanwordHead;
     m_lastWordWasTunCollocationHead = temp.m_lastWordWasTunCollocationHead;
     m_lastWordWasLotCompoundHead = temp.m_lastWordWasLotCompoundHead;

@@ -64,6 +64,7 @@ public:
     const char *getLastCommitDiffTextUtf8() const { return m_lastCommitDiffTextUtf8; }
     bool isComposing() const { return m_composingFlag; }
     bool hasActiveWord() const { return m_activeWordFlag; }
+    bool willRestoreOnTelexDigit() const;
 
 private:
     InputMethod m_inputMethod{InputMethod::Telex};

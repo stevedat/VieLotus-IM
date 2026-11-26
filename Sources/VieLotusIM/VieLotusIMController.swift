@@ -3482,7 +3482,7 @@ final class VieLotusIMController: IMKInputController {
         let currentMethod = Preferences.shared.inputMethod
 
         let telexItem = NSMenuItem(
-            title: "Kiểu gõ Telex Tự Do",
+            title: L10n.tr("Kiểu gõ Telex Tự Do", "Telex Typing"),
             action: #selector(selectTelexInputMethod),
             keyEquivalent: ""
         )
@@ -3491,7 +3491,7 @@ final class VieLotusIMController: IMKInputController {
         menu.addItem(telexItem)
 
         let vniItem = NSMenuItem(
-            title: "Kiểu gõ VNI (Số 1–9)",
+            title: L10n.tr("Kiểu gõ VNI (Số 1–9)", "VNI Typing (1–9)"),
             action: #selector(selectVNIInputMethod),
             keyEquivalent: ""
         )
@@ -3501,15 +3501,16 @@ final class VieLotusIMController: IMKInputController {
 
         menu.addItem(.separator())
 
+        let clipboardTitle = L10n.tr("Chuẩn hóa Clipboard", "Convert Clipboard Charset")
         let clipboardItem = NSMenuItem(
-            title: "Chuẩn hóa Clipboard",
+            title: clipboardTitle,
             action: nil,
             keyEquivalent: ""
         )
-        let clipboardSubmenu = NSMenu(title: "Chuẩn hóa Clipboard")
+        let clipboardSubmenu = NSMenu(title: clipboardTitle)
         for mode in ClipboardCharsetMode.allCases {
             let subItem = NSMenuItem(
-                title: mode.menuTitle,
+                title: mode.localizedMenuTitle,
                 action: #selector(convertClipboardCharset(_:)),
                 keyEquivalent: ""
             )
@@ -3523,7 +3524,7 @@ final class VieLotusIMController: IMKInputController {
         menu.addItem(.separator())
 
         let settingsItem = NSMenuItem(
-            title: "Cài đặt Sen Việt...",
+            title: L10n.tr("Cài đặt Sen Việt...", "Sen Việt Settings..."),
             action: #selector(openSettings),
             keyEquivalent: ","
         )
