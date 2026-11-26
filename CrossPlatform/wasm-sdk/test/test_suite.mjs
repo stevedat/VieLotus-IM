@@ -271,7 +271,7 @@ async function testOfficial9091Suite() {
     eng.setOptions({ smartBilingual: bilingual });
     if (primeEn) {
       eng.appendContext("he");
-      eng.appendContext("is");
+      eng.appendContext(r.input.toLowerCase() === "been" ? "has" : "is");
     }
     totalKeys += r.input.length;
     const got = eng.typeString(r.input, { interpretBackspace: true, commit: true });
